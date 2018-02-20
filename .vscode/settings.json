@@ -1,0 +1,11 @@
+{
+  "tslint.autoFixOnSave": true,
+  "tslint.jsEnable": false,
+  "mocha.files.glob": "src/**/*.spec.ts",
+  "mocha.requires": [
+    "dotenv/config",
+    "ts-node/register"
+  ],
+  "mocha.options": {},
+  "coverage-gutters.showGutterCoverage": true
+}

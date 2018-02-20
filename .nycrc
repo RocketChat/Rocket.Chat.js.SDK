@@ -1,0 +1,22 @@
+{
+  "check-coverage": true,
+  "per-file": true,
+  "extension": [
+    ".ts"
+  ],
+  "require": [
+    "ts-node/register"
+  ],
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "**/*.d.ts",
+    "**/*.spec.ts"
+  ],
+  "reporter": [
+    "lcovonly",
+    "text"
+  ],
+  "all": true
+}
