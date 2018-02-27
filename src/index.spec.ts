@@ -1,10 +1,11 @@
 import { expect } from 'chai'
-import { Driver } from './index'
+import exported from './index'
 
-describe('Index', () => {
-  describe('Driver', () => {
-    it('class is accessible', () => {
-      expect(Driver).to.have.property('name', 'Driver')
-    })
+describe('index:', () => {
+  it('exports all lib members', () => {
+    expect(Object.keys(exported)).to.eql([
+      'driver',
+      'methodCache'
+    ])
   })
 })
