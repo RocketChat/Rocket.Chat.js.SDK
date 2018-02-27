@@ -1,11 +1,15 @@
 {
   "tslint.autoFixOnSave": true,
   "tslint.jsEnable": false,
+  "mocha-snippets.semicolon": false,
+  "mocha-snippets.glob": "src/**/*.spec.ts",
   "mocha.files.glob": "src/**/*.spec.ts",
   "mocha.requires": [
     "dotenv/config",
     "ts-node/register"
   ],
-  "mocha.options": {},
+  "mocha.options": {
+    "reporter": "list"
+  },
   "coverage-gutters.showGutterCoverage": true
 }
