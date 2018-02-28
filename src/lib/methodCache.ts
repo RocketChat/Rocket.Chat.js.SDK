@@ -1,8 +1,8 @@
-import LRU, { Cache } from 'lru-cache'
+import LRU from 'lru-cache'
 
 /** @TODO: Remove ! post-fix expression when TypeScript #9619 resolved */
 let instance: any
-export const results: Map<string, Cache<string, any>> = new Map()
+export const results: Map<string, LRU.Cache<string, any>> = new Map()
 export const defaults: LRU.Options = {
   max: 100,
   maxAge: 300 * 1000

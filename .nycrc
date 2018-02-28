@@ -12,7 +12,8 @@
   ],
   "exclude": [
     "**/*.d.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "src/config/*"
   ],
   "reporter": [
     "lcovonly",

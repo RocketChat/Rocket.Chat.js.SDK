@@ -26,13 +26,13 @@
   },
   "scripts": {
     "pretest": "tslint -p .",
-    "test": "nyc mocha --opts ./mocha.opts src/**/*.spec.ts",
-    "test:hook": "mocha --opts ./mocha.opts src/**/*.spec.ts",
-    "test:debug": "mocha  --opts ./mocha.opts --inspect --debug-brk src/**/*.spec.ts",
+    "test": "nyc mocha --opts ./mocha.opts './**/*.spec.ts'",
+    "test:hook": "mocha --opts ./mocha.opts './**/*.spec.ts'",
+    "test:debug": "mocha  --opts ./mocha.opts --inspect --debug-brk './**/*.spec.ts'",
     "docs": "rimraf ./docs/*; typedoc --options ./typedoc.json ./src",
     "prebuild": "npm run test",
     "build": "rimraf ./dist/*; tsc",
-    "_postbuild": "npm run docs"
+    "postbuild": "npm run docs"
   },
   "husky": {
     "hooks": {

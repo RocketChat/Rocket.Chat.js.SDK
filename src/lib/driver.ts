@@ -1,9 +1,9 @@
 // @ts-ignore // Asteroid is not typed
 import { createClass } from 'asteroid'
-import EventEmitter from 'events'
-import ws from 'ws'
+import { EventEmitter } from 'events'
+import WebSocket from 'ws'
 import * as methodCache from './methodCache'
-import { IAsteroid } from './asteroidInterfaces'
+import { IAsteroid } from '../config/asteroidInterfaces'
 const Asteroid = createClass()
 
 /**
@@ -64,7 +64,7 @@ export function connect (options: IOptions = {}, callback?: ICallback): Promise<
     options = Object.assign(defaults, options)
     asteroid = new Asteroid({
       endpoint: `ws://${options.host}/websocket`,
-      SocketConstructor: ws
+      SocketConstructor: WebSocket
     })
     methodCache.use(asteroid) // init instance for later caching method calls
     asteroid.on('connected', () => events.emit('connected'))
