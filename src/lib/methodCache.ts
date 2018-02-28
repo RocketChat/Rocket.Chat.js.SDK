@@ -19,8 +19,8 @@ export function use (instanceToUse: object) {
 /**
  * Setup a cache for a method call
  * @param method Method name, for index of cached results
- * @param max Maximum size of cache
- * @param maxAge Maximum age of cache
+ * @param options.max Maximum size of cache
+ * @param options.maxAge Maximum age of cache
  */
 export function create (method: string, options: LRU.Options = {}) {
   options = Object.assign(defaults, options)

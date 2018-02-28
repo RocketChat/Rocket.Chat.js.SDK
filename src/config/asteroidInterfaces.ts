@@ -2,7 +2,7 @@ import { EventEmitter } from 'events'
 
 /**
  * Patch in mock Asteroid type
- * @todo Update with typing from definately typed (when available)
+ * @todo Update with typing from definitely typed (when available)
  */
 export interface IAsteroid extends EventEmitter {
   ddp: { on: (event: string, func: (doc: any) => void) => void }
@@ -21,7 +21,7 @@ export interface IAsteroid extends EventEmitter {
 
 /**
  * Patch in Asteroid subscription type
- * @todo Update with typing from definately typed (when available)
+ * @todo Update with typing from definitely typed (when available)
  */
 export interface ISubscription extends EventEmitter {
   id: string
@@ -29,7 +29,7 @@ export interface ISubscription extends EventEmitter {
 
 /**
  * Patch in Asteroid user options type
- * @todo Update with typing from definately typed (when available)
+ * @todo Update with typing from definitely typed (when available)
  */
 export interface IUserOptions {
   username?: string,

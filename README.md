@@ -61,6 +61,10 @@ More to come...
 | `ADMIN_PASS` | Admin user password for API |
 | `ROCKETCHAT_USER` | Bot password for tests |
 | `ROCKETCHAT_PASS` | Bot username for tests |
+| `ROOM_CACHE_SIZE` | Size of cache (LRU) for room (ID or name) lookups |
+| `ROOM_CACHE_MAX_AGE` | Max age of cache for room lookups |
+| `DM_ROOM_CACHE_SIZE` | Size of cache for Direct Message room lookups |
+| `DM_ROOM_CACHE_MAX_AGE` | Max age of cache for DM lookups |
 
 These are only required in test and development, assuming in production they
 will be passed from the adapter implementing this package.
