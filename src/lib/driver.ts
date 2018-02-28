@@ -1,4 +1,3 @@
-// @ts-ignore // Asteroid is not typed
 import { createClass } from 'asteroid'
 import { EventEmitter } from 'events'
 import WebSocket from 'ws'
@@ -9,7 +8,7 @@ const Asteroid = createClass()
 /**
  * Connection options type
  * @param host Rocket.Chat instance Host URL:PORT (without protocol)
- * @param timeout How long to wait (ms) before abandonning connection
+ * @param timeout How long to wait (ms) before abandoning connection
  */
 export interface IOptions {
   host?: string,

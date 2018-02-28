@@ -10,7 +10,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 }
 Object.defineProperty(exports, "__esModule", { value: true });
-// @ts-ignore // Asteroid is not typed
 const asteroid_1 = require("asteroid");
 const events_1 = require("events");
 const ws_1 = __importDefault(require("ws"));

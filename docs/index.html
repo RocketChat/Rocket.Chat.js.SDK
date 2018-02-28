@@ -912,9 +912,108 @@ img { max-width: 100%; }
 <div class="container container-main">
 	<div class="content-wrap">
 		<div class="tsd-panel tsd-typography">
-			<h1 id="rocketchat-bot-driver">rocketchat-bot-driver</h1>
-			<p>Agnostic interface for bot adaptors to interact with Rocket.Chat</p>
-			<h3 id="work-in-progress">WORK IN PROGRESS</h3>
+			<h1 id="rocket-chat-bot-driver">Rocket.Chat Bot Driver</h1>
+			<p>An agnostic interface for bot adaptors to interact with Rocket.Chat</p>
+			<h2 id="overview">Overview</h2>
+			<p>Rocket.Chat makes it easy for bot makers to provide the best solutions and
+				experience for their community. The internal Hubot and adapter enables chat-ops
+			workflows and multi-channel, multi-user, public and private interactions.</p>
+			<p>This package provides the core interface to subscribe to message streams, send
+			messages and query user details.</p>
+			<p>We have more bot features and adapters on the roadmap and encourage the
+				community to implement this driver to provide adapters for their bot framework
+			or platform of choice.</p>
+			<h2 id="api">API</h2>
+			<p>See full API documentation links in the generated docs. Below is just a summary:</p>
+			<hr>
+			<h3 id="driver-connect-options-cb-"><code>driver.connect(options, cb?)</code></h3>
+			<ul>
+				<li>Options accepts <code>host</code> and <code>timeout</code></li>
+				<li>Returns an <a href="https://www.npmjs.com/package/asteroid">asteroid</a> instance</li>
+				<li>Can return a promise, or use error-first callback pattern</li>
+			</ul>
+			<h2 id="see-asteroid-docs-for-methods-that-can-be-called-from-that-api-">See <a href="https://www.npmjs.com/package/asteroid">Asteroid</a> docs for methods that can be called from that API.</h2>
+			<h2 id="getting-started">Getting Started</h2>
+			<p>A local instance of Rocket.Chat is required for unit tests to confirm connection
+				and subscription methods are functional. And it helps to manually run your bot
+			interactions locally while in development.</p>
+			<h2 id="use-as-dependency">Use as Dependency</h2>
+			<p><code>yarn add rocketchat-bot-driver</code> or <code>npm install --save rocketchat-bot-driver</code></p>
+			<p>ES6 Module, using async</p>
+			<pre><code><span class="hljs-keyword">import</span> { driver } <span class="hljs-keyword">from</span> <span class="hljs-string">'rocketchat-bot-driver'</span>
+
+<span class="hljs-keyword">const</span> asteroid = <span class="hljs-keyword">await</span> driver.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span> })
+</code></pre><p>More to come...</p>
+			<h2 id="develop-test">Develop &amp; Test</h2>
+			<h3 id="settings">Settings</h3>
+			<table>
+				<thead>
+					<tr>
+						<th>Env var</th>
+						<th>Description</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td><code>ROCKETCHAT_URL</code></td>
+						<td>URL of the Rocket.Chat to connect to</td>
+					</tr>
+					<tr>
+						<td><code>ADMIN_USERNAME</code></td>
+						<td>Admin user password for API</td>
+					</tr>
+					<tr>
+						<td><code>ADMIN_PASS</code></td>
+						<td>Admin user password for API</td>
+					</tr>
+					<tr>
+						<td><code>ROCKETCHAT_USER</code></td>
+						<td>Bot password for tests</td>
+					</tr>
+					<tr>
+						<td><code>ROCKETCHAT_PASS</code></td>
+						<td>Bot username for tests</td>
+					</tr>
+				</tbody>
+			</table>
+			<p>These are only required in test and development, assuming in production they
+			will be passed from the adapter implementing this package.</p>
+			<p>If a <code>.env</code> file exists in the project folder, it will be used by <code>dotenv</code>.</p>
+			<h3 id="installing-rocket-chat">Installing Rocket.Chat</h3>
+			<p>Clone and run a new instance of Rocket.Chat locally, using either the internal
+				mongo or a dedicated local mongo for testing, so the bot can&#39;t affect any other
+			Rocket.Chat development you might do locally.</p>
+			<p>The following will provision a default admin user on build, so it can be used to
+			access the API, allowing bot driver utils to prepare for and clean up tests.</p>
+			<ul>
+				<li><code>git clone https://github.com/RocketChat/Rocket.Chat.git rc-bot-test</code></li>
+				<li><code>cd rc-bot-test</code></li>
+				<li><code>meteor npm install</code></li>
+				<li><code>export ADMIN_PASS=pass; export ADMIN_USERNAME=admin; export MONGO_URL=&#39;mongodb://localhost:27017/rc-bot-test&#39;; meteor</code></li>
+			</ul>
+			<p>Using <code>yarn</code> to run local tests and build scripts is recommended.</p>
+			<p>Do <code>npm install -g yarn</code> if you don&#39;t have it. Then setup the project:</p>
+			<ul>
+				<li><code>git clone https://github.com/RocketChat/rocketchat-bot-driver</code></li>
+				<li><code>cd rocketchat-bot-driver</code></li>
+				<li><code>yarn</code></li>
+			</ul>
+			<h3 id="test-scripts">Test Scripts</h3>
+			<ul>
+				<li><code>yarn test</code> runs tests and coverage locally</li>
+				<li><code>yarn test:debug</code> runs tests without coverage, breaking for debug attach</li>
+				<li><code>yarn docs</code> generates docs</li>
+				<li><code>yarn build</code> runs tests, coverage, compiles and generates docs</li>
+			</ul>
+			<p><code>yarn:hook</code> is run on git push hooks to prevent publishing with failing tests.</p>
+			<h3 id="integration-tests">Integration Tests</h3>
+			<p>The node scripts in <code>utils</code> are used to prepare for and clean up after test
+				interactions. They use the Rocket.Chat API to create a bot user and a mock human
+				user (benny) for the bot to interact with. They <em>should</em> restore the pre-test
+				state but it is always advised to only run tests with a connection to a clean
+			local instance of Rocket.Chat.</p>
+			<h3 id="debugging">Debugging</h3>
+			<p>Configs are included in source for VS Code using Wallaby or Mocha Sidebar.</p>
 		</div>
 		<div style="position:relative;"><a name="typedoc-main-index" class="tsd-anchor"></a></div>
 		<section class="tsd-panel-group tsd-index-group">

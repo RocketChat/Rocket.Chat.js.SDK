@@ -4,7 +4,7 @@ import { IAsteroid } from '../config/asteroidInterfaces';
 /**
  * Connection options type
  * @param host Rocket.Chat instance Host URL:PORT (without protocol)
- * @param timeout How long to wait (ms) before abandonning connection
+ * @param timeout How long to wait (ms) before abandoning connection
  */
 export interface IOptions {
     host?: string;
