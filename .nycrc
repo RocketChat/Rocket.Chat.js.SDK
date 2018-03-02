@@ -1,6 +1,4 @@
 {
-  "check-coverage": true,
-  "per-file": true,
   "extension": [
     ".ts"
   ],

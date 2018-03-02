@@ -11,5 +11,6 @@
   "mocha.options": {
     "reporter": "list"
   },
-  "coverage-gutters.showGutterCoverage": true
+  "coverage-gutters.showGutterCoverage": true,
+  "eslint.packageManager": "yarn"
 }

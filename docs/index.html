@@ -959,6 +959,10 @@ img { max-width: 100%; }
 						<td>URL of the Rocket.Chat to connect to</td>
 					</tr>
 					<tr>
+						<td><code>ROCKETCHAT_AUTH</code></td>
+						<td>Set to &#39;ldap&#39; to enable LDAP login</td>
+					</tr>
+					<tr>
 						<td><code>ADMIN_USERNAME</code></td>
 						<td>Admin user password for API</td>
 					</tr>
@@ -973,6 +977,22 @@ img { max-width: 100%; }
 					<tr>
 						<td><code>ROCKETCHAT_PASS</code></td>
 						<td>Bot username for tests</td>
+					</tr>
+					<tr>
+						<td><code>ROOM_CACHE_SIZE</code></td>
+						<td>Size of cache (LRU) for room (ID or name) lookups</td>
+					</tr>
+					<tr>
+						<td><code>ROOM_CACHE_MAX_AGE</code></td>
+						<td>Max age of cache for room lookups</td>
+					</tr>
+					<tr>
+						<td><code>DM_ROOM_CACHE_SIZE</code></td>
+						<td>Size of cache for Direct Message room lookups</td>
+					</tr>
+					<tr>
+						<td><code>DM_ROOM_CACHE_MAX_AGE</code></td>
+						<td>Max age of cache for DM lookups</td>
 					</tr>
 				</tbody>
 			</table>
@@ -1024,10 +1044,20 @@ img { max-width: 100%; }
 						<h3>External modules</h3>
 						<ul class="tsd-index-list">
 							<li class="tsd-kind-external-module"><a href="modules/_config_asteroidinterfaces_.html" class="tsd-kind-icon">"config/asteroid<wbr>Interfaces"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_config_driverinterfaces_.html" class="tsd-kind-icon">"config/driver<wbr>Interfaces"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_config_messageinterfaces_.html" class="tsd-kind-icon">"config/message<wbr>Interfaces"</a></li>
 							<li class="tsd-kind-external-module"><a href="modules/_index_.html" class="tsd-kind-icon">"index"</a></li>
 							<li class="tsd-kind-external-module"><a href="modules/_lib_driver_.html" class="tsd-kind-icon">"lib/driver"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_lib_message_.html" class="tsd-kind-icon">"lib/message"</a></li>
 							<li class="tsd-kind-external-module"><a href="modules/_lib_methodcache_.html" class="tsd-kind-icon">"lib/method<wbr>Cache"</a></li>
 							<li class="tsd-kind-external-module"><a href="modules/_types_asteroid_d_.html" class="tsd-kind-icon">"types/<wbr>Asteroid.d"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_types_client_d_.html" class="tsd-kind-icon">"types/<wbr>Client.d"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_types_immutablecollectionmixin_d_.html" class="tsd-kind-icon">"types/immutable<wbr>Collection<wbr>Mixin.d"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_utils_api_.html" class="tsd-kind-icon">"utils/api"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_utils_config_.html" class="tsd-kind-icon">"utils/config"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_utils_setup_.html" class="tsd-kind-icon">"utils/setup"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_utils_start_.html" class="tsd-kind-icon">"utils/start"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_utils_teardown_.html" class="tsd-kind-icon">"utils/teardown"</a></li>
 						</ul>
 					</section>
 				</div>

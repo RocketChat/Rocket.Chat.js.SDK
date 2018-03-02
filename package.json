@@ -52,7 +52,7 @@
     "rimraf": "^2.6.2",
     "sinon": "^4.4.2",
     "source-map-support": "^0.5.3",
-    "ts-node": "^5.0.0",
+    "ts-node": "^5.0.1",
     "tslint": "^5.9.1",
     "tslint-config-standard": "^7.0.0",
     "typedoc": "0.8.0",
@@ -63,10 +63,9 @@
     "@types/lru-cache": "^4.1.0",
     "@types/node": "^9.4.6",
     "@types/ws": "^4.0.1",
-    "asteroid": "^2.0.3",
+    "asteroid": "rocketchat/asteroid",
     "dotenv": "^5.0.1",
-    "lru-cache": "^4.1.1",
-    "ws": "^4.0.0"
+    "lru-cache": "^4.1.1"
   },
   "config": {
     "commitizen": {

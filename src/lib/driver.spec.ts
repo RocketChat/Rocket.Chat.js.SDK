@@ -30,7 +30,7 @@ describe('lib:', function () {
         })
       })
       context('with timeout, on expiry', () => {
-        beforeEach(() => clock = sinon.useFakeTimers())
+        beforeEach(() => clock = sinon.useFakeTimers(0))
         afterEach(() => clock.restore())
         it('returns error', (done) => {
           let opts = { host: 'localhost:3000', timeout: 10 }
@@ -65,5 +65,6 @@ describe('lib:', function () {
         })
       })
     })
+    // describe('login', () => {})
   })
 })

@@ -57,6 +57,7 @@ More to come...
 | Env var | Description |
 | --------------------- | ---------------------------------------------------- |
 | `ROCKETCHAT_URL` | URL of the Rocket.Chat to connect to |
+| `ROCKETCHAT_AUTH` | Set to 'ldap' to enable LDAP login |
 | `ADMIN_USERNAME` | Admin user password for API |
 | `ADMIN_PASS` | Admin user password for API |
 | `ROCKETCHAT_USER` | Bot password for tests |

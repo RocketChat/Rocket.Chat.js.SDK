@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>IOptions | rocketchat-bot-driver</title>
+	<title>ICallback | rocketchat-bot-driver</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<style type="text/css">/*! normalize.css v1.1.3 | MIT License | git.io/normalize */
@@ -907,34 +907,11 @@ img { max-width: 100%; }
 </header>
 <nav class="tsd-navigation secondary">
 	<ul>
-		<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-			<a href="_lib_driver_.icallback.html" class="tsd-kind-icon">ICallback</a>
-		</li>
 		<li class="current tsd-kind-interface tsd-parent-kind-external-module">
-			<a href="_lib_driver_.ioptions.html" class="tsd-kind-icon">IOptions</a>
-			<ul>
-				<li class=" tsd-kind-property tsd-parent-kind-interface">
-					<a href="_lib_driver_.ioptions.html#host" class="tsd-kind-icon">host</a>
-				</li>
-				<li class=" tsd-kind-property tsd-parent-kind-interface">
-					<a href="_lib_driver_.ioptions.html#timeout" class="tsd-kind-icon">timeout</a>
-				</li>
-			</ul>
+			<a href="_config_driverinterfaces_.icallback.html" class="tsd-kind-icon">ICallback</a>
 		</li>
-		<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-not-exported">
-			<a href="../modules/_lib_driver_.html#asteroid" class="tsd-kind-icon">Asteroid</a>
-		</li>
-		<li class=" tsd-kind-variable tsd-parent-kind-external-module">
-			<a href="../modules/_lib_driver_.html#asteroid-1" class="tsd-kind-icon">asteroid</a>
-		</li>
-		<li class=" tsd-kind-variable tsd-parent-kind-external-module">
-			<a href="../modules/_lib_driver_.html#events" class="tsd-kind-icon">events</a>
-		</li>
-		<li class=" tsd-kind-function tsd-parent-kind-external-module">
-			<a href="../modules/_lib_driver_.html#connect" class="tsd-kind-icon">connect</a>
-		</li>
-		<li class=" tsd-kind-object-literal tsd-parent-kind-external-module">
-			<a href="../modules/_lib_driver_.html#defaults" class="tsd-kind-icon">defaults</a>
+		<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+			<a href="_config_driverinterfaces_.ioptions.html" class="tsd-kind-icon">IOptions</a>
 		</li>
 	</ul>
 </nav>
@@ -943,62 +920,47 @@ img { max-width: 100%; }
 		<section class="tsd-panel tsd-comment">
 			<div class="tsd-comment tsd-typography">
 				<div class="lead">
-					<p>Connection options type</p>
+					<p>Error-first callback param type</p>
 				</div>
-				<dl class="tsd-comment-tags">
-					<dt>param</dt>
-					<dd><p>Rocket.Chat instance Host URL:PORT (without protocol)</p>
-					</dd>
-					<dt>param</dt>
-					<dd><p>How long to wait (ms) before abandoning connection</p>
-					</dd>
-				</dl>
 			</div>
 		</section>
 		<section class="tsd-panel tsd-hierarchy">
 			<h3>Hierarchy</h3>
 			<ul class="tsd-hierarchy">
 				<li>
-					<span class="target">IOptions</span>
+					<span class="target">ICallback</span>
 				</li>
 			</ul>
 		</section>
-		<section class="tsd-panel-group tsd-index-group">
-			<h2>Index</h2>
-			<section class="tsd-panel tsd-index-panel">
-				<div class="tsd-index-content">
-					<section class="tsd-index-section ">
-						<h3>Properties</h3>
-						<ul class="tsd-index-list">
-							<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_lib_driver_.ioptions.html#host" class="tsd-kind-icon">host</a></li>
-							<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_lib_driver_.ioptions.html#timeout" class="tsd-kind-icon">timeout</a></li>
+		<section class="tsd-panel">
+			<h3 class="tsd-before-signature">Callable</h3>
+			<ul class="tsd-signatures tsd-kind-interface tsd-parent-kind-external-module">
+				<li class="tsd-signature tsd-kind-icon">__call<span class="tsd-signature-symbol">(</span>error<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Error</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">null</span>, <span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+			</ul>
+			<ul class="tsd-descriptions">
+				<li class="tsd-description">
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/abd2396/src/config/driverInterfaces.ts#L15">config/driverInterfaces.ts:15</a></li>
 						</ul>
-					</section>
-				</div>
-			</section>
-		</section>
-		<section class="tsd-panel-group tsd-member-group ">
-			<h2>Properties</h2>
-			<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-				<a name="host" class="tsd-anchor"></a>
-				<h3><span class="tsd-flag ts-flagOptional">Optional</span> host</h3>
-				<div class="tsd-signature tsd-kind-icon">host<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
-				<aside class="tsd-sources">
-					<ul>
-						<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/32210a8/src/lib/driver.ts#L14">lib/driver.ts:14</a></li>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Error-first callback param type</p>
+						</div>
+					</div>
+					<h4 class="tsd-parameters-title">Parameters</h4>
+					<ul class="tsd-parameters">
+						<li>
+							<h5>error: <span class="tsd-signature-type">Error</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">null</span></h5>
+						</li>
+						<li>
+							<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5>
+						</li>
 					</ul>
-				</aside>
-			</section>
-			<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-				<a name="timeout" class="tsd-anchor"></a>
-				<h3><span class="tsd-flag ts-flagOptional">Optional</span> timeout</h3>
-				<div class="tsd-signature tsd-kind-icon">timeout<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
-				<aside class="tsd-sources">
-					<ul>
-						<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/32210a8/src/lib/driver.ts#L15">lib/driver.ts:15</a></li>
-					</ul>
-				</aside>
-			</section>
+					<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+				</li>
+			</ul>
 		</section>
 		<footer class="with-border-bottom">
 			<div class="container">
