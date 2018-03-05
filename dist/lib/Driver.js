@@ -59,6 +59,8 @@ exports.events = new events_1.EventEmitter();
 exports.subscriptions = [];
 /**
  * Initialise asteroid instance with given options or defaults.
+ * Returns promise, resolved with Asteroid instance. Callback follows
+ * error-first-pattern. Error returned or promise rejected on timeout.
  * @example <caption>Use with callback</caption>
  *  import { driver } from 'rocketchat-bot-driver'
  *  driver.connect({}, (err) => {
@@ -73,9 +75,9 @@ exports.subscriptions = [];
  */
 function connect(options = {}, callback) {
     return new Promise((resolve, reject) => {
-        options = Object.assign(defaults, options);
-        console.log('[connect] Connecting', JSON.stringify(options));
-        exports.asteroid = new asteroid_1.default(options.host, options.useSsl);
+        const config = Object.assign({}, defaults, options);
+        console.log('[connect] Connecting', JSON.stringify(config));
+        exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
         // Asteroid ^v2 interface...
         /*
         asteroid = new Asteroid({
@@ -87,22 +89,19 @@ function connect(options = {}, callback) {
         exports.asteroid.on('connected', () => exports.events.emit('connected'));
         exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
         // let cancelled = false
-        const rejectionTimeout = setTimeout(() => {
-            console.log('[connect] Timeout', options.timeout);
+        const rejectionTimeout = setTimeout(function () {
+            console.log(`[connect] Timeout (${config.timeout})`);
             // cancelled = true
             const err = new Error('Asteroid connection timeout');
-            // if no callback available, reject the promise
-            // else, return callback using "error-first-pattern"
-            return callback ? callback(err, exports.asteroid) : reject(err);
-        }, options.timeout);
+            callback ? callback(err, exports.asteroid) : reject(err);
+        }, config.timeout);
         exports.events.once('connected', () => {
             console.log('[connect] Connected');
-            // cancel connection and don't resolve if already rejected
-            // if (cancelled) return asteroid.disconnect()
+            // if (cancelled) return asteroid.ddp.disconnect() // cancel if already rejected
             clearTimeout(rejectionTimeout);
-            return (callback !== undefined)
-                ? callback(null, exports.asteroid)
-                : resolve(exports.asteroid);
+            if (callback)
+                callback(null, exports.asteroid);
+            resolve(exports.asteroid);
         });
     });
 }
@@ -113,7 +112,7 @@ exports.connect = connect;
 function disconnect() {
     console.log('Unsubscribing, logging out, disconnecting');
     unsubscribeAll();
-    return logout().then(() => exports.asteroid.disconnect());
+    return logout().then(() => Promise.resolve()); // asteroid.disconnect()) // v2 only
 }
 exports.disconnect = disconnect;
 // ASYNC AND CACHE METHOD UTILS
@@ -159,9 +158,15 @@ function asyncCall(method, params) {
     });
 }
 exports.asyncCall = asyncCall;
-/** @alias asyncCall */
+/**
+ * Call a method as async via Asteroid, or through cache if one is created.
+ * @param name The Rocket.Chat server method to call
+ * @param params Single or array of parameters of the method to call
+ */
 function callMethod(name, params) {
-    return asyncCall(name, params);
+    return (methodCache.has(name))
+        ? asyncCall(name, params)
+        : cacheCall(name, params);
 }
 exports.callMethod = callMethod;
 /**

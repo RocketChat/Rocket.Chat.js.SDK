@@ -22,6 +22,7 @@ or platform of choice.
 See full API documentation links in the generated docs. Below is just a summary:
 
 ---
+
 ### `driver.connect(options, cb?)`
 
 - Options accepts `host` and `timeout`
@@ -29,6 +30,7 @@ See full API documentation links in the generated docs. Below is just a summary:
 - Can return a promise, or use error-first callback pattern
 
 See [Asteroid][asteroid] docs for methods that can be called from that API.
+
 ---
 
 ## Getting Started

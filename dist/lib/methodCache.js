@@ -4,8 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 }
 Object.defineProperty(exports, "__esModule", { value: true });
 const lru_cache_1 = __importDefault(require("lru-cache"));
-/** @TODO: Remove ! post-fix expression when TypeScript #9619 resolved */
-let instance;
 exports.results = new Map();
 exports.defaults = {
     max: 100,
@@ -16,7 +14,7 @@ exports.defaults = {
  * @param instanceToUse Instance of a class
  */
 function use(instanceToUse) {
-    instance = instanceToUse;
+    exports.instance = instanceToUse;
 }
 exports.use = use;
 /**
@@ -49,12 +47,21 @@ function call(method, key) {
     else {
         // call and cache for next time, returning results
         console.log(`[${method}] Calling (caching): ${key}`);
-        callResults = instance.call(method, key).result;
+        callResults = exports.instance.call(method, key).result;
         methodCache.set(key, callResults);
     }
     return Promise.resolve(callResults);
 }
 exports.call = call;
+/**
+ * Proxy for checking if method has been cached.
+ * Cache may exist from manual creation, or prior call.
+ * @param method Method name for cache to get
+ */
+function has(method) {
+    return exports.results.has(method);
+}
+exports.has = has;
 /**
  * Get results of a prior method call.
  * @param method Method name for cache to get
@@ -66,11 +73,11 @@ function get(method, key) {
 }
 exports.get = get;
 /**
- * Clear a cached method call's results (all or only for given key).
+ * Reset a cached method call's results (all or only for given key).
  * @param method Method name for cache to clear
  * @param key Key for method result set to clear
  */
-function clear(method, key) {
+function reset(method, key) {
     if (exports.results.has(method)) {
         if (key)
             return exports.results.get(method).del(key);
@@ -78,12 +85,12 @@ function clear(method, key) {
             return exports.results.get(method).reset();
     }
 }
-exports.clear = clear;
+exports.reset = reset;
 /**
- * Clear cached results for all methods.
+ * Reset cached results for all methods.
  */
-function clearAll() {
+function resetAll() {
     exports.results.forEach((cache) => cache.reset());
 }
-exports.clearAll = clearAll;
+exports.resetAll = resetAll;
 //# sourceMappingURL=methodCache.js.map

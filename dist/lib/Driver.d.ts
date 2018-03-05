@@ -28,6 +28,8 @@ export declare let subscriptions: ISubscription[];
 export declare let messages: ICollection;
 /**
  * Initialise asteroid instance with given options or defaults.
+ * Returns promise, resolved with Asteroid instance. Callback follows
+ * error-first-pattern. Error returned or promise rejected on timeout.
  * @example <caption>Use with callback</caption>
  *  import { driver } from 'rocketchat-bot-driver'
  *  driver.connect({}, (err) => {
@@ -40,7 +42,7 @@ export declare let messages: ICollection;
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export declare function connect(options?: IOptions, callback?: ICallback): Promise<any>;
+export declare function connect(options?: IOptions, callback?: ICallback): any;
 /**
  * Remove all active subscriptions, logout and disconnect from Rocket.Chat
  */
@@ -51,8 +53,12 @@ export declare function disconnect(): Promise<void>;
  * @param params Single or array of parameters of the method to call
  */
 export declare function asyncCall(method: string, params: any | any[]): Promise<any>;
-/** @alias asyncCall */
-export declare function callMethod(name: string, params: any[]): Promise<any>;
+/**
+ * Call a method as async via Asteroid, or through cache if one is created.
+ * @param name The Rocket.Chat server method to call
+ * @param params Single or array of parameters of the method to call
+ */
+export declare function callMethod(name: string, params: any | any[]): Promise<any>;
 /**
  * Wraps Asteroid method calls, passed through method cache if cache is valid.
  * @param method The Rocket.Chat server method, to call through Asteroid

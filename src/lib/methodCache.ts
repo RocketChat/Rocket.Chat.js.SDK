@@ -1,7 +1,7 @@
 import LRU from 'lru-cache'
 
 /** @TODO: Remove ! post-fix expression when TypeScript #9619 resolved */
-let instance: any
+export let instance: any
 export const results: Map<string, LRU.Cache<string, any>> = new Map()
 export const defaults: LRU.Options = {
   max: 100,
@@ -52,6 +52,15 @@ export function call (method: string, key: string): Promise<any> {
 }
 
 /**
+ * Proxy for checking if method has been cached.
+ * Cache may exist from manual creation, or prior call.
+ * @param method Method name for cache to get
+ */
+export function has (method: string): boolean {
+  return results.has(method)
+}
+
+/**
  * Get results of a prior method call.
  * @param method Method name for cache to get
  * @param key Key for method result set to return
@@ -61,11 +70,11 @@ export function get (method: string, key: string): LRU.Cache<string, any> | unde
 }
 
 /**
- * Clear a cached method call's results (all or only for given key).
+ * Reset a cached method call's results (all or only for given key).
  * @param method Method name for cache to clear
  * @param key Key for method result set to clear
  */
-export function clear (method: string, key?: string): void {
+export function reset (method: string, key?: string): void {
   if (results.has(method)) {
     if (key) return results.get(method)!.del(key)
     else return results.get(method)!.reset()
@@ -73,8 +82,8 @@ export function clear (method: string, key?: string): void {
 }
 
 /**
- * Clear cached results for all methods.
+ * Reset cached results for all methods.
  */
-export function clearAll (): void {
+export function resetAll (): void {
   results.forEach((cache) => cache.reset())
 }

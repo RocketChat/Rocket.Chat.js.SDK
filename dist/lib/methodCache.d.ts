@@ -1,5 +1,7 @@
 /// <reference types="lru-cache" />
 import LRU from 'lru-cache';
+/** @TODO: Remove ! post-fix expression when TypeScript #9619 resolved */
+export declare let instance: any;
 export declare const results: Map<string, LRU.Cache<string, any>>;
 export declare const defaults: LRU.Options;
 /**
@@ -21,18 +23,24 @@ export declare function create(method: string, options?: LRU.Options): LRU.Cache
  */
 export declare function call(method: string, key: string): Promise<any>;
 /**
+ * Proxy for checking if method has been cached.
+ * Cache may exist from manual creation, or prior call.
+ * @param method Method name for cache to get
+ */
+export declare function has(method: string): boolean;
+/**
  * Get results of a prior method call.
  * @param method Method name for cache to get
  * @param key Key for method result set to return
  */
 export declare function get(method: string, key: string): LRU.Cache<string, any> | undefined;
 /**
- * Clear a cached method call's results (all or only for given key).
+ * Reset a cached method call's results (all or only for given key).
  * @param method Method name for cache to clear
  * @param key Key for method result set to clear
  */
-export declare function clear(method: string, key?: string): void;
+export declare function reset(method: string, key?: string): void;
 /**
- * Clear cached results for all methods.
+ * Reset cached results for all methods.
  */
-export declare function clearAll(): void;
+export declare function resetAll(): void;
