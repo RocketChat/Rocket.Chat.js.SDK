@@ -59,10 +59,8 @@
     "typescript": "^2.7.2"
   },
   "dependencies": {
-    "@types/lodash": "^4.14.102",
     "@types/lru-cache": "^4.1.0",
     "@types/node": "^9.4.6",
-    "@types/ws": "^4.0.1",
     "asteroid": "rocketchat/asteroid",
     "dotenv": "^5.0.1",
     "lru-cache": "^4.1.1"
