@@ -97,6 +97,7 @@ export declare function getRoomName(id: string): Promise<string>;
 /**
  * Get ID for a DM room by its recipient's name.
  * Will create a DM (with the bot) if it doesn't exist already.
+ * @todo test why create resolves with object instead of simply ID
  */
 export declare function getDirectMessageRoomId(username: string): Promise<string>;
 /** Join the bot into a room by its name or ID */
@@ -120,6 +121,10 @@ export declare function sendMessageByRoomId(content: string | string[] | IMessag
  * Will create one or more send calls collected into promise.
  */
 export declare function sendMessageByRoom(content: string | string[] | IMessage, room: string): Promise<any>;
+/**
+ * Send a message to a user in a DM.
+ */
+export declare function sendDirectToUser(message: string | string[] | IMessage, username: string): Promise<any>;
 /**
  * Send a prepared message object (with pre-defined room ID).
  * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.

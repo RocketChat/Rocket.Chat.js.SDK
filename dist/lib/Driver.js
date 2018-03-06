@@ -336,9 +336,10 @@ exports.getRoomName = getRoomName;
 /**
  * Get ID for a DM room by its recipient's name.
  * Will create a DM (with the bot) if it doesn't exist already.
+ * @todo test why create resolves with object instead of simply ID
  */
 function getDirectMessageRoomId(username) {
-    return cacheCall('createDirectMessage', username);
+    return cacheCall('createDirectMessage', username).then((DM) => DM.rid);
 }
 exports.getDirectMessageRoomId = getDirectMessageRoomId;
 /** Join the bot into a room by its name or ID */
@@ -370,7 +371,7 @@ exports.prepareMessage = prepareMessage;
 function sendMessageByRoomId(content, roomId) {
     let messages = [];
     if (Array.isArray(content)) {
-        content.forEach((msg) => messages.push(prepareMessage(msg, roomId)));
+        content.forEach((text) => messages.push(prepareMessage(text, roomId)));
     }
     else {
         messages.push(prepareMessage(content));
@@ -387,6 +388,13 @@ function sendMessageByRoom(content, room) {
     return getRoomId(room).then((roomId) => sendMessageByRoomId(content, roomId));
 }
 exports.sendMessageByRoom = sendMessageByRoom;
+/**
+ * Send a message to a user in a DM.
+ */
+function sendDirectToUser(message, username) {
+    return getDirectMessageRoomId(username).then((rid) => sendMessageByRoomId(message, rid));
+}
+exports.sendDirectToUser = sendDirectToUser;
 /**
  * Send a prepared message object (with pre-defined room ID).
  * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
