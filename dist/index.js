@@ -8,9 +8,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 }
 Object.defineProperty(exports, "__esModule", { value: true });
 const driver = __importStar(require("./lib/driver"));
+exports.driver = driver;
 const methodCache = __importStar(require("./lib/methodCache"));
-exports.default = {
-    driver,
-    methodCache
-};
+exports.methodCache = methodCache;
 //# sourceMappingURL=index.js.map

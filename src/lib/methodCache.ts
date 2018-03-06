@@ -1,4 +1,5 @@
 import LRU from 'lru-cache'
+import { logger } from './log'
 
 /** @TODO: Remove ! post-fix expression when TypeScript #9619 resolved */
 export let instance: any
@@ -39,12 +40,12 @@ export function call (method: string, key: string): Promise<any> {
   let callResults
 
   if (methodCache.has(key)) {
-    console.log(`[${method}] Calling (cached): ${key}`)
+    logger.debug(`[${method}] Calling (cached): ${key}`)
     // return from cache if key has been used on method before
     callResults = methodCache.get(key)
   } else {
     // call and cache for next time, returning results
-    console.log(`[${method}] Calling (caching): ${key}`)
+    logger.debug(`[${method}] Calling (caching): ${key}`)
     callResults = instance.call(method, key).result
     methodCache.set(key, callResults)
   }

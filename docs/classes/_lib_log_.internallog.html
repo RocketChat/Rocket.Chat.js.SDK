@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>rocketchat-bot-driver | rocketchat-bot-driver</title>
+	<title>InternalLog | rocketchat-bot-driver</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<style type="text/css">/*! normalize.css v1.1.3 | MIT License | git.io/normalize */
@@ -879,7 +879,7 @@ img { max-width: 100%; }
 		<div class="container">
 			<div class="table-wrap">
 				<div class="table-cell">
-					<strong><a href="index.html">rocketchat-bot-driver</a></strong>
+					<strong><a href="../index.html">rocketchat-bot-driver</a></strong>
 				</div>
 				<div class="table-cell" id="tsd-widgets">
 					<div id="tsd-filter">
@@ -907,161 +907,163 @@ img { max-width: 100%; }
 </header>
 <nav class="tsd-navigation secondary">
 	<ul>
+		<li class="current tsd-kind-class tsd-parent-kind-external-module tsd-is-not-exported">
+			<a href="_lib_log_.internallog.html" class="tsd-kind-icon">Internal<wbr>Log</a>
+			<ul>
+				<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+					<a href="_lib_log_.internallog.html#debug" class="tsd-kind-icon">debug</a>
+				</li>
+				<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+					<a href="_lib_log_.internallog.html#error" class="tsd-kind-icon">error</a>
+				</li>
+				<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+					<a href="_lib_log_.internallog.html#info" class="tsd-kind-icon">info</a>
+				</li>
+				<li class=" tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+					<a href="_lib_log_.internallog.html#warning" class="tsd-kind-icon">warning</a>
+				</li>
+			</ul>
+		</li>
+		<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-not-exported">
+			<a href="../modules/_lib_log_.html#logger" class="tsd-kind-icon">logger</a>
+		</li>
+		<li class=" tsd-kind-function tsd-parent-kind-external-module tsd-is-not-exported">
+			<a href="../modules/_lib_log_.html#replacelog" class="tsd-kind-icon">replace<wbr>Log</a>
+		</li>
 	</ul>
 </nav>
 <div class="container container-main">
 	<div class="content-wrap">
-		<div class="tsd-panel tsd-typography">
-			<h1 id="rocket-chat-bot-driver">Rocket.Chat Bot Driver</h1>
-			<p>An agnostic interface for bot adaptors to interact with Rocket.Chat</p>
-			<h2 id="overview">Overview</h2>
-			<p>Rocket.Chat makes it easy for bot makers to provide the best solutions and
-				experience for their community. The internal Hubot and adapter enables chat-ops
-			workflows and multi-channel, multi-user, public and private interactions.</p>
-			<p>This package provides the core interface to subscribe to message streams, send
-			messages and query user details.</p>
-			<p>We have more bot features and adapters on the roadmap and encourage the
-				community to implement this driver to provide adapters for their bot framework
-			or platform of choice.</p>
-			<h2 id="api">API</h2>
-			<p>See full API documentation links in the generated docs. Below is just a summary:</p>
-			<hr>
-			<h3 id="driver-connect-options-cb-"><code>driver.connect(options, cb?)</code></h3>
-			<ul>
-				<li>Options accepts <code>host</code> and <code>timeout</code></li>
-				<li>Returns an <a href="https://www.npmjs.com/package/asteroid">asteroid</a> instance</li>
-				<li>Can return a promise, or use error-first callback pattern</li>
+		<section class="tsd-panel tsd-comment">
+			<div class="tsd-comment tsd-typography">
+				<div class="lead">
+					<p>Temp logging, should override form adapter&#39;s log</p>
+				</div>
+			</div>
+		</section>
+		<section class="tsd-panel tsd-hierarchy">
+			<h3>Hierarchy</h3>
+			<ul class="tsd-hierarchy">
+				<li>
+					<span class="target">InternalLog</span>
+				</li>
 			</ul>
-			<p>See <a href="https://www.npmjs.com/package/asteroid">Asteroid</a> docs for methods that can be called from that API.</p>
-			<hr>
-			<h2 id="getting-started">Getting Started</h2>
-			<p>A local instance of Rocket.Chat is required for unit tests to confirm connection
-				and subscription methods are functional. And it helps to manually run your bot
-			interactions locally while in development.</p>
-			<h2 id="use-as-dependency">Use as Dependency</h2>
-			<p><code>yarn add rocketchat-bot-driver</code> or <code>npm install --save rocketchat-bot-driver</code></p>
-			<p>ES6 Module, using async</p>
-			<pre><code><span class="hljs-keyword">import</span> { driver } <span class="hljs-keyword">from</span> <span class="hljs-string">'rocketchat-bot-driver'</span>
-
-<span class="hljs-keyword">const</span> asteroid = <span class="hljs-keyword">await</span> driver.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span> })
-</code></pre><p>More to come...</p>
-			<h2 id="develop-test">Develop &amp; Test</h2>
-			<h3 id="settings">Settings</h3>
-			<table>
-				<thead>
-					<tr>
-						<th>Env var</th>
-						<th>Description</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr>
-						<td><code>ROCKETCHAT_URL</code></td>
-						<td>URL of the Rocket.Chat to connect to</td>
-					</tr>
-					<tr>
-						<td><code>ROCKETCHAT_AUTH</code></td>
-						<td>Set to &#39;ldap&#39; to enable LDAP login</td>
-					</tr>
-					<tr>
-						<td><code>ADMIN_USERNAME</code></td>
-						<td>Admin user password for API</td>
-					</tr>
-					<tr>
-						<td><code>ADMIN_PASS</code></td>
-						<td>Admin user password for API</td>
-					</tr>
-					<tr>
-						<td><code>ROCKETCHAT_USER</code></td>
-						<td>Bot password for tests</td>
-					</tr>
-					<tr>
-						<td><code>ROCKETCHAT_PASS</code></td>
-						<td>Bot username for tests</td>
-					</tr>
-					<tr>
-						<td><code>ROOM_CACHE_SIZE</code></td>
-						<td>Size of cache (LRU) for room (ID or name) lookups</td>
-					</tr>
-					<tr>
-						<td><code>ROOM_CACHE_MAX_AGE</code></td>
-						<td>Max age of cache for room lookups</td>
-					</tr>
-					<tr>
-						<td><code>DM_ROOM_CACHE_SIZE</code></td>
-						<td>Size of cache for Direct Message room lookups</td>
-					</tr>
-					<tr>
-						<td><code>DM_ROOM_CACHE_MAX_AGE</code></td>
-						<td>Max age of cache for DM lookups</td>
-					</tr>
-				</tbody>
-			</table>
-			<p>These are only required in test and development, assuming in production they
-			will be passed from the adapter implementing this package.</p>
-			<p>If a <code>.env</code> file exists in the project folder, it will be used by <code>dotenv</code>.</p>
-			<h3 id="installing-rocket-chat">Installing Rocket.Chat</h3>
-			<p>Clone and run a new instance of Rocket.Chat locally, using either the internal
-				mongo or a dedicated local mongo for testing, so the bot can&#39;t affect any other
-			Rocket.Chat development you might do locally.</p>
-			<p>The following will provision a default admin user on build, so it can be used to
-			access the API, allowing bot driver utils to prepare for and clean up tests.</p>
-			<ul>
-				<li><code>git clone https://github.com/RocketChat/Rocket.Chat.git rc-bot-test</code></li>
-				<li><code>cd rc-bot-test</code></li>
-				<li><code>meteor npm install</code></li>
-				<li><code>export ADMIN_PASS=pass; export ADMIN_USERNAME=admin; export MONGO_URL=&#39;mongodb://localhost:27017/rc-bot-test&#39;; meteor</code></li>
+		</section>
+		<section class="tsd-panel">
+			<h3>Implements</h3>
+			<ul class="tsd-hierarchy">
+				<li><a href="../interfaces/_config_driverinterfaces_.ilogger.html" class="tsd-signature-type">ILogger</a></li>
 			</ul>
-			<p>Using <code>yarn</code> to run local tests and build scripts is recommended.</p>
-			<p>Do <code>npm install -g yarn</code> if you don&#39;t have it. Then setup the project:</p>
-			<ul>
-				<li><code>git clone https://github.com/RocketChat/rocketchat-bot-driver</code></li>
-				<li><code>cd rocketchat-bot-driver</code></li>
-				<li><code>yarn</code></li>
-			</ul>
-			<h3 id="test-scripts">Test Scripts</h3>
-			<ul>
-				<li><code>yarn test</code> runs tests and coverage locally</li>
-				<li><code>yarn test:debug</code> runs tests without coverage, breaking for debug attach</li>
-				<li><code>yarn docs</code> generates docs</li>
-				<li><code>yarn build</code> runs tests, coverage, compiles and generates docs</li>
-			</ul>
-			<p><code>yarn:hook</code> is run on git push hooks to prevent publishing with failing tests.</p>
-			<h3 id="integration-tests">Integration Tests</h3>
-			<p>The node scripts in <code>utils</code> are used to prepare for and clean up after test
-				interactions. They use the Rocket.Chat API to create a bot user and a mock human
-				user (benny) for the bot to interact with. They <em>should</em> restore the pre-test
-				state but it is always advised to only run tests with a connection to a clean
-			local instance of Rocket.Chat.</p>
-			<h3 id="debugging">Debugging</h3>
-			<p>Configs are included in source for VS Code using Wallaby or Mocha Sidebar.</p>
-		</div>
+		</section>
 		<section class="tsd-panel-group tsd-index-group">
 			<h2>Index</h2>
 			<section class="tsd-panel tsd-index-panel">
 				<div class="tsd-index-content">
-					<section class="tsd-index-section ">
-						<h3>External modules</h3>
+					<section class="tsd-index-section tsd-is-not-exported">
+						<h3>Methods</h3>
 						<ul class="tsd-index-list">
-							<li class="tsd-kind-external-module"><a href="modules/_config_asteroidinterfaces_.html" class="tsd-kind-icon">"config/asteroid<wbr>Interfaces"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_config_driverinterfaces_.html" class="tsd-kind-icon">"config/driver<wbr>Interfaces"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_config_messageinterfaces_.html" class="tsd-kind-icon">"config/message<wbr>Interfaces"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_index_.html" class="tsd-kind-icon">"index"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_lib_driver_.html" class="tsd-kind-icon">"lib/driver"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_lib_log_.html" class="tsd-kind-icon">"lib/log"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_lib_message_.html" class="tsd-kind-icon">"lib/message"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_lib_methodcache_.html" class="tsd-kind-icon">"lib/method<wbr>Cache"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_types_asteroid_d_.html" class="tsd-kind-icon">"types/<wbr>Asteroid.d"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_types_client_d_.html" class="tsd-kind-icon">"types/<wbr>Client.d"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_types_immutablecollectionmixin_d_.html" class="tsd-kind-icon">"types/immutable<wbr>Collection<wbr>Mixin.d"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_utils_api_.html" class="tsd-kind-icon">"utils/api"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_utils_config_.html" class="tsd-kind-icon">"utils/config"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_utils_setup_.html" class="tsd-kind-icon">"utils/setup"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_utils_start_.html" class="tsd-kind-icon">"utils/start"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_utils_teardown_.html" class="tsd-kind-icon">"utils/teardown"</a></li>
+							<li class="tsd-kind-method tsd-parent-kind-class tsd-is-not-exported"><a href="_lib_log_.internallog.html#debug" class="tsd-kind-icon">debug</a></li>
+							<li class="tsd-kind-method tsd-parent-kind-class tsd-is-not-exported"><a href="_lib_log_.internallog.html#error" class="tsd-kind-icon">error</a></li>
+							<li class="tsd-kind-method tsd-parent-kind-class tsd-is-not-exported"><a href="_lib_log_.internallog.html#info" class="tsd-kind-icon">info</a></li>
+							<li class="tsd-kind-method tsd-parent-kind-class tsd-is-not-exported"><a href="_lib_log_.internallog.html#warning" class="tsd-kind-icon">warning</a></li>
 						</ul>
 					</section>
 				</div>
+			</section>
+		</section>
+		<section class="tsd-panel-group tsd-member-group tsd-is-not-exported">
+			<h2>Methods</h2>
+			<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+				<a name="debug" class="tsd-anchor"></a>
+				<h3>debug</h3>
+				<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+					<li class="tsd-signature tsd-kind-icon">debug<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+				</ul>
+				<ul class="tsd-descriptions">
+					<li class="tsd-description">
+						<aside class="tsd-sources">
+							<ul>
+								<li>Defined in lib/log.ts:5</li>
+							</ul>
+						</aside>
+						<h4 class="tsd-parameters-title">Parameters</h4>
+						<ul class="tsd-parameters">
+							<li>
+								<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5>
+							</li>
+						</ul>
+						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+					</li>
+				</ul>
+			</section>
+			<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+				<a name="error" class="tsd-anchor"></a>
+				<h3>error</h3>
+				<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+					<li class="tsd-signature tsd-kind-icon">error<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+				</ul>
+				<ul class="tsd-descriptions">
+					<li class="tsd-description">
+						<aside class="tsd-sources">
+							<ul>
+								<li>Defined in lib/log.ts:14</li>
+							</ul>
+						</aside>
+						<h4 class="tsd-parameters-title">Parameters</h4>
+						<ul class="tsd-parameters">
+							<li>
+								<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5>
+							</li>
+						</ul>
+						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+					</li>
+				</ul>
+			</section>
+			<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+				<a name="info" class="tsd-anchor"></a>
+				<h3>info</h3>
+				<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+					<li class="tsd-signature tsd-kind-icon">info<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+				</ul>
+				<ul class="tsd-descriptions">
+					<li class="tsd-description">
+						<aside class="tsd-sources">
+							<ul>
+								<li>Defined in lib/log.ts:8</li>
+							</ul>
+						</aside>
+						<h4 class="tsd-parameters-title">Parameters</h4>
+						<ul class="tsd-parameters">
+							<li>
+								<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5>
+							</li>
+						</ul>
+						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+					</li>
+				</ul>
+			</section>
+			<section class="tsd-panel tsd-member tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+				<a name="warning" class="tsd-anchor"></a>
+				<h3>warning</h3>
+				<ul class="tsd-signatures tsd-kind-method tsd-parent-kind-class tsd-is-not-exported">
+					<li class="tsd-signature tsd-kind-icon">warning<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">...</span>args<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+				</ul>
+				<ul class="tsd-descriptions">
+					<li class="tsd-description">
+						<aside class="tsd-sources">
+							<ul>
+								<li>Defined in lib/log.ts:11</li>
+							</ul>
+						</aside>
+						<h4 class="tsd-parameters-title">Parameters</h4>
+						<ul class="tsd-parameters">
+							<li>
+								<h5><span class="tsd-flag ts-flagRest">Rest</span> <span class="tsd-signature-symbol">...</span>args: <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></h5>
+							</li>
+						</ul>
+						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+					</li>
+				</ul>
 			</section>
 		</section>
 		<footer class="with-border-bottom">

@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { EventEmitter } from 'events';
 import { Message } from './message';
-import { IOptions, ICallback } from '../config/driverInterfaces';
+import { IOptions, ICallback, ILogger } from '../config/driverInterfaces';
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces';
 import { IMessage } from '../config/messageInterfaces';
 /**
@@ -27,9 +27,14 @@ export declare let subscriptions: ISubscription[];
  */
 export declare let messages: ICollection;
 /**
+ * Allow override of default logging with adapter's log instance
+ */
+export declare function useLog(externalLog: ILogger): void;
+/**
  * Initialise asteroid instance with given options or defaults.
  * Returns promise, resolved with Asteroid instance. Callback follows
  * error-first-pattern. Error returned or promise rejected on timeout.
+ * Removes http/s protocol to get connection hostname if taken from URL.
  * @example <caption>Use with callback</caption>
  *  import { driver } from 'rocketchat-bot-driver'
  *  driver.connect({}, (err) => {

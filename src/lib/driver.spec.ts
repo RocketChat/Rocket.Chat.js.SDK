@@ -1,10 +1,18 @@
+import 'mocha'
 import sinon from 'sinon'
 import { expect } from 'chai'
+import { logger } from './log'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
 let clock
 
 describe('lib:', () => {
+  before(() => {
+    logger.info = () => null
+    logger.debug = () => null
+    logger.warn = () => null
+    logger.error = () => null
+  })
   describe('driver', () => {
     describe('.connect', () => {
       context('with localhost connection', () => {

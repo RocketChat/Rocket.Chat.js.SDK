@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 }
 Object.defineProperty(exports, "__esModule", { value: true });
 const lru_cache_1 = __importDefault(require("lru-cache"));
+const log_1 = require("./log");
 exports.results = new Map();
 exports.defaults = {
     max: 100,
@@ -40,13 +41,13 @@ function call(method, key) {
     const methodCache = exports.results.get(method);
     let callResults;
     if (methodCache.has(key)) {
-        console.log(`[${method}] Calling (cached): ${key}`);
+        log_1.logger.debug(`[${method}] Calling (cached): ${key}`);
         // return from cache if key has been used on method before
         callResults = methodCache.get(key);
     }
     else {
         // call and cache for next time, returning results
-        console.log(`[${method}] Calling (caching): ${key}`);
+        log_1.logger.debug(`[${method}] Calling (caching): ${key}`);
         callResults = exports.instance.call(method, key).result;
         methodCache.set(key, callResults);
     }

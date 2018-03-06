@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import exported from './index'
+import * as exported from './index'
 
 describe('index:', () => {
   it('exports all lib members', () => {

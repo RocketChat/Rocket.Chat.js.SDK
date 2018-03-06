@@ -21,6 +21,7 @@ import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
 */
 const methodCache = __importStar(require("./methodCache"));
 const message_1 = require("./message");
+const log_1 = require("./log");
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages';
 const _messageStreamName = '__my_messages__';
@@ -36,14 +37,12 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 /**
  * Define connection defaults.
  * Enable SSL by default if Rocket.Chat URL contains https.
- * Remove http/s protocol to get hostname if taken from URL
  */
 const defaults = {
     host: process.env.ROCKETCHAT_URL || 'localhost:3000',
-    useSsl: ((process.env.ROCKETCHAT_UR || '').toString().startsWith('https')),
+    useSsl: ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
     timeout: 20 * 1000 // 20 seconds
 };
-defaults.host = defaults.host.replace(/(^\w+:|^)\/\//, '');
 /**
  * Event Emitter for listening to connection.
  * @example
@@ -58,9 +57,17 @@ exports.events = new events_1.EventEmitter();
  */
 exports.subscriptions = [];
 /**
+ * Allow override of default logging with adapter's log instance
+ */
+function useLog(externalLog) {
+    log_1.replaceLog(externalLog);
+}
+exports.useLog = useLog;
+/**
  * Initialise asteroid instance with given options or defaults.
  * Returns promise, resolved with Asteroid instance. Callback follows
  * error-first-pattern. Error returned or promise rejected on timeout.
+ * Removes http/s protocol to get connection hostname if taken from URL.
  * @example <caption>Use with callback</caption>
  *  import { driver } from 'rocketchat-bot-driver'
  *  driver.connect({}, (err) => {
@@ -76,7 +83,8 @@ exports.subscriptions = [];
 function connect(options = {}, callback) {
     return new Promise((resolve, reject) => {
         const config = Object.assign({}, defaults, options);
-        console.log('[connect] Connecting', JSON.stringify(config));
+        config.host = config.host.replace(/(^\w+:|^)\/\//, '');
+        log_1.logger.info('[connect] Connecting', config);
         exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
         // Asteroid ^v2 interface...
         /*
@@ -90,13 +98,13 @@ function connect(options = {}, callback) {
         exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
         // let cancelled = false
         const rejectionTimeout = setTimeout(function () {
-            console.log(`[connect] Timeout (${config.timeout})`);
+            log_1.logger.info(`[connect] Timeout (${config.timeout})`);
             // cancelled = true
             const err = new Error('Asteroid connection timeout');
             callback ? callback(err, exports.asteroid) : reject(err);
         }, config.timeout);
         exports.events.once('connected', () => {
-            console.log('[connect] Connected');
+            log_1.logger.info('[connect] Connected');
             // if (cancelled) return asteroid.ddp.disconnect() // cancel if already rejected
             clearTimeout(rejectionTimeout);
             if (callback)
@@ -110,7 +118,7 @@ exports.connect = connect;
  * Remove all active subscriptions, logout and disconnect from Rocket.Chat
  */
 function disconnect() {
-    console.log('Unsubscribing, logging out, disconnecting');
+    log_1.logger.info('Unsubscribing, logging out, disconnecting');
     unsubscribeAll();
     return logout().then(() => Promise.resolve()); // asteroid.disconnect()) // v2 only
 }
@@ -144,16 +152,16 @@ function setupMethodCache(asteroid) {
 function asyncCall(method, params) {
     if (!Array.isArray(params))
         params = [params]; // cast to array for apply
-    console.log(`[${method}] Calling (async): ${JSON.stringify(params)}`);
+    log_1.logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`);
     return Promise.resolve(exports.asteroid.apply(method, params).result)
         .catch((err) => {
-        console.error(`[${method}] Error:`, err);
+        log_1.logger.error(`[${method}] Error:`, err);
         throw err; // throw after log to stop async chain
     })
         .then((result) => {
         (result)
-            ? console.log(`[${method}] Success: ${JSON.stringify(result)}`)
-            : console.log(`[${method}] Success`);
+            ? log_1.logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
+            : log_1.logger.debug(`[${method}] Success`);
         return result;
     });
 }
@@ -177,13 +185,13 @@ exports.callMethod = callMethod;
 function cacheCall(method, key) {
     return methodCache.call(method, key)
         .catch((err) => {
-        console.error(`[${method}] Error:`, err);
+        log_1.logger.error(`[${method}] Error:`, err);
         throw err; // throw after log to stop async chain
     })
         .then((result) => {
         (result)
-            ? console.log(`[${method}] Success: ${JSON.stringify(result)}`)
-            : console.log(`[${method}] Success`);
+            ? log_1.logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
+            : log_1.logger.debug(`[${method}] Success`);
         return result;
     });
 }
@@ -192,7 +200,7 @@ exports.cacheCall = cacheCall;
 // -----------------------------------------------------------------------------
 /** Login to Rocket.Chat via Asteroid */
 function login(credentials) {
-    console.log(`[login] Logging in ${credentials.username || credentials.email}`);
+    log_1.logger.info(`[login] Logging in ${credentials.username || credentials.email}`);
     let login;
     if (process.env.ROCKETCHAT_AUTH === 'ldap') {
         const params = [
@@ -207,7 +215,7 @@ function login(credentials) {
         login = exports.asteroid.loginWithPassword(usernameOrEmail, credentials.password);
     }
     return login.catch((err) => {
-        console.error('[login] Error:', err);
+        log_1.logger.info('[login] Error:', err);
         throw err; // throw after log to stop async chain
     });
 }
@@ -215,7 +223,7 @@ exports.login = login;
 /** Logout of Rocket.Chat via Asteroid */
 function logout() {
     return exports.asteroid.logout().catch((err) => {
-        console.error('[Logout] Error:', err);
+        log_1.logger.error('[Logout] Error:', err);
         throw err; // throw after log to stop async chain
     });
 }
@@ -227,11 +235,11 @@ exports.logout = logout;
  */
 function subscribe(topic, roomId) {
     return new Promise((resolve, reject) => {
-        console.log(`[subscribe] Preparing subscription: ${topic}: ${roomId}`);
+        log_1.logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`);
         const subscription = exports.asteroid.subscribe(topic, roomId, true);
         exports.subscriptions.push(subscription);
         return subscription.ready.then((id) => {
-            console.log(`[subscribe] Stream ready: ${id}`);
+            log_1.logger.info(`[subscribe] Stream ready: ${id}`);
             resolve(subscription);
         });
         // Asteroid ^v2 interface...
@@ -259,7 +267,7 @@ function unsubscribe(subscription) {
     subscription.stop();
     // asteroid.unsubscribe(subscription.id) // v2
     exports.subscriptions.splice(index, 1); // remove from collection
-    console.log(`[${subscription.id}] Unsubscribed`);
+    log_1.logger.info(`[${subscription.id}] Unsubscribed`);
 }
 exports.unsubscribe = unsubscribe;
 /** Unsubscribe from all subscriptions in collection */
@@ -282,7 +290,7 @@ function subscribeToMessages() {
 }
 exports.subscribeToMessages = subscribeToMessages;
 function reactToMessages(callback) {
-    console.log(`[reactive] Listening for change events in collection ${exports.messages.name}`);
+    log_1.logger.info(`[reactive] Listening for change events in collection ${exports.messages.name}`);
     exports.messages.reactiveQuery({}).on('change', (_id) => {
         const changedMessageQuery = exports.messages.reactiveQuery({ _id });
         if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {

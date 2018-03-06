@@ -2,8 +2,8 @@
   "name": "rocketchat-bot-driver",
   "version": "0.0.0-develop",
   "description": "Agnostic interface for bot adaptors to interact with Rocket.Chat",
-  "main": "./lib/index.js",
-  "types": "./lib/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "repository": "rocketchat-bot-driver",
   "author": "Tim Kinnane <tim.kinnane@rocket.chat>",
   "license": "MIT",
@@ -18,7 +18,7 @@
     "typescript"
   ],
   "files": [
-    "./lib"
+    "./dist"
   ],
   "engines": {
     "node": "> 8.0.0",
