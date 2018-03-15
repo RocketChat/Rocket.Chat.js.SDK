@@ -11,6 +11,9 @@ class InternalLog {
     warning(...args) {
         console.warn(...args);
     }
+    warn(...args) {
+        return this.warning(...args);
+    }
     error(...args) {
         console.error(...args);
     }

@@ -1,9 +1,9 @@
 import { expect } from 'chai'
-import * as exported from './index'
+import * as rocketchat from '@rocket.chat/sdk'
 
 describe('index:', () => {
   it('exports all lib members', () => {
-    expect(Object.keys(exported)).to.eql([
+    expect(Object.keys(rocketchat)).to.eql([
       'driver',
       'methodCache'
     ])

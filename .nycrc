@@ -6,12 +6,11 @@
     "ts-node/register"
   ],
   "include": [
-    "src/**/*.ts"
+    "src/lib/**/*.ts"
   ],
   "exclude": [
     "**/*.d.ts",
-    "**/*.spec.ts",
-    "src/config/*"
+    "**/*.spec.ts"
   ],
   "reporter": [
     "lcovonly",

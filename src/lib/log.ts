@@ -11,6 +11,9 @@ class InternalLog implements ILogger {
   warning (...args: any[]) {
     console.warn(...args)
   }
+  warn (...args: any[]) {
+    return this.warning(...args)
+  }
   error (...args: any[]) {
     console.error(...args)
   }
