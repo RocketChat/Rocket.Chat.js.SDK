@@ -26,13 +26,218 @@ See full API documentation links in the generated docs. Below is just a summary:
 
 ---
 
-### `.connect(options, cb?)`
+Currently, there are two modules exported by the SDK:
+- `driver` - Handles connection, method calls, room subscriptions (via Asteroid)
+- `methodCache` - Manages results cache for calls to server (via LRU cache)
 
+Access these modules by importing them from SDK, e.g:
+
+ES6 `import { driver, methodCache } from '@rocket.chat/sdk'`
+
+ES5 `const { driver, methodCache } = require('@rocket.chat/sdk')`
+
+See [Asteroid][asteroid] docs for methods that can be called from that API.
+
+Any Rocket.Chat server method can be called via `driver.callMethod`,
+`driver.cacheCall` or `driver.asyncCall`. Server methods are not fully
+documented, most require searching the Rocket.Chat codebase.
+
+#### DRIVER METHODS
+
+---
+
+### `driver.connect(options, cb?)`
+
+Connects to a Rocket.Chat server
 - Options accepts `host` and `timeout` attributes
 - Can return a promise, or use error-first callback pattern
 - Resolves with an [asteroid][asteroid] instance
 
-See [Asteroid][asteroid] docs for methods that can be called from that API.
+### `driver.disconnect()`
+
+Unsubscribe, logout, disconnect from Rocket.Chat
+- Returns promise
+
+### `driver.login(credentials)`
+
+Login to Rocket.Chat via Asteroid
+- Accepts object with `username` and/or `email` and `password`
+- Returns promise
+- Resolves with logged in user ID
+
+### `driver.logout()`
+
+Logout current user via Asteroid
+- Returns promise
+
+### `driver.subscribe(topic, roomId)`
+
+Subscribe to Meteor subscription
+- Accepts parameters for Rocket.Chat streamer
+- Returns promise
+- Resolves with subscription instance (with ID)
+
+### `driver.unsubscribe(subscription)`
+
+Cancel a subscription
+- Accepts a subscription instance
+- Returns promise
+
+### `driver.unsubscribeAll()`
+
+Cancel all current subscriptions
+- Returns promise
+
+### `driver.subscribeToMessages()`
+
+Shortcut to subscribe to user's message stream
+- Uses `.subscribe` arguments with defaults
+  - topic: `stream-room-messages`
+  - roomId: `__my_messages__`
+- Returns a subscription instance
+
+### `reactToMessages(callback)`
+
+Fires callback with every change in subscriptions
+- Subscribe must be called first
+- Uses error-first callback pattern
+- Second argument is the changed item
+- Third argument is additional attributes, such as `roomType`
+
+### `driver.asyncCall(method, params)`
+
+Wraps server method calls to always be async
+- Accepts a method name and params (array or single param)
+- Returns a Promise
+
+### `driver.cacheCall(method, key)`
+
+Call server method with `methodCache`
+- Accepts a method name and single param (used as cache key)
+- Returns a promise
+- Resolves with server results or cached if still valid
+
+### `driver.callMethod(method, params)`
+
+Implements either `asyncCall` or `cacheCall` if cache exists
+- Accepts a method name and params (array or single param)
+- Outcome depends on if `methodCache.create` was done for the method
+
+### `driver.useLog(logger)`
+
+Replace the default log, e.g. with one from a bot framework
+- Accepts class or object with `debug`, `info`, `warn`, `error` methods.
+- Returns nothing
+
+### `driver.getRoomId(name)`
+
+Get ID for a room by name
+- Accepts name or ID string
+- Is cached
+- Returns a promise
+- Resolves with room ID
+
+### `driver.getRoomName(id)`
+
+Get name for a room by ID
+- Accepts ID string
+- Is cached
+- Returns a promise
+- Resolves with room name
+
+### `driver.getDirectMessageRoomId(username)`
+
+Get ID for a DM room by its recipient's name
+- Accepts string username
+- Returns a promise
+- Resolves with room ID
+
+### `driver.joinRoom(room)`
+
+Join the logged in user into a room
+- Accepts room name or ID string
+- Returns a promise
+
+### `driver.joinRooms(rooms)`
+
+As above, with array of room names/IDs
+
+### `driver.prepareMessage(content, roomId?)`
+
+Structure message content for sending
+- Accepts a message object or message text string
+- Optionally addressing to room ID with second param
+- Returns a message object
+
+### `driver.sendMessageByRoomId(content, roomId)`
+
+Prepare and send message/s to specified room ID
+- Content can be message object, message text string or array of strings
+- Returns a promise
+- Resolves when all sent
+
+### `driver.sendMessageByRoom(content, room)`
+
+As above, with room name instead of ID
+
+### `driver.sendDirectToUser(content, username)`
+
+As above, with username for DM instead of ID
+
+### `driver.sendMessage(content, roomId?)`
+
+Send a prepared message object (with pre-defined room ID)
+- Optional argument allows redirecting message to different room
+
+---
+
+### METHOD CACHE
+
+---
+
+### `methodCache.use(instance)`
+
+Set the instance to call methods on, with cached results
+- Accepts an asteroid instance (or possibly other classes)
+- Returns nothing
+
+### `methodCache.create(method, options?)`
+
+Setup a cache for a method call
+- Accepts method name and cache options object, such as:
+  - `max` Maximum size of cache
+  - `maxAge` Maximum age of cache
+
+### `methodCache.call(method, key)`
+
+Get results of a prior method call or call and cache
+- Accepts method name to call and key as single param
+- Only methods with a single string argument can be cached (currently) due to 
+the usage of this argument as the index for the cached results.
+
+### `methodCache.has(method)`
+
+Checking if method has been cached
+- Accepts method name
+- Returns bool
+
+### `methodCache.get(method, key)`
+
+Get results of a prior method call
+- Accepts method name and key (argument method called with)
+- Returns results at key
+
+### `methodCache.reset(method, key?)`
+
+Reset a cached method call's results
+- Accepts a method name, optional key
+- If key given, clears only that result set
+- Returns bool
+
+### `methodCache.resetAll()`
+
+ Reset cached results for all methods
+ - Returns nothing
 
 ---
 
@@ -51,7 +256,7 @@ ES6 module, using async
 ```
 import * as rocketchat from '@rocket.chat/sdk'
 
-const asteroid = await rocketchat.connect({ host: 'localhost:3000' })
+const asteroid = await rocketchat.driver.connect({ host: 'localhost:3000' })
 console.log('connected', asteroid)
 ```
 
@@ -60,7 +265,7 @@ ES5 module, using callback
 ```
 const rocketchat = require('@rocket.chat/sdk')
 
-rocketchat.connect({ host: 'localhost:3000' }, function (err, asteroid) {
+rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
   if (err) console.error(err)
   else console.log('connected', asteroid)
 })
