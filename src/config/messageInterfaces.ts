@@ -9,7 +9,7 @@ export interface IMessage {
   emoji?: string, // emoji code
   avatar?: string, // url
   groupable?: boolean, // ?
-  bot?: boolean, // sent by bot
+  bot?: any, // integration details
   urls?: string[], // ?
   mentions?: string[], // ?
   reactions?: { [emoji: string]: string[] } // emoji: [usernames]

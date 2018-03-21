@@ -20,6 +20,19 @@ exports.botUser = {
     sendWelcomeEmail: false,
     verified: true
 };
+// The Mock user, will send messages via API for the bot to respond to
+exports.mockUser = {
+    email: 'mock@localhost',
+    name: 'Mock User',
+    password: 'mock',
+    username: 'mock',
+    active: true,
+    roles: ['user'],
+    joinDefaultChannels: true,
+    requirePasswordChange: false,
+    sendWelcomeEmail: false,
+    verified: true
+};
 // Names for roomId lookup and join for test interactions
 exports.botRooms = ['general'];
 //# sourceMappingURL=config.js.map

@@ -38,8 +38,12 @@ export interface IUserOptions {
  */
 export interface ISubscription {
     stop: () => void;
-    ready: Promise<void>;
+    ready: Promise<IReady>;
     id?: string;
+}
+export interface IReady {
+    state: string;
+    value: string;
 }
 /**
  * If the method is successful, the `result` promise will be resolved with the

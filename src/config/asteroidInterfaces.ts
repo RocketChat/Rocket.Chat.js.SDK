@@ -49,9 +49,13 @@ export interface IUserOptions {
  */
 export interface ISubscription {
   stop: () => void,
-  ready: Promise<void>,
+  ready: Promise<IReady>,
   id?: string
 }
+
+// Asteroid v1 only
+export interface IReady { state: string, value: string }
+
 /* // v2
 export interface ISubscription extends EventEmitter {
   id: string

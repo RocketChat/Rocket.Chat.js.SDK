@@ -8,7 +8,7 @@ export interface IMessage {
     emoji?: string;
     avatar?: string;
     groupable?: boolean;
-    bot?: boolean;
+    bot?: any;
     urls?: string[];
     mentions?: string[];
     reactions?: {

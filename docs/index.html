@@ -929,13 +929,208 @@ img { max-width: 100%; }
 			<h2 id="api">API</h2>
 			<p>See full API documentation links in the generated docs. Below is just a summary:</p>
 			<hr>
-			<h3 id="-connect-options-cb-"><code>.connect(options, cb?)</code></h3>
+			<p>Currently, there are two modules exported by the SDK:</p>
+			<ul>
+				<li><code>driver</code> - Handles connection, method calls, room subscriptions (via Asteroid)</li>
+				<li><code>methodCache</code> - Manages results cache for calls to server (via LRU cache)</li>
+			</ul>
+			<p>Access these modules by importing them from SDK, e.g:</p>
+			<p>ES6 <code>import { driver, methodCache } from &#39;@rocket.chat/sdk&#39;</code></p>
+			<p>ES5 <code>const { driver, methodCache } = require(&#39;@rocket.chat/sdk&#39;)</code></p>
+			<p>See <a href="https://www.npmjs.com/package/asteroid">Asteroid</a> docs for methods that can be called from that API.</p>
+			<p>Any Rocket.Chat server method can be called via <code>driver.callMethod</code>,
+				<code>driver.cacheCall</code> or <code>driver.asyncCall</code>. Server methods are not fully
+			documented, most require searching the Rocket.Chat codebase.</p>
+			<h4 id="driver-methods">DRIVER METHODS</h4>
+			<hr>
+			<h3 id="driver-connect-options-cb-"><code>driver.connect(options, cb?)</code></h3>
+			<p>Connects to a Rocket.Chat server</p>
 			<ul>
 				<li>Options accepts <code>host</code> and <code>timeout</code> attributes</li>
 				<li>Can return a promise, or use error-first callback pattern</li>
-				<li>Resolves with an <a href="https://www.npmjs.com/package/asteroid">asteroid</a> instance</li>
+				<li>Resolves with an <a href="https://www.npmjs.com/package/asteroid">Asteroid</a> instance</li>
 			</ul>
-			<p>See <a href="https://www.npmjs.com/package/asteroid">Asteroid</a> docs for methods that can be called from that API.</p>
+			<h3 id="driver-disconnect-"><code>driver.disconnect()</code></h3>
+			<p>Unsubscribe, logout, disconnect from Rocket.Chat</p>
+			<ul>
+				<li>Returns promise</li>
+			</ul>
+			<h3 id="driver-login-credentials-"><code>driver.login(credentials)</code></h3>
+			<p>Login to Rocket.Chat via Asteroid</p>
+			<ul>
+				<li>Accepts object with <code>username</code> and/or <code>email</code> and <code>password</code></li>
+				<li>Returns promise</li>
+				<li>Resolves with logged in user ID</li>
+			</ul>
+			<h3 id="driver-logout-"><code>driver.logout()</code></h3>
+			<p>Logout current user via Asteroid</p>
+			<ul>
+				<li>Returns promise</li>
+			</ul>
+			<h3 id="driver-subscribe-topic-roomid-"><code>driver.subscribe(topic, roomId)</code></h3>
+			<p>Subscribe to Meteor subscription</p>
+			<ul>
+				<li>Accepts parameters for Rocket.Chat streamer</li>
+				<li>Returns promise</li>
+				<li>Resolves with subscription instance (with ID)</li>
+			</ul>
+			<h3 id="driver-unsubscribe-subscription-"><code>driver.unsubscribe(subscription)</code></h3>
+			<p>Cancel a subscription</p>
+			<ul>
+				<li>Accepts a subscription instance</li>
+				<li>Returns promise</li>
+			</ul>
+			<h3 id="driver-unsubscribeall-"><code>driver.unsubscribeAll()</code></h3>
+			<p>Cancel all current subscriptions</p>
+			<ul>
+				<li>Returns promise</li>
+			</ul>
+			<h3 id="driver-subscribetomessages-"><code>driver.subscribeToMessages()</code></h3>
+			<p>Shortcut to subscribe to user&#39;s message stream</p>
+			<ul>
+				<li>Uses <code>.subscribe</code> arguments with defaults<ul>
+						<li>topic: <code>stream-room-messages</code></li>
+						<li>roomId: <code>__my_messages__</code></li>
+					</ul>
+				</li>
+				<li>Returns a subscription instance</li>
+			</ul>
+			<h3 id="driver-reacttomessages-callback-"><code>driver.reactToMessages(callback)</code></h3>
+			<p>Fires callback with every change in subscriptions</p>
+			<ul>
+				<li>Subscribe must be called first</li>
+				<li>Uses error-first callback pattern</li>
+				<li>Second argument is the changed item</li>
+				<li>Third argument is additional attributes, such as <code>roomType</code></li>
+			</ul>
+			<h3 id="driver-asynccall-method-params-"><code>driver.asyncCall(method, params)</code></h3>
+			<p>Wraps server method calls to always be async</p>
+			<ul>
+				<li>Accepts a method name and params (array or single param)</li>
+				<li>Returns a Promise</li>
+			</ul>
+			<h3 id="driver-cachecall-method-key-"><code>driver.cacheCall(method, key)</code></h3>
+			<p>Call server method with <code>methodCache</code></p>
+			<ul>
+				<li>Accepts a method name and single param (used as cache key)</li>
+				<li>Returns a promise</li>
+				<li>Resolves with server results or cached if still valid</li>
+			</ul>
+			<h3 id="driver-callmethod-method-params-"><code>driver.callMethod(method, params)</code></h3>
+			<p>Implements either <code>asyncCall</code> or <code>cacheCall</code> if cache exists</p>
+			<ul>
+				<li>Accepts a method name and params (array or single param)</li>
+				<li>Outcome depends on if <code>methodCache.create</code> was done for the method</li>
+			</ul>
+			<h3 id="driver-uselog-logger-"><code>driver.useLog(logger)</code></h3>
+			<p>Replace the default log, e.g. with one from a bot framework</p>
+			<ul>
+				<li>Accepts class or object with <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code> methods.</li>
+				<li>Returns nothing</li>
+			</ul>
+			<h3 id="driver-getroomid-name-"><code>driver.getRoomId(name)</code></h3>
+			<p>Get ID for a room by name</p>
+			<ul>
+				<li>Accepts name or ID string</li>
+				<li>Is cached</li>
+				<li>Returns a promise</li>
+				<li>Resolves with room ID</li>
+			</ul>
+			<h3 id="driver-getroomname-id-"><code>driver.getRoomName(id)</code></h3>
+			<p>Get name for a room by ID</p>
+			<ul>
+				<li>Accepts ID string</li>
+				<li>Is cached</li>
+				<li>Returns a promise</li>
+				<li>Resolves with room name</li>
+			</ul>
+			<h3 id="driver-getdirectmessageroomid-username-"><code>driver.getDirectMessageRoomId(username)</code></h3>
+			<p>Get ID for a DM room by its recipient&#39;s name</p>
+			<ul>
+				<li>Accepts string username</li>
+				<li>Returns a promise</li>
+				<li>Resolves with room ID</li>
+			</ul>
+			<h3 id="driver-joinroom-room-"><code>driver.joinRoom(room)</code></h3>
+			<p>Join the logged in user into a room</p>
+			<ul>
+				<li>Accepts room name or ID string</li>
+				<li>Returns a promise</li>
+			</ul>
+			<h3 id="driver-joinrooms-rooms-"><code>driver.joinRooms(rooms)</code></h3>
+			<p>As above, with array of room names/IDs</p>
+			<h3 id="driver-preparemessage-content-roomid-"><code>driver.prepareMessage(content, roomId?)</code></h3>
+			<p>Structure message content for sending</p>
+			<ul>
+				<li>Accepts a message object or message text string</li>
+				<li>Optionally addressing to room ID with second param</li>
+				<li>Returns a message object</li>
+			</ul>
+			<h3 id="driver-sendmessagebyroomid-content-roomid-"><code>driver.sendMessageByRoomId(content, roomId)</code></h3>
+			<p>Prepare and send message/s to specified room ID</p>
+			<ul>
+				<li>Content can be message object, message text string or array of strings</li>
+				<li>Returns a promise</li>
+				<li>Resolves when all sent</li>
+			</ul>
+			<h3 id="driver-sendmessagebyroom-content-room-"><code>driver.sendMessageByRoom(content, room)</code></h3>
+			<p>As above, with room name instead of ID</p>
+			<h3 id="driver-senddirecttouser-content-username-"><code>driver.sendDirectToUser(content, username)</code></h3>
+			<p>As above, with username for DM instead of ID</p>
+			<h3 id="driver-sendmessage-content-roomid-"><code>driver.sendMessage(content, roomId?)</code></h3>
+			<p>Send a prepared message object (with pre-defined room ID)</p>
+			<ul>
+				<li>Optional argument allows redirecting message to different room</li>
+			</ul>
+			<hr>
+			<h3 id="method-cache">METHOD CACHE</h3>
+			<hr>
+			<h3 id="methodcache-use-instance-"><code>methodCache.use(instance)</code></h3>
+			<p>Set the instance to call methods on, with cached results</p>
+			<ul>
+				<li>Accepts an Asteroid instance (or possibly other classes)</li>
+				<li>Returns nothing</li>
+			</ul>
+			<h3 id="methodcache-create-method-options-"><code>methodCache.create(method, options?)</code></h3>
+			<p>Setup a cache for a method call</p>
+			<ul>
+				<li>Accepts method name and cache options object, such as:<ul>
+						<li><code>max</code> Maximum size of cache</li>
+						<li><code>maxAge</code> Maximum age of cache</li>
+					</ul>
+				</li>
+			</ul>
+			<h3 id="methodcache-call-method-key-"><code>methodCache.call(method, key)</code></h3>
+			<p>Get results of a prior method call or call and cache</p>
+			<ul>
+				<li>Accepts method name to call and key as single param</li>
+				<li>Only methods with a single string argument can be cached (currently) due to
+				the usage of this argument as the index for the cached results.</li>
+			</ul>
+			<h3 id="methodcache-has-method-"><code>methodCache.has(method)</code></h3>
+			<p>Checking if method has been cached</p>
+			<ul>
+				<li>Accepts method name</li>
+				<li>Returns bool</li>
+			</ul>
+			<h3 id="methodcache-get-method-key-"><code>methodCache.get(method, key)</code></h3>
+			<p>Get results of a prior method call</p>
+			<ul>
+				<li>Accepts method name and key (argument method called with)</li>
+				<li>Returns results at key</li>
+			</ul>
+			<h3 id="methodcache-reset-method-key-"><code>methodCache.reset(method, key?)</code></h3>
+			<p>Reset a cached method call&#39;s results</p>
+			<ul>
+				<li>Accepts a method name, optional key</li>
+				<li>If key given, clears only that result set</li>
+				<li>Returns bool</li>
+			</ul>
+			<h3 id="methodcache-resetall-"><code>methodCache.resetAll()</code></h3>
+			<p> Reset cached results for all methods</p>
+			<ul>
+				<li>Returns nothing</li>
+			</ul>
 			<hr>
 			<h2 id="getting-started">Getting Started</h2>
 			<p>A local instance of Rocket.Chat is required for unit tests to confirm connection
@@ -946,12 +1141,12 @@ img { max-width: 100%; }
 			<p>ES6 module, using async</p>
 			<pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> rocketchat <span class="hljs-keyword">from</span> <span class="hljs-string">'@rocket.chat/sdk'</span>
 
-<span class="hljs-keyword">const</span> asteroid = <span class="hljs-keyword">await</span> rocketchat.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span> })
+<span class="hljs-keyword">const</span> asteroid = <span class="hljs-keyword">await</span> rocketchat.driver.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span> })
 <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'connected'</span>, asteroid)
 </code></pre><p>ES5 module, using callback</p>
 			<pre><code><span class="hljs-keyword">const</span> rocketchat = <span class="hljs-built_in">require</span>(<span class="hljs-string">'@rocket.chat/sdk'</span>)
 
-rocketchat.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span> }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">err, asteroid</span>) </span>{
+rocketchat.driver.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span> }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">err, asteroid</span>) </span>{
   <span class="hljs-keyword">if</span> (err) <span class="hljs-built_in">console</span>.error(err)
   <span class="hljs-keyword">else</span> <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'connected'</span>, asteroid)
 })
@@ -990,6 +1185,10 @@ rocketchat.connect({ <span class="hljs-attr">host</span>: <span class="hljs-stri
 						<td>Pass username for SDK tests</td>
 					</tr>
 					<tr>
+						<td><code>INTEGRATION_ID</code></td>
+						<td>ID applied to message object to integration source</td>
+					</tr>
+					<tr>
 						<td><code>ROOM_CACHE_SIZE</code></td>
 						<td>Size of cache (LRU) for room (ID or name) lookups</td>
 					</tr>
@@ -1019,7 +1218,7 @@ rocketchat.connect({ <span class="hljs-attr">host</span>: <span class="hljs-stri
 				<li><code>git clone https://github.com/RocketChat/Rocket.Chat.git rc-sdk-test</code></li>
 				<li><code>cd rc-sdk-test</code></li>
 				<li><code>meteor npm install</code></li>
-				<li><code>export ADMIN_PASS=pass; export ADMIN_USERNAME=admin; export MONGO_URL=&#39;mongodb://localhost:27017/rc-sdk-test&#39;; meteor</code></li>
+				<li><code>export ADMIN_PASS=pass; export ADMIN_USERNAME=sdk; export MONGO_URL=&#39;mongodb://localhost:27017/rc-sdk-test&#39;; meteor</code></li>
 			</ul>
 			<p>Using <code>yarn</code> to run local tests and build scripts is recommended.</p>
 			<p>Do <code>npm install -g yarn</code> if you don&#39;t have it. Then setup the project:</p>
@@ -1070,9 +1269,9 @@ rocketchat.connect({ <span class="hljs-attr">host</span>: <span class="hljs-stri
 							<li class="tsd-kind-external-module"><a href="modules/_types_immutablecollectionmixin_d_.html" class="tsd-kind-icon">"types/immutable<wbr>Collection<wbr>Mixin.d"</a></li>
 							<li class="tsd-kind-external-module"><a href="modules/_utils_api_.html" class="tsd-kind-icon">"utils/api"</a></li>
 							<li class="tsd-kind-external-module"><a href="modules/_utils_config_.html" class="tsd-kind-icon">"utils/config"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_utils_setup_.html" class="tsd-kind-icon">"utils/setup"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_utils_interfaces_.html" class="tsd-kind-icon">"utils/interfaces"</a></li>
 							<li class="tsd-kind-external-module"><a href="modules/_utils_start_.html" class="tsd-kind-icon">"utils/start"</a></li>
-							<li class="tsd-kind-external-module"><a href="modules/_utils_teardown_.html" class="tsd-kind-icon">"utils/teardown"</a></li>
+							<li class="tsd-kind-external-module"><a href="modules/_utils_testing_.html" class="tsd-kind-icon">"utils/testing"</a></li>
 						</ul>
 					</section>
 				</div>

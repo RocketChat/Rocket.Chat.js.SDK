@@ -11,7 +11,7 @@ class InternalLog implements ILogger {
   warning (...args: any[]) {
     console.warn(...args)
   }
-  warn (...args: any[]) {
+  warn (...args: any[]) { // legacy method
     return this.warning(...args)
   }
   error (...args: any[]) {
@@ -25,7 +25,18 @@ function replaceLog (externalLog: ILogger) {
   logger = externalLog
 }
 
+function silence () {
+  replaceLog({
+    debug: () => null,
+    info: () => null,
+    warn: () => null,
+    warning: () => null,
+    error: () => null
+  })
+}
+
 export {
   logger,
-  replaceLog
+  replaceLog,
+  silence
 }

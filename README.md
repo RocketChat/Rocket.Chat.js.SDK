@@ -51,7 +51,7 @@ documented, most require searching the Rocket.Chat codebase.
 Connects to a Rocket.Chat server
 - Options accepts `host` and `timeout` attributes
 - Can return a promise, or use error-first callback pattern
-- Resolves with an [asteroid][asteroid] instance
+- Resolves with an [Asteroid][asteroid] instance
 
 ### `driver.disconnect()`
 
@@ -96,7 +96,7 @@ Shortcut to subscribe to user's message stream
   - roomId: `__my_messages__`
 - Returns a subscription instance
 
-### `reactToMessages(callback)`
+### `driver.reactToMessages(callback)`
 
 Fires callback with every change in subscriptions
 - Subscribe must be called first
@@ -198,7 +198,7 @@ Send a prepared message object (with pre-defined room ID)
 ### `methodCache.use(instance)`
 
 Set the instance to call methods on, with cached results
-- Accepts an asteroid instance (or possibly other classes)
+- Accepts an Asteroid instance (or possibly other classes)
 - Returns nothing
 
 ### `methodCache.create(method, options?)`
@@ -283,6 +283,7 @@ rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
 | `ADMIN_PASS` | Admin user password for API |
 | `ROCKETCHAT_USER` | User password for SDK tests |
 | `ROCKETCHAT_PASS` | Pass username for SDK tests |
+| `INTEGRATION_ID` | ID applied to message object to integration source |
 | `ROOM_CACHE_SIZE` | Size of cache (LRU) for room (ID or name) lookups |
 | `ROOM_CACHE_MAX_AGE` | Max age of cache for room lookups |
 | `DM_ROOM_CACHE_SIZE` | Size of cache for Direct Message room lookups |
@@ -303,7 +304,7 @@ access the API, allowing SDK utils to prepare for and clean up tests.
 - `git clone https://github.com/RocketChat/Rocket.Chat.git rc-sdk-test`
 - `cd rc-sdk-test`
 - `meteor npm install`
-- `export ADMIN_PASS=pass; export ADMIN_USERNAME=admin; export MONGO_URL='mongodb://localhost:27017/rc-sdk-test'; meteor`
+- `export ADMIN_PASS=pass; export ADMIN_USERNAME=sdk; export MONGO_URL='mongodb://localhost:27017/rc-sdk-test'; meteor`
 
 Using `yarn` to run local tests and build scripts is recommended.
 

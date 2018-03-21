@@ -6,7 +6,8 @@
 export interface IOptions {
   host?: string,
   useSsl?: boolean,
-  timeout?: number
+  timeout?: number,
+  integration?: string
 }
 
 /**

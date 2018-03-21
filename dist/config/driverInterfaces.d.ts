@@ -7,6 +7,7 @@ export interface IOptions {
     host?: string;
     useSsl?: boolean;
     timeout?: number;
+    integration?: string;
 }
 /**
  * Loggers need to provide the same set of methods

@@ -24,4 +24,14 @@ function replaceLog(externalLog) {
     exports.logger = logger = externalLog;
 }
 exports.replaceLog = replaceLog;
+function silence() {
+    replaceLog({
+        debug: () => null,
+        info: () => null,
+        warn: () => null,
+        warning: () => null,
+        error: () => null
+    });
+}
+exports.silence = silence;
 //# sourceMappingURL=log.js.map

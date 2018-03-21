@@ -6,8 +6,11 @@ exports.api = new node_rest_client_1.Client();
 // Prepare shortcuts for API requests / error handling
 const basicHeaders = { 'Content-Type': 'application/json' };
 const authHeaders = { 'X-Auth-Token': '', 'X-User-Id': '' };
-const debug = (process.env.LOG_LEVEL === 'debug');
-exports.handle = (err) => console.error('ERROR (API):', JSON.stringify(err));
+const debug = (process.env.LOG_LEVEL === 'debug'); // allow override
+exports.handle = (err) => {
+    console.error('ERROR (API):', JSON.stringify(err));
+    throw new Error(err.error || err.message || 'Unknown');
+};
 // Populate auth headers from response data
 function setAuth(authData) {
     authHeaders['X-Auth-Token'] = authData.authToken;
@@ -24,21 +27,23 @@ exports.getHeaders = getHeaders;
 // Do a POST request to an API endpoint
 // If it happens to come back with a token, keep the token
 // If it needs a token, use the token it kept (merges headers with auth)
-function post(endpoint, data, auth) {
+// Ignore param allows certain matching error messages to not count as errors
+function post(endpoint, data, auth, ignore) {
     let headers = getHeaders(auth);
     if (debug)
         console.log(`POST: ${endpoint}`, JSON.stringify(data));
     return new Promise((resolve, reject) => {
         exports.api.post(config_1.apiHost + endpoint, { headers, data }, (result) => {
-            if (result.status !== 'success') {
+            if ((result.status && result.status !== 'success') ||
+                (ignore && result.error && !ignore.test(result.error))) {
                 reject(result);
             }
             else {
-                if (result.data.hasOwnProperty('authToken'))
+                if (result.data && result.data.authToken)
                     setAuth(result.data);
                 if (debug)
                     console.log('RESULT:', JSON.stringify(result));
-                resolve(result.data);
+                resolve(result);
             }
         });
     }).catch(exports.handle);
@@ -51,16 +56,26 @@ function get(endpoint, auth) {
         console.log(`GET: ${endpoint}`);
     return new Promise((resolve, reject) => {
         exports.api.get(config_1.apiHost + endpoint, { headers }, (result) => {
-            if (result.status !== 'success') {
+            if (result.status && result.status !== 'success') {
                 reject(result);
             }
             else {
                 if (debug)
                     console.log('RESULT:', JSON.stringify(result));
-                resolve(result.data);
+                resolve(result);
             }
         });
     }).catch(exports.handle);
 }
 exports.get = get;
+// Login a user for further API calls
+function login(user) {
+    return post('/api/v1/login', user);
+}
+exports.login = login;
+// Logout a user at end of API calls
+function logout() {
+    return get('/api/v1/logout', true);
+}
+exports.logout = logout;
 //# sourceMappingURL=api.js.map

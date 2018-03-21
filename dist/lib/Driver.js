@@ -35,7 +35,7 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 // CONNECTION SETUP AND CONFIGURE
 // -----------------------------------------------------------------------------
 /**
- * Define connection defaults.
+ * Define default config as public, allowing overrides from new connection.
  * Enable SSL by default if Rocket.Chat URL contains https.
  */
 const defaults = {
@@ -43,6 +43,12 @@ const defaults = {
     useSsl: ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
     timeout: 20 * 1000 // 20 seconds
 };
+/**
+ * The integration property is applied as an ID on sent messages `bot.i` param
+ * Should be replaced when connection is invoked by a package using the SDK
+ * e.g. The Hubot adapter would pass its integration ID with credentials, like:
+ */
+const integrationId = process.env.INTEGRATION_ID || 'js.SDK';
 /**
  * Event Emitter for listening to connection.
  * @example
@@ -82,7 +88,7 @@ exports.useLog = useLog;
  */
 function connect(options = {}, callback) {
     return new Promise((resolve, reject) => {
-        const config = Object.assign({}, defaults, options);
+        const config = Object.assign({}, defaults, options); // override defaults
         config.host = config.host.replace(/(^\w+:|^)\/\//, '');
         log_1.logger.info('[connect] Connecting', config);
         exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
@@ -295,16 +301,16 @@ function reactToMessages(callback) {
         const changedMessageQuery = exports.messages.reactiveQuery({ _id });
         if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {
             const changedMessage = changedMessageQuery.result[0];
-            if (changedMessage.args !== null) {
-                console.log(`[received] Message in room ${changedMessage.args[0].rid}`);
+            if (Array.isArray(changedMessage.args)) {
+                log_1.logger.info(`[received] Message in room ${changedMessage.args[0].rid}`);
                 callback(null, changedMessage.args[0], changedMessage.args[1]);
             }
             else {
-                callback(new Error('Received message without args'));
+                log_1.logger.debug('[received] Update without message args');
             }
         }
         else {
-            callback(new Error(`[change] Reactive query at ID ${_id} without results`));
+            log_1.logger.debug('[received] Reactive query at ID ${ _id } without results');
         }
     });
 }
@@ -365,7 +371,7 @@ exports.joinRooms = joinRooms;
  * Accepts message text string or a structured message object.
  */
 function prepareMessage(content, roomId) {
-    const message = new message_1.Message(content);
+    const message = new message_1.Message(content, integrationId);
     if (roomId)
         message.setRoomId(roomId);
     return message;
@@ -382,7 +388,7 @@ function sendMessageByRoomId(content, roomId) {
         content.forEach((text) => messages.push(prepareMessage(text, roomId)));
     }
     else {
-        messages.push(prepareMessage(content));
+        messages.push(prepareMessage(content, roomId));
     }
     return Promise.all(messages.map((message) => sendMessage(message)));
 }

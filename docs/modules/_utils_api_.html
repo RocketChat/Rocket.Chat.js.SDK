@@ -923,6 +923,12 @@ img { max-width: 100%; }
 			<a href="_utils_api_.html#handle" class="tsd-kind-icon">handle</a>
 		</li>
 		<li class=" tsd-kind-function tsd-parent-kind-external-module">
+			<a href="_utils_api_.html#login" class="tsd-kind-icon">login</a>
+		</li>
+		<li class=" tsd-kind-function tsd-parent-kind-external-module">
+			<a href="_utils_api_.html#logout" class="tsd-kind-icon">logout</a>
+		</li>
+		<li class=" tsd-kind-function tsd-parent-kind-external-module">
 			<a href="_utils_api_.html#post" class="tsd-kind-icon">post</a>
 		</li>
 		<li class=" tsd-kind-function tsd-parent-kind-external-module">
@@ -955,6 +961,8 @@ img { max-width: 100%; }
 							<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_api_.html#get" class="tsd-kind-icon">get</a></li>
 							<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_api_.html#getheaders" class="tsd-kind-icon">get<wbr>Headers</a></li>
 							<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_api_.html#handle" class="tsd-kind-icon">handle</a></li>
+							<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_api_.html#login" class="tsd-kind-icon">login</a></li>
+							<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_api_.html#logout" class="tsd-kind-icon">logout</a></li>
 							<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_api_.html#post" class="tsd-kind-icon">post</a></li>
 							<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_api_.html#setauth" class="tsd-kind-icon">set<wbr>Auth</a></li>
 						</ul>
@@ -977,7 +985,7 @@ img { max-width: 100%; }
 				<div class="tsd-signature tsd-kind-icon">api<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol"> =&nbsp;new Client()</span></div>
 				<aside class="tsd-sources">
 					<ul>
-						<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L4">utils/api.ts:4</a></li>
+						<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L5">utils/api.ts:5</a></li>
 					</ul>
 				</aside>
 			</section>
@@ -987,7 +995,7 @@ img { max-width: 100%; }
 				<div class="tsd-signature tsd-kind-icon">debug<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> =&nbsp;(process.env.LOG_LEVEL &#x3D;&#x3D;&#x3D; &#x27;debug&#x27;)</span></div>
 				<aside class="tsd-sources">
 					<ul>
-						<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L9">utils/api.ts:9</a></li>
+						<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L10">utils/api.ts:10</a></li>
 					</ul>
 				</aside>
 			</section>
@@ -1004,7 +1012,7 @@ img { max-width: 100%; }
 					<li class="tsd-description">
 						<aside class="tsd-sources">
 							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L44">utils/api.ts:44</a></li>
+								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L52">utils/api.ts:52</a></li>
 							</ul>
 						</aside>
 						<h4 class="tsd-parameters-title">Parameters</h4>
@@ -1030,7 +1038,7 @@ img { max-width: 100%; }
 					<li class="tsd-description">
 						<aside class="tsd-sources">
 							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L19">utils/api.ts:19</a></li>
+								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L23">utils/api.ts:23</a></li>
 							</ul>
 						</aside>
 						<h4 class="tsd-parameters-title">Parameters</h4>
@@ -1052,22 +1060,62 @@ img { max-width: 100%; }
 				<a name="handle" class="tsd-anchor"></a>
 				<h3>handle</h3>
 				<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
-					<li class="tsd-signature tsd-kind-icon">handle<span class="tsd-signature-symbol">(</span>err<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Error</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					<li class="tsd-signature tsd-kind-icon">handle<span class="tsd-signature-symbol">(</span>err<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">never</span></li>
 				</ul>
 				<ul class="tsd-descriptions">
 					<li class="tsd-description">
 						<aside class="tsd-sources">
 							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L10">utils/api.ts:10</a></li>
+								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L11">utils/api.ts:11</a></li>
 							</ul>
 						</aside>
 						<h4 class="tsd-parameters-title">Parameters</h4>
 						<ul class="tsd-parameters">
 							<li>
-								<h5>err: <span class="tsd-signature-type">Error</span></h5>
+								<h5>err: <span class="tsd-signature-type">any</span></h5>
 							</li>
 						</ul>
-						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">never</span></h4>
+					</li>
+				</ul>
+			</section>
+			<section class="tsd-panel tsd-member tsd-kind-function tsd-parent-kind-external-module">
+				<a name="login" class="tsd-anchor"></a>
+				<h3>login</h3>
+				<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
+					<li class="tsd-signature tsd-kind-icon">login<span class="tsd-signature-symbol">(</span>user<span class="tsd-signature-symbol">: </span><a href="../interfaces/_utils_interfaces_.inewuserapi.html" class="tsd-signature-type">INewUserAPI</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.iloginresultapi.html" class="tsd-signature-type">ILoginResultAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></li>
+				</ul>
+				<ul class="tsd-descriptions">
+					<li class="tsd-description">
+						<aside class="tsd-sources">
+							<ul>
+								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L68">utils/api.ts:68</a></li>
+							</ul>
+						</aside>
+						<h4 class="tsd-parameters-title">Parameters</h4>
+						<ul class="tsd-parameters">
+							<li>
+								<h5>user: <a href="../interfaces/_utils_interfaces_.inewuserapi.html" class="tsd-signature-type">INewUserAPI</a></h5>
+							</li>
+						</ul>
+						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.iloginresultapi.html" class="tsd-signature-type">ILoginResultAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></h4>
+					</li>
+				</ul>
+			</section>
+			<section class="tsd-panel tsd-member tsd-kind-function tsd-parent-kind-external-module">
+				<a name="logout" class="tsd-anchor"></a>
+				<h3>logout</h3>
+				<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
+					<li class="tsd-signature tsd-kind-icon">logout<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></li>
+				</ul>
+				<ul class="tsd-descriptions">
+					<li class="tsd-description">
+						<aside class="tsd-sources">
+							<ul>
+								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L73">utils/api.ts:73</a></li>
+							</ul>
+						</aside>
+						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></h4>
 					</li>
 				</ul>
 			</section>
@@ -1075,13 +1123,13 @@ img { max-width: 100%; }
 				<a name="post" class="tsd-anchor"></a>
 				<h3>post</h3>
 				<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
-					<li class="tsd-signature tsd-kind-icon">post<span class="tsd-signature-symbol">(</span>endpoint<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, data<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span>, auth<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></li>
+					<li class="tsd-signature tsd-kind-icon">post<span class="tsd-signature-symbol">(</span>endpoint<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, data<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span>, auth<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span>, ignore<span class="tsd-signature-symbol">?: </span><span class="tsd-signature-type">RegExp</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></li>
 				</ul>
 				<ul class="tsd-descriptions">
 					<li class="tsd-description">
 						<aside class="tsd-sources">
 							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L27">utils/api.ts:27</a></li>
+								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L32">utils/api.ts:32</a></li>
 							</ul>
 						</aside>
 						<h4 class="tsd-parameters-title">Parameters</h4>
@@ -1094,6 +1142,9 @@ img { max-width: 100%; }
 							</li>
 							<li>
 								<h5><span class="tsd-flag ts-flagOptional">Optional</span> auth: <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span></h5>
+							</li>
+							<li>
+								<h5><span class="tsd-flag ts-flagOptional">Optional</span> ignore: <span class="tsd-signature-type">RegExp</span></h5>
 							</li>
 						</ul>
 						<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">&gt;</span></h4>
@@ -1110,7 +1161,7 @@ img { max-width: 100%; }
 					<li class="tsd-description">
 						<aside class="tsd-sources">
 							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L13">utils/api.ts:13</a></li>
+								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L17">utils/api.ts:17</a></li>
 							</ul>
 						</aside>
 						<h4 class="tsd-parameters-title">Parameters</h4>
@@ -1140,7 +1191,7 @@ img { max-width: 100%; }
 				<div class="tsd-signature tsd-kind-icon">auth<wbr>Headers<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">object</span></div>
 				<aside class="tsd-sources">
 					<ul>
-						<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L8">utils/api.ts:8</a></li>
+						<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L9">utils/api.ts:9</a></li>
 					</ul>
 				</aside>
 				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-object-literal tsd-is-not-exported">
@@ -1149,7 +1200,7 @@ img { max-width: 100%; }
 					<div class="tsd-signature tsd-kind-icon">X-<wbr><wbr>Auth-<wbr><wbr>Token<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> =&nbsp;&quot;&quot;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L8">utils/api.ts:8</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L9">utils/api.ts:9</a></li>
 						</ul>
 					</aside>
 				</section>
@@ -1159,7 +1210,7 @@ img { max-width: 100%; }
 					<div class="tsd-signature tsd-kind-icon">X-<wbr><wbr>User-<wbr><wbr>Id<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> =&nbsp;&quot;&quot;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L8">utils/api.ts:8</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L9">utils/api.ts:9</a></li>
 						</ul>
 					</aside>
 				</section>
@@ -1170,7 +1221,7 @@ img { max-width: 100%; }
 				<div class="tsd-signature tsd-kind-icon">basic<wbr>Headers<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">object</span></div>
 				<aside class="tsd-sources">
 					<ul>
-						<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L7">utils/api.ts:7</a></li>
+						<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L8">utils/api.ts:8</a></li>
 					</ul>
 				</aside>
 				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-object-literal tsd-is-not-exported">
@@ -1179,7 +1230,7 @@ img { max-width: 100%; }
 					<div class="tsd-signature tsd-kind-icon">Content-<wbr><wbr>Type<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> =&nbsp;&quot;application/json&quot;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/rocketchat-bot-driver/blob/21b2c78/src/utils/api.ts#L7">utils/api.ts:7</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/d86a7f2/src/utils/api.ts#L8">utils/api.ts:8</a></li>
 						</ul>
 					</aside>
 				</section>
