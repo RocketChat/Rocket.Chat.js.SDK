@@ -5,5 +5,6 @@
   "module": "commonjs",
   "target": "ES6",
   "out": "./docs",
-  "theme": "minimal"
+  "theme": "default",
+  "exclude": "**/*.spec.ts"
 }

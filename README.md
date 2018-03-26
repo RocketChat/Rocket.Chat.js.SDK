@@ -1,4 +1,5 @@
 [asteroid]: https://www.npmjs.com/package/asteroid
+[lru]: https://www.npmjs.com/package/lru
 
 # Rocket.Chat Node.js SDK
 
@@ -32,15 +33,27 @@ Currently, there are two modules exported by the SDK:
 
 Access these modules by importing them from SDK, e.g:
 
-ES6 `import { driver, methodCache } from '@rocket.chat/sdk'`
+ES6 `import { driver, methodCache } from 'rocketchat-sdk'`
 
-ES5 `const { driver, methodCache } = require('@rocket.chat/sdk')`
+ES5 `const { driver, methodCache } = require('rocketchat-sdk')`
 
 See [Asteroid][asteroid] docs for methods that can be called from that API.
 
 Any Rocket.Chat server method can be called via `driver.callMethod`,
 `driver.cacheCall` or `driver.asyncCall`. Server methods are not fully
 documented, most require searching the Rocket.Chat codebase.
+
+#### MESSAGE OBJECTS
+
+The Rocket.Chat message schema can be found here:
+https://rocket.chat/docs/developer-guides/schema-definition/
+
+The structure for messages in this package matches that schema, with a
+TypeScript interface defined here: https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/master/src/config/messageInterfaces.ts
+
+The `driver.prepareMessage` method (documented below) provides a helper for
+simple message creation and the `message` module can also be imported to create
+new `Message` class instances directly if detailed attributes are required.
 
 #### DRIVER METHODS
 
@@ -98,11 +111,17 @@ Shortcut to subscribe to user's message stream
 
 ### `driver.reactToMessages(callback)`
 
+Once a subscription is created, using `driver.subscribeToMessages()` this method
+can be used to attach a callback to changes in the message stream.
+
 Fires callback with every change in subscriptions
-- Subscribe must be called first
 - Uses error-first callback pattern
 - Second argument is the changed item
 - Third argument is additional attributes, such as `roomType`
+
+For example usage, see the Rocket.Chat Hubot adapter's receive function, which
+is bound as a callback to this method:
+https://github.com/RocketChat/hubot-rocketchat/blob/convert-es6/index.js#L97-L193
 
 ### `driver.asyncCall(method, params)`
 
@@ -193,6 +212,10 @@ Send a prepared message object (with pre-defined room ID)
 
 ### METHOD CACHE
 
+[LRU][lru] is used to cache results from the server, to reduce unnecessary calls
+for data that is unlikely to change, such as room IDs. Utility methods and env
+vars allow configuring, creating and resetting caches for specific methods.
+
 ---
 
 ### `methodCache.use(instance)`
@@ -249,12 +272,12 @@ interactions (i.e. bots) locally while in development.
 
 ## Use as Dependency
 
-`yarn add @rocket.chat/sdk` or `npm install --save @rocket.chat/sdk`
+`yarn add rocketchat-sdk` or `npm install --save rocketchat-sdk`
 
 ES6 module, using async
 
 ```
-import * as rocketchat from '@rocket.chat/sdk'
+import * as rocketchat from 'rocketchat-sdk'
 
 const asteroid = await rocketchat.driver.connect({ host: 'localhost:3000' })
 console.log('connected', asteroid)
@@ -263,7 +286,7 @@ console.log('connected', asteroid)
 ES5 module, using callback
 
 ```
-const rocketchat = require('@rocket.chat/sdk')
+const rocketchat = require('rocketchat-sdk')
 
 rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
   if (err) console.error(err)

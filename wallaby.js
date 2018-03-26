@@ -1,6 +1,6 @@
 module.exports = function (wallaby) {
   return {
-    name: 'Rokcet.Chat Bot Driver',
+    name: 'Rocket.Chat.js.SDK',
     files: [
       "src/**/*.ts",
       { pattern: "src/**/*.spec.ts", ignore: true },

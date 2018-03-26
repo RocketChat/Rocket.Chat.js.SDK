@@ -1,5 +1,5 @@
 {
-  "name": "@rocket.chat/sdk",
+  "name": "rocketchat-sdk",
   "version": "0.0.0-develop",
   "description": "Node.js SDK for Rocket.Chat. Application interface for server methods and message streams.",
   "main": "dist/index.js",
@@ -30,7 +30,7 @@
     "test:hook": "mocha --opts ./mocha.opts './**/*.spec.ts'",
     "test:debug": "mocha  --opts ./mocha.opts --inspect --debug-brk 'src/**/*.spec.ts'",
     "test:package": "preview && mocha --opts ./mocha.opts 'src/index.spec.ts'",
-    "docs": "rimraf ./docs/*; typedoc --options ./typedoc.json ./src",
+    "docs": "rimraf ./docs/*; typedoc --options ./typedoc.json ./src/lib",
     "prebuild": "npm run test",
     "build": "rimraf ./dist/* && tsc && npm run test:package && npm run docs"
   },
@@ -53,12 +53,12 @@
     "package-preview": "^1.0.5",
     "rimraf": "^2.6.2",
     "sinon": "^4.4.2",
-    "sinon-chai": "^3.0.0",
     "source-map-support": "^0.5.3",
     "ts-node": "^5.0.1",
     "tslint": "^5.9.1",
     "tslint-config-standard": "^7.0.0",
     "typedoc": "0.8.0",
+    "typedoc-plugin-external-module-name": "^1.1.1",
     "typescript": "^2.7.2"
   },
   "dependencies": {

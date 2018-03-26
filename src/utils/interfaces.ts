@@ -22,10 +22,10 @@ export interface IAttachmentAPI {
   ts?: string,           // ISO timestamp, displays the time next to the text portion
   thumb_url?: string,    // An image that displays to the left of the text, looks better when this is relatively small
   message_link?: string, // Only applicable if the ts is provided, as it makes the time clickable to this link
-  collapsed?: boolean,   // Causes the image, audio, and video sections to be hidding when collapsed is true
+  collapsed?: boolean,   // Causes the image, audio, and video sections to be hiding when collapsed is true
   author_name?: string,  // Name of the author
   author_link?: string,  // Providing this makes the author name clickable and points to this link
-  author_icon?: string,  // Displays a tiny icon to the left of the Author’s name
+  author_icon?: string,  // Displays a tiny icon to the left of the author's name
   title?: string,        // Title to display for this attachment, displays under the author
   title_link?: string,   // Providing this makes the title clickable, pointing to this link
   title_link_download_true?: string, // When this is true, a download icon appears and clicking this saves the link to file
