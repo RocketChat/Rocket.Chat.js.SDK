@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>rocketchat-sdk</title>
+	<title>@rocket.chat/sdk</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="assets/css/main.css">
@@ -22,7 +22,7 @@
 						<li class="state loading">Preparing search index...</li>
 						<li class="state failure">The search index is not available</li>
 					</ul>
-					<a href="index.html" class="title">rocketchat-sdk</a>
+					<a href="index.html" class="title">@rocket.chat/sdk</a>
 				</div>
 				<div class="table-cell" id="tsd-widgets">
 					<div id="tsd-filter">
@@ -54,7 +54,7 @@
 					<a href="globals.html">Globals</a>
 				</li>
 			</ul>
-			<h1> rocketchat-sdk</h1>
+			<h1> @rocket.chat/sdk</h1>
 		</div>
 	</div>
 </header>
@@ -85,8 +85,8 @@
 					<li><code>methodCache</code> - Manages results cache for calls to server (via LRU cache)</li>
 				</ul>
 				<p>Access these modules by importing them from SDK, e.g:</p>
-				<p>ES6 <code>import { driver, methodCache } from &#39;rocketchat-sdk&#39;</code></p>
-				<p>ES5 <code>const { driver, methodCache } = require(&#39;rocketchat-sdk&#39;)</code></p>
+				<p>ES6 <code>import { driver, methodCache } from &#39;@rocket.chat/sdk&#39;</code></p>
+				<p>ES5 <code>const { driver, methodCache } = require(&#39;@rocket.chat/sdk&#39;)</code></p>
 				<p>See <a href="https://www.npmjs.com/package/asteroid">Asteroid</a> docs for methods that can be called from that API.</p>
 				<p>Any Rocket.Chat server method can be called via <code>driver.callMethod</code>,
 					<code>driver.cacheCall</code> or <code>driver.asyncCall</code>. Server methods are not fully
@@ -302,14 +302,14 @@
 					and subscription methods are functional. And it helps to manually run your SDK
 				interactions (i.e. bots) locally while in development.</p>
 				<h2 id="use-as-dependency">Use as Dependency</h2>
-				<p><code>yarn add rocketchat-sdk</code> or <code>npm install --save rocketchat-sdk</code></p>
+				<p><code>yarn add @rocket.chat/sdk</code> or <code>npm install --save @rocket.chat/sdk</code></p>
 				<p>ES6 module, using async</p>
-				<pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> rocketchat <span class="hljs-keyword">from</span> <span class="hljs-string">'rocketchat-sdk'</span>
+				<pre><code><span class="hljs-keyword">import</span> * <span class="hljs-keyword">as</span> rocketchat <span class="hljs-keyword">from</span> <span class="hljs-string">'@rocket.chat/sdk'</span>
 
 <span class="hljs-keyword">const</span> asteroid = <span class="hljs-keyword">await</span> rocketchat.driver.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span> })
 <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'connected'</span>, asteroid)
 </code></pre><p>ES5 module, using callback</p>
-				<pre><code><span class="hljs-keyword">const</span> rocketchat = <span class="hljs-built_in">require</span>(<span class="hljs-string">'rocketchat-sdk'</span>)
+				<pre><code><span class="hljs-keyword">const</span> rocketchat = <span class="hljs-built_in">require</span>(<span class="hljs-string">'@rocket.chat/sdk'</span>)
 
 rocketchat.driver.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span> }, <span class="hljs-function"><span class="hljs-keyword">function</span> (<span class="hljs-params">err, asteroid</span>) </span>{
   <span class="hljs-keyword">if</span> (err) <span class="hljs-built_in">console</span>.error(err)

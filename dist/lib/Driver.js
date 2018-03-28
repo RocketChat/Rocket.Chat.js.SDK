@@ -52,7 +52,7 @@ const integrationId = process.env.INTEGRATION_ID || 'js.SDK';
 /**
  * Event Emitter for listening to connection.
  * @example
- *  import { driver } from 'rocketchat-sdk'
+ *  import { driver } from '@rocket.chat/sdk'
  *  driver.connect()
  *  driver.events.on('connected', () => console.log('driver connected'))
  */
@@ -75,13 +75,13 @@ exports.useLog = useLog;
  * error-first-pattern. Error returned or promise rejected on timeout.
  * Removes http/s protocol to get connection hostname if taken from URL.
  * @example <caption>Use with callback</caption>
- *  import { driver } from 'rocketchat-sdk'
+ *  import { driver } from '@rocket.chat/sdk'
  *  driver.connect({}, (err) => {
  *    if (err) throw err
  *    else console.log('connected')
  *  })
  * @example <caption>Using promise</caption>
- *  import { driver } from 'rocketchat-sdk'
+ *  import { driver } from '@rocket.chat/sdk'
  *  driver.connect()
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))

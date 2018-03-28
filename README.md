@@ -33,9 +33,9 @@ Currently, there are two modules exported by the SDK:
 
 Access these modules by importing them from SDK, e.g:
 
-ES6 `import { driver, methodCache } from 'rocketchat-sdk'`
+ES6 `import { driver, methodCache } from '@rocket.chat/sdk'`
 
-ES5 `const { driver, methodCache } = require('rocketchat-sdk')`
+ES5 `const { driver, methodCache } = require('@rocket.chat/sdk')`
 
 See [Asteroid][asteroid] docs for methods that can be called from that API.
 
@@ -272,12 +272,12 @@ interactions (i.e. bots) locally while in development.
 
 ## Use as Dependency
 
-`yarn add rocketchat-sdk` or `npm install --save rocketchat-sdk`
+`yarn add @rocket.chat/sdk` or `npm install --save @rocket.chat/sdk`
 
 ES6 module, using async
 
 ```
-import * as rocketchat from 'rocketchat-sdk'
+import * as rocketchat from '@rocket.chat/sdk'
 
 const asteroid = await rocketchat.driver.connect({ host: 'localhost:3000' })
 console.log('connected', asteroid)
@@ -286,7 +286,7 @@ console.log('connected', asteroid)
 ES5 module, using callback
 
 ```
-const rocketchat = require('rocketchat-sdk')
+const rocketchat = require('@rocket.chat/sdk')
 
 rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
   if (err) console.error(err)
