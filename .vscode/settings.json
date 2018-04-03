@@ -12,5 +12,9 @@
     "reporter": "list"
   },
   "coverage-gutters.showGutterCoverage": true,
-  "eslint.packageManager": "yarn"
+  "eslint.packageManager": "yarn",
+  "cSpell.words": [
+    "groupable",
+    "msgs"
+  ]
 }

@@ -26,10 +26,10 @@
   },
   "scripts": {
     "pretest": "tslint -p .",
-    "test": "nyc mocha --opts ./mocha.opts './src/lib/**/*.spec.ts'",
-    "test:hook": "mocha --opts ./mocha.opts './**/*.spec.ts'",
-    "test:debug": "mocha  --opts ./mocha.opts --inspect --debug-brk 'src/**/*.spec.ts'",
-    "test:package": "preview && mocha --opts ./mocha.opts 'src/index.spec.ts'",
+    "test": "nyc mocha './src/lib/**/*.spec.ts'",
+    "test:hook": "mocha './**/*.spec.ts'",
+    "test:debug": "mocha  --inspect --debug-brk 'src/**/*.spec.ts'",
+    "test:package": "preview && mocha 'src/index.spec.ts'",
     "docs": "rimraf ./docs/*; typedoc --options ./typedoc.json ./src/lib",
     "prebuild": "npm run test",
     "build": "rimraf ./dist/* && tsc && npm run test:package && npm run docs"
@@ -42,6 +42,7 @@
   "devDependencies": {
     "@types/chai": "^4.1.2",
     "@types/mocha": "^2.2.48",
+    "@types/sinon": "^4.3.0",
     "chai": "^4.1.2",
     "commitizen": "^2.9.6",
     "cz-conventional-changelog": "^2.1.0",

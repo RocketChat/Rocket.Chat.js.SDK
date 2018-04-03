@@ -15,6 +15,9 @@ module.exports = function (wallaby) {
       '**/*.ts?(x)': wallaby.compilers.typeScript({ module: 'commonjs' })
     },
     debug: true,
-    slowTestThreshold: 200
+    slowTestThreshold: 200,
+    delays: {
+      run: 1000
+    }
   }
 }
