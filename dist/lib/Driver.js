@@ -38,17 +38,30 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
  * Define default config as public, allowing overrides from new connection.
  * Enable SSL by default if Rocket.Chat URL contains https.
  */
-const defaults = {
-    host: process.env.ROCKETCHAT_URL || 'localhost:3000',
-    useSsl: ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
-    timeout: 20 * 1000 // 20 seconds
-};
+function connectDefaults() {
+    return {
+        host: process.env.ROCKETCHAT_URL || 'localhost:3000',
+        useSsl: ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
+        timeout: 20 * 1000 // 20 seconds
+    };
+}
+exports.connectDefaults = connectDefaults;
+/** Define default config for message respond filters. */
+function respondDefaults() {
+    return {
+        allPublic: (process.env.LISTEN_ON_ALL_PUBLIC || 'false').toLowerCase() === 'true',
+        dm: (process.env.RESPOND_TO_DM || 'false').toLowerCase() === 'true',
+        livechat: (process.env.RESPOND_TO_LIVECHAT || 'false').toLowerCase() === 'true',
+        edited: (process.env.RESPOND_TO_EDITED || 'false').toLowerCase() === 'true'
+    };
+}
+exports.respondDefaults = respondDefaults;
 /**
  * The integration property is applied as an ID on sent messages `bot.i` param
  * Should be replaced when connection is invoked by a package using the SDK
  * e.g. The Hubot adapter would pass its integration ID with credentials, like:
  */
-const integrationId = process.env.INTEGRATION_ID || 'js.SDK';
+exports.integrationId = process.env.INTEGRATION_ID || 'js.SDK';
 /**
  * Event Emitter for listening to connection.
  * @example
@@ -88,7 +101,7 @@ exports.useLog = useLog;
  */
 function connect(options = {}, callback) {
     return new Promise((resolve, reject) => {
-        const config = Object.assign({}, defaults, options); // override defaults
+        const config = Object.assign({}, connectDefaults(), options); // override defaults
         config.host = config.host.replace(/(^\w+:|^)\/\//, '');
         log_1.logger.info('[connect] Connecting', config);
         exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
@@ -220,7 +233,12 @@ function login(credentials) {
         const usernameOrEmail = credentials.username || credentials.email || 'bot';
         login = exports.asteroid.loginWithPassword(usernameOrEmail, credentials.password);
     }
-    return login.catch((err) => {
+    return login
+        .then((loggedInUserId) => {
+        exports.userId = loggedInUserId;
+        return loggedInUserId;
+    })
+        .catch((err) => {
         log_1.logger.info('[login] Error:', err);
         throw err; // throw after log to stop async chain
     });
@@ -295,6 +313,18 @@ function subscribeToMessages() {
     });
 }
 exports.subscribeToMessages = subscribeToMessages;
+/**
+ * Once a subscription is created, using `subscribeToMessages` this method
+ * can be used to attach a callback to changes in the message stream.
+ * This can be called directly for custom extensions, but for most usage (e.g.
+ * for bots) the respondToMessages is more useful to only receive messages
+ * matching configuration.
+ *
+ * @param callback Function called with every change in subscriptions
+ *  - Uses error-first callback pattern
+ *  - Second argument is the changed item
+ *  - Third argument is additional attributes, such as `roomType`
+ */
 function reactToMessages(callback) {
     log_1.logger.info(`[reactive] Listening for change events in collection ${exports.messages.name}`);
     exports.messages.reactiveQuery({}).on('change', (_id) => {
@@ -315,6 +345,49 @@ function reactToMessages(callback) {
     });
 }
 exports.reactToMessages = reactToMessages;
+function respondToMessages(callback, options = {}) {
+    const config = Object.assign({}, respondDefaults(), options);
+    exports.lastReadTime = new Date(); // init before any message read
+    reactToMessages((err, message, msgOpts) => {
+        if (err) {
+            log_1.logger.error(`Unable to receive messages ${JSON.stringify(err)}`);
+            callback(err); // bubble errors back to adapter
+        }
+        // Ignore bot's own messages
+        if (message.u._id === exports.userId)
+            return;
+        // Ignore DMs if configured to
+        const isDM = msgOpts.roomType === 'd';
+        if (isDM && !config.dm)
+            return;
+        // Ignore Livechat if configured to
+        const isLC = msgOpts.roomType === 'l';
+        if (isLC && !config.livechat)
+            return;
+        // Ignore messages in public rooms not joined by bot if configured to
+        if (!config.allPublic && !isDM && !msgOpts.roomParticipant)
+            return;
+        // Set current time for comparison to incoming
+        let currentReadTime = new Date(message.ts.$date);
+        // Ignore edited messages if configured to
+        // unless it's newer than current read time (hasn't been seen before)
+        // @todo: test this logic, why not just return if edited and not responding
+        if (config.edited && typeof message.editedAt !== 'undefined') {
+            let edited = new Date(message.editedAt.$date);
+            if (edited > currentReadTime)
+                currentReadTime = edited;
+        }
+        // Ignore messages in stream that aren't new
+        if (currentReadTime <= exports.lastReadTime)
+            return;
+        // At this point, message has passed checks and can be responded to
+        log_1.logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`);
+        log_1.logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`);
+        exports.lastReadTime = currentReadTime;
+        callback(null, message, msgOpts);
+    });
+}
+exports.respondToMessages = respondToMessages;
 /**
  * Get every new element added to DDP in Asteroid (v2)
  * @todo Resolve this functionality within Rocket.Chat with team
@@ -371,7 +444,7 @@ exports.joinRooms = joinRooms;
  * Accepts message text string or a structured message object.
  */
 function prepareMessage(content, roomId) {
-    const message = new message_1.Message(content, integrationId);
+    const message = new message_1.Message(content, exports.integrationId);
     if (roomId)
         message.setRoomId(roomId);
     return message;

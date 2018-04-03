@@ -4,15 +4,43 @@ export interface ILoginResultAPI {
   data: { authToken: string, userId: string }
 }
 
-/** Payload structure for `postMessage` endpoint */
+/** Payload structure for `chat.postMessage` endpoint */
 export interface IMessageAPI {
   roomId: string,       // The room id of where the message is to be sent
-  channel: string,      // The channel name with the prefix in front of it
+  channel?: string,     // The channel name with the prefix in front of it
   text?: string,        // The text of the message to send, is optional because of attachments
   alias?: string,       // This will cause the messenger name to appear as the given alias, but username will still display
   emoji?: string,       // If provided, this will make the avatar on this message be an emoji
   avatar?: string,      // If provided, this will make the avatar use the provided image url
   attachments?: IAttachmentAPI[] // See attachment interface below
+}
+
+/** Payload structure for `chat.update` endpoint */
+export interface IMessageUpdateAPI {
+  roomId: string,       // The room id of where the message is
+  msgId: string,        // The message id to update
+  text: string          // Updated text for the message
+}
+
+/** Message receipt returned after send (not the same as sent object) */
+export interface IMessageReceiptAPI {
+  _id: string           // ID of sent message
+  rid: string,          // Room ID of sent message
+  alias: string,        // ?
+  msg: string,          // Content of message
+  parseUrls: boolean,   // URL parsing enabled on message hooks
+  groupable: boolean,   // Grouping message enabled
+  ts: string,           // Timestamp of message creation
+  u: {                  // User details of sender
+    _id: string,
+    username: string
+  },
+  _updatedAt: string,   // Time message last updated
+  editedAt?: string,    // Time updated by edit
+  editedBy?: {          // User details for the updater
+    _id: string,
+    username: string
+  }
 }
 
 /** Payload structure for message attachments */
@@ -49,7 +77,7 @@ export interface IAttachmentFieldAPI {
 export interface IMessageResultAPI {
   ts: number,           // Seconds since unix epoch
   channel: string,      // Name of channel without prefix
-  message: IMessageAPI, // The sent message object
+  message: IMessageReceiptAPI // Sent message
   success: boolean      // Send status
 }
 
@@ -82,4 +110,25 @@ export interface IUserAPI {
 export interface IUserResultAPI {
   user: IUserAPI,       // The requested user
   success: boolean      // Status of request
+}
+
+/** Room object structure */
+export interface IRoomAPI {
+  _id: string,          // Room ID
+  _updatedAt: string,   // ISO timestamp
+  t: 'c' | 'p' | 'd' | 'l', // Room type (channel, private, direct, livechat)
+  msgs: number,         // Count of messages in room
+  ts: string,           // ISO timestamp (current time in room?)
+  meta: {
+    revision: number,   // ??
+    created: number,    // Unix ms>epoch time
+    version: number     // ??
+  },
+  usernames: string[]   // users in room
+}
+
+/** Result structure for room creation (e.g. DM) */
+export interface IRoomResultAPI {
+  room: IRoomAPI,
+  success: boolean
 }

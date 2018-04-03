@@ -1,13 +1,26 @@
 /**
  * Connection options type
- * @param host Rocket.Chat instance Host URL:PORT (without protocol)
- * @param timeout How long to wait (ms) before abandoning connection
+ * @param host        Rocket.Chat instance Host URL:PORT (without protocol)
+ * @param timeout     How long to wait (ms) before abandoning connection
  */
-export interface IOptions {
+export interface IConnectOptions {
     host?: string;
     useSsl?: boolean;
     timeout?: number;
     integration?: string;
+}
+/**
+ * Message respond options
+ * @param allPublic   Listen and respond on all public channels
+ * @param dm          Respond to messages in DM / private chats
+ * @param livechat    Respond to messages in livechat
+ * @param edited      Respond to edited messages
+ */
+export interface IRespondOptions {
+    allPublic?: boolean;
+    dm?: boolean;
+    livechat?: boolean;
+    edited?: boolean;
 }
 /**
  * Loggers need to provide the same set of methods

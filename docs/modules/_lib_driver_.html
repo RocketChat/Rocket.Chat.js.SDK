@@ -75,9 +75,11 @@
 								<li class="tsd-kind-variable tsd-parent-kind-external-module tsd-is-not-exported"><a href="_lib_driver_.html#_messagestreamname" class="tsd-kind-icon">_message<wbr>Stream<wbr>Name</a></li>
 								<li class="tsd-kind-variable tsd-parent-kind-external-module"><a href="_lib_driver_.html#asteroid" class="tsd-kind-icon">asteroid</a></li>
 								<li class="tsd-kind-variable tsd-parent-kind-external-module"><a href="_lib_driver_.html#events" class="tsd-kind-icon">events</a></li>
-								<li class="tsd-kind-variable tsd-parent-kind-external-module tsd-is-not-exported"><a href="_lib_driver_.html#integrationid" class="tsd-kind-icon">integration<wbr>Id</a></li>
+								<li class="tsd-kind-variable tsd-parent-kind-external-module"><a href="_lib_driver_.html#integrationid" class="tsd-kind-icon">integration<wbr>Id</a></li>
+								<li class="tsd-kind-variable tsd-parent-kind-external-module"><a href="_lib_driver_.html#lastreadtime" class="tsd-kind-icon">last<wbr>Read<wbr>Time</a></li>
 								<li class="tsd-kind-variable tsd-parent-kind-external-module"><a href="_lib_driver_.html#messages" class="tsd-kind-icon">messages</a></li>
 								<li class="tsd-kind-variable tsd-parent-kind-external-module"><a href="_lib_driver_.html#subscriptions" class="tsd-kind-icon">subscriptions</a></li>
+								<li class="tsd-kind-variable tsd-parent-kind-external-module"><a href="_lib_driver_.html#userid" class="tsd-kind-icon">user<wbr>Id</a></li>
 							</ul>
 						</section>
 						<section class="tsd-index-section ">
@@ -87,6 +89,7 @@
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#cachecall" class="tsd-kind-icon">cache<wbr>Call</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#callmethod" class="tsd-kind-icon">call<wbr>Method</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#connect" class="tsd-kind-icon">connect</a></li>
+								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#connectdefaults" class="tsd-kind-icon">connect<wbr>Defaults</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#custommessage" class="tsd-kind-icon">custom<wbr>Message</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#disconnect" class="tsd-kind-icon">disconnect</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#getdirectmessageroomid" class="tsd-kind-icon">get<wbr>Direct<wbr>Message<wbr>Room<wbr>Id</a></li>
@@ -98,6 +101,8 @@
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#logout" class="tsd-kind-icon">logout</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#preparemessage" class="tsd-kind-icon">prepare<wbr>Message</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#reacttomessages" class="tsd-kind-icon">react<wbr>ToMessages</a></li>
+								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#responddefaults" class="tsd-kind-icon">respond<wbr>Defaults</a></li>
+								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#respondtomessages" class="tsd-kind-icon">respond<wbr>ToMessages</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#senddirecttouser" class="tsd-kind-icon">send<wbr>Direct<wbr>ToUser</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#sendmessage" class="tsd-kind-icon">send<wbr>Message</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#sendmessagebyroom" class="tsd-kind-icon">send<wbr>Message<wbr>ByRoom</a></li>
@@ -108,12 +113,6 @@
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#unsubscribe" class="tsd-kind-icon">unsubscribe</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#unsubscribeall" class="tsd-kind-icon">unsubscribe<wbr>All</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_lib_driver_.html#uselog" class="tsd-kind-icon">use<wbr>Log</a></li>
-							</ul>
-						</section>
-						<section class="tsd-index-section tsd-is-not-exported">
-							<h3>Object literals</h3>
-							<ul class="tsd-index-list">
-								<li class="tsd-kind-object-literal tsd-parent-kind-external-module tsd-is-not-exported"><a href="_lib_driver_.html#defaults" class="tsd-kind-icon">defaults</a></li>
 							</ul>
 						</section>
 					</div>
@@ -127,7 +126,7 @@
 					<div class="tsd-signature tsd-kind-icon">_message<wbr>Collection<wbr>Name<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">"stream-room-messages"</span><span class="tsd-signature-symbol"> =&nbsp;&quot;stream-room-messages&quot;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L18">lib/driver.ts:18</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L18">lib/driver.ts:18</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -142,7 +141,7 @@
 					<div class="tsd-signature tsd-kind-icon">_message<wbr>Stream<wbr>Name<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">"__my_messages__"</span><span class="tsd-signature-symbol"> =&nbsp;&quot;__my_messages__&quot;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L19">lib/driver.ts:19</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L19">lib/driver.ts:19</a></li>
 						</ul>
 					</aside>
 				</section>
@@ -152,7 +151,7 @@
 					<div class="tsd-signature tsd-kind-icon">asteroid<span class="tsd-signature-symbol">:</span> <a href="../interfaces/_config_asteroidinterfaces_.iasteroid.html" class="tsd-signature-type">IAsteroid</a></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L62">lib/driver.ts:62</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L77">lib/driver.ts:77</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -168,7 +167,7 @@
 					<div class="tsd-signature tsd-kind-icon">events<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">EventEmitter</span><span class="tsd-signature-symbol"> =&nbsp;new EventEmitter()</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L56">lib/driver.ts:56</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L71">lib/driver.ts:71</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -184,13 +183,13 @@
 						</dl>
 					</div>
 				</section>
-				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-external-module tsd-is-not-exported">
+				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-external-module">
 					<a name="integrationid" class="tsd-anchor"></a>
 					<h3>integration<wbr>Id</h3>
 					<div class="tsd-signature tsd-kind-icon">integration<wbr>Id<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> =&nbsp;process.env.INTEGRATION_ID || &#x27;js.SDK&#x27;</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L47">lib/driver.ts:47</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L62">lib/driver.ts:62</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -202,12 +201,27 @@
 					</div>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-external-module">
+					<a name="lastreadtime" class="tsd-anchor"></a>
+					<h3>last<wbr>Read<wbr>Time</h3>
+					<div class="tsd-signature tsd-kind-icon">last<wbr>Read<wbr>Time<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Date</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L55">lib/driver.ts:55</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Internal for comparing message update timestamps</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-external-module">
 					<a name="messages" class="tsd-anchor"></a>
 					<h3>messages</h3>
 					<div class="tsd-signature tsd-kind-icon">messages<span class="tsd-signature-symbol">:</span> <a href="../interfaces/_config_asteroidinterfaces_.icollection.html" class="tsd-signature-type">ICollection</a></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L73">lib/driver.ts:73</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L93">lib/driver.ts:93</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -222,13 +236,28 @@
 					<div class="tsd-signature tsd-kind-icon">subscriptions<span class="tsd-signature-symbol">:</span> <a href="../interfaces/_config_asteroidinterfaces_.isubscription.html" class="tsd-signature-type">ISubscription</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol"> =&nbsp;[]</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L68">lib/driver.ts:68</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L83">lib/driver.ts:83</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
 						<div class="lead">
 							<p>Asteroid subscriptions, exported for direct polling by adapters
 							Variable not initialised until <code>prepMeteorSubscriptions</code> called.</p>
+						</div>
+					</div>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-external-module">
+					<a name="userid" class="tsd-anchor"></a>
+					<h3>user<wbr>Id</h3>
+					<div class="tsd-signature tsd-kind-icon">user<wbr>Id<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L88">lib/driver.ts:88</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-comment tsd-typography">
+						<div class="lead">
+							<p>Current user object populated from resolved login</p>
 						</div>
 					</div>
 				</section>
@@ -245,7 +274,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L169">lib/driver.ts:169</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L189">lib/driver.ts:189</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -282,7 +311,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L201">lib/driver.ts:201</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L221">lib/driver.ts:221</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -319,7 +348,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L190">lib/driver.ts:190</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L210">lib/driver.ts:210</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -350,13 +379,13 @@
 					<a name="connect" class="tsd-anchor"></a>
 					<h3>connect</h3>
 					<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
-						<li class="tsd-signature tsd-kind-icon">connect<span class="tsd-signature-symbol">(</span>options<span class="tsd-signature-symbol">?: </span><a href="../interfaces/_config_driverinterfaces_.ioptions.html" class="tsd-signature-type">IOptions</a>, callback<span class="tsd-signature-symbol">?: </span><a href="../interfaces/_config_driverinterfaces_.icallback.html" class="tsd-signature-type">ICallback</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span></li>
+						<li class="tsd-signature tsd-kind-icon">connect<span class="tsd-signature-symbol">(</span>options<span class="tsd-signature-symbol">?: </span><a href="../interfaces/_config_driverinterfaces_.iconnectoptions.html" class="tsd-signature-type">IConnectOptions</a>, callback<span class="tsd-signature-symbol">?: </span><a href="../interfaces/_config_driverinterfaces_.icallback.html" class="tsd-signature-type">ICallback</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span></li>
 					</ul>
 					<ul class="tsd-descriptions">
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L99">lib/driver.ts:99</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L119">lib/driver.ts:119</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -387,13 +416,36 @@
 							<h4 class="tsd-parameters-title">Parameters</h4>
 							<ul class="tsd-parameters">
 								<li>
-									<h5><span class="tsd-flag ts-flagDefault value">Default value</span> options: <a href="../interfaces/_config_driverinterfaces_.ioptions.html" class="tsd-signature-type">IOptions</a><span class="tsd-signature-symbol"> =&nbsp;{}</span></h5>
+									<h5><span class="tsd-flag ts-flagDefault value">Default value</span> options: <a href="../interfaces/_config_driverinterfaces_.iconnectoptions.html" class="tsd-signature-type">IConnectOptions</a><span class="tsd-signature-symbol"> =&nbsp;{}</span></h5>
 								</li>
 								<li>
 									<h5><span class="tsd-flag ts-flagOptional">Optional</span> callback: <a href="../interfaces/_config_driverinterfaces_.icallback.html" class="tsd-signature-type">ICallback</a></h5>
 								</li>
 							</ul>
 							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">any</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-function tsd-parent-kind-external-module">
+					<a name="connectdefaults" class="tsd-anchor"></a>
+					<h3>connect<wbr>Defaults</h3>
+					<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
+						<li class="tsd-signature tsd-kind-icon">connect<wbr>Defaults<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="../interfaces/_config_driverinterfaces_.iconnectoptions.html" class="tsd-signature-type">IConnectOptions</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L36">lib/driver.ts:36</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Define default config as public, allowing overrides from new connection.
+									Enable SSL by default if Rocket.Chat URL contains https.</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <a href="../interfaces/_config_driverinterfaces_.iconnectoptions.html" class="tsd-signature-type">IConnectOptions</a></h4>
 						</li>
 					</ul>
 				</section>
@@ -407,7 +459,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L434">lib/driver.ts:434</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L517">lib/driver.ts:517</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -440,7 +492,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L135">lib/driver.ts:135</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L155">lib/driver.ts:155</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -462,7 +514,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L364">lib/driver.ts:364</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L447">lib/driver.ts:447</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -496,7 +548,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L350">lib/driver.ts:350</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L433">lib/driver.ts:433</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -524,7 +576,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L355">lib/driver.ts:355</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L438">lib/driver.ts:438</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -552,7 +604,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L369">lib/driver.ts:369</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L452">lib/driver.ts:452</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -580,7 +632,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L374">lib/driver.ts:374</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L457">lib/driver.ts:457</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -608,7 +660,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L219">lib/driver.ts:219</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L239">lib/driver.ts:239</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -636,7 +688,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L240">lib/driver.ts:240</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L265">lib/driver.ts:265</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -658,7 +710,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L382">lib/driver.ts:382</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L465">lib/driver.ts:465</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -690,13 +742,78 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L307">lib/driver.ts:307</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L344">lib/driver.ts:344</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Once a subscription is created, using <code>subscribeToMessages</code> this method
+										can be used to attach a callback to changes in the message stream.
+										This can be called directly for custom extensions, but for most usage (e.g.
+										for bots) the respondToMessages is more useful to only receive messages
+									matching configuration.</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>callback: <a href="../interfaces/_config_driverinterfaces_.icallback.html" class="tsd-signature-type">ICallback</a></h5>
+									<div class="tsd-comment tsd-typography">
+										<p>Function called with every change in subscriptions</p>
+										<ul>
+											<li>Uses error-first callback pattern</li>
+											<li>Second argument is the changed item</li>
+											<li>Third argument is additional attributes, such as <code>roomType</code></li>
+										</ul>
+									</div>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-function tsd-parent-kind-external-module">
+					<a name="responddefaults" class="tsd-anchor"></a>
+					<h3>respond<wbr>Defaults</h3>
+					<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
+						<li class="tsd-signature tsd-kind-icon">respond<wbr>Defaults<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><a href="../interfaces/_config_driverinterfaces_.irespondoptions.html" class="tsd-signature-type">IRespondOptions</a></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L45">lib/driver.ts:45</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Define default config for message respond filters.</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <a href="../interfaces/_config_driverinterfaces_.irespondoptions.html" class="tsd-signature-type">IRespondOptions</a></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-function tsd-parent-kind-external-module">
+					<a name="respondtomessages" class="tsd-anchor"></a>
+					<h3>respond<wbr>ToMessages</h3>
+					<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
+						<li class="tsd-signature tsd-kind-icon">respond<wbr>ToMessages<span class="tsd-signature-symbol">(</span>callback<span class="tsd-signature-symbol">: </span><a href="../interfaces/_config_driverinterfaces_.icallback.html" class="tsd-signature-type">ICallback</a>, options<span class="tsd-signature-symbol">?: </span><a href="../interfaces/_config_driverinterfaces_.irespondoptions.html" class="tsd-signature-type">IRespondOptions</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L362">lib/driver.ts:362</a></li>
 								</ul>
 							</aside>
 							<h4 class="tsd-parameters-title">Parameters</h4>
 							<ul class="tsd-parameters">
 								<li>
 									<h5>callback: <a href="../interfaces/_config_driverinterfaces_.icallback.html" class="tsd-signature-type">ICallback</a></h5>
+								</li>
+								<li>
+									<h5><span class="tsd-flag ts-flagDefault value">Default value</span> options: <a href="../interfaces/_config_driverinterfaces_.irespondoptions.html" class="tsd-signature-type">IRespondOptions</a><span class="tsd-signature-symbol"> =&nbsp;{}</span></h5>
 								</li>
 							</ul>
 							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
@@ -713,7 +830,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L415">lib/driver.ts:415</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L498">lib/driver.ts:498</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -744,7 +861,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L425">lib/driver.ts:425</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L508">lib/driver.ts:508</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -778,7 +895,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L408">lib/driver.ts:408</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L491">lib/driver.ts:491</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -811,7 +928,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L393">lib/driver.ts:393</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L476">lib/driver.ts:476</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -844,7 +961,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L148">lib/driver.ts:148</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L168">lib/driver.ts:168</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -875,7 +992,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L252">lib/driver.ts:252</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L277">lib/driver.ts:277</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -914,7 +1031,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L297">lib/driver.ts:297</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L322">lib/driver.ts:322</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -937,7 +1054,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L279">lib/driver.ts:279</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L304">lib/driver.ts:304</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -965,7 +1082,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L289">lib/driver.ts:289</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L314">lib/driver.ts:314</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -987,7 +1104,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L78">lib/driver.ts:78</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/lib/driver.ts#L98">lib/driver.ts:98</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -1004,55 +1121,6 @@
 							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
 						</li>
 					</ul>
-				</section>
-			</section>
-			<section class="tsd-panel-group tsd-member-group tsd-is-not-exported">
-				<h2>Object literals</h2>
-				<section class="tsd-panel tsd-member tsd-kind-object-literal tsd-parent-kind-external-module tsd-is-not-exported">
-					<a name="defaults" class="tsd-anchor"></a>
-					<h3>defaults</h3>
-					<div class="tsd-signature tsd-kind-icon">defaults<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">object</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L36">lib/driver.ts:36</a></li>
-						</ul>
-					</aside>
-					<div class="tsd-comment tsd-typography">
-						<div class="lead">
-							<p>Define default config as public, allowing overrides from new connection.
-							Enable SSL by default if Rocket.Chat URL contains https.</p>
-						</div>
-					</div>
-					<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-object-literal tsd-is-not-exported">
-						<a name="defaults.host" class="tsd-anchor"></a>
-						<h3>host</h3>
-						<div class="tsd-signature tsd-kind-icon">host<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> =&nbsp;process.env.ROCKETCHAT_URL || &#x27;localhost:3000&#x27;</span></div>
-						<aside class="tsd-sources">
-							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L37">lib/driver.ts:37</a></li>
-							</ul>
-						</aside>
-					</section>
-					<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-object-literal tsd-is-not-exported">
-						<a name="defaults.timeout" class="tsd-anchor"></a>
-						<h3>timeout</h3>
-						<div class="tsd-signature tsd-kind-icon">timeout<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol"> =&nbsp;20 * 1000</span></div>
-						<aside class="tsd-sources">
-							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L39">lib/driver.ts:39</a></li>
-							</ul>
-						</aside>
-					</section>
-					<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-object-literal tsd-is-not-exported">
-						<a name="defaults.usessl" class="tsd-anchor"></a>
-						<h3>use<wbr>Ssl</h3>
-						<div class="tsd-signature tsd-kind-icon">use<wbr>Ssl<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol"> =&nbsp;((process.env.ROCKETCHAT_URL || &#x27;&#x27;).toString().startsWith(&#x27;https&#x27;))</span></div>
-						<aside class="tsd-sources">
-							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/lib/driver.ts#L38">lib/driver.ts:38</a></li>
-							</ul>
-						</aside>
-					</section>
 				</section>
 			</section>
 		</div>
@@ -1126,14 +1194,20 @@
 					<li class=" tsd-kind-variable tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#events" class="tsd-kind-icon">events</a>
 					</li>
-					<li class=" tsd-kind-variable tsd-parent-kind-external-module tsd-is-not-exported">
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#integrationid" class="tsd-kind-icon">integration<wbr>Id</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module">
+						<a href="_lib_driver_.html#lastreadtime" class="tsd-kind-icon">last<wbr>Read<wbr>Time</a>
 					</li>
 					<li class=" tsd-kind-variable tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#messages" class="tsd-kind-icon">messages</a>
 					</li>
 					<li class=" tsd-kind-variable tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#subscriptions" class="tsd-kind-icon">subscriptions</a>
+					</li>
+					<li class=" tsd-kind-variable tsd-parent-kind-external-module">
+						<a href="_lib_driver_.html#userid" class="tsd-kind-icon">user<wbr>Id</a>
 					</li>
 					<li class=" tsd-kind-function tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#asynccall" class="tsd-kind-icon">async<wbr>Call</a>
@@ -1146,6 +1220,9 @@
 					</li>
 					<li class=" tsd-kind-function tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#connect" class="tsd-kind-icon">connect</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module">
+						<a href="_lib_driver_.html#connectdefaults" class="tsd-kind-icon">connect<wbr>Defaults</a>
 					</li>
 					<li class=" tsd-kind-function tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#custommessage" class="tsd-kind-icon">custom<wbr>Message</a>
@@ -1181,6 +1258,12 @@
 						<a href="_lib_driver_.html#reacttomessages" class="tsd-kind-icon">react<wbr>ToMessages</a>
 					</li>
 					<li class=" tsd-kind-function tsd-parent-kind-external-module">
+						<a href="_lib_driver_.html#responddefaults" class="tsd-kind-icon">respond<wbr>Defaults</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module">
+						<a href="_lib_driver_.html#respondtomessages" class="tsd-kind-icon">respond<wbr>ToMessages</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#senddirecttouser" class="tsd-kind-icon">send<wbr>Direct<wbr>ToUser</a>
 					</li>
 					<li class=" tsd-kind-function tsd-parent-kind-external-module">
@@ -1209,9 +1292,6 @@
 					</li>
 					<li class=" tsd-kind-function tsd-parent-kind-external-module">
 						<a href="_lib_driver_.html#uselog" class="tsd-kind-icon">use<wbr>Log</a>
-					</li>
-					<li class=" tsd-kind-object-literal tsd-parent-kind-external-module tsd-is-not-exported">
-						<a href="_lib_driver_.html#defaults" class="tsd-kind-icon">defaults</a>
 					</li>
 				</ul>
 			</nav>

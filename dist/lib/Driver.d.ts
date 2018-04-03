@@ -1,9 +1,28 @@
 /// <reference types="node" />
 import { EventEmitter } from 'events';
 import { Message } from './message';
-import { IOptions, ICallback, ILogger } from '../config/driverInterfaces';
+import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces';
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces';
 import { IMessage } from '../config/messageInterfaces';
+/**
+ * Asteroid ^v2 interface below, suspended for work on future branch
+ * @todo Upgrade to Asteroid v2 or find a better maintained ddp client
+ */
+/**
+ * Define default config as public, allowing overrides from new connection.
+ * Enable SSL by default if Rocket.Chat URL contains https.
+ */
+export declare function connectDefaults(): IConnectOptions;
+/** Define default config for message respond filters. */
+export declare function respondDefaults(): IRespondOptions;
+/** Internal for comparing message update timestamps */
+export declare let lastReadTime: Date;
+/**
+ * The integration property is applied as an ID on sent messages `bot.i` param
+ * Should be replaced when connection is invoked by a package using the SDK
+ * e.g. The Hubot adapter would pass its integration ID with credentials, like:
+ */
+export declare const integrationId: string;
 /**
  * Event Emitter for listening to connection.
  * @example
@@ -22,6 +41,10 @@ export declare let asteroid: IAsteroid;
  * Variable not initialised until `prepMeteorSubscriptions` called.
  */
 export declare let subscriptions: ISubscription[];
+/**
+ * Current user object populated from resolved login
+ */
+export declare let userId: string;
 /**
  * Array of messages received from reactive collection
  */
@@ -47,7 +70,7 @@ export declare function useLog(externalLog: ILogger): void;
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export declare function connect(options?: IOptions, callback?: ICallback): any;
+export declare function connect(options?: IConnectOptions, callback?: ICallback): any;
 /**
  * Remove all active subscriptions, logout and disconnect from Rocket.Chat
  */
@@ -89,7 +112,20 @@ export declare function unsubscribeAll(): void;
  * Older adapters used an option for this method but it was always the default.
  */
 export declare function subscribeToMessages(): Promise<ISubscription>;
+/**
+ * Once a subscription is created, using `subscribeToMessages` this method
+ * can be used to attach a callback to changes in the message stream.
+ * This can be called directly for custom extensions, but for most usage (e.g.
+ * for bots) the respondToMessages is more useful to only receive messages
+ * matching configuration.
+ *
+ * @param callback Function called with every change in subscriptions
+ *  - Uses error-first callback pattern
+ *  - Second argument is the changed item
+ *  - Third argument is additional attributes, such as `roomType`
+ */
 export declare function reactToMessages(callback: ICallback): void;
+export declare function respondToMessages(callback: ICallback, options?: IRespondOptions): void;
 /**
  * Get every new element added to DDP in Asteroid (v2)
  * @todo Resolve this functionality within Rocket.Chat with team

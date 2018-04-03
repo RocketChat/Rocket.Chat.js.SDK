@@ -6,15 +6,41 @@ export interface ILoginResultAPI {
         userId: string;
     };
 }
-/** Payload structure for `postMessage` endpoint */
+/** Payload structure for `chat.postMessage` endpoint */
 export interface IMessageAPI {
     roomId: string;
-    channel: string;
+    channel?: string;
     text?: string;
     alias?: string;
     emoji?: string;
     avatar?: string;
     attachments?: IAttachmentAPI[];
+}
+/** Payload structure for `chat.update` endpoint */
+export interface IMessageUpdateAPI {
+    roomId: string;
+    msgId: string;
+    text: string;
+}
+/** Message receipt returned after send (not the same as sent object) */
+export interface IMessageReceiptAPI {
+    _id: string;
+    rid: string;
+    alias: string;
+    msg: string;
+    parseUrls: boolean;
+    groupable: boolean;
+    ts: string;
+    u: {
+        _id: string;
+        username: string;
+    };
+    _updatedAt: string;
+    editedAt?: string;
+    editedBy?: {
+        _id: string;
+        username: string;
+    };
 }
 /** Payload structure for message attachments */
 export interface IAttachmentAPI {
@@ -48,7 +74,7 @@ export interface IAttachmentFieldAPI {
 export interface IMessageResultAPI {
     ts: number;
     channel: string;
-    message: IMessageAPI;
+    message: IMessageReceiptAPI;
     success: boolean;
 }
 /** User object structure for creation endpoints */
@@ -77,5 +103,24 @@ export interface IUserAPI {
 /** Result structure for user data request (by non-admin) */
 export interface IUserResultAPI {
     user: IUserAPI;
+    success: boolean;
+}
+/** Room object structure */
+export interface IRoomAPI {
+    _id: string;
+    _updatedAt: string;
+    t: 'c' | 'p' | 'd' | 'l';
+    msgs: number;
+    ts: string;
+    meta: {
+        revision: number;
+        created: number;
+        version: number;
+    };
+    usernames: string[];
+}
+/** Result structure for room creation (e.g. DM) */
+export interface IRoomResultAPI {
+    room: IRoomAPI;
     success: boolean;
 }

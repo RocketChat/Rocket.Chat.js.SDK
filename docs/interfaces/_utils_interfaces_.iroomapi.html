@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>IReactiveQuery | @rocket.chat/sdk</title>
+	<title>IRoomAPI | @rocket.chat/sdk</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
@@ -54,13 +54,13 @@
 					<a href="../globals.html">Globals</a>
 				</li>
 				<li>
-					<a href="../modules/_config_asteroidinterfaces_.html">&quot;config/asteroidInterfaces&quot;</a>
+					<a href="../modules/_utils_interfaces_.html">&quot;utils/interfaces&quot;</a>
 				</li>
 				<li>
-					<a href="_config_asteroidinterfaces_.ireactivequery.html">IReactiveQuery</a>
+					<a href="_utils_interfaces_.iroomapi.html">IRoomAPI</a>
 				</li>
 			</ul>
-			<h1>Interface IReactiveQuery</h1>
+			<h1>Interface IRoomAPI</h1>
 		</div>
 	</div>
 </header>
@@ -70,9 +70,7 @@
 			<section class="tsd-panel tsd-comment">
 				<div class="tsd-comment tsd-typography">
 					<div class="lead">
-						<p>A reactive subset of a collection. Possible events are:
-							<code>change</code>: emitted whenever the result of the query changes. The id of the
-						item that changed is passed to the handler.</p>
+						<p>Room object structure</p>
 					</div>
 				</div>
 			</section>
@@ -80,7 +78,7 @@
 				<h3>Hierarchy</h3>
 				<ul class="tsd-hierarchy">
 					<li>
-						<span class="target">IReactiveQuery</span>
+						<span class="target">IRoomAPI</span>
 					</li>
 				</ul>
 			</section>
@@ -91,8 +89,13 @@
 						<section class="tsd-index-section ">
 							<h3>Properties</h3>
 							<ul class="tsd-index-list">
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_config_asteroidinterfaces_.ireactivequery.html#on" class="tsd-kind-icon">on</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_config_asteroidinterfaces_.ireactivequery.html#result" class="tsd-kind-icon">result</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.iroomapi.html#_id" class="tsd-kind-icon">_id</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.iroomapi.html#_updatedat" class="tsd-kind-icon">_updated<wbr>At</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.iroomapi.html#meta" class="tsd-kind-icon">meta</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.iroomapi.html#msgs" class="tsd-kind-icon">msgs</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.iroomapi.html#t" class="tsd-kind-icon">t</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.iroomapi.html#ts" class="tsd-kind-icon">ts</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.iroomapi.html#usernames" class="tsd-kind-icon">usernames</a></li>
 							</ul>
 						</section>
 					</div>
@@ -101,46 +104,86 @@
 			<section class="tsd-panel-group tsd-member-group ">
 				<h2>Properties</h2>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="on" class="tsd-anchor"></a>
-					<h3>on</h3>
-					<div class="tsd-signature tsd-kind-icon">on<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">function</span></div>
+					<a name="_id" class="tsd-anchor"></a>
+					<h3>_id</h3>
+					<div class="tsd-signature tsd-kind-icon">_id<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/config/asteroidInterfaces.ts#L113">config/asteroidInterfaces.ts:113</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L117">utils/interfaces.ts:117</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="_updatedat" class="tsd-anchor"></a>
+					<h3>_updated<wbr>At</h3>
+					<div class="tsd-signature tsd-kind-icon">_updated<wbr>At<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L118">utils/interfaces.ts:118</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="meta" class="tsd-anchor"></a>
+					<h3>meta</h3>
+					<div class="tsd-signature tsd-kind-icon">meta<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">object</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L122">utils/interfaces.ts:122</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-type-declaration">
 						<h4>Type declaration</h4>
 						<ul class="tsd-parameters">
-							<li class="tsd-parameter-siganture">
-								<ul class="tsd-signatures tsd-kind-type-literal tsd-parent-kind-property tsd-is-not-exported">
-									<li class="tsd-signature tsd-kind-icon"><span class="tsd-signature-symbol">(</span>event<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span>, handler<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Function</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">void</span></li>
-								</ul>
-								<ul class="tsd-descriptions">
-									<li class="tsd-description">
-										<h4 class="tsd-parameters-title">Parameters</h4>
-										<ul class="tsd-parameters">
-											<li>
-												<h5>event: <span class="tsd-signature-type">string</span></h5>
-											</li>
-											<li>
-												<h5>handler: <span class="tsd-signature-type">Function</span></h5>
-											</li>
-										</ul>
-										<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
-									</li>
-								</ul>
+							<li class="tsd-parameter">
+								<h5>created<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></h5>
+							</li>
+							<li class="tsd-parameter">
+								<h5>revision<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></h5>
+							</li>
+							<li class="tsd-parameter">
+								<h5>version<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">number</span></h5>
 							</li>
 						</ul>
 					</div>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="result" class="tsd-anchor"></a>
-					<h3>result</h3>
-					<div class="tsd-signature tsd-kind-icon">result<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></div>
+					<a name="msgs" class="tsd-anchor"></a>
+					<h3>msgs</h3>
+					<div class="tsd-signature tsd-kind-icon">msgs<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/config/asteroidInterfaces.ts#L114">config/asteroidInterfaces.ts:114</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L120">utils/interfaces.ts:120</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="t" class="tsd-anchor"></a>
+					<h3>t</h3>
+					<div class="tsd-signature tsd-kind-icon">t<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">"c"</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">"p"</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">"d"</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">"l"</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L119">utils/interfaces.ts:119</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="ts" class="tsd-anchor"></a>
+					<h3>ts</h3>
+					<div class="tsd-signature tsd-kind-icon">ts<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L121">utils/interfaces.ts:121</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="usernames" class="tsd-anchor"></a>
+					<h3>usernames</h3>
+					<div class="tsd-signature tsd-kind-icon">usernames<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L127">utils/interfaces.ts:127</a></li>
 						</ul>
 					</aside>
 				</section>
@@ -152,7 +195,7 @@
 					<li class="globals  ">
 						<a href="../globals.html"><em>Globals</em></a>
 					</li>
-					<li class="current tsd-kind-external-module">
+					<li class=" tsd-kind-external-module">
 						<a href="../modules/_config_asteroidinterfaces_.html">"config/asteroid<wbr>Interfaces"</a>
 					</li>
 					<li class=" tsd-kind-external-module">
@@ -191,7 +234,7 @@
 					<li class=" tsd-kind-external-module">
 						<a href="../modules/_utils_config_.html">"utils/config"</a>
 					</li>
-					<li class=" tsd-kind-external-module">
+					<li class="current tsd-kind-external-module">
 						<a href="../modules/_utils_interfaces_.html">"utils/interfaces"</a>
 					</li>
 					<li class=" tsd-kind-external-module">
@@ -205,43 +248,67 @@
 			<nav class="tsd-navigation secondary menu-sticky">
 				<ul class="before-current">
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.iasteroid.html" class="tsd-kind-icon">IAsteroid</a>
+						<a href="_utils_interfaces_.iattachmentapi.html" class="tsd-kind-icon">IAttachmentAPI</a>
 					</li>
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.icollection.html" class="tsd-kind-icon">ICollection</a>
+						<a href="_utils_interfaces_.iattachmentfieldapi.html" class="tsd-kind-icon">IAttachment<wbr>FieldAPI</a>
 					</li>
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.icollectionresult.html" class="tsd-kind-icon">ICollection<wbr>Result</a>
+						<a href="_utils_interfaces_.iloginresultapi.html" class="tsd-kind-icon">ILogin<wbr>ResultAPI</a>
 					</li>
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.icredentials.html" class="tsd-kind-icon">ICredentials</a>
+						<a href="_utils_interfaces_.imessageapi.html" class="tsd-kind-icon">IMessageAPI</a>
 					</li>
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.imethodresult.html" class="tsd-kind-icon">IMethod<wbr>Result</a>
+						<a href="_utils_interfaces_.imessagereceiptapi.html" class="tsd-kind-icon">IMessage<wbr>ReceiptAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.imessageresultapi.html" class="tsd-kind-icon">IMessage<wbr>ResultAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.imessageupdateapi.html" class="tsd-kind-icon">IMessage<wbr>UpdateAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.inewuserapi.html" class="tsd-kind-icon">INew<wbr>UserAPI</a>
 					</li>
 				</ul>
 				<ul class="current">
 					<li class="current tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.ireactivequery.html" class="tsd-kind-icon">IReactive<wbr>Query</a>
+						<a href="_utils_interfaces_.iroomapi.html" class="tsd-kind-icon">IRoomAPI</a>
 						<ul>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_config_asteroidinterfaces_.ireactivequery.html#on" class="tsd-kind-icon">on</a>
+								<a href="_utils_interfaces_.iroomapi.html#_id" class="tsd-kind-icon">_id</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_config_asteroidinterfaces_.ireactivequery.html#result" class="tsd-kind-icon">result</a>
+								<a href="_utils_interfaces_.iroomapi.html#_updatedat" class="tsd-kind-icon">_updated<wbr>At</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.iroomapi.html#meta" class="tsd-kind-icon">meta</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.iroomapi.html#msgs" class="tsd-kind-icon">msgs</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.iroomapi.html#t" class="tsd-kind-icon">t</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.iroomapi.html#ts" class="tsd-kind-icon">ts</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.iroomapi.html#usernames" class="tsd-kind-icon">usernames</a>
 							</li>
 						</ul>
 					</li>
 				</ul>
 				<ul class="after-current">
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.iready.html" class="tsd-kind-icon">IReady</a>
+						<a href="_utils_interfaces_.iroomresultapi.html" class="tsd-kind-icon">IRoom<wbr>ResultAPI</a>
 					</li>
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.isubscription.html" class="tsd-kind-icon">ISubscription</a>
+						<a href="_utils_interfaces_.iuserapi.html" class="tsd-kind-icon">IUserAPI</a>
 					</li>
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_asteroidinterfaces_.iuseroptions.html" class="tsd-kind-icon">IUser<wbr>Options</a>
+						<a href="_utils_interfaces_.iuserresultapi.html" class="tsd-kind-icon">IUser<wbr>ResultAPI</a>
 					</li>
 				</ul>
 			</nav>

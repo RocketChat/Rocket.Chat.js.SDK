@@ -8,6 +8,7 @@ import { botUser } from '../utils/config'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
+const initEnv = process.env // store configs to reset after tests
 const credentials = { username: botUser.username, password: botUser.password }
 const delay = (ms) => new Promise((resolve, reject) => setTimeout(resolve, ms))
 let clock
@@ -149,6 +150,95 @@ describe('driver', () => {
       await driver.login(credentials)
       await driver.subscribeToMessages()
       await driver.sendMessageByRoomId('SDK test `sendMessageByRoomId`', 'GENERAL')
+    })
+  })
+  describe('.respondDefaults', () => {
+    afterEach(() => process.env = initEnv)
+    it('all configs default to false if env undefined', () => {
+      delete process.env.LISTEN_ON_ALL_PUBLIC
+      delete process.env.RESPOND_TO_DM
+      delete process.env.RESPOND_TO_LIVECHAT
+      delete process.env.RESPOND_TO_EDITED
+      const defaults = driver.respondDefaults()
+      expect(defaults).to.eql({
+        allPublic: false,
+        dm: false,
+        livechat: false,
+        edited: false
+      })
+    })
+    it('inherits config from env defaults', () => {
+      process.env.LISTEN_ON_ALL_PUBLIC = 'false'
+      process.env.RESPOND_TO_DM = 'true'
+      process.env.RESPOND_TO_LIVECHAT = 'true'
+      process.env.RESPOND_TO_EDITED = 'true'
+      const defaults = driver.respondDefaults()
+      expect(defaults).to.eql({
+        allPublic: false,
+        dm: true,
+        livechat: true,
+        edited: true
+      })
+    })
+  })
+  describe('.respondToMessages', () => {
+    beforeEach(async () => {
+      delete process.env.LISTEN_ON_ALL_PUBLIC
+      delete process.env.RESPOND_TO_DM
+      delete process.env.RESPOND_TO_LIVECHAT
+      delete process.env.RESPOND_TO_EDITED
+      await driver.connect()
+      await driver.login(credentials)
+      await driver.subscribeToMessages()
+    })
+    afterEach(() => process.env = initEnv)
+    it('ignores messages sent from bot', async () => {
+      const callback = sinon.spy()
+      driver.respondToMessages(callback)
+      await driver.sendMessageByRoomId('SDK test `respondToMessages`', 'GENERAL')
+      sinon.assert.notCalled(callback)
+    })
+    it('fires callback on messages in joined rooms', async () => {
+      const callback = sinon.spy()
+      driver.respondToMessages(callback)
+      await utils.sendFromUser({ text: 'SDK test `respondToMessages` 1' })
+      sinon.assert.calledOnce(callback)
+    })
+    it('by default ignores edited messages', async () => {
+      const callback = sinon.spy()
+      const sentMessage = await utils.sendFromUser({ text: 'SDK test `respondToMessages` sent' })
+      driver.respondToMessages(callback)
+      const updated = await utils.updateFromUser({
+        roomId: 'GENERAL',
+        msgId: sentMessage.message._id,
+        text: 'SDK test `respondToMessages` edited'
+      })
+      sinon.assert.notCalled(callback)
+    })
+    it('fires callback on edited message if configured', async () => {
+      const callback = sinon.spy()
+      const sentMessage = await utils.sendFromUser({ text: 'SDK test `respondToMessages` sent' })
+      driver.respondToMessages(callback, { edited: true })
+      const updated = await utils.updateFromUser({
+        roomId: 'GENERAL',
+        msgId: sentMessage.message._id,
+        text: 'SDK test `respondToMessages` edited'
+      })
+      sinon.assert.calledOnce(callback)
+    })
+    it('by default ignores DMs', async () => {
+      const dmResult = await utils.setupDirectFromUser()
+      const callback = sinon.spy()
+      driver.respondToMessages(callback)
+      await utils.sendFromUser({ text: 'SDK test `respondToMessages` DM', roomId: dmResult.room._id })
+      sinon.assert.notCalled(callback)
+    })
+    it('fires callback on DMs if configured', async () => {
+      const dmResult = await utils.setupDirectFromUser()
+      const callback = sinon.spy()
+      driver.respondToMessages(callback, { dm: true })
+      await utils.sendFromUser({ text: 'SDK test `respondToMessages` DM', roomId: dmResult.room._id })
+      sinon.assert.calledOnce(callback)
     })
   })
 })

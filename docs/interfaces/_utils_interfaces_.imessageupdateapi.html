@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>IOptions | @rocket.chat/sdk</title>
+	<title>IMessageUpdateAPI | @rocket.chat/sdk</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
@@ -54,13 +54,13 @@
 					<a href="../globals.html">Globals</a>
 				</li>
 				<li>
-					<a href="../modules/_config_driverinterfaces_.html">&quot;config/driverInterfaces&quot;</a>
+					<a href="../modules/_utils_interfaces_.html">&quot;utils/interfaces&quot;</a>
 				</li>
 				<li>
-					<a href="_config_driverinterfaces_.ioptions.html">IOptions</a>
+					<a href="_utils_interfaces_.imessageupdateapi.html">IMessageUpdateAPI</a>
 				</li>
 			</ul>
-			<h1>Interface IOptions</h1>
+			<h1>Interface IMessageUpdateAPI</h1>
 		</div>
 	</div>
 </header>
@@ -70,23 +70,15 @@
 			<section class="tsd-panel tsd-comment">
 				<div class="tsd-comment tsd-typography">
 					<div class="lead">
-						<p>Connection options type</p>
+						<p>Payload structure for <code>chat.update</code> endpoint</p>
 					</div>
-					<dl class="tsd-comment-tags">
-						<dt>param</dt>
-						<dd><p>Rocket.Chat instance Host URL:PORT (without protocol)</p>
-						</dd>
-						<dt>param</dt>
-						<dd><p>How long to wait (ms) before abandoning connection</p>
-						</dd>
-					</dl>
 				</div>
 			</section>
 			<section class="tsd-panel tsd-hierarchy">
 				<h3>Hierarchy</h3>
 				<ul class="tsd-hierarchy">
 					<li>
-						<span class="target">IOptions</span>
+						<span class="target">IMessageUpdateAPI</span>
 					</li>
 				</ul>
 			</section>
@@ -97,10 +89,9 @@
 						<section class="tsd-index-section ">
 							<h3>Properties</h3>
 							<ul class="tsd-index-list">
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_config_driverinterfaces_.ioptions.html#host" class="tsd-kind-icon">host</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_config_driverinterfaces_.ioptions.html#integration" class="tsd-kind-icon">integration</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_config_driverinterfaces_.ioptions.html#timeout" class="tsd-kind-icon">timeout</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_config_driverinterfaces_.ioptions.html#usessl" class="tsd-kind-icon">use<wbr>Ssl</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessageupdateapi.html#msgid" class="tsd-kind-icon">msg<wbr>Id</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessageupdateapi.html#roomid" class="tsd-kind-icon">room<wbr>Id</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessageupdateapi.html#text" class="tsd-kind-icon">text</a></li>
 							</ul>
 						</section>
 					</div>
@@ -109,42 +100,32 @@
 			<section class="tsd-panel-group tsd-member-group ">
 				<h2>Properties</h2>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="host" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagOptional">Optional</span> host</h3>
-					<div class="tsd-signature tsd-kind-icon">host<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
+					<a name="msgid" class="tsd-anchor"></a>
+					<h3>msg<wbr>Id</h3>
+					<div class="tsd-signature tsd-kind-icon">msg<wbr>Id<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/config/driverInterfaces.ts#L7">config/driverInterfaces.ts:7</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L21">utils/interfaces.ts:21</a></li>
 						</ul>
 					</aside>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="integration" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagOptional">Optional</span> integration</h3>
-					<div class="tsd-signature tsd-kind-icon">integration<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
+					<a name="roomid" class="tsd-anchor"></a>
+					<h3>room<wbr>Id</h3>
+					<div class="tsd-signature tsd-kind-icon">room<wbr>Id<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/config/driverInterfaces.ts#L10">config/driverInterfaces.ts:10</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L20">utils/interfaces.ts:20</a></li>
 						</ul>
 					</aside>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="timeout" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagOptional">Optional</span> timeout</h3>
-					<div class="tsd-signature tsd-kind-icon">timeout<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">number</span></div>
+					<a name="text" class="tsd-anchor"></a>
+					<h3>text</h3>
+					<div class="tsd-signature tsd-kind-icon">text<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/config/driverInterfaces.ts#L9">config/driverInterfaces.ts:9</a></li>
-						</ul>
-					</aside>
-				</section>
-				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="usessl" class="tsd-anchor"></a>
-					<h3><span class="tsd-flag ts-flagOptional">Optional</span> use<wbr>Ssl</h3>
-					<div class="tsd-signature tsd-kind-icon">use<wbr>Ssl<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">true</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">false</span></div>
-					<aside class="tsd-sources">
-						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/config/driverInterfaces.ts#L8">config/driverInterfaces.ts:8</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L22">utils/interfaces.ts:22</a></li>
 						</ul>
 					</aside>
 				</section>
@@ -159,7 +140,7 @@
 					<li class=" tsd-kind-external-module">
 						<a href="../modules/_config_asteroidinterfaces_.html">"config/asteroid<wbr>Interfaces"</a>
 					</li>
-					<li class="current tsd-kind-external-module">
+					<li class=" tsd-kind-external-module">
 						<a href="../modules/_config_driverinterfaces_.html">"config/driver<wbr>Interfaces"</a>
 					</li>
 					<li class=" tsd-kind-external-module">
@@ -195,7 +176,7 @@
 					<li class=" tsd-kind-external-module">
 						<a href="../modules/_utils_config_.html">"utils/config"</a>
 					</li>
-					<li class=" tsd-kind-external-module">
+					<li class="current tsd-kind-external-module">
 						<a href="../modules/_utils_interfaces_.html">"utils/interfaces"</a>
 					</li>
 					<li class=" tsd-kind-external-module">
@@ -209,32 +190,56 @@
 			<nav class="tsd-navigation secondary menu-sticky">
 				<ul class="before-current">
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_driverinterfaces_.icallback.html" class="tsd-kind-icon">ICallback</a>
+						<a href="_utils_interfaces_.iattachmentapi.html" class="tsd-kind-icon">IAttachmentAPI</a>
 					</li>
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_driverinterfaces_.ilogger.html" class="tsd-kind-icon">ILogger</a>
+						<a href="_utils_interfaces_.iattachmentfieldapi.html" class="tsd-kind-icon">IAttachment<wbr>FieldAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.iloginresultapi.html" class="tsd-kind-icon">ILogin<wbr>ResultAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.imessageapi.html" class="tsd-kind-icon">IMessageAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.imessagereceiptapi.html" class="tsd-kind-icon">IMessage<wbr>ReceiptAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.imessageresultapi.html" class="tsd-kind-icon">IMessage<wbr>ResultAPI</a>
 					</li>
 				</ul>
 				<ul class="current">
 					<li class="current tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_config_driverinterfaces_.ioptions.html" class="tsd-kind-icon">IOptions</a>
+						<a href="_utils_interfaces_.imessageupdateapi.html" class="tsd-kind-icon">IMessage<wbr>UpdateAPI</a>
 						<ul>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_config_driverinterfaces_.ioptions.html#host" class="tsd-kind-icon">host</a>
+								<a href="_utils_interfaces_.imessageupdateapi.html#msgid" class="tsd-kind-icon">msg<wbr>Id</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_config_driverinterfaces_.ioptions.html#integration" class="tsd-kind-icon">integration</a>
+								<a href="_utils_interfaces_.imessageupdateapi.html#roomid" class="tsd-kind-icon">room<wbr>Id</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_config_driverinterfaces_.ioptions.html#timeout" class="tsd-kind-icon">timeout</a>
-							</li>
-							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_config_driverinterfaces_.ioptions.html#usessl" class="tsd-kind-icon">use<wbr>Ssl</a>
+								<a href="_utils_interfaces_.imessageupdateapi.html#text" class="tsd-kind-icon">text</a>
 							</li>
 						</ul>
 					</li>
 				</ul>
 				<ul class="after-current">
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.inewuserapi.html" class="tsd-kind-icon">INew<wbr>UserAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.iroomapi.html" class="tsd-kind-icon">IRoomAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.iroomresultapi.html" class="tsd-kind-icon">IRoom<wbr>ResultAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.iuserapi.html" class="tsd-kind-icon">IUserAPI</a>
+					</li>
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.iuserresultapi.html" class="tsd-kind-icon">IUser<wbr>ResultAPI</a>
+					</li>
 				</ul>
 			</nav>
 		</div>

@@ -75,6 +75,8 @@
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_testing_.html#getuserdata" class="tsd-kind-icon">get<wbr>User<wbr>Data</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_testing_.html#sendfromuser" class="tsd-kind-icon">send<wbr>From<wbr>User</a></li>
 								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_testing_.html#setup" class="tsd-kind-icon">setup</a></li>
+								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_testing_.html#setupdirectfromuser" class="tsd-kind-icon">setup<wbr>Direct<wbr>From<wbr>User</a></li>
+								<li class="tsd-kind-function tsd-parent-kind-external-module"><a href="_utils_testing_.html#updatefromuser" class="tsd-kind-icon">update<wbr>From<wbr>User</a></li>
 							</ul>
 						</section>
 						<section class="tsd-index-section tsd-is-not-exported">
@@ -98,7 +100,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/utils/testing.ts#L12">utils/testing.ts:12</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/testing.ts#L11">utils/testing.ts:11</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -126,7 +128,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/utils/testing.ts#L27">utils/testing.ts:27</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/testing.ts#L41">utils/testing.ts:41</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -156,13 +158,13 @@
 					<a name="sendfromuser" class="tsd-anchor"></a>
 					<h3>send<wbr>From<wbr>User</h3>
 					<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
-						<li class="tsd-signature tsd-kind-icon">send<wbr>From<wbr>User<span class="tsd-signature-symbol">(</span>payload<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.imessageapi.html" class="tsd-signature-type">IMessageAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></li>
+						<li class="tsd-signature tsd-kind-icon">send<wbr>From<wbr>User<span class="tsd-signature-symbol">(</span>payload<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">any</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.imessageresultapi.html" class="tsd-signature-type">IMessageResultAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></li>
 					</ul>
 					<ul class="tsd-descriptions">
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/utils/testing.ts#L17">utils/testing.ts:17</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/testing.ts#L16">utils/testing.ts:16</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -176,7 +178,7 @@
 									<h5>payload: <span class="tsd-signature-type">any</span></h5>
 								</li>
 							</ul>
-							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.imessageapi.html" class="tsd-signature-type">IMessageAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></h4>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.imessageresultapi.html" class="tsd-signature-type">IMessageResultAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></h4>
 						</li>
 					</ul>
 				</section>
@@ -190,7 +192,7 @@
 						<li class="tsd-description">
 							<aside class="tsd-sources">
 								<ul>
-									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/utils/testing.ts#L39">utils/testing.ts:39</a></li>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/testing.ts#L53">utils/testing.ts:53</a></li>
 								</ul>
 							</aside>
 							<div class="tsd-comment tsd-typography">
@@ -199,6 +201,56 @@
 								</div>
 							</div>
 							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">&gt;</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-function tsd-parent-kind-external-module">
+					<a name="setupdirectfromuser" class="tsd-anchor"></a>
+					<h3>setup<wbr>Direct<wbr>From<wbr>User</h3>
+					<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
+						<li class="tsd-signature tsd-kind-icon">setup<wbr>Direct<wbr>From<wbr>User<span class="tsd-signature-symbol">(</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.iroomresultapi.html" class="tsd-signature-type">IRoomResultAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/testing.ts#L33">utils/testing.ts:33</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Create a direct message session with the mock user</p>
+								</div>
+							</div>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.iroomresultapi.html" class="tsd-signature-type">IRoomResultAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></h4>
+						</li>
+					</ul>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-function tsd-parent-kind-external-module">
+					<a name="updatefromuser" class="tsd-anchor"></a>
+					<h3>update<wbr>From<wbr>User</h3>
+					<ul class="tsd-signatures tsd-kind-function tsd-parent-kind-external-module">
+						<li class="tsd-signature tsd-kind-icon">update<wbr>From<wbr>User<span class="tsd-signature-symbol">(</span>payload<span class="tsd-signature-symbol">: </span><a href="../interfaces/_utils_interfaces_.imessageupdateapi.html" class="tsd-signature-type">IMessageUpdateAPI</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.imessageresultapi.html" class="tsd-signature-type">IMessageResultAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></li>
+					</ul>
+					<ul class="tsd-descriptions">
+						<li class="tsd-description">
+							<aside class="tsd-sources">
+								<ul>
+									<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/testing.ts#L25">utils/testing.ts:25</a></li>
+								</ul>
+							</aside>
+							<div class="tsd-comment tsd-typography">
+								<div class="lead">
+									<p>Update message sent from mock user</p>
+								</div>
+							</div>
+							<h4 class="tsd-parameters-title">Parameters</h4>
+							<ul class="tsd-parameters">
+								<li>
+									<h5>payload: <a href="../interfaces/_utils_interfaces_.imessageupdateapi.html" class="tsd-signature-type">IMessageUpdateAPI</a></h5>
+								</li>
+							</ul>
+							<h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="../interfaces/_utils_interfaces_.imessageresultapi.html" class="tsd-signature-type">IMessageResultAPI</a><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol">&gt;</span></h4>
 						</li>
 					</ul>
 				</section>
@@ -211,7 +263,7 @@
 					<div class="tsd-signature tsd-kind-icon">message<wbr>Defaults<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">object</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/utils/testing.ts#L6">utils/testing.ts:6</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/testing.ts#L6">utils/testing.ts:6</a></li>
 						</ul>
 					</aside>
 					<div class="tsd-comment tsd-typography">
@@ -220,22 +272,12 @@
 						</div>
 					</div>
 					<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-object-literal tsd-is-not-exported">
-						<a name="messagedefaults.channel" class="tsd-anchor"></a>
-						<h3>channel</h3>
-						<div class="tsd-signature tsd-kind-icon">channel<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> =&nbsp;&quot;#general&quot;</span></div>
-						<aside class="tsd-sources">
-							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/utils/testing.ts#L8">utils/testing.ts:8</a></li>
-							</ul>
-						</aside>
-					</section>
-					<section class="tsd-panel tsd-member tsd-kind-variable tsd-parent-kind-object-literal tsd-is-not-exported">
 						<a name="messagedefaults.roomid" class="tsd-anchor"></a>
 						<h3>room<wbr>Id</h3>
 						<div class="tsd-signature tsd-kind-icon">room<wbr>Id<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol"> =&nbsp;&quot;GENERAL&quot;</span></div>
 						<aside class="tsd-sources">
 							<ul>
-								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/b3f6e1b/src/utils/testing.ts#L7">utils/testing.ts:7</a></li>
+								<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/testing.ts#L7">utils/testing.ts:7</a></li>
 							</ul>
 						</aside>
 					</section>
@@ -311,6 +353,12 @@
 					</li>
 					<li class=" tsd-kind-function tsd-parent-kind-external-module">
 						<a href="_utils_testing_.html#setup" class="tsd-kind-icon">setup</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module">
+						<a href="_utils_testing_.html#setupdirectfromuser" class="tsd-kind-icon">setup<wbr>Direct<wbr>From<wbr>User</a>
+					</li>
+					<li class=" tsd-kind-function tsd-parent-kind-external-module">
+						<a href="_utils_testing_.html#updatefromuser" class="tsd-kind-icon">update<wbr>From<wbr>User</a>
 					</li>
 					<li class=" tsd-kind-object-literal tsd-parent-kind-external-module tsd-is-not-exported">
 						<a href="_utils_testing_.html#messagedefaults" class="tsd-kind-icon">message<wbr>Defaults</a>

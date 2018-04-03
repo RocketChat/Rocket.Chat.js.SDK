@@ -12,8 +12,7 @@ const api_1 = require("./api");
 const config_1 = require("./config");
 /** Define common attributes for DRY tests */
 const messageDefaults = {
-    roomId: 'GENERAL',
-    channel: '#general'
+    roomId: 'GENERAL'
 };
 /** Create a user and catch the error if they exist already */
 function createUser(user) {
@@ -23,15 +22,34 @@ exports.createUser = createUser;
 /** Send message from mock user to channel for tests to listen and respond */
 function sendFromUser(payload) {
     return __awaiter(this, void 0, void 0, function* () {
-        const data = (payload) ? Object.assign(payload, messageDefaults) : messageDefaults;
-        const credentials = { username: config_1.mockUser.username, password: config_1.mockUser.password };
-        yield api_1.login(credentials);
+        const data = Object.assign({}, messageDefaults, payload);
+        yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
         const result = yield api_1.post('/api/v1/chat.postMessage', data, true);
         yield api_1.logout();
         return result;
     });
 }
 exports.sendFromUser = sendFromUser;
+/** Update message sent from mock user */
+function updateFromUser(payload) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
+        const result = yield api_1.post('/api/v1/chat.update', payload, true);
+        yield api_1.logout();
+        return result;
+    });
+}
+exports.updateFromUser = updateFromUser;
+/** Create a direct message session with the mock user */
+function setupDirectFromUser() {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
+        const result = yield api_1.post('/api/v1/im.create', { username: config_1.botUser.username }, true);
+        yield api_1.logout();
+        return result;
+    });
+}
+exports.setupDirectFromUser = setupDirectFromUser;
 /** Get user data, to check if they're online or have attributes set */
 function getUserData(payload) {
     return __awaiter(this, void 0, void 0, function* () {

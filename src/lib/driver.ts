@@ -9,7 +9,7 @@ import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
 */
 import * as methodCache from './methodCache'
 import { Message } from './message'
-import { IOptions, ICallback, ILogger } from '../config/driverInterfaces'
+import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
@@ -33,18 +33,33 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
  * Define default config as public, allowing overrides from new connection.
  * Enable SSL by default if Rocket.Chat URL contains https.
  */
-const defaults: IOptions = {
-  host: process.env.ROCKETCHAT_URL || 'localhost:3000',
-  useSsl: ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
-  timeout: 20 * 1000 // 20 seconds
+export function connectDefaults (): IConnectOptions {
+  return {
+    host: process.env.ROCKETCHAT_URL || 'localhost:3000',
+    useSsl: ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
+    timeout: 20 * 1000 // 20 seconds
+  }
 }
+
+/** Define default config for message respond filters. */
+export function respondDefaults (): IRespondOptions {
+  return {
+    allPublic: (process.env.LISTEN_ON_ALL_PUBLIC || 'false').toLowerCase() === 'true',
+    dm: (process.env.RESPOND_TO_DM || 'false').toLowerCase() === 'true',
+    livechat: (process.env.RESPOND_TO_LIVECHAT || 'false').toLowerCase() === 'true',
+    edited: (process.env.RESPOND_TO_EDITED || 'false').toLowerCase() === 'true'
+  }
+}
+
+/** Internal for comparing message update timestamps */
+export let lastReadTime: Date
 
 /**
  * The integration property is applied as an ID on sent messages `bot.i` param
  * Should be replaced when connection is invoked by a package using the SDK
  * e.g. The Hubot adapter would pass its integration ID with credentials, like:
  */
-const integrationId = process.env.INTEGRATION_ID || 'js.SDK'
+export const integrationId = process.env.INTEGRATION_ID || 'js.SDK'
 
 /**
  * Event Emitter for listening to connection.
@@ -66,6 +81,11 @@ export let asteroid: IAsteroid
  * Variable not initialised until `prepMeteorSubscriptions` called.
  */
 export let subscriptions: ISubscription[] = []
+
+/**
+ * Current user object populated from resolved login
+ */
+export let userId: string
 
 /**
  * Array of messages received from reactive collection
@@ -96,9 +116,9 @@ export function useLog (externalLog: ILogger) {
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export function connect (options: IOptions = {}, callback?: ICallback): any {
+export function connect (options: IConnectOptions = {}, callback?: ICallback): any {
   return new Promise((resolve, reject) => {
-    const config = Object.assign({}, defaults, options) // override defaults
+    const config = Object.assign({}, connectDefaults(), options) // override defaults
     config.host = config.host!.replace(/(^\w+:|^)\/\//, '')
     logger.info('[connect] Connecting', config)
     asteroid = new Asteroid(config.host, config.useSsl)
@@ -230,10 +250,15 @@ export function login (credentials: ICredentials): Promise<any> {
     const usernameOrEmail = credentials.username || credentials.email || 'bot'
     login = asteroid.loginWithPassword(usernameOrEmail, credentials.password)
   }
-  return login.catch((err: Error) => {
-    logger.info('[login] Error:', err)
-    throw err // throw after log to stop async chain
-  })
+  return login
+    .then((loggedInUserId) => {
+      userId = loggedInUserId
+      return loggedInUserId
+    })
+    .catch((err: Error) => {
+      logger.info('[login] Error:', err)
+      throw err // throw after log to stop async chain
+    })
 }
 
 /** Logout of Rocket.Chat via Asteroid */
@@ -304,6 +329,18 @@ export function subscribeToMessages (): Promise<ISubscription> {
     })
 }
 
+/**
+ * Once a subscription is created, using `subscribeToMessages` this method
+ * can be used to attach a callback to changes in the message stream.
+ * This can be called directly for custom extensions, but for most usage (e.g.
+ * for bots) the respondToMessages is more useful to only receive messages
+ * matching configuration.
+ *
+ * @param callback Function called with every change in subscriptions.
+ *  - Uses error-first callback pattern
+ *  - Second argument is the changed item
+ *  - Third argument is additional attributes, such as `roomType`
+ */
 export function reactToMessages (callback: ICallback): void {
   logger.info(`[reactive] Listening for change events in collection ${messages.name}`)
   messages.reactiveQuery({}).on('change', (_id: string) => {
@@ -319,6 +356,61 @@ export function reactToMessages (callback: ICallback): void {
     } else {
       logger.debug('[received] Reactive query at ID ${ _id } without results')
     }
+  })
+}
+
+/**
+ * Proxy for `reactToMessages` with some filtering of messages based on config.
+ *
+ * @param callback Function called after filters run on subscription events.
+ *  - Uses error-first callback pattern
+ *  - Second argument is the changed item
+ *  - Third argument is additional attributes, such as `roomType`
+ * @param options Sets filters for different event/message types.
+ */
+export function respondToMessages (callback: ICallback, options: IRespondOptions = {}): void {
+  const config = Object.assign({}, respondDefaults(), options)
+  lastReadTime = new Date() // init before any message read
+  reactToMessages((err, message, msgOpts) => {
+    if (err) {
+      logger.error(`Unable to receive messages ${JSON.stringify(err)}`)
+      callback(err) // bubble errors back to adapter
+    }
+
+    // Ignore bot's own messages
+    if (message.u._id === userId) return
+
+    // Ignore DMs if configured to
+    const isDM = msgOpts.roomType === 'd'
+    if (isDM && !config.dm) return
+
+    // Ignore Livechat if configured to
+    const isLC = msgOpts.roomType === 'l'
+    if (isLC && !config.livechat) return
+
+    // Ignore messages in public rooms not joined by bot if configured to
+    if (!config.allPublic && !isDM && !msgOpts.roomParticipant) return
+
+    // Set current time for comparison to incoming
+    let currentReadTime = new Date(message.ts.$date)
+
+    // Ignore edited messages if configured to
+    // unless it's newer than current read time (hasn't been seen before)
+    // @todo: test this logic, why not just return if edited and not responding
+    if (config.edited && typeof message.editedAt !== 'undefined') {
+      let edited = new Date(message.editedAt.$date)
+      if (edited > currentReadTime) currentReadTime = edited
+    }
+
+    // Ignore messages in stream that aren't new
+    if (currentReadTime <= lastReadTime) return
+
+    // At this point, message has passed checks and can be responded to
+    logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`)
+    logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`)
+    lastReadTime = currentReadTime
+
+    callback(null, message, msgOpts)
   })
 }
 

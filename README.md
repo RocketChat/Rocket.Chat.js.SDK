@@ -43,7 +43,42 @@ Any Rocket.Chat server method can be called via `driver.callMethod`,
 `driver.cacheCall` or `driver.asyncCall`. Server methods are not fully
 documented, most require searching the Rocket.Chat codebase.
 
+### BASIC USAGE
+
+---
+
+The following ES6 demo uses async calls to login, join rooms, subscribe to 
+message streams and respond to messages (with a callback) using provided
+options to filter the types of messages to respond to.
+
+This example can be executed with the testing instance by running `yarn start`, 
+to allow manual testing, once subscription is setup try sending DMs to the bot
+user and they should be logged in console.
+
+```
+import { driver } from '@rocket.chat/sdk'
+
+async function startReceiving () {
+  await driver.connect({ host: 'localhost:3000', useSsl: true })
+  await driver.login({ username: 'bot', password: 'pass' })
+  await driver.joinRooms(['GENERAL'])
+  await driver.subscribeToMessages()
+  await driver.respondToMessages((err, message, msgOpts) => {
+    console.log('received message', message, msgOpts)
+  }, {
+    allPublic: false,
+    dm: true,
+    livechat: false,
+    edited: true
+  })
+}
+
+startReceiving()
+```
+
 #### MESSAGE OBJECTS
+
+---
 
 The Rocket.Chat message schema can be found here:
 https://rocket.chat/docs/developer-guides/schema-definition/
@@ -114,7 +149,7 @@ Shortcut to subscribe to user's message stream
 Once a subscription is created, using `driver.subscribeToMessages()` this method
 can be used to attach a callback to changes in the message stream.
 
-Fires callback with every change in subscriptions
+Fires callback with every change in subscriptions.
 - Uses error-first callback pattern
 - Second argument is the changed item
 - Third argument is additional attributes, such as `roomType`
@@ -122,6 +157,22 @@ Fires callback with every change in subscriptions
 For example usage, see the Rocket.Chat Hubot adapter's receive function, which
 is bound as a callback to this method:
 https://github.com/RocketChat/hubot-rocketchat/blob/convert-es6/index.js#L97-L193
+
+### `driver.respondToMessages(callback, options)`
+
+Proxy for `reactToMessages` with some filtering of messages based on config.
+This is a more user-friendly method for bots to subscribe to a message stream.
+
+Fires callback after filters run on subscription events.
+- Uses error-first callback pattern
+- Second argument is the changed item
+- Third argument is additional attributes, such as `roomType`
+
+Accepts options object, that parallels respond filter env variables:
+- options.allPublic : respond to messages on all channels (or just joined)
+- options.dm : respond to messages in DMs with the SDK user
+- options.livechat : respond to messages in Livechat rooms
+- options.edited : respond to edited messages
 
 ### `driver.asyncCall(method, params)`
 
@@ -298,19 +349,23 @@ rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
 
 ### Settings
 
-| Env var | Description |
-| --------------------- | ---------------------------------------------------- |
-| `ROCKETCHAT_URL` | URL of the Rocket.Chat to connect to |
-| `ROCKETCHAT_AUTH` | Set to 'ldap' to enable LDAP login |
-| `ADMIN_USERNAME` | Admin user password for API |
-| `ADMIN_PASS` | Admin user password for API |
-| `ROCKETCHAT_USER` | User password for SDK tests |
-| `ROCKETCHAT_PASS` | Pass username for SDK tests |
-| `INTEGRATION_ID` | ID applied to message object to integration source |
-| `ROOM_CACHE_SIZE` | Size of cache (LRU) for room (ID or name) lookups |
-| `ROOM_CACHE_MAX_AGE` | Max age of cache for room lookups |
-| `DM_ROOM_CACHE_SIZE` | Size of cache for Direct Message room lookups |
-| `DM_ROOM_CACHE_MAX_AGE` | Max age of cache for DM lookups |
+| Env var                | Description                                           |
+| ---------------------- | ----------------------------------------------------- |
+| `ROCKETCHAT_URL`       | URL of the Rocket.Chat to connect to                  |
+| `ROCKETCHAT_AUTH`      | Set to 'ldap' to enable LDAP login                    |
+| `ADMIN_USERNAME`       | Admin user password for API                           |
+| `ADMIN_PASS`           | Admin user password for API                           |
+| `ROCKETCHAT_USER`      | User password for SDK tests                           |
+| `ROCKETCHAT_PASS`      | Pass username for SDK tests                           |
+| `INTEGRATION_ID`       | ID applied to message object to integration source    |
+| `ROOM_CACHE_SIZE`      | Size of cache (LRU) for room (ID or name) lookups     |
+| `ROOM_CACHE_MAX_AGE`   | Max age of cache for room lookups                     |
+| `DM_ROOM_CACHE_SIZE`   | Size of cache for Direct Message room lookups         |
+| `DM_ROOM_CACHE_MAX_AGE`| Max age of cache for DM lookups                       |
+| `LISTEN_ON_ALL_PUBLIC` | true/false, respond listens in all public channels    |
+| `RESPOND_TO_LIVECHAT`  | true/false, respond listens in livechat               |
+| `RESPOND_TO_DM`        | true/false, respond listens to DMs with bot           |
+| `RESPOND_TO_EDITED`    | true/false, respond listens to edited messages        |
 
 These are only required in test and development, assuming in production they
 will be passed from the adapter implementing this package.

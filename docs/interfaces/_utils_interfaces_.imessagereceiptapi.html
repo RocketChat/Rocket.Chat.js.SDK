@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>IMessageResultAPI | @rocket.chat/sdk</title>
+	<title>IMessageReceiptAPI | @rocket.chat/sdk</title>
 	<meta name="description" content="">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" href="../assets/css/main.css">
@@ -57,10 +57,10 @@
 					<a href="../modules/_utils_interfaces_.html">&quot;utils/interfaces&quot;</a>
 				</li>
 				<li>
-					<a href="_utils_interfaces_.imessageresultapi.html">IMessageResultAPI</a>
+					<a href="_utils_interfaces_.imessagereceiptapi.html">IMessageReceiptAPI</a>
 				</li>
 			</ul>
-			<h1>Interface IMessageResultAPI</h1>
+			<h1>Interface IMessageReceiptAPI</h1>
 		</div>
 	</div>
 </header>
@@ -70,7 +70,7 @@
 			<section class="tsd-panel tsd-comment">
 				<div class="tsd-comment tsd-typography">
 					<div class="lead">
-						<p>Result structure for message endpoints</p>
+						<p>Message receipt returned after send (not the same as sent object)</p>
 					</div>
 				</div>
 			</section>
@@ -78,7 +78,7 @@
 				<h3>Hierarchy</h3>
 				<ul class="tsd-hierarchy">
 					<li>
-						<span class="target">IMessageResultAPI</span>
+						<span class="target">IMessageReceiptAPI</span>
 					</li>
 				</ul>
 			</section>
@@ -89,10 +89,17 @@
 						<section class="tsd-index-section ">
 							<h3>Properties</h3>
 							<ul class="tsd-index-list">
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessageresultapi.html#channel" class="tsd-kind-icon">channel</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessageresultapi.html#message" class="tsd-kind-icon">message</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessageresultapi.html#success" class="tsd-kind-icon">success</a></li>
-								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessageresultapi.html#ts" class="tsd-kind-icon">ts</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#_id" class="tsd-kind-icon">_id</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#_updatedat" class="tsd-kind-icon">_updated<wbr>At</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#alias" class="tsd-kind-icon">alias</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#editedat" class="tsd-kind-icon">edited<wbr>At</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#editedby" class="tsd-kind-icon">edited<wbr>By</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#groupable" class="tsd-kind-icon">groupable</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#msg" class="tsd-kind-icon">msg</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#parseurls" class="tsd-kind-icon">parse<wbr>Urls</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#rid" class="tsd-kind-icon">rid</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#ts" class="tsd-kind-icon">ts</a></li>
+								<li class="tsd-kind-property tsd-parent-kind-interface"><a href="_utils_interfaces_.imessagereceiptapi.html#u" class="tsd-kind-icon">u</a></li>
 							</ul>
 						</section>
 					</div>
@@ -101,44 +108,125 @@
 			<section class="tsd-panel-group tsd-member-group ">
 				<h2>Properties</h2>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="channel" class="tsd-anchor"></a>
-					<h3>channel</h3>
-					<div class="tsd-signature tsd-kind-icon">channel<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<a name="_id" class="tsd-anchor"></a>
+					<h3>_id</h3>
+					<div class="tsd-signature tsd-kind-icon">_id<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L79">utils/interfaces.ts:79</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L27">utils/interfaces.ts:27</a></li>
 						</ul>
 					</aside>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="message" class="tsd-anchor"></a>
-					<h3>message</h3>
-					<div class="tsd-signature tsd-kind-icon">message<span class="tsd-signature-symbol">:</span> <a href="_utils_interfaces_.imessagereceiptapi.html" class="tsd-signature-type">IMessageReceiptAPI</a></div>
+					<a name="_updatedat" class="tsd-anchor"></a>
+					<h3>_updated<wbr>At</h3>
+					<div class="tsd-signature tsd-kind-icon">_updated<wbr>At<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L80">utils/interfaces.ts:80</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L38">utils/interfaces.ts:38</a></li>
 						</ul>
 					</aside>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
-					<a name="success" class="tsd-anchor"></a>
-					<h3>success</h3>
-					<div class="tsd-signature tsd-kind-icon">success<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+					<a name="alias" class="tsd-anchor"></a>
+					<h3>alias</h3>
+					<div class="tsd-signature tsd-kind-icon">alias<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L81">utils/interfaces.ts:81</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L29">utils/interfaces.ts:29</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="editedat" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> edited<wbr>At</h3>
+					<div class="tsd-signature tsd-kind-icon">edited<wbr>At<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L39">utils/interfaces.ts:39</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="editedby" class="tsd-anchor"></a>
+					<h3><span class="tsd-flag ts-flagOptional">Optional</span> edited<wbr>By</h3>
+					<div class="tsd-signature tsd-kind-icon">edited<wbr>By<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">undefined</span><span class="tsd-signature-symbol"> | </span><span class="tsd-signature-type">object</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L40">utils/interfaces.ts:40</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="groupable" class="tsd-anchor"></a>
+					<h3>groupable</h3>
+					<div class="tsd-signature tsd-kind-icon">groupable<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L32">utils/interfaces.ts:32</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="msg" class="tsd-anchor"></a>
+					<h3>msg</h3>
+					<div class="tsd-signature tsd-kind-icon">msg<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L30">utils/interfaces.ts:30</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="parseurls" class="tsd-anchor"></a>
+					<h3>parse<wbr>Urls</h3>
+					<div class="tsd-signature tsd-kind-icon">parse<wbr>Urls<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L31">utils/interfaces.ts:31</a></li>
+						</ul>
+					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="rid" class="tsd-anchor"></a>
+					<h3>rid</h3>
+					<div class="tsd-signature tsd-kind-icon">rid<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L28">utils/interfaces.ts:28</a></li>
 						</ul>
 					</aside>
 				</section>
 				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
 					<a name="ts" class="tsd-anchor"></a>
 					<h3>ts</h3>
-					<div class="tsd-signature tsd-kind-icon">ts<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
+					<div class="tsd-signature tsd-kind-icon">ts<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 					<aside class="tsd-sources">
 						<ul>
-							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L78">utils/interfaces.ts:78</a></li>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L33">utils/interfaces.ts:33</a></li>
 						</ul>
 					</aside>
+				</section>
+				<section class="tsd-panel tsd-member tsd-kind-property tsd-parent-kind-interface">
+					<a name="u" class="tsd-anchor"></a>
+					<h3>u</h3>
+					<div class="tsd-signature tsd-kind-icon">u<span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">object</span></div>
+					<aside class="tsd-sources">
+						<ul>
+							<li>Defined in <a href="https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/2c3f50e/src/utils/interfaces.ts#L34">utils/interfaces.ts:34</a></li>
+						</ul>
+					</aside>
+					<div class="tsd-type-declaration">
+						<h4>Type declaration</h4>
+						<ul class="tsd-parameters">
+							<li class="tsd-parameter">
+								<h5>_id<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span></h5>
+							</li>
+							<li class="tsd-parameter">
+								<h5>username<span class="tsd-signature-symbol">: </span><span class="tsd-signature-type">string</span></h5>
+							</li>
+						</ul>
+					</div>
 				</section>
 			</section>
 		</div>
@@ -212,30 +300,51 @@
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
 						<a href="_utils_interfaces_.imessageapi.html" class="tsd-kind-icon">IMessageAPI</a>
 					</li>
-					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_utils_interfaces_.imessagereceiptapi.html" class="tsd-kind-icon">IMessage<wbr>ReceiptAPI</a>
-					</li>
 				</ul>
 				<ul class="current">
 					<li class="current tsd-kind-interface tsd-parent-kind-external-module">
-						<a href="_utils_interfaces_.imessageresultapi.html" class="tsd-kind-icon">IMessage<wbr>ResultAPI</a>
+						<a href="_utils_interfaces_.imessagereceiptapi.html" class="tsd-kind-icon">IMessage<wbr>ReceiptAPI</a>
 						<ul>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_utils_interfaces_.imessageresultapi.html#channel" class="tsd-kind-icon">channel</a>
+								<a href="_utils_interfaces_.imessagereceiptapi.html#_id" class="tsd-kind-icon">_id</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_utils_interfaces_.imessageresultapi.html#message" class="tsd-kind-icon">message</a>
+								<a href="_utils_interfaces_.imessagereceiptapi.html#_updatedat" class="tsd-kind-icon">_updated<wbr>At</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_utils_interfaces_.imessageresultapi.html#success" class="tsd-kind-icon">success</a>
+								<a href="_utils_interfaces_.imessagereceiptapi.html#alias" class="tsd-kind-icon">alias</a>
 							</li>
 							<li class=" tsd-kind-property tsd-parent-kind-interface">
-								<a href="_utils_interfaces_.imessageresultapi.html#ts" class="tsd-kind-icon">ts</a>
+								<a href="_utils_interfaces_.imessagereceiptapi.html#editedat" class="tsd-kind-icon">edited<wbr>At</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.imessagereceiptapi.html#editedby" class="tsd-kind-icon">edited<wbr>By</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.imessagereceiptapi.html#groupable" class="tsd-kind-icon">groupable</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.imessagereceiptapi.html#msg" class="tsd-kind-icon">msg</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.imessagereceiptapi.html#parseurls" class="tsd-kind-icon">parse<wbr>Urls</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.imessagereceiptapi.html#rid" class="tsd-kind-icon">rid</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.imessagereceiptapi.html#ts" class="tsd-kind-icon">ts</a>
+							</li>
+							<li class=" tsd-kind-property tsd-parent-kind-interface">
+								<a href="_utils_interfaces_.imessagereceiptapi.html#u" class="tsd-kind-icon">u</a>
 							</li>
 						</ul>
 					</li>
 				</ul>
 				<ul class="after-current">
+					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
+						<a href="_utils_interfaces_.imessageresultapi.html" class="tsd-kind-icon">IMessage<wbr>ResultAPI</a>
+					</li>
 					<li class=" tsd-kind-interface tsd-parent-kind-external-module">
 						<a href="_utils_interfaces_.imessageupdateapi.html" class="tsd-kind-icon">IMessage<wbr>UpdateAPI</a>
 					</li>

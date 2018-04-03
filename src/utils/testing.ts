@@ -1,11 +1,10 @@
 import { get, post, login, logout } from './api'
 import { apiUser, botUser, mockUser } from './config'
-import { IMessageAPI, INewUserAPI, IUserResultAPI } from './interfaces'
+import { IMessageAPI, IMessageUpdateAPI, IMessageResultAPI, INewUserAPI, IUserResultAPI, IRoomResultAPI } from './interfaces'
 
 /** Define common attributes for DRY tests */
 const messageDefaults: IMessageAPI = {
-  roomId: 'GENERAL',
-  channel: '#general'
+  roomId: 'GENERAL'
 }
 
 /** Create a user and catch the error if they exist already */
@@ -14,11 +13,26 @@ export function createUser (user: INewUserAPI): Promise<IUserResultAPI | undefin
 }
 
 /** Send message from mock user to channel for tests to listen and respond */
-export async function sendFromUser (payload: any): Promise<IMessageAPI | undefined> {
-  const data: IMessageAPI = (payload) ? Object.assign(payload, messageDefaults) : messageDefaults
-  const credentials = { username: mockUser.username, password: mockUser.password }
-  await login(credentials)
+export async function sendFromUser (payload: any): Promise<IMessageResultAPI | undefined> {
+  const data: IMessageAPI = Object.assign({}, messageDefaults, payload)
+  await login({ username: mockUser.username, password: mockUser.password })
   const result = await post('/api/v1/chat.postMessage', data, true)
+  await logout()
+  return result
+}
+
+/** Update message sent from mock user */
+export async function updateFromUser (payload: IMessageUpdateAPI): Promise<IMessageResultAPI | undefined> {
+  await login({ username: mockUser.username, password: mockUser.password })
+  const result = await post('/api/v1/chat.update', payload, true)
+  await logout()
+  return result
+}
+
+/** Create a direct message session with the mock user */
+export async function setupDirectFromUser (): Promise<IRoomResultAPI | undefined> {
+  await login({ username: mockUser.username, password: mockUser.password })
+  const result = await post('/api/v1/im.create', { username: botUser.username }, true)
   await logout()
   return result
 }
