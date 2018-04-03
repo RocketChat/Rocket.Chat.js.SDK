@@ -1,4 +1,12 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 }
@@ -320,7 +328,7 @@ exports.subscribeToMessages = subscribeToMessages;
  * for bots) the respondToMessages is more useful to only receive messages
  * matching configuration.
  *
- * @param callback Function called with every change in subscriptions
+ * @param callback Function called with every change in subscriptions.
  *  - Uses error-first callback pattern
  *  - Second argument is the changed item
  *  - Third argument is additional attributes, such as `roomType`
@@ -345,10 +353,19 @@ function reactToMessages(callback) {
     });
 }
 exports.reactToMessages = reactToMessages;
+/**
+ * Proxy for `reactToMessages` with some filtering of messages based on config.
+ *
+ * @param callback Function called after filters run on subscription events.
+ *  - Uses error-first callback pattern
+ *  - Second argument is the changed item
+ *  - Third argument is additional attributes, such as `roomType`
+ * @param options Sets filters for different event/message types.
+ */
 function respondToMessages(callback, options = {}) {
     const config = Object.assign({}, respondDefaults(), options);
     exports.lastReadTime = new Date(); // init before any message read
-    reactToMessages((err, message, msgOpts) => {
+    reactToMessages((err, message, meta) => __awaiter(this, void 0, void 0, function* () {
         if (err) {
             log_1.logger.error(`Unable to receive messages ${JSON.stringify(err)}`);
             callback(err); // bubble errors back to adapter
@@ -357,15 +374,15 @@ function respondToMessages(callback, options = {}) {
         if (message.u._id === exports.userId)
             return;
         // Ignore DMs if configured to
-        const isDM = msgOpts.roomType === 'd';
+        const isDM = meta.roomType === 'd';
         if (isDM && !config.dm)
             return;
         // Ignore Livechat if configured to
-        const isLC = msgOpts.roomType === 'l';
+        const isLC = meta.roomType === 'l';
         if (isLC && !config.livechat)
             return;
         // Ignore messages in public rooms not joined by bot if configured to
-        if (!config.allPublic && !isDM && !msgOpts.roomParticipant)
+        if (!config.allPublic && !isDM && !meta.roomParticipant)
             return;
         // Set current time for comparison to incoming
         let currentReadTime = new Date(message.ts.$date);
@@ -384,8 +401,12 @@ function respondToMessages(callback, options = {}) {
         log_1.logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`);
         log_1.logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`);
         exports.lastReadTime = currentReadTime;
-        callback(null, message, msgOpts);
-    });
+        // Add room name to meta, is useful for some adapters
+        if (!isDM && !isLC)
+            meta.roomName = yield getRoomName(message.rid);
+        // Processing completed, call callback to respond to message
+        callback(null, message, meta);
+    }));
 }
 exports.respondToMessages = respondToMessages;
 /**

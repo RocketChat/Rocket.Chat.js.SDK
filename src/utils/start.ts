@@ -4,12 +4,11 @@ import { botUser, botRooms } from './config'
 
 // Start subscription to log message stream (used for e2e test)
 async function start () {
-  const credentials = { username: botUser.username, password: botUser.password }
   await driver.connect()
-  await driver.login(credentials)
+  await driver.login({ username: botUser.username, password: botUser.password })
   await driver.joinRooms(botRooms)
   await driver.subscribeToMessages()
-  await driver.respondToMessages((err, msg, msgOpts) => {
+  driver.respondToMessages((err, msg, msgOpts) => {
     if (err) throw err
     console.log('[respond]', JSON.stringify(msg), JSON.stringify(msgOpts))
   }, {
@@ -20,4 +19,4 @@ async function start () {
   })
 }
 
-start()
+start().catch((e) => console.error(e))

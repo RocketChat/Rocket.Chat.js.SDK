@@ -116,7 +116,7 @@ export function useLog (externalLog: ILogger) {
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export function connect (options: IConnectOptions = {}, callback?: ICallback): any {
+export function connect (options: IConnectOptions = {}, callback?: ICallback): Promise<IAsteroid> {
   return new Promise((resolve, reject) => {
     const config = Object.assign({}, connectDefaults(), options) // override defaults
     config.host = config.host!.replace(/(^\w+:|^)\/\//, '')
@@ -371,7 +371,7 @@ export function reactToMessages (callback: ICallback): void {
 export function respondToMessages (callback: ICallback, options: IRespondOptions = {}): void {
   const config = Object.assign({}, respondDefaults(), options)
   lastReadTime = new Date() // init before any message read
-  reactToMessages((err, message, msgOpts) => {
+  reactToMessages(async (err, message, meta) => {
     if (err) {
       logger.error(`Unable to receive messages ${JSON.stringify(err)}`)
       callback(err) // bubble errors back to adapter
@@ -381,15 +381,15 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     if (message.u._id === userId) return
 
     // Ignore DMs if configured to
-    const isDM = msgOpts.roomType === 'd'
+    const isDM = meta.roomType === 'd'
     if (isDM && !config.dm) return
 
     // Ignore Livechat if configured to
-    const isLC = msgOpts.roomType === 'l'
+    const isLC = meta.roomType === 'l'
     if (isLC && !config.livechat) return
 
     // Ignore messages in public rooms not joined by bot if configured to
-    if (!config.allPublic && !isDM && !msgOpts.roomParticipant) return
+    if (!config.allPublic && !isDM && !meta.roomParticipant) return
 
     // Set current time for comparison to incoming
     let currentReadTime = new Date(message.ts.$date)
@@ -410,7 +410,11 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`)
     lastReadTime = currentReadTime
 
-    callback(null, message, msgOpts)
+    // Add room name to meta, is useful for some adapters
+    if (!isDM && !isLC) meta.roomName = await getRoomName(message.rid)
+
+    // Processing completed, call callback to respond to message
+    callback(null, message, meta)
   })
 }
 

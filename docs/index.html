@@ -91,7 +91,34 @@
 				<p>Any Rocket.Chat server method can be called via <code>driver.callMethod</code>,
 					<code>driver.cacheCall</code> or <code>driver.asyncCall</code>. Server methods are not fully
 				documented, most require searching the Rocket.Chat codebase.</p>
-				<h4 id="message-objects">MESSAGE OBJECTS</h4>
+				<h3 id="basic-usage">BASIC USAGE</h3>
+				<hr>
+				<p>The following ES6 demo uses async calls to login, join rooms, subscribe to
+					message streams and respond to messages (with a callback) using provided
+				options to filter the types of messages to respond to.</p>
+				<p>This example can be executed with the testing instance by running <code>yarn start</code>,
+					to allow manual testing, once subscription is setup try sending DMs to the bot
+				user and they should be logged in console.</p>
+				<pre><code><span class="hljs-keyword">import</span> { driver } <span class="hljs-keyword">from</span> <span class="hljs-string">'@rocket.chat/sdk'</span>
+
+<span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">startReceiving</span> (<span class="hljs-params"></span>) </span>{
+  <span class="hljs-keyword">await</span> driver.connect({ <span class="hljs-attr">host</span>: <span class="hljs-string">'localhost:3000'</span>, <span class="hljs-attr">useSsl</span>: <span class="hljs-literal">true</span> })
+  <span class="hljs-keyword">await</span> driver.login({ <span class="hljs-attr">username</span>: <span class="hljs-string">'bot'</span>, <span class="hljs-attr">password</span>: <span class="hljs-string">'pass'</span> })
+  <span class="hljs-keyword">await</span> driver.joinRooms([<span class="hljs-string">'GENERAL'</span>])
+  <span class="hljs-keyword">await</span> driver.subscribeToMessages()
+  <span class="hljs-keyword">await</span> driver.respondToMessages(<span class="hljs-function">(<span class="hljs-params">err, message, msgOpts</span>) =&gt;</span> {
+    <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'received message'</span>, message, msgOpts)
+  }, {
+    <span class="hljs-attr">allPublic</span>: <span class="hljs-literal">false</span>,
+    <span class="hljs-attr">dm</span>: <span class="hljs-literal">true</span>,
+    <span class="hljs-attr">livechat</span>: <span class="hljs-literal">false</span>,
+    <span class="hljs-attr">edited</span>: <span class="hljs-literal">true</span>
+  })
+}
+
+startReceiving()
+</code></pre><h4 id="message-objects">MESSAGE OBJECTS</h4>
+				<hr>
 				<p>The Rocket.Chat message schema can be found here:
 				<a href="https://rocket.chat/docs/developer-guides/schema-definition/">https://rocket.chat/docs/developer-guides/schema-definition/</a></p>
 				<p>The structure for messages in this package matches that schema, with a
@@ -156,7 +183,7 @@
 				<h3 id="driver-reacttomessages-callback-"><code>driver.reactToMessages(callback)</code></h3>
 				<p>Once a subscription is created, using <code>driver.subscribeToMessages()</code> this method
 				can be used to attach a callback to changes in the message stream.</p>
-				<p>Fires callback with every change in subscriptions</p>
+				<p>Fires callback with every change in subscriptions.</p>
 				<ul>
 					<li>Uses error-first callback pattern</li>
 					<li>Second argument is the changed item</li>
@@ -165,6 +192,22 @@
 				<p>For example usage, see the Rocket.Chat Hubot adapter&#39;s receive function, which
 					is bound as a callback to this method:
 				<a href="https://github.com/RocketChat/hubot-rocketchat/blob/convert-es6/index.js#L97-L193">https://github.com/RocketChat/hubot-rocketchat/blob/convert-es6/index.js#L97-L193</a></p>
+				<h3 id="driver-respondtomessages-callback-options-"><code>driver.respondToMessages(callback, options)</code></h3>
+				<p>Proxy for <code>reactToMessages</code> with some filtering of messages based on config.
+				This is a more user-friendly method for bots to subscribe to a message stream.</p>
+				<p>Fires callback after filters run on subscription events.</p>
+				<ul>
+					<li>Uses error-first callback pattern</li>
+					<li>Second argument is the changed item</li>
+					<li>Third argument is additional attributes, such as <code>roomType</code></li>
+				</ul>
+				<p>Accepts options object, that parallels respond filter env variables:</p>
+				<ul>
+					<li>options.allPublic : respond to messages on all channels (or just joined)</li>
+					<li>options.dm : respond to messages in DMs with the SDK user</li>
+					<li>options.livechat : respond to messages in Livechat rooms</li>
+					<li>options.edited : respond to edited messages</li>
+				</ul>
 				<h3 id="driver-asynccall-method-params-"><code>driver.asyncCall(method, params)</code></h3>
 				<p>Wraps server method calls to always be async</p>
 				<ul>
@@ -368,6 +411,22 @@ rocketchat.driver.connect({ <span class="hljs-attr">host</span>: <span class="hl
 						<tr>
 							<td><code>DM_ROOM_CACHE_MAX_AGE</code></td>
 							<td>Max age of cache for DM lookups</td>
+						</tr>
+						<tr>
+							<td><code>LISTEN_ON_ALL_PUBLIC</code></td>
+							<td>true/false, respond listens in all public channels</td>
+						</tr>
+						<tr>
+							<td><code>RESPOND_TO_LIVECHAT</code></td>
+							<td>true/false, respond listens in livechat</td>
+						</tr>
+						<tr>
+							<td><code>RESPOND_TO_DM</code></td>
+							<td>true/false, respond listens to DMs with bot</td>
+						</tr>
+						<tr>
+							<td><code>RESPOND_TO_EDITED</code></td>
+							<td>true/false, respond listens to edited messages</td>
 						</tr>
 					</tbody>
 				</table>

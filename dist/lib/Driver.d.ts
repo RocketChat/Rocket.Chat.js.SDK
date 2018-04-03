@@ -70,7 +70,7 @@ export declare function useLog(externalLog: ILogger): void;
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export declare function connect(options?: IConnectOptions, callback?: ICallback): any;
+export declare function connect(options?: IConnectOptions, callback?: ICallback): Promise<IAsteroid>;
 /**
  * Remove all active subscriptions, logout and disconnect from Rocket.Chat
  */
@@ -119,12 +119,21 @@ export declare function subscribeToMessages(): Promise<ISubscription>;
  * for bots) the respondToMessages is more useful to only receive messages
  * matching configuration.
  *
- * @param callback Function called with every change in subscriptions
+ * @param callback Function called with every change in subscriptions.
  *  - Uses error-first callback pattern
  *  - Second argument is the changed item
  *  - Third argument is additional attributes, such as `roomType`
  */
 export declare function reactToMessages(callback: ICallback): void;
+/**
+ * Proxy for `reactToMessages` with some filtering of messages based on config.
+ *
+ * @param callback Function called after filters run on subscription events.
+ *  - Uses error-first callback pattern
+ *  - Second argument is the changed item
+ *  - Third argument is additional attributes, such as `roomType`
+ * @param options Sets filters for different event/message types.
+ */
 export declare function respondToMessages(callback: ICallback, options?: IRespondOptions): void;
 /**
  * Get every new element added to DDP in Asteroid (v2)

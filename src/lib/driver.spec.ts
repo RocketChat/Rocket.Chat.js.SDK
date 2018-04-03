@@ -240,5 +240,33 @@ describe('driver', () => {
       await utils.sendFromUser({ text: 'SDK test `respondToMessages` DM', roomId: dmResult.room._id })
       sinon.assert.calledOnce(callback)
     })
+    it('appends room name to event meta in channels', async () => {
+      const callback = sinon.spy()
+      driver.respondToMessages(callback, { dm: true })
+      await utils.sendFromUser({ text: 'SDK test `respondToMessages` DM' })
+      expect(callback.firstCall.args[2].roomName).to.equal('general')
+    })
+    it('room name is undefined in direct messages', async () => {
+      const dmResult = await utils.setupDirectFromUser()
+      const callback = sinon.spy()
+      driver.respondToMessages(callback, { dm: true })
+      await utils.sendFromUser({ text: 'SDK test `respondToMessages` DM', roomId: dmResult.room._id })
+      expect(callback.firstCall.args[2].roomName).to.equal(undefined)
+    })
+  })
+  describe('.getRoomName', () => {
+    beforeEach(async () => {
+      await driver.connect()
+      await driver.login(credentials)
+    })
+    it('returns the name for a channel by ID', async () => {
+      const room = await driver.getRoomName('GENERAL')
+      expect(room).to.equal('general')
+    })
+    it('returns undefined for a DM room', async () => {
+      const dmResult = await utils.setupDirectFromUser()
+      const room = await driver.getRoomName(dmResult.room._id)
+      expect(room).to.equal(undefined)
+    })
   })
 })
