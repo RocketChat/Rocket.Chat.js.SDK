@@ -22,7 +22,7 @@ npm install @rocket.chat/sdk --save
 
 Next, create _easybot.js_ with the following:
 ```
-const driver = require('@rocket.chat/sdk').driver;
+const { driver } = require('@rocket.chat/sdk');
 // customize the following with your server and BOT account information
 const HOST = 'myserver.com';
 const USER = 'mysuer';
@@ -75,6 +75,11 @@ const processMessages = async(err, message, messageOptions) => {
 
 runbot()
 ```
+
+The above code uses async calls to login, join rooms, subscribe to 
+message streams and respond to messages (with a callback) using provided
+options to filter the types of messages to respond to.
+
 Make sure you customize the constants to your Rocket.Chat server account.  
 
 Finally, run the bot:
@@ -83,7 +88,7 @@ Finally, run the bot:
 node easybot.js
 ```
 
-<insert screenshot of bot working on a server>
+_TBD:  insert screenshot of bot working on a server_
 
 ## Overview
 
@@ -116,9 +121,13 @@ Currently, there are two modules exported by the SDK:
 
 Access these modules by importing them from SDK, e.g:
 
-ES6 `import { driver, methodCache } from '@rocket.chat/sdk'`
+For Node 8 / ES5
 
-ES5 `const { driver, methodCache } = require('@rocket.chat/sdk')`
+`const { driver, methodCache } = require('@rocket.chat/sdk')`
+
+For ES6 supporting platforms
+
+`import { driver, methodCache } from '@rocket.chat/sdk'`
 
 See [Asteroid][asteroid] docs for methods that can be called from that API.
 
@@ -126,38 +135,6 @@ Any Rocket.Chat server method can be called via `driver.callMethod`,
 `driver.cacheCall` or `driver.asyncCall`. Server methods are not fully
 documented, most require searching the Rocket.Chat codebase.
 
-### BASIC USAGE
-
----
-
-The following ES6 demo uses async calls to login, join rooms, subscribe to 
-message streams and respond to messages (with a callback) using provided
-options to filter the types of messages to respond to.
-
-This example can be executed with the testing instance by running `yarn start`, 
-to allow manual testing, once subscription is setup try sending DMs to the bot
-user and they should be logged in console.
-
-```
-import { driver } from '@rocket.chat/sdk'
-
-async function startReceiving () {
-  await driver.connect({ host: 'localhost:3000', useSsl: true })
-  await driver.login({ username: 'bot', password: 'pass' })
-  await driver.joinRooms(['GENERAL'])
-  await driver.subscribeToMessages()
-  await driver.respondToMessages((err, message, msgOpts) => {
-    console.log('received message', message, msgOpts)
-  }, {
-    allPublic: false,
-    dm: true,
-    livechat: false,
-    edited: true
-  })
-}
-
-startReceiving()
-```
 
 #### MESSAGE OBJECTS
 
