@@ -5,3 +5,5 @@
 /.env
 /shrinkwrap.yaml
 /package-lock.json
+/docs/*
+!/docs/.gitkeep
