@@ -5,6 +5,86 @@
 
 Application interface for server methods and message stream subscriptions.
 
+## Quick Start
+
+Add your own Rocket.Chat BOT, running on your favorite Linux, MacOS or Windows system.
+
+First, make sure you have the latest version of [nodeJS](https://nodejs.org/) (nodeJS 8.x or higher).   
+```
+node -v
+v8.9.3
+```
+In a project directory, add Rocket.Chat.js.SDK as dependency:
+
+```
+npm install @rocket.chat/sdk --save
+```
+
+Next, create _easybot.js_ with the following:
+```
+const driver = require('@rocket.chat/sdk').driver;
+// customize the following with your server and BOT account information
+const HOST = 'myserver.com';
+const USER = 'mysuer';
+const PASS = 'mypassword';
+const BOTNAME = 'easybot';  // name  bot response to
+const SSL = true;  // server uses https ?
+const ROOMS = ['GENERAL', 'myroom1'];
+
+var myuserid;
+// this simple bot does not handle errors, different messsage types, server resets 
+// and other production situations 
+
+const runbot = async () => {
+    const conn = await driver.connect( { host: HOST, useSsl: SSL})
+    myuserid = await driver.login({username: USER, password: PASS});
+    const roomsJoined = await driver.joinRooms(ROOMS);
+    console.log('joined rooms');
+
+    // set up subscriptions - rooms we are interested in listening to
+    const subscribed = await driver.subscribeToMessages();
+    console.log('subscribed');
+
+    // connect the processMessages callback
+    const msgloop = await driver.reactToMessages( processMessages );
+    console.log('connected and waiting for messages');
+
+    // when a message is created in one of the ROOMS, we 
+    // receive it in the processMesssages callback
+
+    // greets from the first room in ROOMS 
+    const sent = await driver.sendMessageByRoom( BOTNAME + ' is listening ...',ROOMS[0]);
+    console.log('Greeting message sent');
+}
+
+// callback for incoming messages filter and processing
+const processMessages = async(err, message, messageOptions) => {
+  if (!err) {
+    // filter our own message
+    if (message.u._id === myuserid) return;
+    // can filter further based on message.rid
+    const roomname = await driver.getRoomName(message.rid);
+    if (message.msg.toLowerCase().startsWith(BOTNAME)) {
+      const response = message.u.username + 
+            ', how can ' + BOTNAME + ' help you with ' +
+            message.msg.substr(BOTNAME.length + 1);
+      const sentmsg = await driver.sendMessageByRoom(response, roomname);
+    }
+  }
+}
+
+runbot()
+```
+Make sure you customize the constants to your Rocket.Chat server account.  
+
+Finally, run the bot:
+
+```
+node easybot.js
+```
+
+<insert screenshot of bot working on a server>
+
 ## Overview
 
 Using this package third party apps can control and query a Rocket.Chat server
