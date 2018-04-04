@@ -4,7 +4,7 @@ import 'mocha'
 import sinon from 'sinon'
 import { expect } from 'chai'
 import { silence } from './log'
-import { botUser } from '../utils/config'
+import { botUser, mockUser } from '../utils/config'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
@@ -144,12 +144,67 @@ describe('driver', () => {
       expect(messageArgs.msg).to.equal('SDK test `subscribeToMessages` 3')
     })
   })
-  describe('.sendMessageByRoomId', () => {
-    it('sends to the given room name', async () => {
+  describe('.sendToRoomId', () => {
+    it('sends string to the given room id', async () => {
       await driver.connect()
       await driver.login(credentials)
       await driver.subscribeToMessages()
-      await driver.sendMessageByRoomId('SDK test `sendMessageByRoomId`', 'GENERAL')
+      const result = await driver.sendToRoomId('SDK test `sendToRoomId`', 'GENERAL')
+      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+    it('sends array of strings to the given room id', async () => {
+      await driver.connect()
+      await driver.login(credentials)
+      await driver.subscribeToMessages()
+      const result = await driver.sendToRoomId([
+        'SDK test `sendToRoomId` A',
+        'SDK test `sendToRoomId` B'
+      ], 'GENERAL')
+      expect(result).to.be.an('array')
+      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
+      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+  })
+  describe('.sendToRoom', () => {
+    it('sends string to the given room name', async () => {
+      await driver.connect()
+      await driver.login(credentials)
+      await driver.subscribeToMessages()
+      const result = await driver.sendToRoom('SDK test `sendToRoom`', 'general')
+      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+    it('sends array of strings to the given room name', async () => {
+      await driver.connect()
+      await driver.login(credentials)
+      await driver.subscribeToMessages()
+      const result = await driver.sendToRoom([
+        'SDK test `sendToRoom` A',
+        'SDK test `sendToRoom` B'
+      ], 'general')
+      expect(result).to.be.an('array')
+      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
+      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+  })
+  describe('.sendDirectToUser', () => {
+    it('sends string to the given room name', async () => {
+      await driver.connect()
+      await driver.login(credentials)
+      await driver.subscribeToMessages()
+      const result = await driver.sendDirectToUser('SDK test `sendDirectToUser`', mockUser.username)
+      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+    it('sends array of strings to the given room name', async () => {
+      await driver.connect()
+      await driver.login(credentials)
+      await driver.subscribeToMessages()
+      const result = await driver.sendDirectToUser([
+        'SDK test `sendDirectToUser` A',
+        'SDK test `sendDirectToUser` B'
+      ], mockUser.username)
+      expect(result).to.be.an('array')
+      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
+      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
     })
   })
   describe('.respondDefaults', () => {
@@ -195,7 +250,7 @@ describe('driver', () => {
     it('ignores messages sent from bot', async () => {
       const callback = sinon.spy()
       driver.respondToMessages(callback)
-      await driver.sendMessageByRoomId('SDK test `respondToMessages`', 'GENERAL')
+      await driver.sendToRoomId('SDK test `respondToMessages`', 'GENERAL')
       sinon.assert.notCalled(callback)
     })
     it('fires callback on messages in joined rooms', async () => {

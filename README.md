@@ -23,7 +23,10 @@ or platform of choice.
 
 ## API
 
-See full API documentation links in the generated docs. Below is just a summary:
+Full API documentation can be generated locally using `yarn docs`.
+This isn't in a format we can publish yet, but can be useful for development.
+
+Below is just a summary:
 
 ---
 
@@ -239,25 +242,26 @@ Structure message content for sending
 - Optionally addressing to room ID with second param
 - Returns a message object
 
-### `driver.sendMessageByRoomId(content, roomId)`
+### `driver.sendMessage(message)`
 
-Prepare and send message/s to specified room ID
-- Content can be message object, message text string or array of strings
-- Returns a promise
-- Resolves when all sent
+Send a prepared message object (with pre-defined room ID)
+- Accepts a message object
+- Returns a promise that resolves to sent message object
 
-### `driver.sendMessageByRoom(content, room)`
+### `driver.sendToRoomId(content, roomId)`
+
+Prepare and send string/s to specified room ID
+- Accepts message text string or array of strings
+- Returns a promise or array of promises that resolve to sent message object/s
+
+### `driver.sendToRoom(content, room)`
 
 As above, with room name instead of ID
 
 ### `driver.sendDirectToUser(content, username)`
 
 As above, with username for DM instead of ID
-
-### `driver.sendMessage(content, roomId?)`
-
-Send a prepared message object (with pre-defined room ID)
-- Optional argument allows redirecting message to different room
+- Creates DM room if it doesn't exist
 
 ---
 
@@ -396,8 +400,9 @@ Do `npm install -g yarn` if you don't have it. Then setup the project:
 
 - `yarn test` runs tests and coverage locally (pretest does lint)
 - `yarn test:debug` runs tests without coverage, breaking for debug attach
-- `yarn docs` generates docs
-- `yarn build` runs tests, coverage, compiles, tests package, generates docs
+- `yarn start` run locally from source, to allow manual testing of streams
+- `yarn docs` generates API docs locally, then `open docs/index.html`
+- `yarn build` runs tests, coverage, compiles, and tests package for publishing
 - `yarn test:package` uses package-preview to make sure the published node
 package can be required and run only with defined dependencies, to avoid errors
 that might pass locally due to existing global dependencies or symlinks.

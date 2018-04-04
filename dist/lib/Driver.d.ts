@@ -160,30 +160,25 @@ export declare function joinRooms(rooms: string[]): Promise<void[]>;
  */
 export declare function prepareMessage(content: string | IMessage, roomId?: string): Message;
 /**
- * Prepare and send message/s to specified room ID.
- * Accepts message text string, array of strings or a structured message object.
- * Will create one or more send calls collected into promise.
- */
-export declare function sendMessageByRoomId(content: string | string[] | IMessage, roomId: string): Promise<any>;
-/**
- * Prepare and send message/s to specified room name (or ID).
- * Accepts message text string, array of strings or a structured message object.
- * Will create one or more send calls collected into promise.
- */
-export declare function sendMessageByRoom(content: string | string[] | IMessage, room: string): Promise<any>;
-/**
- * Send a message to a user in a DM.
- */
-export declare function sendDirectToUser(message: string | string[] | IMessage, username: string): Promise<any>;
-/**
  * Send a prepared message object (with pre-defined room ID).
  * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
- * In the Hubot adapter, this method accepted a room ID, which was not semantic,
- * such usage should be replaced by `sendMessageByRoom(content, roomId)`
  */
-export declare function sendMessage(message: IMessage, roomId?: string): Promise<any>;
+export declare function sendMessage(message: IMessage): Promise<IMessage>;
 /**
- * Legacy method for older adapters - sendMessage now accepts all properties
- * @deprecated since 0.0.0
+ * Prepare and send string/s to specified room ID.
+ * @param content Accepts message text string or array of strings.
+ * @param roomId  ID of the target room to use in send.
  */
-export declare function customMessage(message: IMessage): Promise<any>;
+export declare function sendToRoomId(content: string | string[], roomId: string): Promise<IMessage[] | IMessage>;
+/**
+ * Prepare and send string/s to specified room name (or ID).
+ * @param content Accepts message text string or array of strings.
+ * @param room    A name (or ID) to resolve as ID to use in send.
+ */
+export declare function sendToRoom(content: string | string[], room: string): Promise<IMessage[] | IMessage>;
+/**
+ * Prepare and send string/s to a user in a DM.
+ * @param content   Accepts message text string or array of strings.
+ * @param username  Name to create (or get) DM for room ID to use in send.
+ */
+export declare function sendDirectToUser(content: string | string[], username: string): Promise<IMessage[] | IMessage>;

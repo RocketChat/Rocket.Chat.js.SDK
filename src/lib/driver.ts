@@ -482,51 +482,42 @@ export function prepareMessage (content: string | IMessage, roomId?: string): Me
 }
 
 /**
- * Prepare and send message/s to specified room ID.
- * Accepts message text string, array of strings or a structured message object.
- * Will create one or more send calls collected into promise.
- */
-export function sendMessageByRoomId (content: string | string[] | IMessage, roomId: string): Promise<any> {
-  let messages: Message[] = []
-  if (Array.isArray(content)) {
-    content.forEach((text) => messages.push(prepareMessage(text, roomId)))
-  } else {
-    messages.push(prepareMessage(content, roomId))
-  }
-  return Promise.all(messages.map((message) => sendMessage(message)))
-}
-
-/**
- * Prepare and send message/s to specified room name (or ID).
- * Accepts message text string, array of strings or a structured message object.
- * Will create one or more send calls collected into promise.
- */
-export function sendMessageByRoom (content: string | string[] | IMessage, room: string): Promise<any> {
-  return getRoomId(room).then((roomId) => sendMessageByRoomId(content, roomId))
-}
-
-/**
- * Send a message to a user in a DM.
- */
-export function sendDirectToUser (message: string | string[] | IMessage, username: string): Promise<any> {
-  return getDirectMessageRoomId(username).then((rid) => sendMessageByRoomId(message, rid))
-}
-
-/**
  * Send a prepared message object (with pre-defined room ID).
  * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
- * In the Hubot adapter, this method accepted a room ID, which was not semantic,
- * such usage should be replaced by `sendMessageByRoom(content, roomId)`
  */
-export function sendMessage (message: IMessage, roomId?: string): Promise<any> {
-  if (roomId) return sendMessageByRoomId(message, roomId)
+export function sendMessage (message: IMessage): Promise<IMessage> {
   return asyncCall('sendMessage', message)
 }
 
 /**
- * Legacy method for older adapters - sendMessage now accepts all properties
- * @deprecated since 0.0.0
+ * Prepare and send string/s to specified room ID.
+ * @param content Accepts message text string or array of strings.
+ * @param roomId  ID of the target room to use in send.
  */
-export function customMessage (message: IMessage): Promise<any> {
-  return sendMessage(message)
+export function sendToRoomId (content: string | string[], roomId: string): Promise<IMessage[] | IMessage> {
+  if (!Array.isArray(content)) {
+    return sendMessage(prepareMessage(content, roomId))
+  } else {
+    return Promise.all(content.map((text) => {
+      return sendMessage(prepareMessage(text, roomId))
+    }))
+  }
+}
+
+/**
+ * Prepare and send string/s to specified room name (or ID).
+ * @param content Accepts message text string or array of strings.
+ * @param room    A name (or ID) to resolve as ID to use in send.
+ */
+export function sendToRoom (content: string | string[], room: string): Promise<IMessage[] | IMessage> {
+  return getRoomId(room).then((roomId) => sendToRoomId(content, roomId))
+}
+
+/**
+ * Prepare and send string/s to a user in a DM.
+ * @param content   Accepts message text string or array of strings.
+ * @param username  Name to create (or get) DM for room ID to use in send.
+ */
+export function sendDirectToUser (content: string | string[], username: string): Promise<IMessage[] | IMessage> {
+  return getDirectMessageRoomId(username).then((rid) => sendToRoomId(content, rid))
 }

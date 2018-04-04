@@ -11,11 +11,6 @@ async function start () {
   driver.respondToMessages((err, msg, msgOpts) => {
     if (err) throw err
     console.log('[respond]', JSON.stringify(msg), JSON.stringify(msgOpts))
-  }, {
-    allPublic: false,
-    dm: true,
-    livechat: false,
-    edited: true
   })
 }
 

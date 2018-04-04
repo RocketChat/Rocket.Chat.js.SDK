@@ -29,11 +29,6 @@ function start() {
             if (err)
                 throw err;
             console.log('[respond]', JSON.stringify(msg), JSON.stringify(msgOpts));
-        }, {
-            allPublic: false,
-            dm: true,
-            livechat: false,
-            edited: true
         });
     });
 }
