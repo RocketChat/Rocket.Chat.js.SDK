@@ -53,7 +53,7 @@ const runbot = async () => {
     // receive it in the processMesssages callback
 
     // greets from the first room in ROOMS 
-    const sent = await driver.sendMessageByRoom( BOTNAME + ' is listening ...',ROOMS[0]);
+    const sent = await driver.sendToRoom( BOTNAME + ' is listening ...',ROOMS[0]);
     console.log('Greeting message sent');
 }
 
@@ -68,7 +68,7 @@ const processMessages = async(err, message, messageOptions) => {
       const response = message.u.username + 
             ', how can ' + BOTNAME + ' help you with ' +
             message.msg.substr(BOTNAME.length + 1);
-      const sentmsg = await driver.sendMessageByRoom(response, roomname);
+      const sentmsg = await driver.sendToRoom(response, roomname);
     }
   }
 }
