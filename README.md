@@ -5,6 +5,10 @@
 
 Application interface for server methods and message stream subscriptions.
 
+## Super Quick Start (30 seconds)
+
+Create your own working BOT for Rocket.Chat, in seconds, at [glitch.com](https://glitch.com/~rocketchat-bot).
+
 ## Quick Start
 
 Add your own Rocket.Chat BOT, running on your favorite Linux, MacOS or Windows system.
