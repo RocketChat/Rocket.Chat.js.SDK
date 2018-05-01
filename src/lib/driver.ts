@@ -132,20 +132,26 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
     setupMethodCache(asteroid) // init instance for later caching method calls
     asteroid.on('connected', () => events.emit('connected'))
     asteroid.on('reconnected', () => events.emit('reconnected'))
-    // let cancelled = false
+    let cancelled = false
     const rejectionTimeout = setTimeout(function () {
       logger.info(`[connect] Timeout (${config.timeout})`)
-      // cancelled = true
       const err = new Error('Asteroid connection timeout')
+      cancelled = true
+      events.removeAllListeners('connected')
       callback ? callback(err, asteroid) : reject(err)
     }, config.timeout)
-    events.once('connected', () => {
-      logger.info('[connect] Connected')
-      // if (cancelled) return asteroid.ddp.disconnect() // cancel if already rejected
-      clearTimeout(rejectionTimeout)
-      if (callback) callback(null, asteroid)
-      resolve(asteroid)
-    })
+
+    // if to avoid condition where timeout happens before listener to 'connected' is added
+    // and this listener is not removed (because it was added after the removal)
+    if (!cancelled) {
+      events.once('connected', () => {
+        logger.info('[connect] Connected')
+        // if (cancelled) return asteroid.ddp.disconnect() // cancel if already rejected
+        clearTimeout(rejectionTimeout)
+        if (callback) callback(null, asteroid)
+        resolve(asteroid)
+      })
+    }
   })
 }
 

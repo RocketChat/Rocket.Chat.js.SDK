@@ -16,7 +16,7 @@ let clock
 describe('driver', () => {
   silence() // suppress log during tests (disable this while developing tests)
   before(() => utils.setup()) // add user accounts for bot and mock user
-  /*
+  
   describe('.connect', () => {
     context('with localhost connection', () => {
       it('without args, returns a promise', () => {
@@ -91,7 +91,7 @@ describe('driver', () => {
       })
     })
   })
-  */
+  
   // describe('disconnect', () => {
     // Disabled for now, as only Asteroid v2 has a disconnect method
     // it('disconnects from asteroid', async () => {
