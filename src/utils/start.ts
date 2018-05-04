@@ -8,7 +8,7 @@ async function start () {
   await driver.login({ username: botUser.username, password: botUser.password })
   await driver.joinRooms(botRooms)
   await driver.subscribeToMessages()
-  driver.respondToMessages((err, msg, msgOpts) => {
+  await driver.respondToMessages((err, msg, msgOpts) => {
     if (err) throw err
     console.log('[respond]', JSON.stringify(msg), JSON.stringify(msgOpts))
   })

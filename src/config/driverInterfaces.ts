@@ -12,12 +12,14 @@ export interface IConnectOptions {
 
 /**
  * Message respond options
- * @param allPublic   Listen and respond on all public channels
+ * @param rooms       Respond to only selected room/s (names or IDs)
+ * @param allPublic   Respond on all public channels (ignores rooms if true)
  * @param dm          Respond to messages in DM / private chats
  * @param livechat    Respond to messages in livechat
  * @param edited      Respond to edited messages
  */
 export interface IRespondOptions {
+  rooms?: string[],
   allPublic?: boolean,
   dm?: boolean,
   livechat?: boolean,

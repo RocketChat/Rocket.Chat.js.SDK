@@ -416,24 +416,33 @@ rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
 
 | Env var                | Description                                           |
 | ---------------------- | ----------------------------------------------------- |
-| `ROCKETCHAT_URL`       | URL of the Rocket.Chat to connect to                  |
+| `ROCKETCHAT_URL`*      | URL of the Rocket.Chat to connect to                  |
+| `ROCKETCHAT_USER`*     | Username for bot account login                        |
+| `ROCKETCHAT_PASSWORD`* | Password for bot account login                        |
 | `ROCKETCHAT_AUTH`      | Set to 'ldap' to enable LDAP login                    |
-| `ADMIN_USERNAME`       | Admin user password for API                           |
-| `ADMIN_PASS`           | Admin user password for API                           |
-| `ROCKETCHAT_USER`      | User password for SDK tests                           |
-| `ROCKETCHAT_PASS`      | Pass username for SDK tests                           |
-| `INTEGRATION_ID`       | ID applied to message object to integration source    |
-| `ROOM_CACHE_SIZE`      | Size of cache (LRU) for room (ID or name) lookups     |
-| `ROOM_CACHE_MAX_AGE`   | Max age of cache for room lookups                     |
-| `DM_ROOM_CACHE_SIZE`   | Size of cache for Direct Message room lookups         |
-| `DM_ROOM_CACHE_MAX_AGE`| Max age of cache for DM lookups                       |
+| `ROCKETCHAT_USE_SSL`   | Force bot to connect with SSL                         |
+| `ROCKETCHAT_ROOM`      | Respond listens in the named channel/s (can be csv)   |
 | `LISTEN_ON_ALL_PUBLIC` | true/false, respond listens in all public channels    |
 | `RESPOND_TO_LIVECHAT`  | true/false, respond listens in livechat               |
 | `RESPOND_TO_DM`        | true/false, respond listens to DMs with bot           |
 | `RESPOND_TO_EDITED`    | true/false, respond listens to edited messages        |
+| `INTEGRATION_ID`       | ID applied to message object to integration source    |
+| **Advanced configs**   |                                                       |
+| `ROOM_CACHE_SIZE`      | Size of cache (LRU) for room (ID or name) lookups     |
+| `ROOM_CACHE_MAX_AGE`   | Max age of cache for room lookups                     |
+| `DM_ROOM_CACHE_SIZE`   | Size of cache for Direct Message room lookups         |
+| `DM_ROOM_CACHE_MAX_AGE`| Max age of cache for DM lookups                       |
+| **Test configs**       |                                                       |
+| `ADMIN_USERNAME`       | Admin user password for API                           |
+| `ADMIN_PASS`           | Admin user password for API                           |
 
 These are only required in test and development, assuming in production they
 will be passed from the adapter implementing this package.
+
+`ROCKETCHAT_ROOM` should be set to empty (with `ROCKETCHAT_ROOM=''`) when using
+`LISTEN_ON_ALL_PUBLIC`. This option also allows the bot to listen and respond to
+messages _from all newly created private groups_ where the bot's user has been
+added as a member.
 
 ### Installing Rocket.Chat
 

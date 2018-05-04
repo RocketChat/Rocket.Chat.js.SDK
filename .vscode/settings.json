@@ -13,8 +13,7 @@
   },
   "coverage-gutters.showGutterCoverage": true,
   "eslint.packageManager": "yarn",
-  "cSpell.words": [
-    "groupable",
-    "msgs"
-  ]
+  "search.exclude": {
+    "**/dist": true
+  }
 }

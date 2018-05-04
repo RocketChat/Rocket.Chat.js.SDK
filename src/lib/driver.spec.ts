@@ -5,6 +5,7 @@ import sinon from 'sinon'
 import { expect } from 'chai'
 import { silence } from './log'
 import { botUser, mockUser } from '../utils/config'
+import * as api from '../utils/api'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
@@ -16,7 +17,7 @@ let clock
 describe('driver', () => {
   silence() // suppress log during tests (disable this while developing tests)
   before(() => utils.setup()) // add user accounts for bot and mock user
-  
+
   describe('.connect', () => {
     context('with localhost connection', () => {
       it('without args, returns a promise', () => {
@@ -43,7 +44,7 @@ describe('driver', () => {
       })
       it('promise resolves with asteroid in successful state', () => {
         return driver.connect({}).then((asteroid) => {
-          const isActive = asteroid.ddp.readyState === 1
+          const isActive = (asteroid.ddp.readyState === 1)
           // const isActive = asteroid.ddp.status === 'connected'
           expect(isActive).to.equal(true)
         })
@@ -91,7 +92,7 @@ describe('driver', () => {
       })
     })
   })
-  
+
   // describe('disconnect', () => {
     // Disabled for now, as only Asteroid v2 has a disconnect method
     // it('disconnects from asteroid', async () => {
@@ -107,7 +108,10 @@ describe('driver', () => {
     it('sets the bot user status to online', async () => {
       await driver.connect()
       await driver.login(credentials)
-      const result = await utils.getUserData({ username: botUser.username })
+      await utils
+      await api.login(credentials)
+      const result = await utils.userInfo(botUser.username)
+      await api.logout()
       expect(result.user.status).to.equal('online')
     })
   })
@@ -207,15 +211,55 @@ describe('driver', () => {
       expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
     })
   })
-  describe('.respondDefaults', () => {
+  describe('.connectDefaults', () => {
+    beforeEach(() => {
+      delete process.env.ROCKETCHAT_URL
+      delete process.env.ROCKETCHAT_USE_SSL
+    })
     afterEach(() => process.env = initEnv)
-    it('all configs default to false if env undefined', () => {
+    it('uses localhost URL without SSL if env undefined', () => {
+      const defaults = driver.connectDefaults()
+      expect(defaults).to.eql({
+        host: 'localhost:3000',
+        useSsl: false,
+        timeout: 20000
+      })
+    })
+    it('sets SSL from env if defined', () => {
+      process.env.ROCKETCHAT_USE_SSL = 'true'
+      const defaults = driver.connectDefaults()
+      expect(defaults.useSsl).to.equal(true)
+    })
+    it('uses SSL if https protocol URL in env', () => {
+      process.env.ROCKETCHAT_URL = 'https://localhost:3000'
+      const defaults = driver.connectDefaults()
+      expect(defaults.useSsl).to.equal(true)
+    })
+    it('does not use SSL if http protocol URL in env', () => {
+      process.env.ROCKETCHAT_URL = 'http://localhost:3000'
+      const defaults = driver.connectDefaults()
+      expect(defaults.useSsl).to.equal(false)
+    })
+    it('SSL overrides protocol detection', () => {
+      process.env.ROCKETCHAT_URL = 'https://localhost:3000'
+      process.env.ROCKETCHAT_USE_SSL = 'false'
+      const defaults = driver.connectDefaults()
+      expect(defaults.useSsl).to.equal(false)
+    })
+  })
+  describe('.respondDefaults', () => {
+    beforeEach(() => {
+      delete process.env.ROCKETCHAT_ROOM
       delete process.env.LISTEN_ON_ALL_PUBLIC
       delete process.env.RESPOND_TO_DM
       delete process.env.RESPOND_TO_LIVECHAT
       delete process.env.RESPOND_TO_EDITED
+    })
+    afterEach(() => process.env = initEnv)
+    it('all configs default to false if env undefined', () => {
       const defaults = driver.respondDefaults()
       expect(defaults).to.eql({
+        rooms: [],
         allPublic: false,
         dm: false,
         livechat: false,
@@ -223,17 +267,24 @@ describe('driver', () => {
       })
     })
     it('inherits config from env defaults', () => {
+      process.env.ROCKETCHAT_ROOM = 'GENERAL'
       process.env.LISTEN_ON_ALL_PUBLIC = 'false'
       process.env.RESPOND_TO_DM = 'true'
       process.env.RESPOND_TO_LIVECHAT = 'true'
       process.env.RESPOND_TO_EDITED = 'true'
       const defaults = driver.respondDefaults()
       expect(defaults).to.eql({
+        rooms: ['GENERAL'],
         allPublic: false,
         dm: true,
         livechat: true,
         edited: true
       })
+    })
+    it('creates room array from csv list', () => {
+      process.env.ROCKETCHAT_ROOM = 'general, tests'
+      const defaults = driver.respondDefaults()
+      expect(defaults.rooms).to.eql(['general', 'tests'])
     })
   })
   describe('.respondToMessages', () => {
@@ -247,6 +298,12 @@ describe('driver', () => {
       await driver.subscribeToMessages()
     })
     afterEach(() => process.env = initEnv)
+    it('joins rooms if not already joined', async () => {
+      expect(driver.joinedIds).to.have.lengthOf(0)
+      const rooms = ['general', utils.testChannelName]
+      await driver.respondToMessages(() => null, { rooms })
+      expect(driver.joinedIds).to.have.lengthOf(2)
+    })
     it('ignores messages sent from bot', async () => {
       const callback = sinon.spy()
       driver.respondToMessages(callback)
@@ -322,6 +379,18 @@ describe('driver', () => {
       const dmResult = await utils.setupDirectFromUser()
       const room = await driver.getRoomName(dmResult.room._id)
       expect(room).to.equal(undefined)
+    })
+  })
+  describe('.joinRooms', () => {
+    it('joins all the rooms in array, keeping IDs', async () => {
+      driver.joinedIds.splice(0, driver.joinedIds.length) // clear const array
+      await api.login(credentials)
+      const testChannel = await utils.channelInfo(utils.testChannelName)
+      await api.logout()
+      await driver.connect()
+      await driver.login(credentials)
+      await driver.joinRooms(['general', utils.testChannelName])
+      expect(driver.joinedIds).to.eql(['GENERAL', testChannel.channel._id])
     })
   })
 })

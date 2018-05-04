@@ -2,6 +2,13 @@ import { EventEmitter } from 'events'
 // import { Map } from 'immutable'
 
 /**
+ * Asteroid DDP - add known properties to avoid TS lint errors
+ */
+export interface IAsteroidDDP extends EventEmitter {
+  readyState: 1 | 0
+}
+
+/**
  * Asteroid type
  * @todo Update with typing from definitely typed (when available)
  */
@@ -21,7 +28,7 @@ export interface IAsteroid extends EventEmitter {
   call: (method: string, ...params: any[]) => IMethodResult
   apply: (method: string, params: any[]) => IMethodResult
   getCollection: (name: string) => ICollection
-  ddp: EventEmitter
+  ddp: IAsteroidDDP
   // v2 Interface
   /*
   collections: Map<string, any>,

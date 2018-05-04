@@ -22,7 +22,17 @@ export function setAuth (authData: {authToken: string, userId: string}) {
 // Join basic headers with auth headers if required
 export function getHeaders (authRequired = false) {
   if (!authRequired) return basicHeaders
+  if (authHeaders['X-Auth-Token'] === '' || authHeaders['X-User-Id'] === '') {
+    throw new Error('Auth required endpoint cannot be called before login')
+  }
   return Object.assign({}, basicHeaders, authHeaders)
+}
+
+// Convert payload data to query string for GET requests
+export function getQueryString (data: any) {
+  return '?' + Object.keys(data).map((k) => {
+    return `${encodeURIComponent(k)}=${encodeURIComponent(data[k])}`
+  }).join('&')
 }
 
 // Do a POST request to an API endpoint
@@ -49,9 +59,10 @@ export function post (endpoint: string, data: any, auth?: boolean, ignore?: RegE
 }
 
 // Do a GET request to an API endpoint
-export function get (endpoint: string, auth: boolean): Promise<any> {
+export function get (endpoint: string, data: any, auth: boolean): Promise<any> {
   let headers = getHeaders(auth)
-  if (debug) console.log(`GET: ${endpoint}`)
+  if (debug) console.log(`GET: ${endpoint}`, data)
+  if (data) endpoint += getQueryString(data)
   return new Promise((resolve, reject) => {
     api.get(apiHost + endpoint, { headers }, (result: any) => {
       if (result.status && result.status !== 'success') {
@@ -65,11 +76,15 @@ export function get (endpoint: string, auth: boolean): Promise<any> {
 }
 
 // Login a user for further API calls
-export function login (user: INewUserAPI): Promise<ILoginResultAPI | undefined> {
+export function login (user: INewUserAPI): Promise<ILoginResultAPI> {
   return post('/api/v1/login', user)
 }
 
 // Logout a user at end of API calls
+// Resets headers so they can't be used without logging in again
 export function logout () {
-  return get('/api/v1/logout', true)
+  return get('/api/v1/logout', null, true).then(() => {
+    authHeaders['X-Auth-Token'] = ''
+    authHeaders['X-User-Id'] = ''
+  }).catch((e) => console.log(e))
 }

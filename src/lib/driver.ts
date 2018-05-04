@@ -36,7 +36,9 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 export function connectDefaults (): IConnectOptions {
   return {
     host: process.env.ROCKETCHAT_URL || 'localhost:3000',
-    useSsl: ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
+    useSsl: (process.env.ROCKETCHAT_USE_SSL)
+      ? (process.env.ROCKETCHAT_USE_SSL.toLowerCase() === 'true')
+      : ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
     timeout: 20 * 1000 // 20 seconds
   }
 }
@@ -44,6 +46,9 @@ export function connectDefaults (): IConnectOptions {
 /** Define default config for message respond filters. */
 export function respondDefaults (): IRespondOptions {
   return {
+    rooms: (process.env.ROCKETCHAT_ROOM)
+      ? (process.env.ROCKETCHAT_ROOM || '').split(',').map((room) => room.trim())
+      : [],
     allPublic: (process.env.LISTEN_ON_ALL_PUBLIC || 'false').toLowerCase() === 'true',
     dm: (process.env.RESPOND_TO_DM || 'false').toLowerCase() === 'true',
     livechat: (process.env.RESPOND_TO_LIVECHAT || 'false').toLowerCase() === 'true',
@@ -86,6 +91,11 @@ export let subscriptions: ISubscription[] = []
  * Current user object populated from resolved login
  */
 export let userId: string
+
+/**
+ * Array of joined room IDs (for reactive queries)
+ */
+export let joinedIds: string[] = []
 
 /**
  * Array of messages received from reactive collection
@@ -243,18 +253,20 @@ export function cacheCall (method: string, key: string): Promise<any> {
 
 /** Login to Rocket.Chat via Asteroid */
 export function login (credentials: ICredentials): Promise<any> {
-  logger.info(`[login] Logging in ${credentials.username || credentials.email}`)
   let login: Promise<any>
   if (process.env.ROCKETCHAT_AUTH === 'ldap') {
     const params = [
-      credentials.username,
-      credentials.password,
+      credentials.username || process.env.ROCKETCHAT_USER,
+      credentials.password || process.env.ROCKETCHAT_PASSWORD,
       { ldap: true, ldapOptions: {} }
     ]
+    logger.info(`[login] Logging in ${params[0]} with LDAP`)
     login = asteroid.loginWithLDAP(...params)
   } else {
-    const usernameOrEmail = credentials.username || credentials.email || 'bot'
-    login = asteroid.loginWithPassword(usernameOrEmail, credentials.password)
+    const user = credentials.username || credentials.email || process.env.ROCKETCHAT_USER || 'bot'
+    const pass = credentials.password || process.env.ROCKETCHAT_PASSWORD || 'pass'
+    logger.info(`[login] Logging in ${user}`)
+    login = asteroid.loginWithPassword(user, pass)
   }
   return login
     .then((loggedInUserId) => {
@@ -342,6 +354,17 @@ export function subscribeToMessages (): Promise<ISubscription> {
  * for bots) the respondToMessages is more useful to only receive messages
  * matching configuration.
  *
+ * If the bot hasn't been joined to any rooms at this point, it will attempt to
+ * join now based on environment config, otherwise it might not receive any
+ * messages. It doesn't matter that this happens asynchronously because the
+ * bot's joined rooms can change after the reactive query is set up.
+ *
+ * @todo `reactToMessages` should call `subscribeToMessages` if not already
+ *       done, so it's not required as an arbitrary step for simpler adapters.
+ *       Also make `login` call `connect` for the same reason, the way
+ *       `respondToMessages` calls `respondToMessages`, so all that's really
+ *       required is:
+ *       `driver.login(credentials).then(() => driver.respondToMessages(callback))`
  * @param callback Function called with every change in subscriptions.
  *  - Uses error-first callback pattern
  *  - Second argument is the changed item
@@ -349,6 +372,7 @@ export function subscribeToMessages (): Promise<ISubscription> {
  */
 export function reactToMessages (callback: ICallback): void {
   logger.info(`[reactive] Listening for change events in collection ${messages.name}`)
+
   messages.reactiveQuery({}).on('change', (_id: string) => {
     const changedMessageQuery = messages.reactiveQuery({ _id })
     if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {
@@ -374,8 +398,23 @@ export function reactToMessages (callback: ICallback): void {
  *  - Third argument is additional attributes, such as `roomType`
  * @param options Sets filters for different event/message types.
  */
-export function respondToMessages (callback: ICallback, options: IRespondOptions = {}): void {
+export function respondToMessages (callback: ICallback, options: IRespondOptions = {}): Promise<void | void[]> {
   const config = Object.assign({}, respondDefaults(), options)
+  let promise: Promise<void | void[]> = Promise.resolve() // return value, may be replaced by async ops
+
+  // Join configured rooms if they haven't been already, unless listening to all
+  // public rooms, in which case it doesn't matter
+  if (
+    !config.allPublic &&
+    joinedIds.length === 0 &&
+    config.rooms &&
+    config.rooms.length > 0
+  ) {
+    promise = joinRooms(config.rooms).catch((err) => {
+      logger.error(`Failed to join rooms set in env: ${process.env.ROCKETCHAT_ROOM}`, err)
+    })
+  }
+
   lastReadTime = new Date() // init before any message read
   reactToMessages(async (err, message, meta) => {
     if (err) {
@@ -386,15 +425,15 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     // Ignore bot's own messages
     if (message.u._id === userId) return
 
-    // Ignore DMs if configured to
+    // Ignore DMs unless configured not to
     const isDM = meta.roomType === 'd'
     if (isDM && !config.dm) return
 
-    // Ignore Livechat if configured to
+    // Ignore Livechat unless configured not to
     const isLC = meta.roomType === 'l'
     if (isLC && !config.livechat) return
 
-    // Ignore messages in public rooms not joined by bot if configured to
+    // Ignore messages in un-joined public rooms unless configured not to
     if (!config.allPublic && !isDM && !meta.roomParticipant) return
 
     // Set current time for comparison to incoming
@@ -422,6 +461,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     // Processing completed, call callback to respond to message
     callback(null, message, meta)
   })
+  return promise
 }
 
 /**
@@ -468,8 +508,27 @@ export function getDirectMessageRoomId (username: string): Promise<string> {
 }
 
 /** Join the bot into a room by its name or ID */
-export function joinRoom (room: string): Promise<void> {
-  return getRoomId(room).then((roomId) => asyncCall('joinRoom', roomId))
+export async function joinRoom (room: string): Promise<void> {
+  let roomId = await getRoomId(room)
+  let joinedIndex = joinedIds.indexOf(room)
+  if (joinedIndex !== -1) {
+    logger.error(`tried to join room that was already joined`)
+  } else {
+    await asyncCall('joinRoom', roomId)
+    joinedIds.push(roomId)
+  }
+}
+
+/** Exit a room the bot has joined */
+export async function leaveRoom (room: string): Promise<void> {
+  let roomId = await getRoomId(room)
+  let joinedIndex = joinedIds.indexOf(room)
+  if (joinedIndex === -1) {
+    logger.error(`leave room ${room} failed because bot has not joined in room`)
+  } else {
+    await asyncCall('leaveRoom', roomId)
+    delete joinedIds[joinedIndex]
+  }
 }
 
 /** Join a set of rooms by array of names or IDs */
