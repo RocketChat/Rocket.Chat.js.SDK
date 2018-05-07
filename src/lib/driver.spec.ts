@@ -4,7 +4,8 @@ import 'mocha'
 import sinon from 'sinon'
 import { expect } from 'chai'
 import { silence } from './log'
-import { botUser, mockUser } from '../utils/config'
+import { botUser, mockUser, apiUser } from '../utils/config'
+import { logout } from './api'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
@@ -22,6 +23,7 @@ describe('driver', () => {
     const testChannel = await utils.channelInfo(tName)
     tId = testChannel.channel._id
   })
+  after(() => logout())
   describe('.connect', () => {
     context('with localhost connection', () => {
       it('without args, returns a promise', () => {

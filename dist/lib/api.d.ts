@@ -77,3 +77,12 @@ export declare function get(endpoint: string, data?: any, auth?: boolean, ignore
 export declare function login(user?: ILoginCredentials): Promise<ILoginResultAPI>;
 /** Logout a user at end of API calls */
 export declare function logout(): Promise<void>;
+/** Defaults for user queries */
+export declare const userFields: {
+    name: number;
+    username: number;
+    status: number;
+    type: number;
+};
+/** Query helpers for user collection requests */
+export declare const users: any;

@@ -31,6 +31,4 @@ exports.mockUser = {
     sendWelcomeEmail: false,
     verified: true
 };
-// Names for roomId lookup and join for test interactions
-exports.botRooms = ['general'];
 //# sourceMappingURL=config.js.map

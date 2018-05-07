@@ -33,6 +33,3 @@ export const mockUser: INewUserAPI = {
   sendWelcomeEmail: false,
   verified: true
 }
-
-// Names for roomId lookup and join for test interactions
-export const botRooms = ['general']

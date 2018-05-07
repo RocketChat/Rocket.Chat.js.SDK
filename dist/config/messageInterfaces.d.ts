@@ -24,6 +24,11 @@ export interface IMessage {
         _id: string;
         username: string;
     };
+    u?: {
+        _id: string;
+        username: string;
+        name: string;
+    };
 }
 export interface IAttachment {
     fields: IAttachmentField[];

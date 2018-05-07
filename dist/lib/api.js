@@ -198,4 +198,15 @@ function logout() {
     });
 }
 exports.logout = logout;
+/** Defaults for user queries */
+exports.userFields = { name: 1, username: 1, status: 1, type: 1 };
+/** Query helpers for user collection requests */
+exports.users = {
+    all: (fields = exports.userFields) => get('users.list', { fields }).then((r) => r.users),
+    allNames: () => get('users.list', { fields: { 'username': 1 } }).then((r) => r.users.map((u) => u.username)),
+    allIDs: () => get('users.list', { fields: { '_id': 1 } }).then((r) => r.users.map((u) => u._id)),
+    online: (fields = exports.userFields) => get('users.list', { fields, query: { 'status': { $ne: 'offline' } } }).then((r) => r.users),
+    onlineNames: () => get('users.list', { fields: { 'username': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r) => r.users.map((u) => u.username)),
+    onlineIds: () => get('users.list', { fields: { '_id': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r) => r.users.map((u) => u._id))
+};
 //# sourceMappingURL=api.js.map

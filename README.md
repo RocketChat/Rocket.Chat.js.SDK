@@ -1,6 +1,7 @@
 [asteroid]: https://www.npmjs.com/package/asteroid
 [lru]: https://www.npmjs.com/package/lru
 [rest]: https://rocket.chat/docs/developer-guides/rest-api/
+[start]: https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/master/src/utils/start.ts
 
 # Rocket.Chat Node.js SDK
 
@@ -95,6 +96,18 @@ node easybot.js
 
 _TBD:  insert screenshot of bot working on a server_
 
+### Demo
+
+There's a simple listener script provided to demonstrate functionality locally.
+[See the source here][start] and/or run it with `yarn start`.
+
+The start script will log to console any message events that appear in its
+stream. It will respond to a couple specific commands demonstrating usage of
+the API helpers. Try messaging the bot directly one of the following:
+
+- `tell everyone <something>` - It will send that "something" to everyone
+- `who's online` - It will tell you who's online
+
 ## Overview
 
 Using this package third party apps can control and query a Rocket.Chat server
@@ -120,7 +133,7 @@ Below is just a summary:
 
 ---
 
-Currently, there are two modules exported by the SDK:
+The following modules are exported by the SDK:
 - `driver` - Handles connection, method calls, room subscriptions (via Asteroid)
 - `methodCache` - Manages results cache for calls to server (via LRU cache)
 - `api` - Provides a client for making requests with Rocket.Chat's REST API
@@ -144,7 +157,11 @@ more advanced methods that can be called from the `driver.asteroid` interface.
 
 Rocket.Chat REST API calls can be made via `api.get` or `api.post`, with
 parameters defining the endpoint, payload and if authorization is required
-(respectively). See the 
+(respectively). See the [REST API docs][rest] for details.
+
+Some common requests for user queries are made available as simple helpers under
+`api.users`, such as `api.users.onlineIDs()` which returns the user IDs of all
+online users. Run `ts-node src/utils/users.ts` for a demo of user query outputs.
 
 ## MESSAGE OBJECTS
 
@@ -409,6 +426,8 @@ called, it will attempt to login first and keep the response token for later.
 Bots and apps should manually call the API `.logout` method on shutdown if they
 have used the API.
 
+---
+
 ### `api.loggedIn()`
 
 Returns boolean status of existing login
@@ -446,6 +465,44 @@ Exported property with details of the current API session
 - `.username` - The logged in user's username
 - `.userId` - The logged in user's ID
 - `.authToken` - The current auth token
+
+### `api.userFields`
+
+Exported property for user query helper default fields
+- Defaults to `{ name: 1, username: 1, status: 1, type: 1 }`
+- See https://rocket.chat/docs/developer-guides/rest-api/query-and-fields-info/
+
+### `api.users.all([fields])`
+
+Helper for querying all users
+- Optional fields object (see fields docs link above)
+- Returns promise, resolves with array of user objects
+
+### `api.users.allNames()`
+
+Helper for querying all usernames
+- Returns promise, resolves with array of usernames
+
+### `api.users.allIDs()`
+
+Helper for querying all user IDs
+- Returns promise, resolves with array of IDs
+
+### `api.users.online([fields])`
+
+Helper for querying online users
+- Optional fields object (see fields docs link above)
+- Returns promise, resolves with array of user objects
+
+### `api.users.onlineNames()`
+
+Helper for querying online usernames
+- Returns promise, resolves with array of usernames
+
+### `api.users.onlineIDs()`
+
+Helper for querying online user IDs
+- Returns promise, resolves with array of IDs
 
 ---
 
