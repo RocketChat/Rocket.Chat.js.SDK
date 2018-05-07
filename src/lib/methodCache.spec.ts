@@ -13,7 +13,7 @@ mockInstance.call.withArgs('methodTwo', 'key2').returns({ result: 'value2' })
 describe('methodCache', () => {
   beforeEach(() => mockInstance.call.resetHistory())
   afterEach(() => methodCache.resetAll())
-  describe('use', () => {
+  describe('.use', () => {
     it('calls apply to instance', () => {
       methodCache.use(mockInstance)
       methodCache.call('methodOne', 'key1')
@@ -26,7 +26,7 @@ describe('methodCache', () => {
       expect(shouldWork).to.not.throw()
     })
   })
-  describe('create', () => {
+  describe('.create', () => {
     it('returns a cache for method calls', () => {
       expect(methodCache.create('anyMethod')).to.be.instanceof(LRU)
     })
@@ -36,7 +36,7 @@ describe('methodCache', () => {
       expect(cache.maxAge).to.equal(3000)
     })
   })
-  describe('call', () => {
+  describe('.call', () => {
     it('throws if instance not in use', () => {
       const badUse = () => methodCache.call('methodOne', 'key1')
       expect(badUse).to.throw()
@@ -85,7 +85,7 @@ describe('methodCache', () => {
       })
     })
   })
-  describe('has', () => {
+  describe('.has', () => {
     it('returns true if the method cache was created', () => {
       methodCache.use(mockInstance)
       methodCache.create('methodOne')
@@ -101,7 +101,7 @@ describe('methodCache', () => {
       expect(methodCache.has('methodThree')).to.equal(false)
     })
   })
-  describe('get', () => {
+  describe('.get', () => {
     it('returns cached result from last call with key', () => {
       methodCache.use(mockInstance)
       return methodCache.call('methodOne', 'key1').then((result) => {
@@ -109,7 +109,7 @@ describe('methodCache', () => {
       })
     })
   })
-  describe('reset', () => {
+  describe('.reset', () => {
     it('removes cached results for a method and key', () => {
       methodCache.use(mockInstance)
       const result1 = methodCache.call('methodOne', 'key1')
@@ -136,7 +136,7 @@ describe('methodCache', () => {
       expect(result2).to.equal(undefined)
     })
   })
-  describe('resetAll', () => {
+  describe('.resetAll', () => {
     it('resets all cached methods', () => {
       methodCache.use(mockInstance)
       methodCache.call('methodOne', 'key1')

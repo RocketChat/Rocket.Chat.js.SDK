@@ -1,5 +1,6 @@
 [asteroid]: https://www.npmjs.com/package/asteroid
 [lru]: https://www.npmjs.com/package/lru
+[rest]: https://rocket.chat/docs/developer-guides/rest-api/
 
 # Rocket.Chat Node.js SDK
 
@@ -36,7 +37,7 @@ const SSL = true;  // server uses https ?
 const ROOMS = ['GENERAL', 'myroom1'];
 
 var myuserid;
-// this simple bot does not handle errors, different messsage types, server resets 
+// this simple bot does not handle errors, different message types, server resets 
 // and other production situations 
 
 const runbot = async () => {
@@ -110,9 +111,9 @@ We have more bot features and adapters on the roadmap and encourage the
 community to implement this SDK to provide adapters for their bot framework
 or platform of choice.
 
-## API
+## Docs
 
-Full API documentation can be generated locally using `yarn docs`.
+Full documentation can be generated locally using `yarn docs`.
 This isn't in a format we can publish yet, but can be useful for development.
 
 Below is just a summary:
@@ -122,25 +123,30 @@ Below is just a summary:
 Currently, there are two modules exported by the SDK:
 - `driver` - Handles connection, method calls, room subscriptions (via Asteroid)
 - `methodCache` - Manages results cache for calls to server (via LRU cache)
+- `api` - Provides a client for making requests with Rocket.Chat's REST API
 
 Access these modules by importing them from SDK, e.g:
 
 For Node 8 / ES5
 
-`const { driver, methodCache } = require('@rocket.chat/sdk')`
+`const { driver, methodCache, api } = require('@rocket.chat/sdk')`
 
 For ES6 supporting platforms
 
-`import { driver, methodCache } from '@rocket.chat/sdk'`
-
-See [Asteroid][asteroid] docs for methods that can be called from that API.
+`import { driver, methodCache, api } from '@rocket.chat/sdk'`
 
 Any Rocket.Chat server method can be called via `driver.callMethod`,
 `driver.cacheCall` or `driver.asyncCall`. Server methods are not fully
 documented, most require searching the Rocket.Chat codebase.
 
+Driver methods use an [Asteroid][asteroid] DDP connection. See its own docs for
+more advanced methods that can be called from the `driver.asteroid` interface.
 
-#### MESSAGE OBJECTS
+Rocket.Chat REST API calls can be made via `api.get` or `api.post`, with
+parameters defining the endpoint, payload and if authorization is required
+(respectively). See the 
+
+## MESSAGE OBJECTS
 
 ---
 
@@ -154,11 +160,11 @@ The `driver.prepareMessage` method (documented below) provides a helper for
 simple message creation and the `message` module can also be imported to create
 new `Message` class instances directly if detailed attributes are required.
 
-#### DRIVER METHODS
+## DRIVER METHODS
 
 ---
 
-### `driver.connect(options, cb?)`
+### `driver.connect(options[, cb])`
 
 Connects to a Rocket.Chat server
 - Options accepts `host` and `timeout` attributes
@@ -233,10 +239,16 @@ Fires callback after filters run on subscription events.
 - Third argument is additional attributes, such as `roomType`
 
 Accepts options object, that parallels respond filter env variables:
-- options.allPublic : respond to messages on all channels (or just joined)
+- options.rooms : respond to messages in joined rooms
+- options.allPublic : respond to messages on all channels
 - options.dm : respond to messages in DMs with the SDK user
 - options.livechat : respond to messages in Livechat rooms
 - options.edited : respond to edited messages
+
+If rooms are given as option or set in the environment with `ROCKETCHAT_ROOM`
+but have not been joined yet this method will join to those rooms automatically.
+
+If `allPublic` is true, the `rooms` option will be ignored.
 
 ### `driver.asyncCall(method, params)`
 
@@ -296,7 +308,7 @@ Join the logged in user into a room
 
 As above, with array of room names/IDs
 
-### `driver.prepareMessage(content, roomId?)`
+### `driver.prepareMessage(content[, roomId])`
 
 Structure message content for sending
 - Accepts a message object or message text string
@@ -326,7 +338,7 @@ As above, with username for DM instead of ID
 
 ---
 
-### METHOD CACHE
+## METHOD CACHE
 
 [LRU][lru] is used to cache results from the server, to reduce unnecessary calls
 for data that is unlikely to change, such as room IDs. Utility methods and env
@@ -340,7 +352,7 @@ Set the instance to call methods on, with cached results
 - Accepts an Asteroid instance (or possibly other classes)
 - Returns nothing
 
-### `methodCache.create(method, options?)`
+### `methodCache.create(method[, options])`
 
 Setup a cache for a method call
 - Accepts method name and cache options object, such as:
@@ -366,7 +378,7 @@ Get results of a prior method call
 - Accepts method name and key (argument method called with)
 - Returns results at key
 
-### `methodCache.reset(method, key?)`
+### `methodCache.reset(method[, key])`
 
 Reset a cached method call's results
 - Accepts a method name, optional key
@@ -380,7 +392,64 @@ Reset a cached method call's results
 
 ---
 
-## Getting Started
+### API CLIENT
+
+[node-rest]: https://www.npmjs.com/package/node-rest-client
+[rest-api]: https://rocket.chat/docs/developer-guides/rest-api/
+We've included an [API client][node-rest] to make it super simple for bots and
+apps consuming the SDK to call the [Rocket.Chat REST API][rest-api] endpoints.
+
+By default, it will attempt to login with the same defaults or env config as
+the driver, but the `.login` method could be used manually prior to requests to
+use different credentials.
+
+If a request is made to an endpoint requiring authentication, before login is
+called, it will attempt to login first and keep the response token for later.
+
+Bots and apps should manually call the API `.logout` method on shutdown if they
+have used the API.
+
+### `api.loggedIn()`
+
+Returns boolean status of existing login
+
+### `api.post(endpoint, data[, auth, ignore])
+
+Make a POST request to the REST API
+- `endpoint` - The API resource ID, e.g. `channels.info`
+- `data` - Request payload object to send, e.g. { roomName: 'general' }
+- `auth` - If authorisation is required (defaults to true)
+- Returns promise
+
+### `api.get(endpoint, data[, auth, ignore])
+
+Make a GET request to the REST API
+- `endpoint` - The API endpoint resource ID, e.g. `users.list`
+- `data` - Params (converted to query string), e.g. { fields: { 'username': 1 } }
+- `auth` - If authorisation is required (defaults to true)
+- Returns promise
+
+### `api.login([user])`
+
+Perform login with default or given credentials
+- `user` object with `.username` and `.password` properties.
+- Returns promise, resolves with login result
+
+### `api.logout()`
+
+Logout the current user. Returns promise
+
+### `api.currentLogin`
+
+Exported property with details of the current API session
+- `.result` - The login request result
+- `.username` - The logged in user's username
+- `.userId` - The logged in user's ID
+- `.authToken` - The current auth token
+
+---
+
+## Development
 
 A local instance of Rocket.Chat is required for unit tests to confirm connection
 and subscription methods are functional. And it helps to manually run your SDK
@@ -410,8 +479,6 @@ rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
 })
 ```
 
-## Develop & Test
-
 ### Settings
 
 | Env var                | Description                                           |
@@ -439,10 +506,9 @@ rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
 These are only required in test and development, assuming in production they
 will be passed from the adapter implementing this package.
 
-`ROCKETCHAT_ROOM` should be set to empty (with `ROCKETCHAT_ROOM=''`) when using
-`LISTEN_ON_ALL_PUBLIC`. This option also allows the bot to listen and respond to
-messages _from all newly created private groups_ where the bot's user has been
-added as a member.
+`ROCKETCHAT_ROOM` is ignored when using `LISTEN_ON_ALL_PUBLIC`. This option also
+allows the bot to listen and respond to messages _from all private groups_ where
+the bot's user has been added as a member.
 
 ### Installing Rocket.Chat
 
@@ -484,9 +550,8 @@ but won't change coverage to avoid making any working copy changes after commit.
 
 The node scripts in `utils` are used to prepare for and clean up after test
 interactions. They use the Rocket.Chat API to create a bot user and a mock human
-user (benny) for the bot to interact with. They *should* restore the pre-test
-state but it is always advised to only run tests with a connection to a clean
-local or fresh re-usable container instance of Rocket.Chat.
+user for the bot to interact with. It is always advised to only run tests with
+a connection to a clean local or re-usable container instance of Rocket.Chat.
 
 ### Debugging
 

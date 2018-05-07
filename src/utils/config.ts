@@ -1,8 +1,5 @@
 import { INewUserAPI } from './interfaces'
 
-// The API location, requires a running Rocket.Chat instance
-export const apiHost = process.env.ROCKETCHAT_URL || 'http://localhost:3000'
-
 // The API user, should be provisioned on build with local Rocket.Chat
 export const apiUser: INewUserAPI = {
   username: process.env.ADMIN_USERNAME || 'admin',

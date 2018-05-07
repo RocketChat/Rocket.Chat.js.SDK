@@ -1,7 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-// The API location, requires a running Rocket.Chat instance
-exports.apiHost = process.env.ROCKETCHAT_URL || 'http://localhost:3000';
 // The API user, should be provisioned on build with local Rocket.Chat
 exports.apiUser = {
     username: process.env.ADMIN_USERNAME || 'admin',

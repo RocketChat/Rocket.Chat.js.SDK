@@ -25,7 +25,7 @@ function start() {
         yield driver.login({ username: config_1.botUser.username, password: config_1.botUser.password });
         yield driver.joinRooms(config_1.botRooms);
         yield driver.subscribeToMessages();
-        driver.respondToMessages((err, msg, msgOpts) => {
+        yield driver.respondToMessages((err, msg, msgOpts) => {
             if (err)
                 throw err;
             console.log('[respond]', JSON.stringify(msg), JSON.stringify(msgOpts));

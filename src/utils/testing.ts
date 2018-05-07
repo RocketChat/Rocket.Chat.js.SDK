@@ -1,4 +1,4 @@
-import { get, post, login, logout } from './api'
+import { get, post, login, logout } from '../lib/api'
 import { apiUser, botUser, mockUser } from './config'
 import {
   IMessageAPI,
@@ -11,61 +11,56 @@ import {
 } from './interfaces'
 
 /** Define common attributes for DRY tests */
-export const messageDefaults: IMessageAPI = { roomId: 'GENERAL' }
 export const testChannelName = 'tests'
 
 /** Get information about a user */
-export function userInfo (username: string): Promise<IUserResultAPI> {
-  return get('/api/v1/users.info', { username }, true)
+export async function userInfo (username: string): Promise<IUserResultAPI> {
+  return get('users.info', { username }, true)
 }
 
 /** Create a user and catch the error if they exist already */
-export function createUser (user: INewUserAPI): Promise<IUserResultAPI> {
-  return post('/api/v1/users.create', user, true, /already in use/i)
+export async function createUser (user: INewUserAPI): Promise<IUserResultAPI> {
+  return post('users.create', user, true, /already in use/i)
 }
 
 /** Get information about a channel */
-export function channelInfo (roomName: string): Promise<IChannelResultAPI> {
-  return get('/api/v1/channels.info', { roomName }, true)
+export async function channelInfo (roomName: string): Promise<IChannelResultAPI> {
+  return get('channels.info', { roomName }, true)
 }
 
 /** Create a room for tests and catch the error if it exists already */
-export function createChannel (
+export async function createChannel (
   name: string,
   members: string[] = [],
   readOnly: boolean = false
 ): Promise<IChannelResultAPI> {
-  return post('/api/v1/channels.create', { name, members, readOnly }, true)
+  return post('channels.create', { name, members, readOnly }, true)
 }
 
 /** Send message from mock user to channel for tests to listen and respond */
 export async function sendFromUser (payload: any): Promise<IMessageResultAPI> {
+  const testChannel = await channelInfo(testChannelName)
+  const messageDefaults: IMessageAPI = { roomId: testChannel.channel._id }
   const data: IMessageAPI = Object.assign({}, messageDefaults, payload)
   await login({ username: mockUser.username, password: mockUser.password })
-  const result = await post('/api/v1/chat.postMessage', data, true)
-  await logout()
-  return result
+  return post('chat.postMessage', data, true)
 }
 
 /** Update message sent from mock user */
 export async function updateFromUser (payload: IMessageUpdateAPI): Promise<IMessageResultAPI> {
   await login({ username: mockUser.username, password: mockUser.password })
-  const result = await post('/api/v1/chat.update', payload, true)
-  await logout()
-  return result
+  return post('chat.update', payload, true)
 }
 
 /** Create a direct message session with the mock user */
 export async function setupDirectFromUser (): Promise<IRoomResultAPI> {
   await login({ username: mockUser.username, password: mockUser.password })
-  const result = await post('/api/v1/im.create', { username: botUser.username }, true)
-  await logout()
-  return result
+  return post('im.create', { username: botUser.username }, true)
 }
 
 /** Initialise testing instance with the required users for SDK/bot tests */
 export async function setup () {
-  console.log('Preparing instance for tests...')
+  console.log('\nPreparing instance for tests...')
   try {
     // Verify API user can login
     const loginInfo = await login(apiUser)

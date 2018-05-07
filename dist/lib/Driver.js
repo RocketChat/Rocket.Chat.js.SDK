@@ -49,7 +49,9 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 function connectDefaults() {
     return {
         host: process.env.ROCKETCHAT_URL || 'localhost:3000',
-        useSsl: ((process.env.ROCKETCHAT_URL || '').toString().startsWith('https')),
+        useSsl: (process.env.ROCKETCHAT_USE_SSL)
+            ? ((process.env.ROCKETCHAT_USE_SSL || '').toString().toLowerCase() === 'true')
+            : ((process.env.ROCKETCHAT_URL || '').toString().toLowerCase().startsWith('https')),
         timeout: 20 * 1000 // 20 seconds
     };
 }
@@ -57,6 +59,9 @@ exports.connectDefaults = connectDefaults;
 /** Define default config for message respond filters. */
 function respondDefaults() {
     return {
+        rooms: (process.env.ROCKETCHAT_ROOM)
+            ? (process.env.ROCKETCHAT_ROOM || '').split(',').map((room) => room.trim())
+            : [],
         allPublic: (process.env.LISTEN_ON_ALL_PUBLIC || 'false').toLowerCase() === 'true',
         dm: (process.env.RESPOND_TO_DM || 'false').toLowerCase() === 'true',
         livechat: (process.env.RESPOND_TO_LIVECHAT || 'false').toLowerCase() === 'true',
@@ -83,6 +88,10 @@ exports.events = new events_1.EventEmitter();
  * Variable not initialised until `prepMeteorSubscriptions` called.
  */
 exports.subscriptions = [];
+/**
+ * Array of joined room IDs (for reactive queries)
+ */
+exports.joinedIds = [];
 /**
  * Allow override of default logging with adapter's log instance
  */
@@ -123,21 +132,26 @@ function connect(options = {}, callback) {
         setupMethodCache(exports.asteroid); // init instance for later caching method calls
         exports.asteroid.on('connected', () => exports.events.emit('connected'));
         exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
-        // let cancelled = false
+        let cancelled = false;
         const rejectionTimeout = setTimeout(function () {
             log_1.logger.info(`[connect] Timeout (${config.timeout})`);
-            // cancelled = true
             const err = new Error('Asteroid connection timeout');
+            cancelled = true;
+            exports.events.removeAllListeners('connected');
             callback ? callback(err, exports.asteroid) : reject(err);
         }, config.timeout);
-        exports.events.once('connected', () => {
-            log_1.logger.info('[connect] Connected');
-            // if (cancelled) return asteroid.ddp.disconnect() // cancel if already rejected
-            clearTimeout(rejectionTimeout);
-            if (callback)
-                callback(null, exports.asteroid);
-            resolve(exports.asteroid);
-        });
+        // if to avoid condition where timeout happens before listener to 'connected' is added
+        // and this listener is not removed (because it was added after the removal)
+        if (!cancelled) {
+            exports.events.once('connected', () => {
+                log_1.logger.info('[connect] Connected');
+                // if (cancelled) return asteroid.ddp.disconnect() // cancel if already rejected
+                clearTimeout(rejectionTimeout);
+                if (callback)
+                    callback(null, exports.asteroid);
+                resolve(exports.asteroid);
+            });
+        }
     });
 }
 exports.connect = connect;
@@ -195,11 +209,13 @@ function asyncCall(method, params) {
 exports.asyncCall = asyncCall;
 /**
  * Call a method as async via Asteroid, or through cache if one is created.
+ * If the method doesn't have or need parameters, it can't use them for caching
+ * so it will always call asynchronously.
  * @param name The Rocket.Chat server method to call
  * @param params Single or array of parameters of the method to call
  */
 function callMethod(name, params) {
-    return (methodCache.has(name))
+    return (methodCache.has(name) || typeof params === 'undefined')
         ? asyncCall(name, params)
         : cacheCall(name, params);
 }
@@ -227,19 +243,21 @@ exports.cacheCall = cacheCall;
 // -----------------------------------------------------------------------------
 /** Login to Rocket.Chat via Asteroid */
 function login(credentials) {
-    log_1.logger.info(`[login] Logging in ${credentials.username || credentials.email}`);
     let login;
     if (process.env.ROCKETCHAT_AUTH === 'ldap') {
         const params = [
-            credentials.username,
-            credentials.password,
+            credentials.username || process.env.ROCKETCHAT_USER,
+            credentials.password || process.env.ROCKETCHAT_PASSWORD,
             { ldap: true, ldapOptions: {} }
         ];
+        log_1.logger.info(`[login] Logging in ${params[0]} with LDAP`);
         login = exports.asteroid.loginWithLDAP(...params);
     }
     else {
-        const usernameOrEmail = credentials.username || credentials.email || 'bot';
-        login = exports.asteroid.loginWithPassword(usernameOrEmail, credentials.password);
+        const user = credentials.username || credentials.email || process.env.ROCKETCHAT_USER || 'bot';
+        const pass = credentials.password || process.env.ROCKETCHAT_PASSWORD || 'pass';
+        log_1.logger.info(`[login] Logging in ${user}`);
+        login = exports.asteroid.loginWithPassword(user, pass);
     }
     return login
         .then((loggedInUserId) => {
@@ -328,6 +346,17 @@ exports.subscribeToMessages = subscribeToMessages;
  * for bots) the respondToMessages is more useful to only receive messages
  * matching configuration.
  *
+ * If the bot hasn't been joined to any rooms at this point, it will attempt to
+ * join now based on environment config, otherwise it might not receive any
+ * messages. It doesn't matter that this happens asynchronously because the
+ * bot's joined rooms can change after the reactive query is set up.
+ *
+ * @todo `reactToMessages` should call `subscribeToMessages` if not already
+ *       done, so it's not required as an arbitrary step for simpler adapters.
+ *       Also make `login` call `connect` for the same reason, the way
+ *       `respondToMessages` calls `respondToMessages`, so all that's really
+ *       required is:
+ *       `driver.login(credentials).then(() => driver.respondToMessages(callback))`
  * @param callback Function called with every change in subscriptions.
  *  - Uses error-first callback pattern
  *  - Second argument is the changed item
@@ -364,6 +393,17 @@ exports.reactToMessages = reactToMessages;
  */
 function respondToMessages(callback, options = {}) {
     const config = Object.assign({}, respondDefaults(), options);
+    let promise = Promise.resolve(); // return value, may be replaced by async ops
+    // Join configured rooms if they haven't been already, unless listening to all
+    // public rooms, in which case it doesn't matter
+    if (!config.allPublic &&
+        exports.joinedIds.length === 0 &&
+        config.rooms &&
+        config.rooms.length > 0) {
+        promise = joinRooms(config.rooms).catch((err) => {
+            log_1.logger.error(`Failed to join rooms set in env: ${process.env.ROCKETCHAT_ROOM}`, err);
+        });
+    }
     exports.lastReadTime = new Date(); // init before any message read
     reactToMessages((err, message, meta) => __awaiter(this, void 0, void 0, function* () {
         if (err) {
@@ -373,15 +413,15 @@ function respondToMessages(callback, options = {}) {
         // Ignore bot's own messages
         if (message.u._id === exports.userId)
             return;
-        // Ignore DMs if configured to
+        // Ignore DMs unless configured not to
         const isDM = meta.roomType === 'd';
         if (isDM && !config.dm)
             return;
-        // Ignore Livechat if configured to
+        // Ignore Livechat unless configured not to
         const isLC = meta.roomType === 'l';
         if (isLC && !config.livechat)
             return;
-        // Ignore messages in public rooms not joined by bot if configured to
+        // Ignore messages in un-joined public rooms unless configured not to
         if (!config.allPublic && !isDM && !meta.roomParticipant)
             return;
         // Set current time for comparison to incoming
@@ -401,12 +441,18 @@ function respondToMessages(callback, options = {}) {
         log_1.logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`);
         log_1.logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`);
         exports.lastReadTime = currentReadTime;
-        // Add room name to meta, is useful for some adapters
-        if (!isDM && !isLC)
-            meta.roomName = yield getRoomName(message.rid);
+        /**
+         * @todo Fix below by adding to meta from Rocket.Chat instead of getting on
+         *       each message event. It's inefficient and throws off tests that
+         *       await on send completion, because the callback has not yet fired.
+         *       Then re-enable last two `.respondToMessages` tests.
+         */
+        // Add room name to meta, is useful for some adapters (is promise)
+        // if (!isDM && !isLC) meta.roomName = await getRoomName(message.rid)
         // Processing completed, call callback to respond to message
         callback(null, message, meta);
     }));
+    return promise;
 }
 exports.respondToMessages = respondToMessages;
 /**
@@ -452,9 +498,34 @@ function getDirectMessageRoomId(username) {
 exports.getDirectMessageRoomId = getDirectMessageRoomId;
 /** Join the bot into a room by its name or ID */
 function joinRoom(room) {
-    return getRoomId(room).then((roomId) => asyncCall('joinRoom', roomId));
+    return __awaiter(this, void 0, void 0, function* () {
+        let roomId = yield getRoomId(room);
+        let joinedIndex = exports.joinedIds.indexOf(room);
+        if (joinedIndex !== -1) {
+            log_1.logger.error(`tried to join room that was already joined`);
+        }
+        else {
+            yield asyncCall('joinRoom', roomId);
+            exports.joinedIds.push(roomId);
+        }
+    });
 }
 exports.joinRoom = joinRoom;
+/** Exit a room the bot has joined */
+function leaveRoom(room) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let roomId = yield getRoomId(room);
+        let joinedIndex = exports.joinedIds.indexOf(room);
+        if (joinedIndex === -1) {
+            log_1.logger.error(`leave room ${room} failed because bot has not joined in room`);
+        }
+        else {
+            yield asyncCall('leaveRoom', roomId);
+            delete exports.joinedIds[joinedIndex];
+        }
+    });
+}
+exports.leaveRoom = leaveRoom;
 /** Join a set of rooms by array of names or IDs */
 function joinRooms(rooms) {
     return Promise.all(rooms.map((room) => joinRoom(room)));

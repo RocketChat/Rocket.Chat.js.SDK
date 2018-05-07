@@ -46,6 +46,10 @@ export declare let subscriptions: ISubscription[];
  */
 export declare let userId: string;
 /**
+ * Array of joined room IDs (for reactive queries)
+ */
+export declare let joinedIds: string[];
+/**
  * Array of messages received from reactive collection
  */
 export declare let messages: ICollection;
@@ -83,10 +87,12 @@ export declare function disconnect(): Promise<void>;
 export declare function asyncCall(method: string, params: any | any[]): Promise<any>;
 /**
  * Call a method as async via Asteroid, or through cache if one is created.
+ * If the method doesn't have or need parameters, it can't use them for caching
+ * so it will always call asynchronously.
  * @param name The Rocket.Chat server method to call
  * @param params Single or array of parameters of the method to call
  */
-export declare function callMethod(name: string, params: any | any[]): Promise<any>;
+export declare function callMethod(name: string, params?: any | any[]): Promise<any>;
 /**
  * Wraps Asteroid method calls, passed through method cache if cache is valid.
  * @param method The Rocket.Chat server method, to call through Asteroid
@@ -119,6 +125,17 @@ export declare function subscribeToMessages(): Promise<ISubscription>;
  * for bots) the respondToMessages is more useful to only receive messages
  * matching configuration.
  *
+ * If the bot hasn't been joined to any rooms at this point, it will attempt to
+ * join now based on environment config, otherwise it might not receive any
+ * messages. It doesn't matter that this happens asynchronously because the
+ * bot's joined rooms can change after the reactive query is set up.
+ *
+ * @todo `reactToMessages` should call `subscribeToMessages` if not already
+ *       done, so it's not required as an arbitrary step for simpler adapters.
+ *       Also make `login` call `connect` for the same reason, the way
+ *       `respondToMessages` calls `respondToMessages`, so all that's really
+ *       required is:
+ *       `driver.login(credentials).then(() => driver.respondToMessages(callback))`
  * @param callback Function called with every change in subscriptions.
  *  - Uses error-first callback pattern
  *  - Second argument is the changed item
@@ -134,7 +151,7 @@ export declare function reactToMessages(callback: ICallback): void;
  *  - Third argument is additional attributes, such as `roomType`
  * @param options Sets filters for different event/message types.
  */
-export declare function respondToMessages(callback: ICallback, options?: IRespondOptions): void;
+export declare function respondToMessages(callback: ICallback, options?: IRespondOptions): Promise<void | void[]>;
 /**
  * Get every new element added to DDP in Asteroid (v2)
  * @todo Resolve this functionality within Rocket.Chat with team
@@ -152,6 +169,8 @@ export declare function getRoomName(id: string): Promise<string>;
 export declare function getDirectMessageRoomId(username: string): Promise<string>;
 /** Join the bot into a room by its name or ID */
 export declare function joinRoom(room: string): Promise<void>;
+/** Exit a room the bot has joined */
+export declare function leaveRoom(room: string): Promise<void>;
 /** Join a set of rooms by array of names or IDs */
 export declare function joinRooms(rooms: string[]): Promise<void[]>;
 /**

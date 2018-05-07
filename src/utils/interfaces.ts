@@ -1,9 +1,3 @@
-/** Result object from an API login */
-export interface ILoginResultAPI {
-  status: string // e.g. 'success'
-  data: { authToken: string, userId: string }
-}
-
 /** Payload structure for `chat.postMessage` endpoint */
 export interface IMessageAPI {
   roomId: string       // The room id of where the message is to be sent

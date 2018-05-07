@@ -1,61 +1,56 @@
 /// <reference types="node" />
-import { EventEmitter } from 'events'
-
+import { EventEmitter } from 'events';
 /**
  * Asteroid DDP - add known properties to avoid TS lint errors
  */
 export interface IAsteroidDDP extends EventEmitter {
-  readyState: 1 | 0
+    readyState: 1 | 0;
 }
-
 /**
  * Asteroid type
  * @todo Update with typing from definitely typed (when available)
  */
 export interface IAsteroid extends EventEmitter {
-  connect: () => Promise<void>
-  disconnect: () => Promise<void>
-  createUser: (usernameOrEmail: string, password: string, profile: IUserOptions) => Promise<any>
-  loginWithLDAP: (...params: any[]) => Promise<any>
-  loginWithFacebook: (...params: any[]) => Promise<any>
-  loginWithGoogle: (...params: any[]) => Promise<any>
-  loginWithTwitter: (...params: any[]) => Promise<any>
-  loginWithGithub: (...params: any[]) => Promise<any>
-  loginWithPassword: (usernameOrEmail: string, password: string) => Promise<any>
-  logout: () => Promise<null>
-  subscribe: (name: string, ...params: any[]) => ISubscription
-  subscriptions: ISubscription[]
-  call: (method: string, ...params: any[]) => IMethodResult
-  apply: (method: string, params: any[]) => IMethodResult
-  getCollection: (name: string) => ICollection
-  ddp: IAsteroidDDP
+    connect: () => Promise<void>;
+    disconnect: () => Promise<void>;
+    createUser: (usernameOrEmail: string, password: string, profile: IUserOptions) => Promise<any>;
+    loginWithLDAP: (...params: any[]) => Promise<any>;
+    loginWithFacebook: (...params: any[]) => Promise<any>;
+    loginWithGoogle: (...params: any[]) => Promise<any>;
+    loginWithTwitter: (...params: any[]) => Promise<any>;
+    loginWithGithub: (...params: any[]) => Promise<any>;
+    loginWithPassword: (usernameOrEmail: string, password: string) => Promise<any>;
+    logout: () => Promise<null>;
+    subscribe: (name: string, ...params: any[]) => ISubscription;
+    subscriptions: ISubscription[];
+    call: (method: string, ...params: any[]) => IMethodResult;
+    apply: (method: string, params: any[]) => IMethodResult;
+    getCollection: (name: string) => ICollection;
+    ddp: IAsteroidDDP;
 }
-
 /**
  * Asteroid user options type
  * @todo Update with typing from definitely typed (when available)
  */
 export interface IUserOptions {
-  username?: string
-  email?: string
-  password: string
+    username?: string;
+    email?: string;
+    password: string;
 }
-
 /**
- * Asteroid subscription type
+ * Asteroid subscription type.
  * ID is populated when ready promise resolves.
  * @todo Update with typing from definitely typed (when available)
  */
 export interface ISubscription {
-  stop: () => void
-  ready: Promise<IReady>
-  id?: string
+    stop: () => void;
+    ready: Promise<IReady>;
+    id?: string;
 }
 export interface IReady {
-  state: string
-  value: string
+    state: string;
+    value: string;
 }
-
 /**
  * If the method is successful, the `result` promise will be resolved with the
  * return value passed by the server. The `updated` promise will be resolved
@@ -70,19 +65,19 @@ export interface IReady {
  * (with nothing).
  */
 export interface IMethodResult {
-  result: Promise<any>
-  updated: Promise<any>
+    result: Promise<any>;
+    updated: Promise<any>;
 }
-
-/** Asteroid collection class */
+/**
+ *
+ */
 export interface ICollection {
-  name: string
-  insert: (item: any) => ICollectionResult
-  update: (id: string, item: any) => ICollectionResult
-  remove: (id: string) => ICollectionResult
-  reactiveQuery: (selector: object | Function) => IReactiveQuery
+    name: string;
+    insert: (item: any) => ICollectionResult;
+    update: (id: string, item: any) => ICollectionResult;
+    remove: (id: string) => ICollectionResult;
+    reactiveQuery: (selector: object | Function) => IReactiveQuery;
 }
-
 /**
  * The `local` promise is immediately resolved with the `_id` of the updated
  * item. That is, unless an error occurred. In that case, an exception will be
@@ -92,25 +87,23 @@ export interface ICollection {
  * failure.
  */
 export interface ICollectionResult {
-  local: Promise<any>
-  remote: Promise<any>
+    local: Promise<any>;
+    remote: Promise<any>;
 }
-
 /**
  * A reactive subset of a collection. Possible events are:
  * `change`: emitted whenever the result of the query changes. The id of the
  * item that changed is passed to the handler.
  */
 export interface IReactiveQuery {
-  on: (event: string, handler: Function) => void
-  result: any[]
+    on: (event: string, handler: Function) => void;
+    result: any[];
 }
-
 /** Credentials for Asteroid login method */
 export interface ICredentials {
-  username?: string
-  password?: string
-  email?: string
-  ldap?: boolean
-  ldapOptions?: object
+    password: string;
+    username?: string;
+    email?: string;
+    ldap?: boolean;
+    ldapOptions?: object;
 }

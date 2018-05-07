@@ -1,3 +1,4 @@
 import * as driver from './lib/driver';
 import * as methodCache from './lib/methodCache';
-export { driver, methodCache };
+import * as api from './lib/api';
+export { driver, methodCache, api };

@@ -11,4 +11,6 @@ const driver = __importStar(require("./lib/driver"));
 exports.driver = driver;
 const methodCache = __importStar(require("./lib/methodCache"));
 exports.methodCache = methodCache;
+const api = __importStar(require("./lib/api"));
+exports.api = api;
 //# sourceMappingURL=index.js.map
