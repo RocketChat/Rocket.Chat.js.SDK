@@ -432,7 +432,7 @@ have used the API.
 
 Returns boolean status of existing login
 
-### `api.post(endpoint, data[, auth, ignore])
+### `api.post(endpoint, data[, auth, ignore])`
 
 Make a POST request to the REST API
 - `endpoint` - The API resource ID, e.g. `channels.info`
@@ -440,7 +440,7 @@ Make a POST request to the REST API
 - `auth` - If authorisation is required (defaults to true)
 - Returns promise
 
-### `api.get(endpoint, data[, auth, ignore])
+### `api.get(endpoint, data[, auth, ignore])`
 
 Make a GET request to the REST API
 - `endpoint` - The API endpoint resource ID, e.g. `users.list`
