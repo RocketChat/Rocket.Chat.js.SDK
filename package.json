@@ -1,6 +1,6 @@
 {
   "name": "@rocket.chat/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Node.js SDK for Rocket.Chat. Application interface for server methods and message streams.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -66,8 +66,8 @@
     "@types/lru-cache": "^4.1.0",
     "@types/node": "^9.4.6",
     "asteroid": "rocketchat/asteroid",
-    "node-rest-client": "^3.1.0",
-    "lru-cache": "^4.1.1"
+    "lru-cache": "^4.1.1",
+    "node-rest-client": "^3.1.0"
   },
   "config": {
     "commitizen": {
