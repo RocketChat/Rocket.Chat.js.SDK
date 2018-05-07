@@ -193,10 +193,11 @@ Connects to a Rocket.Chat server
 Unsubscribe, logout, disconnect from Rocket.Chat
 - Returns promise
 
-### `driver.login(credentials)`
+### `driver.login([credentials])`
 
 Login to Rocket.Chat via Asteroid
 - Accepts object with `username` and/or `email` and `password`
+- Uses defaults from env `ROCKETCHAT_USER` and `ROCKETCHAT_PASSWORD`
 - Returns promise
 - Resolves with logged in user ID
 

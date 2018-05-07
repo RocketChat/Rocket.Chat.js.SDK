@@ -6,7 +6,8 @@ describe('index:', () => {
     expect(Object.keys(rocketchat)).to.eql([
       'driver',
       'methodCache',
-      'api'
+      'api',
+      'settings'
     ])
   })
 })

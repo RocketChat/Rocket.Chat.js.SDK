@@ -7,6 +7,7 @@ import WebSocket from 'ws'
 import { Map } from 'immutable'
 import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
 */
+import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
 import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
@@ -29,33 +30,6 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 // CONNECTION SETUP AND CONFIGURE
 // -----------------------------------------------------------------------------
 
-/**
- * Define default config as public, allowing overrides from new connection.
- * Enable SSL by default if Rocket.Chat URL contains https.
- */
-export function connectDefaults (): IConnectOptions {
-  return {
-    host: process.env.ROCKETCHAT_URL || 'localhost:3000',
-    useSsl: (process.env.ROCKETCHAT_USE_SSL)
-      ? ((process.env.ROCKETCHAT_USE_SSL || '').toString().toLowerCase() === 'true')
-      : ((process.env.ROCKETCHAT_URL || '').toString().toLowerCase().startsWith('https')),
-    timeout: 20 * 1000 // 20 seconds
-  }
-}
-
-/** Define default config for message respond filters. */
-export function respondDefaults (): IRespondOptions {
-  return {
-    rooms: (process.env.ROCKETCHAT_ROOM)
-      ? (process.env.ROCKETCHAT_ROOM || '').split(',').map((room) => room.trim())
-      : [],
-    allPublic: (process.env.LISTEN_ON_ALL_PUBLIC || 'false').toLowerCase() === 'true',
-    dm: (process.env.RESPOND_TO_DM || 'false').toLowerCase() === 'true',
-    livechat: (process.env.RESPOND_TO_LIVECHAT || 'false').toLowerCase() === 'true',
-    edited: (process.env.RESPOND_TO_EDITED || 'false').toLowerCase() === 'true'
-  }
-}
-
 /** Internal for comparing message update timestamps */
 export let lastReadTime: Date
 
@@ -64,7 +38,7 @@ export let lastReadTime: Date
  * Should be replaced when connection is invoked by a package using the SDK
  * e.g. The Hubot adapter would pass its integration ID with credentials, like:
  */
-export const integrationId = process.env.INTEGRATION_ID || 'js.SDK'
+export const integrationId = settings.integrationId
 
 /**
  * Event Emitter for listening to connection.
@@ -128,8 +102,8 @@ export function useLog (externalLog: ILogger) {
  */
 export function connect (options: IConnectOptions = {}, callback?: ICallback): Promise<IAsteroid> {
   return new Promise((resolve, reject) => {
-    const config = Object.assign({}, connectDefaults(), options) // override defaults
-    config.host = config.host!.replace(/(^\w+:|^)\/\//, '')
+    const config = Object.assign({}, settings, options) // override defaults
+    config.host = config.host.replace(/(^\w+:|^)\/\//, '')
     logger.info('[connect] Connecting', config)
     asteroid = new Asteroid(config.host, config.useSsl)
     // Asteroid ^v2 interface...
@@ -184,16 +158,16 @@ export function disconnect (): Promise<void> {
 function setupMethodCache (asteroid: IAsteroid): void {
   methodCache.use(asteroid)
   methodCache.create('getRoomIdByNameOrId', {
-    max: parseInt(process.env.ROOM_CACHE_SIZE || '10', 10),
-    maxAge: 1000 * parseInt(process.env.ROOM_CACHE_MAX_AGE || '300', 10)
+    max: settings.roomCacheMaxSize,
+    maxAge: settings.roomCacheMaxAge
   }),
   methodCache.create('getRoomNameById', {
-    max: parseInt(process.env.ROOM_CACHE_SIZE || '10', 10),
-    maxAge: 1000 * parseInt(process.env.ROOM_CACHE_MAX_AGE || '300', 10)
+    max: settings.roomCacheMaxSize,
+    maxAge: settings.roomCacheMaxAge
   })
   methodCache.create('createDirectMessage', {
-    max: parseInt(process.env.DM_ROOM_CACHE_SIZE || '10', 10),
-    maxAge: 1000 * parseInt(process.env.DM_ROOM_CACHE_MAX_AGE || '100', 10)
+    max: settings.dmCacheMaxSize,
+    maxAge: settings.dmCacheMaxAge
   })
 }
 
@@ -254,21 +228,25 @@ export function cacheCall (method: string, key: string): Promise<any> {
 // -----------------------------------------------------------------------------
 
 /** Login to Rocket.Chat via Asteroid */
-export function login (credentials: ICredentials): Promise<any> {
+export function login (credentials: ICredentials = {
+  username: settings.username,
+  password: settings.password,
+  ldap: settings.ldap
+}): Promise<any> {
   let login: Promise<any>
-  if (process.env.ROCKETCHAT_AUTH === 'ldap') {
-    const params = [
-      credentials.username || process.env.ROCKETCHAT_USER,
-      credentials.password || process.env.ROCKETCHAT_PASSWORD,
-      { ldap: true, ldapOptions: {} }
-    ]
-    logger.info(`[login] Logging in ${params[0]} with LDAP`)
-    login = asteroid.loginWithLDAP(...params)
+  if (credentials.ldap) {
+    logger.info(`[login] Logging in ${credentials.username} with LDAP`)
+    login = asteroid.loginWithLDAP(
+      credentials.email || credentials.username,
+      credentials.password,
+      { ldap: true, ldapOptions: credentials.ldapOptions || {} }
+    )
   } else {
-    const user = credentials.username || credentials.email || process.env.ROCKETCHAT_USER || 'bot'
-    const pass = credentials.password || process.env.ROCKETCHAT_PASSWORD || 'pass'
-    logger.info(`[login] Logging in ${user}`)
-    login = asteroid.loginWithPassword(user, pass)
+    logger.info(`[login] Logging in ${credentials.username}`)
+    login = asteroid.loginWithPassword(
+      credentials.email || credentials.username!,
+      credentials.password
+    )
   }
   return login
     .then((loggedInUserId) => {
@@ -401,7 +379,7 @@ export function reactToMessages (callback: ICallback): void {
  * @param options Sets filters for different event/message types.
  */
 export function respondToMessages (callback: ICallback, options: IRespondOptions = {}): Promise<void | void[]> {
-  const config = Object.assign({}, respondDefaults(), options)
+  const config = Object.assign({}, settings, options)
   let promise: Promise<void | void[]> = Promise.resolve() // return value, may be replaced by async ops
 
   // Join configured rooms if they haven't been already, unless listening to all
@@ -413,7 +391,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     config.rooms.length > 0
   ) {
     promise = joinRooms(config.rooms).catch((err) => {
-      logger.error(`Failed to join rooms set in env: ${process.env.ROCKETCHAT_ROOM}`, err)
+      logger.error(`Failed to join rooms set in env: ${config.rooms}`, err)
     })
   }
 

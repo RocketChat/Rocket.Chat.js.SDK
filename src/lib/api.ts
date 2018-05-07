@@ -1,5 +1,5 @@
 import { Client } from 'node-rest-client'
-import { connectDefaults } from './driver'
+import * as settings from './settings'
 import { logger } from './log'
 import { IUserAPI } from '../utils/interfaces'
 
@@ -28,16 +28,10 @@ export function loggedIn (): boolean {
 
 /** Initialise client and configs */
 export const client = new Client()
-export const host = connectDefaults().host || 'localhost:3000'
-
-/** Use env credentials by default, overridden by login arguments */
-export const credentials: ILoginCredentials = {
-  username: process.env.ROCKETCHAT_USER || 'bot',
-  password: process.env.ROCKETCHAT_PASSWORD || 'pass'
-}
+export const host = settings.host
 
 /**
- * Prepend protocol (or put back if removed by driver defaults)
+ * Prepend protocol (or put back if removed from env settings for driver)
  * Hard code endpoint prefix, because all syntax depends on this version
  */
 export const url = ((host.indexOf('http') === -1)
@@ -167,8 +161,12 @@ export async function get (
 /**
  * Login a user for further API calls
  * Result should come back with a token, to authorise following requests.
+ * Use env default credentials, unless overridden by login arguments.
  */
-export async function login (user: ILoginCredentials = credentials): Promise<ILoginResultAPI> {
+export async function login (user: ILoginCredentials = {
+  username: settings.username,
+  password: settings.password
+}): Promise<ILoginResultAPI> {
   logger.info(`[API] Logging in ${user.username}`)
   if (currentLogin !== null) {
     logger.debug(`[API] Already logged in`)

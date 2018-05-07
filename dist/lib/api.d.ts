@@ -22,10 +22,8 @@ export declare function loggedIn(): boolean;
 /** Initialise client and configs */
 export declare const client: any;
 export declare const host: string;
-/** Use env credentials by default, overridden by login arguments */
-export declare const credentials: ILoginCredentials;
 /**
- * Prepend protocol (or put back if removed by driver defaults)
+ * Prepend protocol (or put back if removed from env settings for driver)
  * Hard code endpoint prefix, because all syntax depends on this version
  */
 export declare const url: string;
@@ -73,6 +71,7 @@ export declare function get(endpoint: string, data?: any, auth?: boolean, ignore
 /**
  * Login a user for further API calls
  * Result should come back with a token, to authorise following requests.
+ * Use env default credentials, unless overridden by login arguments.
  */
 export declare function login(user?: ILoginCredentials): Promise<ILoginResultAPI>;
 /** Logout a user at end of API calls */

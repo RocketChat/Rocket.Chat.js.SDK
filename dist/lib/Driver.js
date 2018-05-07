@@ -27,6 +27,7 @@ import WebSocket from 'ws'
 import { Map } from 'immutable'
 import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
 */
+const settings = __importStar(require("./settings"));
 const methodCache = __importStar(require("./methodCache"));
 const message_1 = require("./message");
 const log_1 = require("./log");
@@ -34,47 +35,11 @@ const log_1 = require("./log");
 const _messageCollectionName = 'stream-room-messages';
 const _messageStreamName = '__my_messages__';
 /**
- * Asteroid ^v2 interface below, suspended for work on future branch
- * @todo Upgrade to Asteroid v2 or find a better maintained ddp client
- */
-/*
-const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
-*/
-// CONNECTION SETUP AND CONFIGURE
-// -----------------------------------------------------------------------------
-/**
- * Define default config as public, allowing overrides from new connection.
- * Enable SSL by default if Rocket.Chat URL contains https.
- */
-function connectDefaults() {
-    return {
-        host: process.env.ROCKETCHAT_URL || 'localhost:3000',
-        useSsl: (process.env.ROCKETCHAT_USE_SSL)
-            ? ((process.env.ROCKETCHAT_USE_SSL || '').toString().toLowerCase() === 'true')
-            : ((process.env.ROCKETCHAT_URL || '').toString().toLowerCase().startsWith('https')),
-        timeout: 20 * 1000 // 20 seconds
-    };
-}
-exports.connectDefaults = connectDefaults;
-/** Define default config for message respond filters. */
-function respondDefaults() {
-    return {
-        rooms: (process.env.ROCKETCHAT_ROOM)
-            ? (process.env.ROCKETCHAT_ROOM || '').split(',').map((room) => room.trim())
-            : [],
-        allPublic: (process.env.LISTEN_ON_ALL_PUBLIC || 'false').toLowerCase() === 'true',
-        dm: (process.env.RESPOND_TO_DM || 'false').toLowerCase() === 'true',
-        livechat: (process.env.RESPOND_TO_LIVECHAT || 'false').toLowerCase() === 'true',
-        edited: (process.env.RESPOND_TO_EDITED || 'false').toLowerCase() === 'true'
-    };
-}
-exports.respondDefaults = respondDefaults;
-/**
  * The integration property is applied as an ID on sent messages `bot.i` param
  * Should be replaced when connection is invoked by a package using the SDK
  * e.g. The Hubot adapter would pass its integration ID with credentials, like:
  */
-exports.integrationId = process.env.INTEGRATION_ID || 'js.SDK';
+exports.integrationId = settings.integrationId;
 /**
  * Event Emitter for listening to connection.
  * @example
@@ -118,7 +83,7 @@ exports.useLog = useLog;
  */
 function connect(options = {}, callback) {
     return new Promise((resolve, reject) => {
-        const config = Object.assign({}, connectDefaults(), options); // override defaults
+        const config = Object.assign({}, settings, options); // override defaults
         config.host = config.host.replace(/(^\w+:|^)\/\//, '');
         log_1.logger.info('[connect] Connecting', config);
         exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
@@ -173,16 +138,16 @@ exports.disconnect = disconnect;
 function setupMethodCache(asteroid) {
     methodCache.use(asteroid);
     methodCache.create('getRoomIdByNameOrId', {
-        max: parseInt(process.env.ROOM_CACHE_SIZE || '10', 10),
-        maxAge: 1000 * parseInt(process.env.ROOM_CACHE_MAX_AGE || '300', 10)
+        max: settings.roomCacheMaxSize,
+        maxAge: settings.roomCacheMaxAge
     }),
         methodCache.create('getRoomNameById', {
-            max: parseInt(process.env.ROOM_CACHE_SIZE || '10', 10),
-            maxAge: 1000 * parseInt(process.env.ROOM_CACHE_MAX_AGE || '300', 10)
+            max: settings.roomCacheMaxSize,
+            maxAge: settings.roomCacheMaxAge
         });
     methodCache.create('createDirectMessage', {
-        max: parseInt(process.env.DM_ROOM_CACHE_SIZE || '10', 10),
-        maxAge: 1000 * parseInt(process.env.DM_ROOM_CACHE_MAX_AGE || '100', 10)
+        max: settings.dmCacheMaxSize,
+        maxAge: settings.dmCacheMaxAge
     });
 }
 /**
@@ -242,22 +207,19 @@ exports.cacheCall = cacheCall;
 // LOGIN AND SUBSCRIBE TO ROOMS
 // -----------------------------------------------------------------------------
 /** Login to Rocket.Chat via Asteroid */
-function login(credentials) {
+function login(credentials = {
+    username: settings.username,
+    password: settings.password,
+    ldap: settings.ldap
+}) {
     let login;
-    if (process.env.ROCKETCHAT_AUTH === 'ldap') {
-        const params = [
-            credentials.username || process.env.ROCKETCHAT_USER,
-            credentials.password || process.env.ROCKETCHAT_PASSWORD,
-            { ldap: true, ldapOptions: {} }
-        ];
-        log_1.logger.info(`[login] Logging in ${params[0]} with LDAP`);
-        login = exports.asteroid.loginWithLDAP(...params);
+    if (credentials.ldap) {
+        log_1.logger.info(`[login] Logging in ${credentials.username} with LDAP`);
+        login = exports.asteroid.loginWithLDAP(credentials.email || credentials.username, credentials.password, { ldap: true, ldapOptions: credentials.ldapOptions || {} });
     }
     else {
-        const user = credentials.username || credentials.email || process.env.ROCKETCHAT_USER || 'bot';
-        const pass = credentials.password || process.env.ROCKETCHAT_PASSWORD || 'pass';
-        log_1.logger.info(`[login] Logging in ${user}`);
-        login = exports.asteroid.loginWithPassword(user, pass);
+        log_1.logger.info(`[login] Logging in ${credentials.username}`);
+        login = exports.asteroid.loginWithPassword(credentials.email || credentials.username, credentials.password);
     }
     return login
         .then((loggedInUserId) => {
@@ -392,7 +354,7 @@ exports.reactToMessages = reactToMessages;
  * @param options Sets filters for different event/message types.
  */
 function respondToMessages(callback, options = {}) {
-    const config = Object.assign({}, respondDefaults(), options);
+    const config = Object.assign({}, settings, options);
     let promise = Promise.resolve(); // return value, may be replaced by async ops
     // Join configured rooms if they haven't been already, unless listening to all
     // public rooms, in which case it doesn't matter
@@ -401,7 +363,7 @@ function respondToMessages(callback, options = {}) {
         config.rooms &&
         config.rooms.length > 0) {
         promise = joinRooms(config.rooms).catch((err) => {
-            log_1.logger.error(`Failed to join rooms set in env: ${process.env.ROCKETCHAT_ROOM}`, err);
+            log_1.logger.error(`Failed to join rooms set in env: ${config.rooms}`, err);
         });
     }
     exports.lastReadTime = new Date(); // init before any message read

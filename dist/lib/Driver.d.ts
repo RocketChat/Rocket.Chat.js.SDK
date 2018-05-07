@@ -8,13 +8,6 @@ import { IMessage } from '../config/messageInterfaces';
  * Asteroid ^v2 interface below, suspended for work on future branch
  * @todo Upgrade to Asteroid v2 or find a better maintained ddp client
  */
-/**
- * Define default config as public, allowing overrides from new connection.
- * Enable SSL by default if Rocket.Chat URL contains https.
- */
-export declare function connectDefaults(): IConnectOptions;
-/** Define default config for message respond filters. */
-export declare function respondDefaults(): IRespondOptions;
 /** Internal for comparing message update timestamps */
 export declare let lastReadTime: Date;
 /**
@@ -100,7 +93,7 @@ export declare function callMethod(name: string, params?: any | any[]): Promise<
  */
 export declare function cacheCall(method: string, key: string): Promise<any>;
 /** Login to Rocket.Chat via Asteroid */
-export declare function login(credentials: ICredentials): Promise<any>;
+export declare function login(credentials?: ICredentials): Promise<any>;
 /** Logout of Rocket.Chat via Asteroid */
 export declare function logout(): Promise<void | null>;
 /**

@@ -1,5 +1,3 @@
-process.env.LOG_LEVEL = 'silent' // suppress API logs
-
 import 'mocha'
 import sinon from 'sinon'
 import { expect } from 'chai'
@@ -9,8 +7,6 @@ import { logout } from './api'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
-const initEnv = process.env // store configs to restore after tests
-const credentials = { username: botUser.username, password: botUser.password }
 const delay = (ms) => new Promise((resolve, reject) => setTimeout(resolve, ms))
 let clock
 let tId // test channel ID populated before tests start
@@ -113,7 +109,7 @@ describe('driver', () => {
   describe('.login', () => {
     it('sets the bot user status to online', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await utils
       const result = await utils.userInfo(botUser.username)
       expect(result.user.status).to.equal('online')
@@ -122,7 +118,7 @@ describe('driver', () => {
   describe('.subscribeToMessages', () => {
     it('resolves with subscription object', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       const subscription = await driver.subscribeToMessages()
       expect(subscription).to.have.property('ready')
       // expect(subscription.ready).to.have.property('state', 'fulfilled') ????
@@ -132,7 +128,7 @@ describe('driver', () => {
     afterEach(() => delay(500)) // avoid rate limit
     it('calls callback on every subscription update', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
       const callback = sinon.spy()
       driver.reactToMessages(callback)
@@ -143,7 +139,7 @@ describe('driver', () => {
     })
     it('calls callback with sent message object', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
       const callback = sinon.spy()
       driver.reactToMessages(callback)
@@ -155,14 +151,14 @@ describe('driver', () => {
   describe('.sendToRoomId', () => {
     it('sends string to the given room id', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
       const result = await driver.sendToRoomId('SDK test `sendToRoomId`', tId)
       expect(result).to.include.all.keys(['msg', 'rid', '_id'])
     })
     it('sends array of strings to the given room id', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
       const result = await driver.sendToRoomId([
         'SDK test `sendToRoomId` A',
@@ -176,14 +172,14 @@ describe('driver', () => {
   describe('.sendToRoom', () => {
     it('sends string to the given room name', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
       const result = await driver.sendToRoom('SDK test `sendToRoom`', tName)
       expect(result).to.include.all.keys(['msg', 'rid', '_id'])
     })
     it('sends array of strings to the given room name', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
       const result = await driver.sendToRoom([
         'SDK test `sendToRoom` A',
@@ -197,14 +193,14 @@ describe('driver', () => {
   describe('.sendDirectToUser', () => {
     it('sends string to the given room name', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
       const result = await driver.sendDirectToUser('SDK test `sendDirectToUser`', mockUser.username)
       expect(result).to.include.all.keys(['msg', 'rid', '_id'])
     })
     it('sends array of strings to the given room name', async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
       const result = await driver.sendDirectToUser([
         'SDK test `sendDirectToUser` A',
@@ -215,94 +211,12 @@ describe('driver', () => {
       expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
     })
   })
-  describe('.connectDefaults', () => {
-    beforeEach(() => {
-      delete process.env.ROCKETCHAT_URL
-      delete process.env.ROCKETCHAT_USE_SSL
-    })
-    afterEach(() => process.env = initEnv)
-    it('uses localhost URL without SSL if env undefined', () => {
-      const defaults = driver.connectDefaults()
-      expect(defaults).to.eql({
-        host: 'localhost:3000',
-        useSsl: false,
-        timeout: 20000
-      })
-    })
-    it('sets SSL from env if defined', () => {
-      process.env.ROCKETCHAT_USE_SSL = 'true'
-      const defaults = driver.connectDefaults()
-      expect(defaults.useSsl).to.equal(true)
-    })
-    it('uses SSL if https protocol URL in env', () => {
-      process.env.ROCKETCHAT_URL = 'https://localhost:3000'
-      const defaults = driver.connectDefaults()
-      expect(defaults.useSsl).to.equal(true)
-    })
-    it('does not use SSL if http protocol URL in env', () => {
-      process.env.ROCKETCHAT_URL = 'http://localhost:3000'
-      const defaults = driver.connectDefaults()
-      expect(defaults.useSsl).to.equal(false)
-    })
-    it('SSL overrides protocol detection', () => {
-      process.env.ROCKETCHAT_URL = 'https://localhost:3000'
-      process.env.ROCKETCHAT_USE_SSL = 'false'
-      const defaults = driver.connectDefaults()
-      expect(defaults.useSsl).to.equal(false)
-    })
-  })
-  describe('.respondDefaults', () => {
-    beforeEach(() => {
-      delete process.env.ROCKETCHAT_ROOM
-      delete process.env.LISTEN_ON_ALL_PUBLIC
-      delete process.env.RESPOND_TO_DM
-      delete process.env.RESPOND_TO_LIVECHAT
-      delete process.env.RESPOND_TO_EDITED
-    })
-    afterEach(() => process.env = initEnv)
-    it('all configs default to false if env undefined', () => {
-      const defaults = driver.respondDefaults()
-      expect(defaults).to.eql({
-        rooms: [],
-        allPublic: false,
-        dm: false,
-        livechat: false,
-        edited: false
-      })
-    })
-    it('inherits config from env defaults', () => {
-      process.env.ROCKETCHAT_ROOM = 'GENERAL'
-      process.env.LISTEN_ON_ALL_PUBLIC = 'false'
-      process.env.RESPOND_TO_DM = 'true'
-      process.env.RESPOND_TO_LIVECHAT = 'true'
-      process.env.RESPOND_TO_EDITED = 'true'
-      const defaults = driver.respondDefaults()
-      expect(defaults).to.eql({
-        rooms: ['GENERAL'],
-        allPublic: false,
-        dm: true,
-        livechat: true,
-        edited: true
-      })
-    })
-    it('creates room array from csv list', () => {
-      process.env.ROCKETCHAT_ROOM = `general, ${tName}`
-      const defaults = driver.respondDefaults()
-      expect(defaults.rooms).to.eql(['general', tName])
-    })
-  })
   describe('.respondToMessages', () => {
     beforeEach(async () => {
-      delete process.env.ROCKETCHAT_ROOM
-      delete process.env.LISTEN_ON_ALL_PUBLIC
-      delete process.env.RESPOND_TO_DM
-      delete process.env.RESPOND_TO_LIVECHAT
-      delete process.env.RESPOND_TO_EDITED
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.subscribeToMessages()
     })
-    afterEach(() => process.env = initEnv)
     it('joins rooms if not already joined', async () => {
       expect(driver.joinedIds).to.have.lengthOf(0)
       await driver.respondToMessages(() => null, { rooms: ['general', tName] })
@@ -386,7 +300,7 @@ describe('driver', () => {
   describe('.getRoomName', () => {
     beforeEach(async () => {
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
     })
     it('returns the name for a channel by ID', async () => {
       const room = await driver.getRoomName(tId)
@@ -402,7 +316,7 @@ describe('driver', () => {
     it('joins all the rooms in array, keeping IDs', async () => {
       driver.joinedIds.splice(0, driver.joinedIds.length) // clear const array
       await driver.connect()
-      await driver.login(credentials)
+      await driver.login()
       await driver.joinRooms(['general', tName])
       expect(driver.joinedIds).to.eql(['GENERAL', tId])
     })

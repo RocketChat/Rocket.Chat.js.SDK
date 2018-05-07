@@ -7,9 +7,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+}
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_rest_client_1 = require("node-rest-client");
-const driver_1 = require("./driver");
+const settings = __importStar(require("./settings"));
 const log_1 = require("./log");
 exports.currentLogin = null;
 /** Check for existing login */
@@ -19,14 +26,9 @@ function loggedIn() {
 exports.loggedIn = loggedIn;
 /** Initialise client and configs */
 exports.client = new node_rest_client_1.Client();
-exports.host = driver_1.connectDefaults().host || 'localhost:3000';
-/** Use env credentials by default, overridden by login arguments */
-exports.credentials = {
-    username: process.env.ROCKETCHAT_USER || 'bot',
-    password: process.env.ROCKETCHAT_PASSWORD || 'pass'
-};
+exports.host = settings.host;
 /**
- * Prepend protocol (or put back if removed by driver defaults)
+ * Prepend protocol (or put back if removed from env settings for driver)
  * Hard code endpoint prefix, because all syntax depends on this version
  */
 exports.url = ((exports.host.indexOf('http') === -1)
@@ -154,8 +156,12 @@ exports.get = get;
 /**
  * Login a user for further API calls
  * Result should come back with a token, to authorise following requests.
+ * Use env default credentials, unless overridden by login arguments.
  */
-function login(user = exports.credentials) {
+function login(user = {
+    username: settings.username,
+    password: settings.password
+}) {
     return __awaiter(this, void 0, void 0, function* () {
         log_1.logger.info(`[API] Logging in ${user.username}`);
         if (exports.currentLogin !== null) {

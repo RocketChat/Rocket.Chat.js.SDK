@@ -4,8 +4,6 @@ import { expect } from 'chai'
 import { silence, logger } from './log'
 const initEnv = process.env // store configs to restore after tests
 import { botUser, mockUser } from '../utils/config'
-process.env.ROCKETCHAT_USER = botUser.username
-process.env.ROCKETCHAT_PASSWORD = botUser.password
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as api from './api'
@@ -13,7 +11,10 @@ import * as api from './api'
 silence() // suppress log during tests (disable this while developing tests)
 
 describe('api', () => {
-  before(() => driver.connect()) // wait for connection
+  before(async () => { // wait for connection
+    await driver.connect()
+    await driver.login()
+  })
   after(() => process.env = initEnv)
   afterEach(() => api.logout())
   describe('.success', () => {
@@ -68,29 +69,25 @@ describe('api', () => {
     })
   })
   describe('.login', () => {
-    it('logs in with the bot user by default', async () => {
-      const botId = await driver.login(api.credentials)
+    it('logs in with the default user without arguments', async () => {
       const login = await api.login()
-      expect(login.data.userId).to.equal(botId)
+      expect(login.data.userId).to.equal(driver.userId)
     })
     it('logs in with another user if given credentials', async () => {
-      const credentials = {
+      await api.login({
         username: mockUser.username,
         password: mockUser.password
-      }
-      const userId = await driver.login(credentials)
-      await api.login(credentials)
-      expect(api.currentLogin.userId).to.equal(userId)
+      })
+      const mockInfo = await api.get('users.info', { username: mockUser.username })
+      expect(api.currentLogin.userId).to.equal(mockInfo.user._id)
     })
     it('stores logged in user result', async () => {
-      const botId = await driver.login(api.credentials)
       await api.login()
-      expect(api.currentLogin.userId).to.equal(botId)
+      expect(api.currentLogin.userId).to.equal(driver.userId)
     })
     it('stores user and token in auth headers', async () => {
-      const botId = await driver.login(api.credentials)
       await api.login()
-      expect(api.authHeaders['X-User-Id']).to.equal(botId)
+      expect(api.authHeaders['X-User-Id']).to.equal(driver.userId)
       expect(api.authHeaders['X-Auth-Token']).to.have.lengthOf(43)
     })
   })
