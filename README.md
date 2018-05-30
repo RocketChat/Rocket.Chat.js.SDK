@@ -206,10 +206,10 @@ Login to Rocket.Chat via Asteroid
 Logout current user via Asteroid
 - Returns promise
 
-### `driver.subscribe(topic, roomId)`
+### `driver.subscribe(subscriptionName, ...params)`
 
 Subscribe to Meteor subscription
-- Accepts parameters for Rocket.Chat streamer
+- Accepts parameters for the subscription
 - Returns promise
 - Resolves with subscription instance (with ID)
 

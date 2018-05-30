@@ -283,12 +283,13 @@ export function logout (): Promise<void | null> {
 /**
  * Subscribe to Meteor subscription
  * Resolves with subscription (added to array), with ID property
- * @todo - 3rd param of asteroid.subscribe is deprecated in Rocket.Chat?
+ * @param subscriptionName Name of the publication to subscribe to
+ * @param params Any params required by the publication
  */
-export function subscribe (topic: string, roomId: string): Promise<ISubscription> {
+export function subscribe (subscriptionName: string, ...params: any[]): Promise<ISubscription> {
   return new Promise((resolve, reject) => {
-    logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`)
-    const subscription = asteroid.subscribe(topic, roomId, true)
+    logger.info(`[subscribe] Preparing subscription: ${subscriptionName} with params ${params}`)
+    const subscription = asteroid.subscribe(subscriptionName, ...params)
     subscriptions.push(subscription)
     return subscription.ready.then((id) => {
       logger.info(`[subscribe] Stream ready: ${id}`)
@@ -331,7 +332,7 @@ export function unsubscribeAll (): void {
  * Older adapters used an option for this method but it was always the default.
  */
 export function subscribeToMessages (): Promise<ISubscription> {
-  return subscribe(_messageCollectionName, _messageStreamName)
+  return subscribe(_messageCollectionName, _messageStreamName, true)
     .then((subscription) => {
       messages = asteroid.getCollection(_messageCollectionName)
       // v2
