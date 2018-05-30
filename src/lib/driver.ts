@@ -18,6 +18,8 @@ import { logger, replaceLog } from './log'
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
+const _clientCommandsCollectionName = 'rocketchat_clientcommand'
+const _clientCommandsSubscriptionName = 'clientCommands'
 
 /**
  * Asteroid ^v2 interface below, suspended for work on future branch
@@ -75,6 +77,11 @@ export let joinedIds: string[] = []
  * Array of messages received from reactive collection
  */
 export let messages: ICollection
+
+/**
+ * Array of client commands received from reactive collection
+ */
+export let clientCommands: ICollection
 
 /**
  * Allow override of default logging with adapter's log instance
@@ -253,6 +260,12 @@ export function login (credentials: ICredentials = {
       userId = loggedInUserId
       return loggedInUserId
     })
+    .then(() => {
+      return subscribeToCommands()
+    })
+    .then(() => {
+      return respondToCommands(() => {})
+    })
     .catch((err: Error) => {
       logger.info('[login] Error:', err)
       throw err // throw after log to stop async chain
@@ -325,6 +338,88 @@ export function subscribeToMessages (): Promise<ISubscription> {
       // messages = asteroid.collections.get(_messageCollectionName) || Map()
       return subscription
     })
+}
+
+/**
+ * Begin subscription to client commands for user
+ * Adapters might register callbacks to certain commands
+ */
+export function subscribeToCommands (): Promise<ISubscription> {
+  return subscribe(_clientCommandsSubscriptionName, '')
+    .then((subscription) => {
+      clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
+      // v2
+      // messages = asteroid.collections.get(_clientCommandsCollectionName) || Map()
+      return subscription
+    })
+}
+
+/**
+ * Once a subscription is created, using `subscribeToCommands` this method
+ * can be used to attach a callback to changes in the commands stream.
+ *
+ * @todo `reactToCommands` should call `subscribeToCommands` if not already
+ *       done, so it's not required as an arbitrary step for simpler adapters.
+ *       Also make `login` call `connect` for the same reason, the way
+ *       `respondToCommands` calls `respondToCommands`, so all that's really
+ *       required is:
+ *       `driver.login(credentials).then(() => driver.respondToCommands(callback))`
+ * @param callback Function called with every change in subscription of clientCOmmands.
+ *  - Uses error-first callback pattern
+ *  - Second argument is the the command received
+ */
+export function reactToCommands (callback: ICallback): void {
+  logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
+  clientCommands.reactiveQuery({}).on('change', (_id: string) => {
+    const changedCommandQuery = clientCommands.reactiveQuery({ _id })
+    if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
+      const changedCommand = changedCommandQuery.result[0]
+      callback(null, changedCommand)
+    } else {
+      logger.debug('[received] Reactive query at ID ${ _id } without results')
+    }
+  })
+}
+
+/**
+ * Begin subscription to client commands for user
+ * Adapters might register callbacks to certain commands
+ */
+export function respondToCommands (callback: ICallback, options: IRespondOptions = {}): Promise<void | void[]> {
+  const config = Object.assign({}, settings, options)
+  let promise: Promise<void | void[]> = Promise.resolve() // return value, may be replaced by async ops
+
+  lastReadTime = new Date() // init before any message read
+  reactToCommands(async (err, command) => {
+    if (err) {
+      logger.error(`Unable to receive commands ${JSON.stringify(err)}`)
+      callback(err) // bubble errors back to adapter
+    }
+
+    // Set current time for comparison to incoming
+    let currentReadTime = new Date(command.ts.$date)
+
+    // Ignore commands in stream that aren't new
+    if (currentReadTime <= lastReadTime) return
+
+    // At this point, command has passed checks and can be responded to
+    logger.info(`Command receive callback ID ${command._id} at ${currentReadTime}`)
+    logger.info(`[Incoming] ${command.u.username}: ${command.cmm}`)
+    lastReadTime = currentReadTime
+
+    /**
+     * @todo Fix below by adding to meta from Rocket.Chat instead of getting on
+     *       each command event. It's inefficient and throws off tests that
+     *       await on send completion, because the callback has not yet fired.
+     *       Then re-enable last two `.respondToMessages` tests.
+     */
+    // Add room name to meta, is useful for some adapters (is promise)
+    // if (!isDM && !isLC) meta.roomName = await getRoomName(command.rid)
+
+    // Processing completed, call callback to respond to command
+    callback(null, command)
+  })
+  return promise
 }
 
 /**
