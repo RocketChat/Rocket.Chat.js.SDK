@@ -264,7 +264,15 @@ export function login (credentials: ICredentials = {
       return subscribeToCommands()
     })
     .then(() => {
-      return respondToCommands(() => {})
+      return respondToCommands((err, cmd) => {
+        console.log(cmd);
+        callMethod('replyClientCommand', [cmd._id, { msg: 'OK' }]);
+        if (cmd.msg == 'pauseSubscriptions') {
+          console.log(cmd);
+        } else if (cmd.msg == 'resumeSubscriptions') {
+          console.log(cmd);
+        }
+      })
     })
     .catch((err: Error) => {
       logger.info('[login] Error:', err)
@@ -405,7 +413,7 @@ export function respondToCommands (callback: ICallback, options: IRespondOptions
 
     // At this point, command has passed checks and can be responded to
     logger.info(`Command receive callback ID ${command._id} at ${currentReadTime}`)
-    logger.info(`[Incoming] ${command.u.username}: ${command.cmm}`)
+    logger.info(`[Incoming] ${command.u.username}: ${command.cmd.msg}`)
     lastReadTime = currentReadTime
 
     /**
