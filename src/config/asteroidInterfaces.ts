@@ -57,7 +57,8 @@ export interface IUserOptions {
 export interface ISubscription {
   stop: () => void,
   ready: Promise<IReady>,
-  id?: string
+  id?: string,
+  _name?: string
 }
 
 // Asteroid v1 only
