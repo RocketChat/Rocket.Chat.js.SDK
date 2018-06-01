@@ -1,12 +1,6 @@
 import { EventEmitter } from 'events'
 import Asteroid from 'asteroid'
-// Asteroid v2 imports
-/*
-import { createClass } from 'asteroid'
-import WebSocket from 'ws'
-import { Map } from 'immutable'
-import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
-*/
+
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
@@ -14,18 +8,11 @@ import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
+import Socket from './ddp'
 
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
-
-/**
- * Asteroid ^v2 interface below, suspended for work on future branch
- * @todo Upgrade to Asteroid v2 or find a better maintained ddp client
- */
-/*
-const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
-*/
 
 // CONNECTION SETUP AND CONFIGURE
 // -----------------------------------------------------------------------------
@@ -54,6 +41,8 @@ export const events = new EventEmitter()
  * Variable not initialised until `connect` called.
  */
 export let asteroid: IAsteroid
+
+export let ddp: Socket
 
 /**
  * Asteroid subscriptions, exported for direct polling by adapters
@@ -84,8 +73,8 @@ export function useLog (externalLog: ILogger) {
 }
 
 /**
- * Initialise asteroid instance with given options or defaults.
- * Returns promise, resolved with Asteroid instance. Callback follows
+ * Initialise socket instance with given options or defaults.
+ * Returns promise, resolved with Socket instance. Callback follows
  * error-first-pattern. Error returned or promise rejected on timeout.
  * Removes http/s protocol to get connection hostname if taken from URL.
  * @example <caption>Use with callback</caption>
@@ -105,21 +94,23 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
     const config = Object.assign({}, settings, options) // override defaults
     config.host = config.host.replace(/(^\w+:|^)\/\//, '')
     logger.info('[connect] Connecting', config)
+
+    // TODO: Initialize DDP here
     asteroid = new Asteroid(config.host, config.useSsl)
-    // Asteroid ^v2 interface...
-    /*
-    asteroid = new Asteroid({
-      endpoint: `ws://${options.host}/websocket`,
-      SocketConstructor: WebSocket
-    })
-    */
-    setupMethodCache(asteroid) // init instance for later caching method calls
-    asteroid.on('connected', () => events.emit('connected'))
-    asteroid.on('reconnected', () => events.emit('reconnected'))
+    ddp = new Socket(config.host)
+    // END TODO
+
+    setupMethodCache(ddp) // init instance for later caching method calls
+    
+    // TODO: refact
+    ddp.on('connected', () => events.emit('connected'))
+    ddp.on('reconnected', () => events.emit('reconnected'))
+    // END
+
     let cancelled = false
     const rejectionTimeout = setTimeout(function () {
       logger.info(`[connect] Timeout (${config.timeout})`)
-      const err = new Error('Asteroid connection timeout')
+      const err = new Error('Socket connection timeout')
       cancelled = true
       events.removeAllListeners('connected')
       callback ? callback(err, asteroid) : reject(err)
@@ -145,7 +136,7 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
 export function disconnect (): Promise<void> {
   logger.info('Unsubscribing, logging out, disconnecting')
   unsubscribeAll()
-  return logout().then(() => Promise.resolve()) // asteroid.disconnect()) // v2 only
+  return logout().then(() => Promise.resolve())
 }
 
 // ASYNC AND CACHE METHOD UTILS
@@ -153,10 +144,10 @@ export function disconnect (): Promise<void> {
 
 /**
  * Setup method cache configs from env or defaults, before they are called.
- * @param asteroid The asteroid instance to cache method calls
+ * @param ddp The Socket instance to cache method calls
  */
-function setupMethodCache (asteroid: IAsteroid): void {
-  methodCache.use(asteroid)
+function setupMethodCache (ddp: Socket): void {
+  methodCache.use(ddp)
   methodCache.create('getRoomIdByNameOrId', {
     max: settings.roomCacheMaxSize,
     maxAge: settings.roomCacheMaxAge
@@ -173,13 +164,13 @@ function setupMethodCache (asteroid: IAsteroid): void {
 
 /**
  * Wraps method calls to ensure they return a Promise with caught exceptions.
- * @param method The Rocket.Chat server method, to call through Asteroid
+ * @param method The Rocket.Chat server method, to call through Socket
  * @param params Single or array of parameters of the method to call
  */
 export function asyncCall (method: string, params: any | any[]): Promise<any> {
   if (!Array.isArray(params)) params = [params] // cast to array for apply
   logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
-  return Promise.resolve(asteroid.apply(method, params).result)
+  return Promise.resolve(ddp.call(method, params))
     .catch((err: Error) => {
       logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
@@ -193,7 +184,7 @@ export function asyncCall (method: string, params: any | any[]): Promise<any> {
 }
 
 /**
- * Call a method as async via Asteroid, or through cache if one is created.
+ * Call a method as async via Socket, or through cache if one is created.
  * If the method doesn't have or need parameters, it can't use them for caching
  * so it will always call asynchronously.
  * @param name The Rocket.Chat server method to call
@@ -206,8 +197,8 @@ export function callMethod (name: string, params?: any | any[]): Promise<any> {
 }
 
 /**
- * Wraps Asteroid method calls, passed through method cache if cache is valid.
- * @param method The Rocket.Chat server method, to call through Asteroid
+ * Wraps Socket method calls, passed through method cache if cache is valid.
+ * @param method The Rocket.Chat server method, to call through Socket
  * @param key Single string parameters only, required to use as cache key
  */
 export function cacheCall (method: string, key: string): Promise<any> {
@@ -227,7 +218,7 @@ export function cacheCall (method: string, key: string): Promise<any> {
 // LOGIN AND SUBSCRIBE TO ROOMS
 // -----------------------------------------------------------------------------
 
-/** Login to Rocket.Chat via Asteroid */
+/** Login to Rocket.Chat via Socket */
 export function login (credentials: ICredentials = {
   username: settings.username,
   password: settings.password,
@@ -236,17 +227,15 @@ export function login (credentials: ICredentials = {
   let login: Promise<any>
   if (credentials.ldap) {
     logger.info(`[login] Logging in ${credentials.username} with LDAP`)
-    login = asteroid.loginWithLDAP(
-      credentials.email || credentials.username,
-      credentials.password,
-      { ldap: true, ldapOptions: credentials.ldapOptions || {} }
+    login = ddp.login(
+      { ldap: true, ldapOptions: credentials.ldapOptions || {}, ldapPass: credentials.password, username: credentials.username }
     )
   } else {
     logger.info(`[login] Logging in ${credentials.username}`)
-    login = asteroid.loginWithPassword(
-      credentials.email || credentials.username!,
-      credentials.password
-    )
+    login = ddp.login({
+      user: { username: credentials.username, email: credentials.password },
+      password: credentials.password
+    })
   }
   return login
     .then((loggedInUserId) => {
@@ -259,9 +248,9 @@ export function login (credentials: ICredentials = {
     })
 }
 
-/** Logout of Rocket.Chat via Asteroid */
+/** Logout of Rocket.Chat via Socket */
 export function logout (): Promise<void | null> {
-  return asteroid.logout().catch((err: Error) => {
+  return ddp.logout().catch((err: Error) => {
     logger.error('[Logout] Error:', err)
     throw err // throw after log to stop async chain
   })
@@ -281,20 +270,6 @@ export function subscribe (topic: string, roomId: string): Promise<ISubscription
       logger.info(`[subscribe] Stream ready: ${id}`)
       resolve(subscription)
     })
-    // Asteroid ^v2 interface...
-    /*
-    subscription.on('ready', () => {
-      console.log(`[${topic}] Subscribe ready`)
-      events.emit('subscription-ready', subscription)
-      subscriptions.push(subscription)
-      resolve(subscription)
-    })
-    subscription.on('error', (err: Error) => {
-      console.error(`[${topic}] Subscribe error:`, err)
-      events.emit('subscription-error', roomId, err)
-      reject(err)
-    })
-    */
   })
 }
 
@@ -303,7 +278,6 @@ export function unsubscribe (subscription: ISubscription): void {
   const index = subscriptions.indexOf(subscription)
   if (index === -1) return
   subscription.stop()
-  // asteroid.unsubscribe(subscription.id) // v2
   subscriptions.splice(index, 1) // remove from collection
   logger.info(`[${subscription.id}] Unsubscribed`)
 }
@@ -321,8 +295,6 @@ export function subscribeToMessages (): Promise<ISubscription> {
   return subscribe(_messageCollectionName, _messageStreamName)
     .then((subscription) => {
       messages = asteroid.getCollection(_messageCollectionName)
-      // v2
-      // messages = asteroid.collections.get(_messageCollectionName) || Map()
       return subscription
     })
 }
@@ -449,27 +421,6 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
   })
   return promise
 }
-
-/**
- * Get every new element added to DDP in Asteroid (v2)
- * @todo Resolve this functionality within Rocket.Chat with team
- * @param callback Function to call with element details
- */
-/*
-export function onAdded (callback: ICallback): void {
-  console.log('Setting up reactive message list...')
-  try {
-    asteroid.ddp.on('added', ({ collection, id, fields }) => {
-      console.log(`Element added to collection ${ collection }`)
-      console.log(id)
-      console.log(fields)
-      callback(null, id)
-    })
-  } catch (err) {
-    callback(err)
-  }
-}
-*/
 
 // PREPARE AND SEND MESSAGES
 // -----------------------------------------------------------------------------
