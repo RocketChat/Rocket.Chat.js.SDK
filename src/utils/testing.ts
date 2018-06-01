@@ -7,7 +7,8 @@ import {
   INewUserAPI,
   IUserResultAPI,
   IRoomResultAPI,
-  IChannelResultAPI
+  IChannelResultAPI,
+  IMessageReceiptAPI
 } from './interfaces'
 
 /** Define common attributes for DRY tests */
@@ -38,12 +39,36 @@ export async function createChannel (
 }
 
 /** Send message from mock user to channel for tests to listen and respond */
+/** @todo Sometimes the post request completes before the change event emits
+ *        the message to the streamer. That's why the interval is used for proof
+ *        of receipt. It would be better for the endpoint to not resolve until
+ *        server side handling is complete. Would require PR to core.
+ */
 export async function sendFromUser (payload: any): Promise<IMessageResultAPI> {
   const testChannel = await channelInfo(testChannelName)
-  const messageDefaults: IMessageAPI = { roomId: testChannel.channel._id }
+  const roomId = testChannel.channel._id
+  const messageDefaults: IMessageAPI = { roomId }
   const data: IMessageAPI = Object.assign({}, messageDefaults, payload)
   await login({ username: mockUser.username, password: mockUser.password })
-  return post('chat.postMessage', data, true)
+  const oldest = new Date().toISOString()
+  const result = await post('chat.postMessage', data, true)
+  const proof = new Promise((resolve, reject) => {
+    let looked = 0
+    const look = setInterval(async () => {
+      const { messages } = await get('channels.history', { roomId, oldest })
+      const found = messages.some((message: IMessageReceiptAPI) => {
+        return result.message._id === message._id
+      })
+      if (found || looked > 10) {
+        clearInterval(look)
+        if (found) resolve()
+        else reject()
+      }
+      looked++
+    }, 100)
+  })
+  await proof
+  return result
 }
 
 /** Update message sent from mock user */
