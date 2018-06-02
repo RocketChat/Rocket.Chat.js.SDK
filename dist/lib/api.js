@@ -174,7 +174,7 @@ function login(user = {
             }
         }
         const result = yield post('login', user, false);
-        if (result.data && result.data.authToken) {
+        if (result && result.data && result.data.authToken) {
             exports.currentLogin = {
                 result: result,
                 username: user.username,

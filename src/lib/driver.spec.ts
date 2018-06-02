@@ -16,7 +16,7 @@ silence() // suppress log during tests (disable this while developing tests)
 
 describe('driver', () => {
   before(async () => {
-    const testChannel = await utils.channelInfo(tName)
+    const testChannel = await utils.channelInfo({ roomName: tName })
     tId = testChannel.channel._id
   })
   after(() => logout())
