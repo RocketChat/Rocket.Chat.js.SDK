@@ -25,8 +25,8 @@ export async function createUser (user: INewUserAPI): Promise<IUserResultAPI> {
 }
 
 /** Get information about a channel */
-export async function channelInfo (roomName: string): Promise<IChannelResultAPI> {
-  return get('channels.info', { roomName }, true)
+export async function channelInfo (query: { roomName?: string, roomId?: string }): Promise<IChannelResultAPI> {
+  return get('channels.info', query, true)
 }
 
 /** Create a room for tests and catch the error if it exists already */
@@ -45,24 +45,28 @@ export async function createChannel (
  *        server side handling is complete. Would require PR to core.
  */
 export async function sendFromUser (payload: any): Promise<IMessageResultAPI> {
-  const testChannel = await channelInfo(testChannelName)
-  const roomId = testChannel.channel._id
+  const user = await login({ username: mockUser.username, password: mockUser.password })
+  const endpoint = (payload.roomId && payload.roomId.indexOf(user.data.userId) !== -1)
+    ? 'dm.history'
+    : 'channels.history'
+  const roomId = (payload.roomId)
+    ? payload.roomId
+    : (await channelInfo({ roomName: testChannelName })).channel._id
   const messageDefaults: IMessageAPI = { roomId }
   const data: IMessageAPI = Object.assign({}, messageDefaults, payload)
-  await login({ username: mockUser.username, password: mockUser.password })
   const oldest = new Date().toISOString()
   const result = await post('chat.postMessage', data, true)
   const proof = new Promise((resolve, reject) => {
     let looked = 0
     const look = setInterval(async () => {
-      const { messages } = await get('channels.history', { roomId, oldest })
+      const { messages } = await get(endpoint, { roomId, oldest })
       const found = messages.some((message: IMessageReceiptAPI) => {
         return result.message._id === message._id
       })
       if (found || looked > 10) {
         clearInterval(look)
         if (found) resolve()
-        else reject()
+        else reject('API send from user, proof of receipt timeout')
       }
       looked++
     }, 100)
@@ -124,7 +128,7 @@ export async function setup () {
     }
 
     // Verify or create channel for tests
-    let testChannelInfo = await channelInfo(testChannelName)
+    let testChannelInfo = await channelInfo({ roomName: testChannelName })
     if (!testChannelInfo.success) {
       console.log(`Test channel (${testChannelName}) not found`)
       testChannelInfo = await createChannel(testChannelName)
