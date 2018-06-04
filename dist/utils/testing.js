@@ -33,6 +33,16 @@ function channelInfo(query) {
     });
 }
 exports.channelInfo = channelInfo;
+/** Get the last messages sent to a channel (in last 10 minutes) */
+function lastMessages(roomId, count = 1) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const now = new Date();
+        const latest = now.toISOString();
+        const oldest = new Date(now.setMinutes(now.getMinutes() - 10)).toISOString();
+        return (yield api_1.get('channels.history', { roomId, latest, oldest, count })).messages;
+    });
+}
+exports.lastMessages = lastMessages;
 /** Create a room for tests and catch the error if it exists already */
 function createChannel(name, members = [], readOnly = false) {
     return __awaiter(this, void 0, void 0, function* () {

@@ -10,6 +10,7 @@ import {
   IChannelResultAPI,
   IMessageReceiptAPI
 } from './interfaces'
+import { IMessage } from '../config/messageInterfaces'
 
 /** Define common attributes for DRY tests */
 export const testChannelName = 'tests'
@@ -27,6 +28,14 @@ export async function createUser (user: INewUserAPI): Promise<IUserResultAPI> {
 /** Get information about a channel */
 export async function channelInfo (query: { roomName?: string, roomId?: string }): Promise<IChannelResultAPI> {
   return get('channels.info', query, true)
+}
+
+/** Get the last messages sent to a channel (in last 10 minutes) */
+export async function lastMessages (roomId: string, count: number = 1): Promise<IMessage[]> {
+  const now = new Date()
+  const latest = now.toISOString()
+  const oldest = new Date(now.setMinutes(now.getMinutes() - 10)).toISOString()
+  return (await get('channels.history', { roomId, latest, oldest, count })).messages
 }
 
 /** Create a room for tests and catch the error if it exists already */

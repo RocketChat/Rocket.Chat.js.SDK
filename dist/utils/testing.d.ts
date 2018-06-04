@@ -1,4 +1,5 @@
 import { IMessageUpdateAPI, IMessageResultAPI, INewUserAPI, IUserResultAPI, IRoomResultAPI, IChannelResultAPI } from './interfaces';
+import { IMessage } from '../config/messageInterfaces';
 /** Define common attributes for DRY tests */
 export declare const testChannelName = "tests";
 /** Get information about a user */
@@ -10,6 +11,8 @@ export declare function channelInfo(query: {
     roomName?: string;
     roomId?: string;
 }): Promise<IChannelResultAPI>;
+/** Get the last messages sent to a channel (in last 10 minutes) */
+export declare function lastMessages(roomId: string, count?: number): Promise<IMessage[]>;
 /** Create a room for tests and catch the error if it exists already */
 export declare function createChannel(name: string, members?: string[], readOnly?: boolean): Promise<IChannelResultAPI>;
 /** Send message from mock user to channel for tests to listen and respond */

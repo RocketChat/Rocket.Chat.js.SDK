@@ -14,6 +14,7 @@ import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
+import { IMessageReceiptAPI } from '../utils/interfaces'
 
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
@@ -536,7 +537,7 @@ export function prepareMessage (content: string | IMessage, roomId?: string): Me
  * Send a prepared message object (with pre-defined room ID).
  * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
  */
-export function sendMessage (message: IMessage): Promise<IMessage> {
+export function sendMessage (message: IMessage): Promise<IMessageReceiptAPI> {
   return asyncCall('sendMessage', message)
 }
 
@@ -544,8 +545,12 @@ export function sendMessage (message: IMessage): Promise<IMessage> {
  * Prepare and send string/s to specified room ID.
  * @param content Accepts message text string or array of strings.
  * @param roomId  ID of the target room to use in send.
+ * @todo Returning one or many gets complicated with type checking not allowing
+ *       use of a property because result may be array, when you know it's not.
+ *       Solution would probably be to always return an array, even for single
+ *       send. This would be a breaking change, should hold until major version.
  */
-export function sendToRoomId (content: string | string[], roomId: string): Promise<IMessage[] | IMessage> {
+export function sendToRoomId (content: string | string[], roomId: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   if (!Array.isArray(content)) {
     return sendMessage(prepareMessage(content, roomId))
   } else {
@@ -560,7 +565,7 @@ export function sendToRoomId (content: string | string[], roomId: string): Promi
  * @param content Accepts message text string or array of strings.
  * @param room    A name (or ID) to resolve as ID to use in send.
  */
-export function sendToRoom (content: string | string[], room: string): Promise<IMessage[] | IMessage> {
+export function sendToRoom (content: string | string[], room: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   return getRoomId(room).then((roomId) => sendToRoomId(content, roomId))
 }
 
@@ -569,6 +574,23 @@ export function sendToRoom (content: string | string[], room: string): Promise<I
  * @param content   Accepts message text string or array of strings.
  * @param username  Name to create (or get) DM for room ID to use in send.
  */
-export function sendDirectToUser (content: string | string[], username: string): Promise<IMessage[] | IMessage> {
+export function sendDirectToUser (content: string | string[], username: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   return getDirectMessageRoomId(username).then((rid) => sendToRoomId(content, rid))
+}
+
+/**
+ * Edit an existing message, replacing any attributes with those provided.
+ * The given message object should have the ID of an existing message.
+ */
+export function editMessage (message: IMessage): Promise<IMessage> {
+  return asyncCall('updateMessage', message)
+}
+
+/**
+ * Send a reaction to an existing message. Simple proxy for method call.
+ * @param emoji     Accepts string like `:thumbsup:` to add 👍 reaction
+ * @param messageId ID for a previously sent message
+ */
+export function setReaction (emoji: string, messageId: string) {
+  return asyncCall('setReaction', [':punch:', messageId])
 }

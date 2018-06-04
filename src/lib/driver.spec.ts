@@ -3,10 +3,11 @@ import sinon from 'sinon'
 import { expect } from 'chai'
 import { silence } from './log'
 import { botUser, mockUser, apiUser } from '../utils/config'
-import { logout } from './api'
+import * as api from './api'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
+
 const delay = (ms) => new Promise((resolve, reject) => setTimeout(resolve, ms))
 let clock
 let tId // test channel ID populated before tests start
@@ -19,7 +20,11 @@ describe('driver', () => {
     const testChannel = await utils.channelInfo({ roomName: tName })
     tId = testChannel.channel._id
   })
-  after(() => logout())
+  after(async () => {
+    await api.logout()
+    await driver.logout()
+    await driver.disconnect()
+  })
   describe('.connect', () => {
     context('with localhost connection', () => {
       it('without args, returns a promise', () => {
@@ -148,18 +153,83 @@ describe('driver', () => {
       expect(messageArgs.msg).to.equal('SDK test `reactToMessages` 3')
     })
   })
-  describe('.sendToRoomId', () => {
-    it('sends string to the given room id', async () => {
+  describe('.sendMessage', () => {
+    before(async () => {
       await driver.connect()
       await driver.login()
-      await driver.subscribeToMessages()
+    })
+    it('sends a custom message', async () => {
+      const message = driver.prepareMessage({
+        msg: ':point_down:',
+        emoji: ':point_right:',
+        reactions: { ':punch:': { usernames: [botUser.username] } },
+        groupable: false,
+        rid: tId
+      })
+      const result = await driver.sendMessage(message)
+      const last = (await utils.lastMessages(tId))[0]
+      expect(last).to.have.deep.property('reactions', message.reactions)
+      expect(last).to.have.property('emoji', ':point_right:')
+      expect(last).to.have.property('msg', ':point_down:')
+    })
+  })
+  describe('.editMessage', () => {
+    before(async () => {
+      await driver.connect()
+      await driver.login()
+    })
+    it('edits the last sent message', async () => {
+      const original = driver.prepareMessage({
+        msg: ':point_down:',
+        emoji: ':point_right:',
+        groupable: false,
+        rid: tId
+      })
+      await driver.sendMessage(original)
+      const sent = (await utils.lastMessages(tId))[0]
+      const update = Object.assign({}, original, {
+        _id: sent._id,
+        msg: ':point_up:'
+      })
+      await driver.editMessage(update)
+      const last = (await utils.lastMessages(tId))[0]
+      expect(last).to.have.property('msg', ':point_up:')
+      expect(last).to.have.deep.property('editedBy', {
+        _id: driver.userId, username: botUser.username
+      })
+    })
+  })
+  describe('.setReaction', () => {
+    before(async () => {
+      await driver.connect()
+      await driver.login()
+    })
+    it('adds emoji reaction to message', async () => {
+      let sent = await driver.sendToRoomId('test reactions', tId)
+      if (Array.isArray(sent)) sent = sent[0] // see todo on `sendToRoomId`
+      const reaction = await driver.setReaction(':punch:', sent._id)
+      const last = (await utils.lastMessages(tId))[0]
+      expect(last.reactions).to.have.deep.property(':punch:', {
+        usernames: [ botUser.username ]
+      })
+    })
+    it('removes if used when emoji reaction exists', async () => {
+      const sent = await driver.sendMessage(driver.prepareMessage({
+        msg: 'test reactions -',
+        reactions: { ':punch:': { usernames: [botUser.username] } },
+        rid: tId
+      }))
+      const reaction = await driver.setReaction(':punch:', sent._id)
+      const last = (await utils.lastMessages(tId))[0]
+      expect(last).to.not.have.property('reactions')
+    })
+  })
+  describe('.sendToRoomId', () => {
+    it('sends string to the given room id', async () => {
       const result = await driver.sendToRoomId('SDK test `sendToRoomId`', tId)
       expect(result).to.include.all.keys(['msg', 'rid', '_id'])
     })
     it('sends array of strings to the given room id', async () => {
-      await driver.connect()
-      await driver.login()
-      await driver.subscribeToMessages()
       const result = await driver.sendToRoomId([
         'SDK test `sendToRoomId` A',
         'SDK test `sendToRoomId` B'
@@ -191,17 +261,17 @@ describe('driver', () => {
     })
   })
   describe('.sendDirectToUser', () => {
+    before(async () => {
+      await driver.connect()
+      await driver.login()
+    })
     it('sends string to the given room name', async () => {
       await driver.connect()
       await driver.login()
-      await driver.subscribeToMessages()
       const result = await driver.sendDirectToUser('SDK test `sendDirectToUser`', mockUser.username)
       expect(result).to.include.all.keys(['msg', 'rid', '_id'])
     })
     it('sends array of strings to the given room name', async () => {
-      await driver.connect()
-      await driver.login()
-      await driver.subscribeToMessages()
       const result = await driver.sendDirectToUser([
         'SDK test `sendDirectToUser` A',
         'SDK test `sendDirectToUser` B'
