@@ -8,6 +8,7 @@ const delay = (ms: number) => new Promise((resolve, reject) => setTimeout(resolv
 async function start () {
   await driver.connect()
   await driver.login({ username: botUser.username, password: botUser.password })
+  await driver.callMethod('updateBotData', { framework: 'Rocket.Chat JS SDK' })
   await driver.subscribeToMessages()
   await driver.respondToMessages((err, msg, msgOpts) => {
     if (err) throw err
