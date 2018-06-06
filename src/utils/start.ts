@@ -21,6 +21,10 @@ async function start () {
     edited: true,
     livechat: false
   })
+  driver.registerCommandHandler('xdlol', async (command) => {
+    console.log('testing')
+    return { msg: 'OK' }
+  })
 }
 
 // Demo bot-style interactions

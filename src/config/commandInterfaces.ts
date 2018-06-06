@@ -12,3 +12,16 @@ export interface IClientCommand {
   }
   ts: Date
 }
+
+export interface IClientCommandResponse {
+  status?: number,
+  msg: string
+}
+
+export interface IClientCommandHandler {
+  (command: IClientCommand): Promise<IClientCommandResponse>
+}
+
+export interface IClientCommandHandlerMap {
+  [key: string]: IClientCommandHandler
+}

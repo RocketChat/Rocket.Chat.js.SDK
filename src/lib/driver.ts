@@ -13,8 +13,14 @@ import { Message } from './message'
 import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
-import { IClientCommand } from '../config/commandInterfaces'
 import { logger, replaceLog } from './log'
+
+import {
+  IClientCommand,
+  IClientCommandResponse,
+  IClientCommandHandler,
+  IClientCommandHandlerMap
+} from '../config/commandInterfaces'
 
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
@@ -88,7 +94,7 @@ export let clientCommands: ICollection
 /**
  * Map of command handlers added by the client of the sdk
  */
-export let commandHandlers = {}
+export let commandHandlers: IClientCommandHandlerMap = {}
 
 /**
  * Allow override of default logging with adapter's log instance
@@ -522,7 +528,7 @@ function respondToCommands (): Promise<void | void[]> {
   reactToCommands(async (err, command) => {
     if (err) {
       logger.error(`Unable to receive commands ${JSON.stringify(err)}`)
-      return commandHandler(err, command) // bubble errors back to adapter
+      throw err
     }
 
     // Set current time for comparison to incoming
@@ -532,41 +538,50 @@ function respondToCommands (): Promise<void | void[]> {
     if (currentReadTime <= commandLastReadTime) return
 
     // At this point, command has passed checks and can be responded to
-    logger.info(`[Command] Received command ID ${command._id} at ${currentReadTime}`)
+    logger.info(`[Command] Received command '${command.cmd.msg}' at ${currentReadTime}`)
     commandLastReadTime = currentReadTime
 
     // Processing completed, call callback to respond to command
-    commandHandler(null, command)
+    return commandHandler(command)
   })
   return promise
 }
 
-function commandHandler (err: Error | null, command: IClientCommand): Promise<void | void[]> {
-  let promise: Promise<void | void[]> = Promise.resolve()
-
-  if (err) {
-    logger.error(`Unable to receive commands ${JSON.stringify(err)}`)
-  }
-
+async function commandHandler (command: IClientCommand): Promise<void | void[]> {
   switch (command.cmd.msg) {
     case 'pauseMessageStream':
       subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
-      asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
       break
 
     case 'resumeMessageStream':
-      subscribeToMessages()
-        .then(() => {
-          messageLastReadTime = new Date() // reset time of last read message
-          asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
-        })
+      await subscribeToMessages()
+      messageLastReadTime = new Date() // reset time of last read message
+      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      break
+
+    case 'heartbeat':
+      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
       break
 
     default:
-      // result = commandHandlers[command.cmd.msg](command)
+      const handler = commandHandlers[command.cmd.msg]
+      if (handler) {
+        const result = await handler(command)
+        await asyncCall('replyClientCommand', [command._id, result])
+      }
+  }
+}
+
+export function registerCommandHandler (key: string, handler: IClientCommandHandler) {
+  const currentHandler = commandHandlers[key]
+  if (currentHandler) {
+    logger.error(`[Command] Command '${key}' already has a handler`)
+    throw Error('Command in use')
   }
 
-  return promise
+  logger.info(`[Command] Registering handler for command '${key}'`)
+  commandHandlers[key] = handler
 }
 
 /**
