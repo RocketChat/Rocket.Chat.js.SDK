@@ -274,9 +274,6 @@ export function login (credentials: ICredentials = {
       return loggedInUserId
     })
     .then(() => {
-      return subscribeToCommands()
-    })
-    .then(() => {
       return respondToCommands()
     })
     .catch((err: Error) => {
@@ -481,14 +478,12 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
  * Begin subscription to client commands for user
  * Adapters might register callbacks to certain commands
  */
-function subscribeToCommands (): Promise<ISubscription> {
-  return subscribe(_clientCommandsSubscriptionName)
-    .then((subscription) => {
-      clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
-      // v2
-      // messages = asteroid.collections.get(_clientCommandsCollectionName) || Map()
-      return subscription
-    })
+async function subscribeToCommands (): Promise<ICollection> {
+  const subscription = await subscribe(_clientCommandsSubscriptionName)
+  clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
+  // v2
+  // clientCommands = asteroid.collections.get(_clientCommandsCollectionName) || Map()
+  return clientCommands
 }
 
 /**
@@ -505,7 +500,8 @@ function subscribeToCommands (): Promise<ISubscription> {
  *  - Uses error-first callback pattern
  *  - Second argument is the the command received
  */
-function reactToCommands (callback: ICallback): void {
+async function reactToCommands (callback: ICallback): Promise<void> {
+  const clientCommands = await subscribeToCommands()
   logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
   clientCommands.reactiveQuery({}).on('change', (_id: string) => {
     const changedCommandQuery = clientCommands.reactiveQuery({ _id })
