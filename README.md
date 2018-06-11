@@ -268,6 +268,28 @@ but have not been joined yet this method will join to those rooms automatically.
 
 If `allPublic` is true, the `rooms` option will be ignored.
 
+### `driver.registerCommandHandler(key, callback)`
+
+[Click here](#) to know more about ClientCommands
+
+Register a function `callback` to handle incoming clientCommands that are not at the SDK-level and have the given `key`.
+
+The `callback` receives a `ClientCommand` object as the first parameter and returns a promise that resolves with a `ClientCommandResponse` object.
+
+`ClientCommand` object structure:
+- ClientCommand._id: ID of the ClientCOmmand
+- ClientCommand.u: Object representing the user that the command is targeted to, always set to the user that receives the command
+- ClientCommand.u._id: ID of the user,
+- ClientCommand.u.username: Username of the user
+- ClientCommand.cmd: Object representing the command itself
+- ClientCommand.msg: Key of the command
+- ClientCommand.options: Addional options or parameters of the command, no defined structure
+- ClientCommand.ts: Timestamp of when the command was issued
+
+`ClientCommandResponse` object structure:
+- ClientCommandResponse.status: ID of the success status of the response (still unused)
+- ClientCommandResponse.msg: Message response to the command
+
 ### `driver.asyncCall(method, params)`
 
 Wraps server method calls to always be async

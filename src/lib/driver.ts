@@ -274,6 +274,7 @@ export function login (credentials: ICredentials = {
       return loggedInUserId
     })
     .then(() => {
+      // Calling function to listen to commands and answer to them
       return respondToCommands()
     })
     .catch((err: Error) => {
@@ -475,8 +476,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
 }
 
 /**
- * Begin subscription to client commands for user
- * Adapters might register callbacks to certain commands
+ * Begin subscription to clientCommands for user and returns the collection
  */
 async function subscribeToCommands (): Promise<ICollection> {
   const subscription = await subscribe(_clientCommandsSubscriptionName)
@@ -488,14 +488,8 @@ async function subscribeToCommands (): Promise<ICollection> {
 
 /**
  * Once a subscription is created, using `subscribeToCommands` this method
- * can be used to attach a callback to changes in the commands stream.
+ * can be used to attach a callback to changes in the clientCommands stream.
  *
- * @todo `reactToCommands` should call `subscribeToCommands` if not already
- *       done, so it's not required as an arbitrary step for simpler adapters.
- *       Also make `login` call `connect` for the same reason, the way
- *       `respondToCommands` calls `respondToCommands`, so all that's really
- *       required is:
- *       `driver.login(credentials).then(() => driver.respondToCommands(callback))`
  * @param callback Function called with every change in subscription of clientCommands.
  *  - Uses error-first callback pattern
  *  - Second argument is the the command received
@@ -515,11 +509,9 @@ async function reactToCommands (callback: ICallback): Promise<void> {
 }
 
 /**
- * Proxy for `reacToCommands` filtering commands based on their timestamp
+ * Calls reactToCommands with a callback to read latest clientCommands and reply to them
  */
-function respondToCommands (): Promise<void | void[]> {
-  let promise: Promise<void | void[]> = Promise.resolve() // return value, may be replaced by async ops
-
+async function respondToCommands (): Promise<void | void[]> {
   commandLastReadTime = new Date() // init before any message read
   reactToCommands(async (err, command) => {
     if (err) {
@@ -540,26 +532,35 @@ function respondToCommands (): Promise<void | void[]> {
     // Processing completed, call callback to respond to command
     return commandHandler(command)
   })
-  return promise
 }
 
+/**
+ * Middleware function to reply to predefined clientCommands or to call a
+ * handler registered by the user
+ *
+ * @param command Command object
+ */
 async function commandHandler (command: IClientCommand): Promise<void | void[]> {
   switch (command.cmd.msg) {
+    // SDK-level command to pause the message stream, interrupting all messages from the server
     case 'pauseMessageStream':
       subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
       await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
       break
 
+    // SDK-level command to resubscribe to the message stream
     case 'resumeMessageStream':
       await subscribeToMessages()
       messageLastReadTime = new Date() // reset time of last read message
       await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
       break
 
+    // SDK-level command to check for aliveness of the bot regarding commands
     case 'heartbeat':
       await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
       break
 
+    // If command is not at the SDK-level, it tries to call a handler added by the user
     default:
       const handler = commandHandlers[command.cmd.msg]
       if (handler) {
@@ -569,7 +570,13 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
   }
 }
 
-export function registerCommandHandler (key: string, handler: IClientCommandHandler) {
+/**
+ * Method to register a handler for a given clientCommand coming from the server
+ *
+ * @param key String representing the key of the clientCommand
+ * @param callback Function to be called when the clientCommand with the given key is received
+ */
+export function registerCommandHandler (key: string, callback: IClientCommandHandler) {
   const currentHandler = commandHandlers[key]
   if (currentHandler) {
     logger.error(`[Command] Command '${key}' already has a handler`)
@@ -577,7 +584,7 @@ export function registerCommandHandler (key: string, handler: IClientCommandHand
   }
 
   logger.info(`[Command] Registering handler for command '${key}'`)
-  commandHandlers[key] = handler
+  commandHandlers[key] = callback
 }
 
 /**
