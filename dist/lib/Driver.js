@@ -516,6 +516,10 @@ exports.sendMessage = sendMessage;
  * Prepare and send string/s to specified room ID.
  * @param content Accepts message text string or array of strings.
  * @param roomId  ID of the target room to use in send.
+ * @todo Returning one or many gets complicated with type checking not allowing
+ *       use of a property because result may be array, when you know it's not.
+ *       Solution would probably be to always return an array, even for single
+ *       send. This would be a breaking change, should hold until major version.
  */
 function sendToRoomId(content, roomId) {
     if (!Array.isArray(content)) {
@@ -546,4 +550,21 @@ function sendDirectToUser(content, username) {
     return getDirectMessageRoomId(username).then((rid) => sendToRoomId(content, rid));
 }
 exports.sendDirectToUser = sendDirectToUser;
+/**
+ * Edit an existing message, replacing any attributes with those provided.
+ * The given message object should have the ID of an existing message.
+ */
+function editMessage(message) {
+    return asyncCall('updateMessage', message);
+}
+exports.editMessage = editMessage;
+/**
+ * Send a reaction to an existing message. Simple proxy for method call.
+ * @param emoji     Accepts string like `:thumbsup:` to add 👍 reaction
+ * @param messageId ID for a previously sent message
+ */
+function setReaction(emoji, messageId) {
+    return asyncCall('setReaction', [':punch:', messageId]);
+}
+exports.setReaction = setReaction;
 //# sourceMappingURL=driver.js.map

@@ -7,8 +7,10 @@ import {
   INewUserAPI,
   IUserResultAPI,
   IRoomResultAPI,
-  IChannelResultAPI
+  IChannelResultAPI,
+  IMessageReceiptAPI
 } from './interfaces'
+import { IMessage } from '../config/messageInterfaces'
 
 /** Define common attributes for DRY tests */
 export const testChannelName = 'tests'
@@ -24,8 +26,16 @@ export async function createUser (user: INewUserAPI): Promise<IUserResultAPI> {
 }
 
 /** Get information about a channel */
-export async function channelInfo (roomName: string): Promise<IChannelResultAPI> {
-  return get('channels.info', { roomName }, true)
+export async function channelInfo (query: { roomName?: string, roomId?: string }): Promise<IChannelResultAPI> {
+  return get('channels.info', query, true)
+}
+
+/** Get the last messages sent to a channel (in last 10 minutes) */
+export async function lastMessages (roomId: string, count: number = 1): Promise<IMessage[]> {
+  const now = new Date()
+  const latest = now.toISOString()
+  const oldest = new Date(now.setMinutes(now.getMinutes() - 10)).toISOString()
+  return (await get('channels.history', { roomId, latest, oldest, count })).messages
 }
 
 /** Create a room for tests and catch the error if it exists already */
@@ -38,12 +48,40 @@ export async function createChannel (
 }
 
 /** Send message from mock user to channel for tests to listen and respond */
+/** @todo Sometimes the post request completes before the change event emits
+ *        the message to the streamer. That's why the interval is used for proof
+ *        of receipt. It would be better for the endpoint to not resolve until
+ *        server side handling is complete. Would require PR to core.
+ */
 export async function sendFromUser (payload: any): Promise<IMessageResultAPI> {
-  const testChannel = await channelInfo(testChannelName)
-  const messageDefaults: IMessageAPI = { roomId: testChannel.channel._id }
+  const user = await login({ username: mockUser.username, password: mockUser.password })
+  const endpoint = (payload.roomId && payload.roomId.indexOf(user.data.userId) !== -1)
+    ? 'dm.history'
+    : 'channels.history'
+  const roomId = (payload.roomId)
+    ? payload.roomId
+    : (await channelInfo({ roomName: testChannelName })).channel._id
+  const messageDefaults: IMessageAPI = { roomId }
   const data: IMessageAPI = Object.assign({}, messageDefaults, payload)
-  await login({ username: mockUser.username, password: mockUser.password })
-  return post('chat.postMessage', data, true)
+  const oldest = new Date().toISOString()
+  const result = await post('chat.postMessage', data, true)
+  const proof = new Promise((resolve, reject) => {
+    let looked = 0
+    const look = setInterval(async () => {
+      const { messages } = await get(endpoint, { roomId, oldest })
+      const found = messages.some((message: IMessageReceiptAPI) => {
+        return result.message._id === message._id
+      })
+      if (found || looked > 10) {
+        clearInterval(look)
+        if (found) resolve()
+        else reject('API send from user, proof of receipt timeout')
+      }
+      looked++
+    }, 100)
+  })
+  await proof
+  return result
 }
 
 /** Update message sent from mock user */
@@ -99,7 +137,7 @@ export async function setup () {
     }
 
     // Verify or create channel for tests
-    let testChannelInfo = await channelInfo(testChannelName)
+    let testChannelInfo = await channelInfo({ roomName: testChannelName })
     if (!testChannelInfo.success) {
       console.log(`Test channel (${testChannelName}) not found`)
       testChannelInfo = await createChannel(testChannelName)

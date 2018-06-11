@@ -27,12 +27,22 @@ function createUser(user) {
 }
 exports.createUser = createUser;
 /** Get information about a channel */
-function channelInfo(roomName) {
+function channelInfo(query) {
     return __awaiter(this, void 0, void 0, function* () {
-        return api_1.get('channels.info', { roomName }, true);
+        return api_1.get('channels.info', query, true);
     });
 }
 exports.channelInfo = channelInfo;
+/** Get the last messages sent to a channel (in last 10 minutes) */
+function lastMessages(roomId, count = 1) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const now = new Date();
+        const latest = now.toISOString();
+        const oldest = new Date(now.setMinutes(now.getMinutes() - 10)).toISOString();
+        return (yield api_1.get('channels.history', { roomId, latest, oldest, count })).messages;
+    });
+}
+exports.lastMessages = lastMessages;
 /** Create a room for tests and catch the error if it exists already */
 function createChannel(name, members = [], readOnly = false) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -41,13 +51,43 @@ function createChannel(name, members = [], readOnly = false) {
 }
 exports.createChannel = createChannel;
 /** Send message from mock user to channel for tests to listen and respond */
+/** @todo Sometimes the post request completes before the change event emits
+ *        the message to the streamer. That's why the interval is used for proof
+ *        of receipt. It would be better for the endpoint to not resolve until
+ *        server side handling is complete. Would require PR to core.
+ */
 function sendFromUser(payload) {
     return __awaiter(this, void 0, void 0, function* () {
-        const testChannel = yield channelInfo(exports.testChannelName);
-        const messageDefaults = { roomId: testChannel.channel._id };
+        const user = yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
+        const endpoint = (payload.roomId && payload.roomId.indexOf(user.data.userId) !== -1)
+            ? 'dm.history'
+            : 'channels.history';
+        const roomId = (payload.roomId)
+            ? payload.roomId
+            : (yield channelInfo({ roomName: exports.testChannelName })).channel._id;
+        const messageDefaults = { roomId };
         const data = Object.assign({}, messageDefaults, payload);
-        yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
-        return api_1.post('chat.postMessage', data, true);
+        const oldest = new Date().toISOString();
+        const result = yield api_1.post('chat.postMessage', data, true);
+        const proof = new Promise((resolve, reject) => {
+            let looked = 0;
+            const look = setInterval(() => __awaiter(this, void 0, void 0, function* () {
+                const { messages } = yield api_1.get(endpoint, { roomId, oldest });
+                const found = messages.some((message) => {
+                    return result.message._id === message._id;
+                });
+                if (found || looked > 10) {
+                    clearInterval(look);
+                    if (found)
+                        resolve();
+                    else
+                        reject('API send from user, proof of receipt timeout');
+                }
+                looked++;
+            }), 100);
+        });
+        yield proof;
+        return result;
     });
 }
 exports.sendFromUser = sendFromUser;
@@ -111,7 +151,7 @@ function setup() {
                 console.log(`Mock user (${config_1.mockUser.username}) exists`);
             }
             // Verify or create channel for tests
-            let testChannelInfo = yield channelInfo(exports.testChannelName);
+            let testChannelInfo = yield channelInfo({ roomName: exports.testChannelName });
             if (!testChannelInfo.success) {
                 console.log(`Test channel (${exports.testChannelName}) not found`);
                 testChannelInfo = yield createChannel(exports.testChannelName);
