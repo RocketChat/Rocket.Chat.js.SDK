@@ -282,12 +282,11 @@ The `callback` receives a `ClientCommand` object as the first parameter and retu
 - ClientCommand.u._id: ID of the user,
 - ClientCommand.u.username: Username of the user
 - ClientCommand.cmd: Object representing the command itself
-- ClientCommand.key: String key of the command
-- ClientCommand.options: Addional options or parameters of the command, no defined structure
+- ClientCommand.cmd.key: String key of the command
 - ClientCommand.ts: Timestamp of when the command was issued
 
 `ClientCommandResponse` object structure:
-- ClientCommandResponse.status: ID of the success status of the response (still unused)
+- ClientCommandResponse.success: Boolean indicating the success status of the command
 - ClientCommandResponse.msg: Message response to the command
 
 ### `driver.asyncCall(method, params)`
