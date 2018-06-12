@@ -526,7 +526,7 @@ async function respondToCommands (): Promise<void | void[]> {
     if (currentReadTime <= commandLastReadTime) return
 
     // At this point, command has passed checks and can be responded to
-    logger.info(`[Command] Received command '${command.cmd.msg}' at ${currentReadTime}`)
+    logger.info(`[Command] Received command '${command.cmd.key}' at ${currentReadTime}`)
     commandLastReadTime = currentReadTime
 
     // Processing completed, call callback to respond to command
@@ -541,7 +541,7 @@ async function respondToCommands (): Promise<void | void[]> {
  * @param command Command object
  */
 async function commandHandler (command: IClientCommand): Promise<void | void[]> {
-  switch (command.cmd.msg) {
+  switch (command.cmd.key) {
     // SDK-level command to pause the message stream, interrupting all messages from the server
     case 'pauseMessageStream':
       subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
@@ -562,7 +562,7 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
 
     // If command is not at the SDK-level, it tries to call a handler added by the user
     default:
-      const handler = commandHandlers[command.cmd.msg]
+      const handler = commandHandlers[command.cmd.key]
       if (handler) {
         const result = await handler(command)
         await asyncCall('replyClientCommand', [command._id, result])

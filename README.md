@@ -282,7 +282,7 @@ The `callback` receives a `ClientCommand` object as the first parameter and retu
 - ClientCommand.u._id: ID of the user,
 - ClientCommand.u.username: Username of the user
 - ClientCommand.cmd: Object representing the command itself
-- ClientCommand.msg: Key of the command
+- ClientCommand.key: String key of the command
 - ClientCommand.options: Addional options or parameters of the command, no defined structure
 - ClientCommand.ts: Timestamp of when the command was issued
 

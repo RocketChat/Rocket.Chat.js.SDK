@@ -8,8 +8,7 @@ export interface IClientCommand {
     username: string
   }
   cmd: {
-    msg: string,
-    options: object
+    key: string
   }
   ts: Date
 }
