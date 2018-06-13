@@ -97,6 +97,11 @@ export let clientCommands: ICollection
 export let commandHandlers: IClientCommandHandlerMap = {}
 
 /**
+ * Custom Data set by the client that is using the SDK
+ */
+export let customClientData: object = {}
+
+/**
  * Allow override of default logging with adapter's log instance
  */
 export function useLog (externalLog: ILogger) {
@@ -487,6 +492,17 @@ async function subscribeToCommands (): Promise<ICollection> {
 }
 
 /**
+ * Data set by the SDK to indicate which operations the server can execute on the client
+ */
+function getSDKData(): object {
+  return {
+    framework: 'Rocket.Chat JS SDK',
+    canPauseResumeMsgStream: true,
+    canListenToHeartbeat: true
+  }
+}
+
+/**
  * Once a subscription is created, using `subscribeToCommands` this method
  * can be used to attach a callback to changes in the clientCommands stream.
  *
@@ -496,14 +512,16 @@ async function subscribeToCommands (): Promise<ICollection> {
  */
 async function reactToCommands (callback: ICallback): Promise<void> {
   const clientCommands = await subscribeToCommands()
+
+  const clientData = Object.assign(getSDKData(), customClientData);
+  await asyncCall('setCustomClientData', clientData);
+
   logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
   clientCommands.reactiveQuery({}).on('change', (_id: string) => {
     const changedCommandQuery = clientCommands.reactiveQuery({ _id })
     if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
       const changedCommand = changedCommandQuery.result[0]
       callback(null, changedCommand)
-    } else {
-      logger.debug('[received] Reactive query at command ${ _id } without results')
     }
   })
 }
@@ -585,6 +603,14 @@ export function registerCommandHandler (key: string, callback: IClientCommandHan
 
   logger.info(`[Command] Registering handler for command '${key}'`)
   commandHandlers[key] = callback
+}
+
+/**
+ * Sets additional data about the client using the SDK
+ * @param clientData Object containing additional data about the client using the SDK
+ */
+export function setCustomClientData (clientData: object) {
+  customClientData = clientData;
 }
 
 /**
