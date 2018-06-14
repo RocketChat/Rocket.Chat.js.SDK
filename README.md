@@ -268,9 +268,32 @@ but have not been joined yet this method will join to those rooms automatically.
 
 If `allPublic` is true, the `rooms` option will be ignored.
 
+### `driver.setCustomClientData(clientData)`
+
+Set additional data about the client using the SDK to be sent to the server.
+
+It must be called before the `driver.login()` function, otherwise it will have no effect.
+
+Useful only when adding new features in Rocket.Chat that depend on the client.
+
+For example, a ExampleBotFramework adapter might have a feature that allows an
+admin to reset its connection to ExampleBotFramework's servers. Other frameworks
+do not have this feature, so the bot manager interface in Rocket.Chat will have
+to differentiate between them, hence the need to define its data.
+
+```
+driver.setCustomClientData({
+  framework: 'ExampleBotFramework',
+  canResetConnection: true
+});
+```
+
+Then, Rocket.Chat's interface will check if the bot is able to reset its connection and
+show an UI to allow the admin to do that.
+
 ### `driver.registerCommandHandler(key, callback)`
 
-[Click here](#) to know more about ClientCommands
+[Click here](https://rocket.chat/docs/developer-guides/client-commands/) to know more about ClientCommands
 
 Register a function `callback` to handle incoming clientCommands that are not at the SDK-level and have the given `key`.
 
