@@ -99,7 +99,11 @@ export let commandHandlers: IClientCommandHandlerMap = {}
 /**
  * Custom Data set by the client that is using the SDK
  */
-export let customClientData: object = {}
+export let customClientData: object = {
+  framework: 'Rocket.Chat JS SDK',
+  canPauseResumeMsgStream: true,
+  canListenToHeartbeat: true
+}
 
 /**
  * Allow override of default logging with adapter's log instance
@@ -484,22 +488,11 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
  * Begin subscription to clientCommands for user and returns the collection
  */
 async function subscribeToCommands (): Promise<ICollection> {
-  const subscription = await subscribe(_clientCommandsSubscriptionName)
+  await subscribe(_clientCommandsSubscriptionName)
   clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
   // v2
   // clientCommands = asteroid.collections.get(_clientCommandsCollectionName) || Map()
   return clientCommands
-}
-
-/**
- * Data set by the SDK to indicate which operations the server can execute on the client
- */
-function getSDKData(): object {
-  return {
-    framework: 'Rocket.Chat JS SDK',
-    canPauseResumeMsgStream: true,
-    canListenToHeartbeat: true
-  }
 }
 
 /**
@@ -513,8 +506,7 @@ function getSDKData(): object {
 async function reactToCommands (callback: ICallback): Promise<void> {
   const clientCommands = await subscribeToCommands()
 
-  const clientData = Object.assign(getSDKData(), customClientData);
-  await asyncCall('setCustomClientData', clientData);
+  await asyncCall('setCustomClientData', customClientData)
 
   logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
   clientCommands.reactiveQuery({}).on('change', (_id: string) => {
@@ -531,7 +523,7 @@ async function reactToCommands (callback: ICallback): Promise<void> {
  */
 async function respondToCommands (): Promise<void | void[]> {
   commandLastReadTime = new Date() // init before any message read
-  reactToCommands(async (err, command) => {
+  await reactToCommands(async (err, command) => {
     if (err) {
       logger.error(`Unable to receive commands ${JSON.stringify(err)}`)
       throw err
@@ -610,7 +602,7 @@ export function registerCommandHandler (key: string, callback: IClientCommandHan
  * @param clientData Object containing additional data about the client using the SDK
  */
 export function setCustomClientData (clientData: object) {
-  customClientData = clientData;
+  Object.assign(customClientData, clientData)
 }
 
 /**

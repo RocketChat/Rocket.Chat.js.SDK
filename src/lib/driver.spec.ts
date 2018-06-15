@@ -115,6 +115,24 @@ describe('driver', () => {
       expect(result.user.status).to.equal('online')
     })
   })
+  describe('.clientCommands', () => {
+    it('sets customClientData from the SDK with no customizations', async () => {
+      await driver.connect()
+      await driver.login()
+      await utils
+      const result = await utils.userInfo(botUser.username)
+      expect(result.user.customClientData).to.deep.include(driver.customClientData)
+    })
+    it('sets customClientData from the SDK with customizations', async () => {
+      driver.setCustomClientData({ framework: 'Testing' })
+      await driver.connect()
+      await driver.login()
+      await utils
+      const result = await utils.userInfo(botUser.username)
+      expect(result.user.customClientData).to.deep.include(driver.customClientData)
+      expect(result.user.customClientData.framework).to.equal('Testing')
+    })
+  })
   describe('.subscribeToMessages', () => {
     it('resolves with subscription object', async () => {
       await driver.connect()
