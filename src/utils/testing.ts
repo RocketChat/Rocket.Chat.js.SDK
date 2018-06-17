@@ -72,7 +72,7 @@ export async function setup () {
 
     // Verify or create user for bot
     let botInfo = await userInfo(botUser.username)
-    if (!botInfo.success) {
+    if (!botInfo || !botInfo.success) {
       console.log(`Bot user (${botUser.username}) not found`)
       botInfo = await createUser(botUser)
       if (!botInfo.success) {
@@ -86,7 +86,7 @@ export async function setup () {
 
     // Verify or create mock user for talking to bot
     let mockInfo = await userInfo(mockUser.username)
-    if (!mockInfo.success) {
+    if (!mockInfo || !mockInfo.success) {
       console.log(`Mock user (${mockUser.username}) not found`)
       mockInfo = await createUser(mockUser)
       if (!mockInfo.success) {
@@ -100,7 +100,7 @@ export async function setup () {
 
     // Verify or create channel for tests
     let testChannelInfo = await channelInfo(testChannelName)
-    if (!testChannelInfo.success) {
+    if (!testChannelInfo || !testChannelInfo.success) {
       console.log(`Test channel (${testChannelName}) not found`)
       testChannelInfo = await createChannel(testChannelName)
       if (!testChannelInfo.success) {
