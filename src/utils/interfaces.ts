@@ -86,18 +86,19 @@ export interface INewUserAPI {
   joinDefaultChannels?: boolean   // Auto join channels marked as default
   requirePasswordChange?: boolean // Direct to password form on next login
   sendWelcomeEmail?: boolean      // Send new credentials in email
-  verified?: true                  // Email address verification status
+  verified?: true                 // Email address verification status
 }
 
 /** User object structure for queries (not including admin access level) */
 export interface IUserAPI {
-  _id: string          // MongoDB user doc ID
-  type: string         // user / bot ?
-  status: string       // online | offline
-  active: boolean      // Subscription is active
-  name: string         // Full name
-  utcOffset: number    // Hours off UTC/GMT
-  username: string     // Username
+  _id: string           // MongoDB user doc ID
+  type: string          // user / bot ?
+  status: string        // online | offline
+  active: boolean       // Subscription is active
+  name: string          // Full name
+  utcOffset: number     // Hours off UTC/GMT
+  username: string      // Username
+  customClientData: any // Custom Client Data
 }
 
 /** Result structure for user data request (by non-admin) */

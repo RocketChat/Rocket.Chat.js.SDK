@@ -6,6 +6,9 @@ const delay = (ms: number) => new Promise((resolve, reject) => setTimeout(resolv
 
 // Start subscription to log message stream (used for e2e test and demo)
 async function start () {
+  driver.setCustomClientData({
+    framework: 'SDK Start Script'
+  })
   await driver.connect()
   await driver.login({ username: botUser.username, password: botUser.password })
   await driver.subscribeToMessages()
@@ -19,6 +22,10 @@ async function start () {
     dm: true,
     edited: true,
     livechat: false
+  })
+  driver.registerCommandHandler('xdlol', async (command) => {
+    console.log('testing')
+    return { msg: 'OK' }
   })
 }
 

@@ -16,9 +16,18 @@ import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
 import { IMessageReceiptAPI } from '../utils/interfaces'
 
+import {
+  IClientCommand,
+  IClientCommandResponse,
+  IClientCommandHandler,
+  IClientCommandHandlerMap
+} from '../config/commandInterfaces'
+
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
+const _clientCommandsCollectionName = 'stream-client-commands'
+let _clientCommandsStreamName: string
 
 /**
  * Asteroid ^v2 interface below, suspended for work on future branch
@@ -31,8 +40,9 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 // CONNECTION SETUP AND CONFIGURE
 // -----------------------------------------------------------------------------
 
-/** Internal for comparing message update timestamps */
-export let lastReadTime: Date
+/** Internal for comparing message and command update timestamps */
+export let messageLastReadTime: Date
+export let commandLastReadTime: Date
 
 /**
  * The integration property is applied as an ID on sent messages `bot.i` param
@@ -76,6 +86,25 @@ export let joinedIds: string[] = []
  * Array of messages received from reactive collection
  */
 export let messages: ICollection
+
+/**
+ * Array of client commands received from reactive collection
+ */
+export let clientCommands: ICollection
+
+/**
+ * Map of command handlers added by the client of the sdk
+ */
+export let commandHandlers: IClientCommandHandlerMap = {}
+
+/**
+ * Custom Data set by the client that is using the SDK
+ */
+export let customClientData: object = {
+  framework: 'Rocket.Chat JS SDK',
+  canPauseResumeMsgStream: true,
+  canListenToHeartbeat: true
+}
 
 /**
  * Allow override of default logging with adapter's log instance
@@ -252,7 +281,12 @@ export function login (credentials: ICredentials = {
   return login
     .then((loggedInUserId) => {
       userId = loggedInUserId
+      _clientCommandsStreamName = loggedInUserId
       return loggedInUserId
+    })
+    .then(() => {
+      // Calling function to listen to commands and answer to them
+      return respondToCommands()
     })
     .catch((err: Error) => {
       logger.info('[login] Error:', err)
@@ -271,12 +305,13 @@ export function logout (): Promise<void | null> {
 /**
  * Subscribe to Meteor subscription
  * Resolves with subscription (added to array), with ID property
- * @todo - 3rd param of asteroid.subscribe is deprecated in Rocket.Chat?
+ * @param subscriptionName Name of the publication to subscribe to
+ * @param params Any params required by the publication
  */
-export function subscribe (topic: string, roomId: string): Promise<ISubscription> {
+export function subscribe (subscriptionName: string, ...params: any[]): Promise<ISubscription> {
   return new Promise((resolve, reject) => {
-    logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`)
-    const subscription = asteroid.subscribe(topic, roomId, true)
+    logger.info(`[subscribe] Preparing subscription: ${subscriptionName} with params ${params}`)
+    const subscription = asteroid.subscribe(subscriptionName, ...params)
     subscriptions.push(subscription)
     return subscription.ready.then((id) => {
       logger.info(`[subscribe] Stream ready: ${id}`)
@@ -319,7 +354,7 @@ export function unsubscribeAll (): void {
  * Older adapters used an option for this method but it was always the default.
  */
 export function subscribeToMessages (): Promise<ISubscription> {
-  return subscribe(_messageCollectionName, _messageStreamName)
+  return subscribe(_messageCollectionName, _messageStreamName, true)
     .then((subscription) => {
       messages = asteroid.getCollection(_messageCollectionName)
       // v2
@@ -396,7 +431,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     })
   }
 
-  lastReadTime = new Date() // init before any message read
+  messageLastReadTime = new Date() // init before any message read
   reactToMessages(async (err, message, meta) => {
     if (err) {
       logger.error(`Unable to receive messages ${JSON.stringify(err)}`)
@@ -429,12 +464,12 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     }
 
     // Ignore messages in stream that aren't new
-    if (currentReadTime <= lastReadTime) return
+    if (currentReadTime <= messageLastReadTime) return
 
     // At this point, message has passed checks and can be responded to
     logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`)
     logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`)
-    lastReadTime = currentReadTime
+    messageLastReadTime = currentReadTime
 
     /**
      * @todo Fix below by adding to meta from Rocket.Chat instead of getting on
@@ -449,6 +484,130 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     callback(null, message, meta)
   })
   return promise
+}
+
+/**
+ * Begin subscription to clientCommands for user and returns the collection
+ */
+async function subscribeToCommands (): Promise<ICollection> {
+  const subscription = await subscribe(_clientCommandsCollectionName, _clientCommandsStreamName, true)
+  clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
+  return clientCommands
+}
+
+/**
+ * Once a subscription is created, using `subscribeToCommands` this method
+ * can be used to attach a callback to changes in the clientCommands stream.
+ *
+ * @param callback Function called with every change in subscription of clientCommands.
+ *  - Uses error-first callback pattern
+ *  - Second argument is the the command received
+ */
+async function reactToCommands (callback: ICallback): Promise<void> {
+  const clientCommands = await subscribeToCommands()
+
+  await asyncCall('setCustomClientData', customClientData)
+
+  logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
+  clientCommands.reactiveQuery({}).on('change', (_id: string) => {
+    const changedCommandQuery = clientCommands.reactiveQuery({ _id })
+    if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
+      const changedCommand = changedCommandQuery.result[0]
+      if (Array.isArray(changedCommand.args)) {
+        logger.info(`[received] Command ${ changedCommand.args[0].cmd.key }`)
+        callback(null, changedCommand.args[0])
+      } else {
+        logger.debug('[received] Update without message args')
+      }
+    }
+  })
+}
+
+/**
+ * Calls reactToCommands with a callback to read latest clientCommands and reply to them
+ */
+async function respondToCommands (): Promise<void | void[]> {
+  commandLastReadTime = new Date() // init before any message read
+  await reactToCommands(async (err, command) => {
+    if (err) {
+      logger.error(`Unable to receive commands ${JSON.stringify(err)}`)
+      throw err
+    }
+
+    // Set current time for comparison to incoming
+    let currentReadTime = new Date(command.ts.$date)
+
+    // Ignore commands in stream that aren't new
+    if (currentReadTime <= commandLastReadTime) return
+
+    // At this point, command has passed checks and can be responded to
+    logger.info(`[Command] Received command '${command.cmd.key}' at ${currentReadTime}`)
+    commandLastReadTime = currentReadTime
+
+    // Processing completed, call callback to respond to command
+    return commandHandler(command)
+  })
+}
+
+/**
+ * Middleware function to reply to predefined clientCommands or to call a
+ * handler registered by the user
+ *
+ * @param command Command object
+ */
+async function commandHandler (command: IClientCommand): Promise<void | void[]> {
+  switch (command.cmd.key) {
+    // SDK-level command to pause the message stream, interrupting all messages from the server
+    case 'pauseMessageStream':
+      subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
+      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      break
+
+    // SDK-level command to resubscribe to the message stream
+    case 'resumeMessageStream':
+      await subscribeToMessages()
+      messageLastReadTime = new Date() // reset time of last read message
+      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      break
+
+    // SDK-level command to check for aliveness of the bot regarding commands
+    case 'heartbeat':
+      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      break
+
+    // If command is not at the SDK-level, it tries to call a handler added by the user
+    default:
+      const handler = commandHandlers[command.cmd.key]
+      if (handler) {
+        const result = await handler(command)
+        // await asyncCall('replyClientCommand', [command._id, result])
+      }
+  }
+}
+
+/**
+ * Method to register a handler for a given clientCommand coming from the server
+ *
+ * @param key String representing the key of the clientCommand
+ * @param callback Function to be called when the clientCommand with the given key is received
+ */
+export function registerCommandHandler (key: string, callback: IClientCommandHandler) {
+  const currentHandler = commandHandlers[key]
+  if (currentHandler) {
+    logger.error(`[Command] Command '${key}' already has a handler`)
+    throw Error('Command in use')
+  }
+
+  logger.info(`[Command] Registering handler for command '${key}'`)
+  commandHandlers[key] = callback
+}
+
+/**
+ * Sets additional data about the client using the SDK
+ * @param clientData Object containing additional data about the client using the SDK
+ */
+export function setCustomClientData (clientData: object) {
+  Object.assign(customClientData, clientData)
 }
 
 /**
