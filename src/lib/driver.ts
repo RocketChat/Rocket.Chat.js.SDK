@@ -25,8 +25,8 @@ import {
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
-const _clientCommandsCollectionName = 'rocketchat_clientcommand'
-const _clientCommandsSubscriptionName = 'clientCommands'
+const _clientCommandsCollectionName = 'stream-client-commands'
+const _clientCommandsStreamName = '__my_commands__'
 
 /**
  * Asteroid ^v2 interface below, suspended for work on future branch
@@ -488,10 +488,8 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
  * Begin subscription to clientCommands for user and returns the collection
  */
 async function subscribeToCommands (): Promise<ICollection> {
-  await subscribe(_clientCommandsSubscriptionName)
+  const subscription = await subscribe(_clientCommandsCollectionName, _clientCommandsStreamName, true)
   clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
-  // v2
-  // clientCommands = asteroid.collections.get(_clientCommandsCollectionName) || Map()
   return clientCommands
 }
 
@@ -513,7 +511,12 @@ async function reactToCommands (callback: ICallback): Promise<void> {
     const changedCommandQuery = clientCommands.reactiveQuery({ _id })
     if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
       const changedCommand = changedCommandQuery.result[0]
-      callback(null, changedCommand)
+      if (Array.isArray(changedCommand.args)) {
+        logger.info(`[received] Command ${ changedCommand.args[0].cmd.key }`)
+        callback(null, changedCommand.args[0])
+      } else {
+        logger.debug('[received] Update without message args')
+      }
     }
   })
 }
@@ -555,19 +558,19 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
     // SDK-level command to pause the message stream, interrupting all messages from the server
     case 'pauseMessageStream':
       subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
-      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
       break
 
     // SDK-level command to resubscribe to the message stream
     case 'resumeMessageStream':
       await subscribeToMessages()
       messageLastReadTime = new Date() // reset time of last read message
-      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
       break
 
     // SDK-level command to check for aliveness of the bot regarding commands
     case 'heartbeat':
-      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
       break
 
     // If command is not at the SDK-level, it tries to call a handler added by the user
@@ -575,7 +578,7 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
       const handler = commandHandlers[command.cmd.key]
       if (handler) {
         const result = await handler(command)
-        await asyncCall('replyClientCommand', [command._id, result])
+        // await asyncCall('replyClientCommand', [command._id, result])
       }
   }
 }
