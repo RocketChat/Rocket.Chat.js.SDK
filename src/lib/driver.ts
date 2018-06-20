@@ -26,7 +26,7 @@ import {
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
 const _clientCommandsCollectionName = 'stream-client-commands'
-const _clientCommandsStreamName = '__my_commands__'
+let _clientCommandsStreamName: string
 
 /**
  * Asteroid ^v2 interface below, suspended for work on future branch
@@ -280,6 +280,7 @@ export function login (credentials: ICredentials = {
   return login
     .then((loggedInUserId) => {
       userId = loggedInUserId
+      _clientCommandsStreamName = loggedInUserId
       return loggedInUserId
     })
     .then(() => {
