@@ -489,7 +489,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
  * Begin subscription to clientCommands for user and returns the collection
  */
 async function subscribeToCommands (): Promise<ICollection> {
-  const subscription = await subscribe(_clientCommandsCollectionName, _clientCommandsStreamName, true)
+  await subscribe(_clientCommandsCollectionName, _clientCommandsStreamName, true)
   clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
   return clientCommands
 }
@@ -555,23 +555,28 @@ async function respondToCommands (): Promise<void | void[]> {
  * @param command Command object
  */
 async function commandHandler (command: IClientCommand): Promise<void | void[]> {
+  const okResponse: IClientCommandResponse = {
+    success: true,
+    msg: 'Ok'
+  }
+
   switch (command.cmd.key) {
     // SDK-level command to pause the message stream, interrupting all messages from the server
     case 'pauseMessageStream':
       subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
-      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      await asyncCall('replyClientCommand', [command._id, okResponse])
       break
 
     // SDK-level command to resubscribe to the message stream
     case 'resumeMessageStream':
       await subscribeToMessages()
       messageLastReadTime = new Date() // reset time of last read message
-      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      await asyncCall('replyClientCommand', [command._id, okResponse])
       break
 
     // SDK-level command to check for aliveness of the bot regarding commands
     case 'heartbeat':
-      // await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
+      await asyncCall('replyClientCommand', [command._id, okResponse])
       break
 
     // If command is not at the SDK-level, it tries to call a handler added by the user
@@ -579,7 +584,7 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
       const handler = commandHandlers[command.cmd.key]
       if (handler) {
         const result = await handler(command)
-        // await asyncCall('replyClientCommand', [command._id, result])
+        await asyncCall('replyClientCommand', [command._id, result])
       }
   }
 }

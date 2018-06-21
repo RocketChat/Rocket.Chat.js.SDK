@@ -17,7 +17,7 @@ export interface IClientCommand {
  * Structure of the object to reply to a clientCommand
  */
 export interface IClientCommandResponse {
-  status?: number,
+  success: boolean,
   msg: string
 }
 
