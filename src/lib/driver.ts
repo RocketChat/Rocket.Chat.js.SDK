@@ -592,5 +592,5 @@ export function editMessage (message: IMessage): Promise<IMessage> {
  * @param messageId ID for a previously sent message
  */
 export function setReaction (emoji: string, messageId: string) {
-  return asyncCall('setReaction', [':punch:', messageId])
+  return asyncCall('setReaction', [emoji, messageId])
 }
