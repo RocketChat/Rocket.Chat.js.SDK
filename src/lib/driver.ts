@@ -25,8 +25,7 @@ import {
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
-const _clientCommandsCollectionName = 'stream-client-commands'
-let _clientCommandsStreamName: string
+const _clientCommandsStreamName = 'stream-client-commands'
 
 /**
  * Asteroid ^v2 interface below, suspended for work on future branch
@@ -280,12 +279,9 @@ export function login (credentials: ICredentials = {
   return login
     .then((loggedInUserId) => {
       userId = loggedInUserId
-      _clientCommandsStreamName = loggedInUserId
-      return loggedInUserId
-    })
-    .then(() => {
       // Calling function to listen to commands and answer to them
-      return respondToCommands()
+      respondToCommands(loggedInUserId)
+      return loggedInUserId
     })
     .catch((err: Error) => {
       logger.info('[login] Error:', err)
@@ -313,7 +309,7 @@ export function subscribe (subscriptionName: string, ...params: any[]): Promise<
     const subscription = asteroid.subscribe(subscriptionName, ...params)
     subscriptions.push(subscription)
     return subscription.ready.then((id) => {
-      logger.info(`[subscribe] Stream ready: ${id}`)
+      logger.info(`[subscribe] Subscription ${subscriptionName} ready: ${id}`)
       resolve(subscription)
     })
     // Asteroid ^v2 interface...
@@ -488,9 +484,9 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
 /**
  * Begin subscription to clientCommands for user and returns the collection
  */
-async function subscribeToCommands (): Promise<ICollection> {
-  await subscribe(_clientCommandsCollectionName, _clientCommandsStreamName, true)
-  clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
+async function subscribeToCommands (userId: string): Promise<ICollection> {
+  await subscribe(_clientCommandsStreamName, userId, true)
+  clientCommands = asteroid.getCollection(_clientCommandsStreamName)
   return clientCommands
 }
 
@@ -502,8 +498,8 @@ async function subscribeToCommands (): Promise<ICollection> {
  *  - Uses error-first callback pattern
  *  - Second argument is the the command received
  */
-async function reactToCommands (callback: ICallback): Promise<void> {
-  const clientCommands = await subscribeToCommands()
+async function reactToCommands (userId: string, callback: ICallback): Promise<void> {
+  const clientCommands = await subscribeToCommands(userId)
 
   await asyncCall('setCustomClientData', customClientData)
 
@@ -525,9 +521,9 @@ async function reactToCommands (callback: ICallback): Promise<void> {
 /**
  * Calls reactToCommands with a callback to read latest clientCommands and reply to them
  */
-async function respondToCommands (): Promise<void | void[]> {
+async function respondToCommands (userId: string): Promise<void | void[]> {
   commandLastReadTime = new Date() // init before any message read
-  await reactToCommands(async (err, command) => {
+  await reactToCommands(userId, async (err, command) => {
     if (err) {
       logger.error(`Unable to receive commands ${JSON.stringify(err)}`)
       throw err
@@ -599,7 +595,7 @@ export function registerCommandHandler (key: string, callback: IClientCommandHan
   const currentHandler = commandHandlers[key]
   if (currentHandler) {
     logger.error(`[Command] Command '${key}' already has a handler`)
-    throw Error('Command in use')
+    throw Error(`[Command] Command '${key}' already has a handler`)
   }
 
   logger.info(`[Command] Registering handler for command '${key}'`)
