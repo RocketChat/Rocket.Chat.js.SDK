@@ -18,7 +18,8 @@ export interface IClientCommand {
  */
 export interface IClientCommandResponse {
   success: boolean,
-  msg: string
+  error?: Error,
+  [key: string]: any
 }
 
 /*

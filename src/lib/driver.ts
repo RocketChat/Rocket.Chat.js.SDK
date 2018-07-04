@@ -10,7 +10,7 @@ import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
-import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
+import { IConnectOptions, IRespondOptions, ICallback, ILogger, ISessionStatistics } from '../config/driverInterfaces'
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
@@ -96,12 +96,20 @@ export let clientCommands: ICollection
 export let commandHandlers: IClientCommandHandlerMap = {}
 
 /**
+ * Map of session statistics collected by the SDK
+ */
+const sessionStatistics: ISessionStatistics = {
+  interceptedMessages: 0
+}
+
+/**
  * Custom Data set by the client that is using the SDK
  */
 export let customClientData: object = {
   framework: 'Rocket.Chat JS SDK',
   canPauseResumeMsgStream: true,
-  canListenToHeartbeat: true
+  canListenToHeartbeat: true,
+  canGetStatistics: true
 }
 
 /**
@@ -280,7 +288,14 @@ export function login (credentials: ICredentials = {
     .then((loggedInUserId) => {
       userId = loggedInUserId
       // Calling function to listen to commands and answer to them
-      respondToCommands(loggedInUserId)
+      return loggedInUserId
+    })
+    .then(async (loggedInUserId) => {
+      if (settings.waitForClientCommands) {
+        await respondToCommands(loggedInUserId)
+      } else {
+        respondToCommands(loggedInUserId).catch(() => {/**/})
+      }
       return loggedInUserId
     })
     .catch((err: Error) => {
@@ -476,6 +491,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     // if (!isDM && !isLC) meta.roomName = await getRoomName(message.rid)
 
     // Processing completed, call callback to respond to message
+    sessionStatistics.interceptedMessages += 1
     callback(null, message, meta)
   })
   return promise
@@ -500,7 +516,6 @@ async function subscribeToCommands (userId: string): Promise<ICollection> {
  */
 async function reactToCommands (userId: string, callback: ICallback): Promise<void> {
   const clientCommands = await subscribeToCommands(userId)
-
   await asyncCall('setCustomClientData', customClientData)
 
   logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
@@ -551,38 +566,50 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
  * @param command Command object
  */
 async function commandHandler (command: IClientCommand): Promise<void | void[]> {
-  const okResponse: IClientCommandResponse = {
-    success: true,
-    msg: 'Ok'
+  let result: IClientCommandResponse = {
+    success: true
+  }
+  try {
+    const handler = commandHandlers[command.cmd.key]
+    switch (command.cmd.key) {
+      // SDK-level command to check for aliveness of the bot regarding commands
+      case 'heartbeat':
+        break
+
+      // SDK-level command to pause the message stream, interrupting all messages from the server
+      case 'pauseMessageStream':
+        subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
+        break
+
+      // SDK-level command to resubscribe to the message stream
+      case 'resumeMessageStream':
+        await subscribeToMessages()
+        messageLastReadTime = new Date() // reset time of last read message
+        break
+
+      case 'getStatistics':
+        const statistics: any = {}
+        statistics.sdk = sessionStatistics
+        if (handler) {
+          statistics.adapter = await handler(command)
+        }
+        result.statistics = statistics
+        break
+
+      // If command is not at the SDK-level, it tries to call a handler added by the user
+      default:
+        if (handler) {
+          result = await handler(command)
+        } else {
+          throw Error('Handler not found')
+        }
+    }
+  } catch (err) {
+    result.success = false
+    result.error = err
   }
 
-  switch (command.cmd.key) {
-    // SDK-level command to pause the message stream, interrupting all messages from the server
-    case 'pauseMessageStream':
-      subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
-      await asyncCall('replyClientCommand', [command._id, okResponse])
-      break
-
-    // SDK-level command to resubscribe to the message stream
-    case 'resumeMessageStream':
-      await subscribeToMessages()
-      messageLastReadTime = new Date() // reset time of last read message
-      await asyncCall('replyClientCommand', [command._id, okResponse])
-      break
-
-    // SDK-level command to check for aliveness of the bot regarding commands
-    case 'heartbeat':
-      await asyncCall('replyClientCommand', [command._id, okResponse])
-      break
-
-    // If command is not at the SDK-level, it tries to call a handler added by the user
-    default:
-      const handler = commandHandlers[command.cmd.key]
-      if (handler) {
-        const result = await handler(command)
-        await asyncCall('replyClientCommand', [command._id, result])
-      }
-  }
+  asyncCall('replyClientCommand', [command._id, result]).catch(() => {/**/})
 }
 
 /**

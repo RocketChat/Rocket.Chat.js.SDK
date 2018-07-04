@@ -116,6 +116,10 @@ describe('driver', () => {
     })
   })
   describe('.clientCommands', () => {
+    /**
+     *  Note: For them to work you have to wait for client-commands subscription
+     * to be fully initialized, so set ROCKETCHAT_WAIT_CLIENT_COMMANDS to true
+     */
     it('sets customClientData from the SDK with no customizations', async () => {
       await driver.connect()
       await driver.login()
