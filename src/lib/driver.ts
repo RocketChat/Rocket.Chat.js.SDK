@@ -99,7 +99,7 @@ export let commandHandlers: IClientCommandHandlerMap = {}
  * Map of session statistics collected by the SDK
  */
 const sessionStatistics: ISessionStatistics = {
-  interceptedMessages: 0
+  Bot_Stats_Read_Messages: 0
 }
 
 /**
@@ -491,7 +491,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     // if (!isDM && !isLC) meta.roomName = await getRoomName(message.rid)
 
     // Processing completed, call callback to respond to message
-    sessionStatistics.interceptedMessages += 1
+    sessionStatistics.Bot_Stats_Read_Messages += 1
     callback(null, message, meta)
   })
   return promise
@@ -590,6 +590,7 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
       case 'getStatistics':
         const statistics: any = {}
         statistics.sdk = sessionStatistics
+        statistics.sdk.Bot_Stats_Latest_Read = messageLastReadTime.toUTCString()
         if (handler) {
           statistics.adapter = await handler(command)
         }

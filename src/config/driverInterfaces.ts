@@ -45,5 +45,5 @@ export interface ICallback {
 }
 
 export interface ISessionStatistics {
-  interceptedMessages: number
+  [key: string]: any
 }
