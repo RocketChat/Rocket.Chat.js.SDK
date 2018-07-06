@@ -1,6 +1,6 @@
 import EJSON from 'ejson'
 import { timeout } from './settings'
-import WebSocket from 'ws'
+import WebSocket from 'isomorphic-ws'
 
 export interface Event {
   [name: string]: any
