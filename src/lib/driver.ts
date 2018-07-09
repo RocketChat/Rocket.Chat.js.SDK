@@ -99,7 +99,8 @@ export let commandHandlers: IClientCommandHandlerMap = {}
  * Map of session statistics collected by the SDK
  */
 const sessionStatistics: ISessionStatistics = {
-  Bot_Stats_Read_Messages: 0
+  Bot_Stats_Read_Messages: 0,
+  Bot_Stats_Reconnect_Count: 0
 }
 
 /**
@@ -170,6 +171,10 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
         clearTimeout(rejectionTimeout)
         if (callback) callback(null, asteroid)
         resolve(asteroid)
+      })
+
+      events.on('reconnected', () => {
+        sessionStatistics.Bot_Stats_Reconnect_Count += 1
       })
     }
   })
