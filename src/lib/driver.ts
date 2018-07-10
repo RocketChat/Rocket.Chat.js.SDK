@@ -595,7 +595,7 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
       case 'getStatistics':
         const statistics: any = {}
         statistics.sdk = sessionStatistics
-        statistics.sdk.Bot_Stats_Latest_Read = messageLastReadTime.toUTCString()
+        statistics.sdk.Bot_Stats_Latest_Read = messageLastReadTime ? messageLastReadTime.toUTCString() : undefined
         if (handler) {
           statistics.adapter = await handler(command)
         }

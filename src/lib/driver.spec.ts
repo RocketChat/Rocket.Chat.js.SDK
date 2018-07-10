@@ -3,7 +3,7 @@ import sinon from 'sinon'
 import { expect } from 'chai'
 import { silence } from './log'
 import { botUser, mockUser, apiUser } from '../utils/config'
-import { logout } from './api'
+import { get, login, logout } from './api'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
@@ -135,6 +135,17 @@ describe('driver', () => {
       const result = await utils.userInfo(botUser.username)
       expect(result.user.customClientData).to.deep.include(driver.customClientData)
       expect(result.user.customClientData.framework).to.equal('Testing')
+    })
+    it('custom handler is called once', async () => {
+      driver.setCustomClientData({ framework: 'Testing' })
+      const callback = sinon.spy()
+      driver.registerCommandHandler('getStatistics', callback)
+      await driver.connect()
+      await driver.login()
+      // Login as admin and request stats from the bot
+      await login({ username: apiUser.username, password: apiUser.password })
+      await get('bots.getLiveStats', { username: botUser.username })
+      sinon.assert.calledOnce(callback)
     })
   })
   describe('.subscribeToMessages', () => {
