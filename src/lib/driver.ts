@@ -563,7 +563,7 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
       if (Array.isArray(changedCommand.args)) {
         callback(null, changedCommand.args[0])
       } else {
-        logger.debug('[received] Update without message args')
+        logger.debug('[received] Update in ClientCommands stream without message args')
       }
     }
   })
@@ -588,7 +588,7 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
 
     // Only log the command when needed
     if (silentClientCommands.indexOf(command.cmd.key) === -1) {
-      logger.info(`[Command] Received command '${command.cmd.key}' at ${currentReadTime}`)
+      logger.info(`[ClientCommand] Received '${command.cmd.key}' at ${currentReadTime}`)
     }
 
     // At this point, command has passed checks and can be responded to
@@ -647,24 +647,24 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
       // If command is not at the SDK-level, it tries to call a handler added by the user
       default:
         if (handler) {
-          if (shouldLog) logger.info(`[Command] Calling custom handler of command '${command.cmd.key}'`)
+          if (shouldLog) logger.info(`[ClientCommand] Calling custom handler of command '${command.cmd.key}'`)
           result = await handler(command)
         } else {
           throw Error('Handler not found')
         }
     }
   } catch (err) {
-    logger.info(`[Command] Error on handling of '${command.cmd.key}'. ${JSON.stringify(err)}`)
+    logger.info(`[ClientCommand] Error on handling of '${command.cmd.key}'. ${JSON.stringify(err)}`)
     result.success = false
     result.error = err
   }
 
   try {
-    if (shouldLog) logger.info(`[Command] Replying to command '${command.cmd.key}' with result ${JSON.stringify(result)}`)
+    if (shouldLog) logger.info(`[ClientCommand] Replying to '${command.cmd.key}' with result ${JSON.stringify(result)}`)
     await asyncCall('replyClientCommand', [command._id, result])
-    if (shouldLog) logger.info(`[Command] Successful reply to command '${command.cmd.key}'`)
+    if (shouldLog) logger.info(`[ClientCommand] Successful reply to command '${command.cmd.key}'`)
   } catch (err) {
-    logger.info(`[Command] Failed to reply to command'${command.cmd.key}'. Error: ${JSON.stringify(err)}`)
+    logger.info(`[ClientCommand] Failed to reply to command'${command.cmd.key}'. Error: ${JSON.stringify(err)}`)
   }
 }
 
