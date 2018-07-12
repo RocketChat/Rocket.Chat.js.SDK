@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
 import Asteroid from 'asteroid'
+import intercept from 'intercept-stdout'
 // Asteroid v2 imports
 /*
 import { createClass } from 'asteroid'
@@ -37,6 +38,21 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 
 // CONNECTION SETUP AND CONFIGURE
 // -----------------------------------------------------------------------------
+
+/**
+ * Intercept all logging going to stdout and store the last 100 entries
+ * That is the array sent to the server when the client receives a ClientCommand
+ * getLogs
+ */
+export let logs: Array<string> = []
+export let maxLogSize: number = 100
+intercept((log: string) => {
+  logs.push(log)
+  if (logs.length > maxLogSize) {
+    logs.splice(logs.length - maxLogSize, logs.length)
+  }
+  return log
+})
 
 /** Internal for comparing message and command update timestamps */
 export let messageLastReadTime: Date
@@ -96,12 +112,14 @@ export let clientCommands: ICollection
 export let commandHandlers: IClientCommandHandlerMap = {}
 
 /**
- * Map of session statistics collected by the SDK
+ * ClientCommands that should not be logged
  */
-const sessionStatistics: ISessionStatistics = {
-  Bot_Stats_Read_Messages: 0,
-  Bot_Stats_Reconnect_Count: 0
-}
+export let silentClientCommands: Array<string> = ['heartbeat', 'getLogs']
+
+/**
+ * Method calls that should not be logged
+ */
+export let silentMethods: Array<string> = ['replyClientCommand']
 
 /**
  * Custom Data set by the client that is using the SDK
@@ -110,7 +128,16 @@ export let customClientData: object = {
   framework: 'Rocket.Chat JS SDK',
   canPauseResumeMsgStream: true,
   canListenToHeartbeat: true,
-  canGetStatistics: true
+  canGetStatistics: true,
+  canGetLogs: true
+}
+
+/**
+ * Map of session statistics collected by the SDK
+ */
+const sessionStatistics: ISessionStatistics = {
+  Bot_Stats_Read_Messages: 0,
+  Bot_Stats_Reconnect_Count: 0
 }
 
 /**
@@ -219,16 +246,21 @@ function setupMethodCache (asteroid: IAsteroid): void {
  */
 export function asyncCall (method: string, params: any | any[]): Promise<any> {
   if (!Array.isArray(params)) params = [params] // cast to array for apply
-  logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
+
+  const shouldLog: boolean = silentMethods.indexOf(method) === -1
+  if (shouldLog) logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
+
   return Promise.resolve(asteroid.apply(method, params).result)
     .catch((err: Error) => {
       logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
     })
     .then((result: any) => {
-      (result)
-        ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
-        : logger.debug(`[${method}] Success`)
+      if (shouldLog) {
+        (result)
+          ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
+          : logger.debug(`[${method}] Success`)
+      }
       return result
     })
 }
@@ -529,7 +561,6 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
     if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
       const changedCommand = changedCommandQuery.result[0]
       if (Array.isArray(changedCommand.args)) {
-        logger.info(`[received] Command ${ changedCommand.args[0].cmd.key }`)
         callback(null, changedCommand.args[0])
       } else {
         logger.debug('[received] Update without message args')
@@ -545,7 +576,7 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
   commandLastReadTime = new Date() // init before any message read
   await reactToCommands(userId, async (err, command) => {
     if (err) {
-      logger.error(`Unable to receive commands ${JSON.stringify(err)}`)
+      logger.error(`Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
       throw err
     }
 
@@ -555,8 +586,12 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
     // Ignore commands in stream that aren't new
     if (currentReadTime <= commandLastReadTime) return
 
+    // Only log the command when needed
+    if (silentClientCommands.indexOf(command.cmd.key) === -1) {
+      logger.info(`[Command] Received command '${command.cmd.key}' at ${currentReadTime}`)
+    }
+
     // At this point, command has passed checks and can be responded to
-    logger.info(`[Command] Received command '${command.cmd.key}' at ${currentReadTime}`)
     commandLastReadTime = currentReadTime
 
     // Processing completed, call callback to respond to command
@@ -574,11 +609,18 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
   let result: IClientCommandResponse = {
     success: true
   }
+  // Only log the command when needed
+  const shouldLog: boolean = silentClientCommands.indexOf(command.cmd.key) === -1
+
   try {
     const handler = commandHandlers[command.cmd.key]
     switch (command.cmd.key) {
       // SDK-level command to check for aliveness of the bot regarding commands
       case 'heartbeat':
+        break
+
+      case 'getLogs':
+        result.logs = logs
         break
 
       // SDK-level command to pause the message stream, interrupting all messages from the server
@@ -605,17 +647,25 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
       // If command is not at the SDK-level, it tries to call a handler added by the user
       default:
         if (handler) {
+          if (shouldLog) logger.info(`[Command] Calling custom handler of command '${command.cmd.key}'`)
           result = await handler(command)
         } else {
           throw Error('Handler not found')
         }
     }
   } catch (err) {
+    logger.info(`[Command] Error on handling of '${command.cmd.key}'. ${JSON.stringify(err)}`)
     result.success = false
     result.error = err
   }
 
-  asyncCall('replyClientCommand', [command._id, result]).catch(() => {/**/})
+  try {
+    if (shouldLog) logger.info(`[Command] Replying to command '${command.cmd.key}' with result ${JSON.stringify(result)}`)
+    await asyncCall('replyClientCommand', [command._id, result])
+    if (shouldLog) logger.info(`[Command] Successful reply to command '${command.cmd.key}'`)
+  } catch (err) {
+    logger.info(`[Command] Failed to reply to command'${command.cmd.key}'. Error: ${JSON.stringify(err)}`)
+  }
 }
 
 /**
