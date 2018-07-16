@@ -563,7 +563,9 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
       if (Array.isArray(changedCommand.args)) {
         callback(null, changedCommand.args[0])
       } else {
-        logger.debug('[received] Update in ClientCommands stream without message args')
+        logger.debug('[ClientCommands] Stream received update without args, probably a reconnect')
+        logger.debug('[ClientCommands] Recalling setCustomClientData to ensure consistence')
+        asyncCall('setCustomClientData', customClientData)
       }
     }
   })
