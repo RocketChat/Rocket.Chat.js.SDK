@@ -40,7 +40,7 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 // -----------------------------------------------------------------------------
 
 /**
- * Intercept all logging going to stdout and store the last 100 entries
+ * Intercept all logging going to stdout and store the last maxLogSize entries
  * That is the array sent to the server when the client receives a ClientCommand
  * getLogs
  */
@@ -563,8 +563,8 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
       if (Array.isArray(changedCommand.args)) {
         callback(null, changedCommand.args[0])
       } else {
-        logger.debug('[ClientCommands] Stream received update without args, probably a reconnect')
-        logger.debug('[ClientCommands] Recalling setCustomClientData to ensure consistence')
+        logger.debug('[ClientCommand] Stream received update without args, probably a reconnect')
+        logger.debug('[ClientCommand] Recalling setCustomClientData to ensure consistence')
         asyncCall('setCustomClientData', customClientData)
       }
     }
@@ -578,7 +578,7 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
   commandLastReadTime = new Date() // init before any message read
   await reactToCommands(userId, async (err, command) => {
     if (err) {
-      logger.error(`Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
+      logger.error(`[ClientCommand] Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
       throw err
     }
 
@@ -621,6 +621,7 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
       case 'heartbeat':
         break
 
+      // SDK-level command to reply with the latest maxLogSize logs
       case 'getLogs':
         result.logs = logs
         break
@@ -679,11 +680,11 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
 export function registerCommandHandler (key: string, callback: IClientCommandHandler) {
   const currentHandler = commandHandlers[key]
   if (currentHandler) {
-    logger.error(`[Command] Command '${key}' already has a handler`)
-    throw Error(`[Command] Command '${key}' already has a handler`)
+    logger.error(`[ClientCommand] Command '${key}' already has a handler`)
+    throw Error(`[ClientCommand] Command '${key}' already has a handler`)
   }
 
-  logger.info(`[Command] Registering handler for command '${key}'`)
+  logger.info(`[ClientCommand] Registering handler for command '${key}'`)
   commandHandlers[key] = callback
 }
 
