@@ -162,7 +162,7 @@ describe('driver', () => {
       const message = driver.prepareMessage({
         msg: ':point_down:',
         emoji: ':point_right:',
-        reactions: { ':punch:': { usernames: [botUser.username] } },
+        reactions: { ':thumbsup:': { usernames: [botUser.username] } },
         groupable: false,
         rid: tId
       })
@@ -207,19 +207,19 @@ describe('driver', () => {
     it('adds emoji reaction to message', async () => {
       let sent = await driver.sendToRoomId('test reactions', tId)
       if (Array.isArray(sent)) sent = sent[0] // see todo on `sendToRoomId`
-      const reaction = await driver.setReaction(':punch:', sent._id)
+      await driver.setReaction(':thumbsup:', sent._id)
       const last = (await utils.lastMessages(tId))[0]
-      expect(last.reactions).to.have.deep.property(':punch:', {
+      expect(last.reactions).to.have.deep.property(':thumbsup:', {
         usernames: [ botUser.username ]
       })
     })
     it('removes if used when emoji reaction exists', async () => {
       const sent = await driver.sendMessage(driver.prepareMessage({
         msg: 'test reactions -',
-        reactions: { ':punch:': { usernames: [botUser.username] } },
+        reactions: { ':thumbsup:': { usernames: [botUser.username] } },
         rid: tId
       }))
-      const reaction = await driver.setReaction(':punch:', sent._id)
+      await driver.setReaction(':thumbsup:', sent._id)
       const last = (await utils.lastMessages(tId))[0]
       expect(last).to.not.have.property('reactions')
     })

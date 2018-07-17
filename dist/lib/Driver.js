@@ -564,7 +564,7 @@ exports.editMessage = editMessage;
  * @param messageId ID for a previously sent message
  */
 function setReaction(emoji, messageId) {
-    return asyncCall('setReaction', [':punch:', messageId]);
+    return asyncCall('setReaction', [emoji, messageId]);
 }
 exports.setReaction = setReaction;
 //# sourceMappingURL=driver.js.map
