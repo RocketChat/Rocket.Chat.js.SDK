@@ -105,13 +105,13 @@ export default class Socket extends EventEmitter {
 
     const waitTimeout = () => setTimeout(async () => {
       // this.connection.ping()
-      this.send({ msg: 'ping' })
+      await this.send({ msg: 'ping' })
       this.timeout = setTimeout(() => this.reconnect(), 1000)
-    }, 40000)
+    }, timeout)
 
-    const handlePing = () => {
+    const handlePing = async () => {
       this.lastping = new Date()
-      this.send({ msg: 'pong' }, true)
+      await this.send({ msg: 'pong' }, true)
       if (this.timeout) {
         clearTimeout(this.timeout)
       }
@@ -136,24 +136,23 @@ export default class Socket extends EventEmitter {
     this.on('disconnected', debounce(() => this.reconnect(), 300))
     this.on('logged', () => this._logged = true)
 
-    this.on('logged', () => {
-      Object.keys(this.subscriptions || {}).forEach((key) => {
+    this.on('logged', async () => {
+      const subscriptions = Object.keys(this.subscriptions || {}).map((key) => {
         const { name, params } = this.subscriptions[key]
         this.subscriptions[key].unsubscribe()
-        this.subscribe(name, ...params)
+        return this.subscribe(name, ...params)
       })
+      await Promise.all(subscriptions)
     })
 
     this.on('open', async () => {
       this._logged = false
-      this.send({ msg: 'connect', version: '1', support: ['1', 'pre2', 'pre1'] })
+      await this.send({ msg: 'connect', version: '1', support: ['1', 'pre2', 'pre1'] })
     })
 
-    try {
-      this._connect()
-    } catch (e) {
+    this._connect().catch(e => {
       console.log('ddp.constructor._connect', e)
-    }
+    })
   }
 
   check () {

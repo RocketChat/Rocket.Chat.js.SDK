@@ -4,7 +4,7 @@ import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
 import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
-import { ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
+import { ICredentials, ISubscription } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
 import Socket, { Subscription } from './ddp'
@@ -53,11 +53,6 @@ export let userId: string
  * Array of joined room IDs (for reactive queries)
  */
 export let joinedIds: string[] = []
-
-/**
- * Array of messages received from reactive collection
- */
-export let messages: ICollection
 
 /**
  * Allow override of default logging with adapter's log instance
@@ -476,7 +471,8 @@ export function prepareMessage (content: string | IMessage, roomId?: string): Me
  * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
  */
 export function sendMessage (message: IMessage): Promise<IMessageReceiptAPI> {
-  return asyncCall('sendMessage', message)
+  const { _id, rid, msg } = message
+  return asyncCall('sendMessage', { _id, rid, msg })
 }
 
 /**
