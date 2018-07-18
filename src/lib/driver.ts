@@ -1,11 +1,10 @@
 import { EventEmitter } from 'events'
-import Asteroid from 'asteroid'
 
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
 import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
-import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
+import { ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
 import Socket, { Subscription } from './ddp'
@@ -36,12 +35,6 @@ export const integrationId = settings.integrationId
  *  driver.events.on('connected', () => console.log('driver connected'))
  */
 export const events = new EventEmitter()
-
-/**
- * An Asteroid instance for interacting with Rocket.Chat.
- * Variable not initialised until `connect` called.
- */
-export let asteroid: IAsteroid
 
 export let ddp: Socket
 
@@ -96,10 +89,7 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
     config.host = config.host.replace(/(^\w+:|^)\/\//, '')
     logger.info('[connect] Connecting', config)
 
-    // TODO: Initialize DDP here
-    asteroid = new Asteroid(config.host, config.useSsl)
     ddp = new Socket(config.host)
-    // END TODO
 
     setupMethodCache(ddp) // init instance for later caching method calls
 
@@ -168,8 +158,7 @@ function setupMethodCache (ddp: Socket): void {
  * @param method The Rocket.Chat server method, to call through Socket
  * @param params Single or array of parameters of the method to call
  */
-export function asyncCall (method: string, params: any | any[]): Promise<any> {
-  if (!Array.isArray(params)) params = [params] // cast to array for apply
+export function asyncCall (method: string, params: any): Promise<any> {
   logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
   return Promise.resolve(ddp.call(method, params))
     .catch((err: Error) => {
@@ -209,7 +198,7 @@ export function cacheCall (method: string, key: string): Promise<any> {
       throw err // throw after log to stop async chain
     })
     .then((result: any) => {
-      (result)
+      result
         ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
         : logger.debug(`[${method}] Success`)
       return result
@@ -298,10 +287,6 @@ export function unsubscribeAll (): void {
  */
 export function subscribeToMessages (): Promise<ISubscription> {
   return subscribe(_messageCollectionName, _messageStreamName)
-    .then((subscription) => {
-      messages = asteroid.getCollection(_messageCollectionName)
-      return subscription
-    })
 }
 
 /**
@@ -328,12 +313,10 @@ export function subscribeToMessages (): Promise<ISubscription> {
  *  - Third argument is additional attributes, such as `roomType`
  */
 export function reactToMessages (callback: ICallback): void {
-  logger.info(`[reactive] Listening for change events in collection ${messages.name}`)
-
-  messages.reactiveQuery({}).on('change', (_id: string) => {
-    const changedMessageQuery = messages.reactiveQuery({ _id })
-    if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {
-      const changedMessage = changedMessageQuery.result[0]
+  logger.info(`[reactive] Listening for change events in collection ${_messageCollectionName}`)
+  ddp.on(_messageCollectionName, (obj: any) => {
+    const changedMessage = obj.fields
+    if (changedMessage && changedMessage.args.length > 0) {
       if (Array.isArray(changedMessage.args)) {
         logger.info(`[received] Message in room ${ changedMessage.args[0].rid }`)
         callback(null, changedMessage.args[0], changedMessage.args[1])
