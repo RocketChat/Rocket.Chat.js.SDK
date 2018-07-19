@@ -168,7 +168,7 @@ export default class Socket extends EventEmitter {
   async login (params: any) {
     try {
       this.emit('login', params)
-      const result = await this.call('login', params)
+      const { result } = await this.call('login', params)
       this._login = { resume: result.token, ...result }
       this._logged = true
       this.emit('logged', result)
@@ -279,10 +279,10 @@ export default class Socket extends EventEmitter {
     }, 1000)
   }
 
-  call (method: any, ...params: any[]) {
+  call (method: any, ...params: any[]): Promise<any> {
     return this.send({
       msg: 'method', method, params
-    }).then((data: any) => data.result || data.subs).catch((err) => {
+    }).catch((err) => {
       console.log('DDP call Error', err)
       return Promise.reject(err)
     })

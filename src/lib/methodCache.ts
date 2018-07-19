@@ -46,7 +46,7 @@ export async function call (method: string, key: string): Promise<any> {
   } else {
     // call and cache for next time, returning results
     logger.debug(`[${method}] Calling (caching): ${key}`)
-    callResults = await instance.call(method, key)
+    callResults = (await instance.call(method, key)).result
     methodCache.set(key, callResults)
   }
   return callResults

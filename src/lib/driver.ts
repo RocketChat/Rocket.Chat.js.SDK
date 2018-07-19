@@ -153,14 +153,14 @@ function setupMethodCache (ddp: Socket): void {
  * @param method The Rocket.Chat server method, to call through Socket
  * @param params Single or array of parameters of the method to call
  */
-export function asyncCall (method: string, params: any): Promise<any> {
+export function asyncCall (method: string, ...params: any[]): Promise <any> {
   logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
-  return Promise.resolve(ddp.call(method, params))
+  return Promise.resolve(ddp.call(method, ...params))
     .catch((err: Error) => {
       logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
     })
-    .then((result: any) => {
+    .then(({ result }: any) => {
       (result)
         ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
         : logger.debug(`[${method}] Success`)
@@ -223,9 +223,9 @@ export function login (credentials: ICredentials = {
     })
   }
   return login
-    .then((loggedInUserId) => {
-      userId = loggedInUserId
-      return loggedInUserId
+    .then((loggedInUser) => {
+      userId = loggedInUser.id
+      return loggedInUser.id
     })
     .catch((err: Error) => {
       logger.info('[login] Error:', err)
@@ -409,7 +409,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
 // -----------------------------------------------------------------------------
 
 /** Get ID for a room by name (or ID). */
-export function getRoomId (name: string): Promise<string> {
+export function getRoomId (name: string): Promise<any> {
   return cacheCall('getRoomIdByNameOrId', name)
 }
 
@@ -471,8 +471,7 @@ export function prepareMessage (content: string | IMessage, roomId?: string): Me
  * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
  */
 export function sendMessage (message: IMessage): Promise<IMessageReceiptAPI> {
-  const { _id, rid, msg } = message
-  return asyncCall('sendMessage', { _id, rid, msg })
+  return asyncCall('sendMessage', message)
 }
 
 /**
@@ -526,5 +525,5 @@ export function editMessage (message: IMessage): Promise<IMessage> {
  * @param messageId ID for a previously sent message
  */
 export function setReaction (emoji: string, messageId: string) {
-  return asyncCall('setReaction', [emoji, messageId])
+  return asyncCall('setReaction', emoji, messageId)
 }

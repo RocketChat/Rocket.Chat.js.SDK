@@ -14,9 +14,9 @@ describe('methodCache', () => {
   beforeEach(() => mockInstance.call.resetHistory())
   afterEach(() => methodCache.resetAll())
   describe('.use', () => {
-    it('calls apply to instance', () => {
+    it('calls apply to instance', async () => {
       methodCache.use(mockInstance)
-      methodCache.call('methodOne', 'key1')
+      await methodCache.call('methodOne', 'key1')
       expect(mockInstance.call.callCount).to.equal(1)
     })
     it('accepts a class instance', () => {
@@ -38,13 +38,15 @@ describe('methodCache', () => {
   })
   describe('.call', () => {
     it('throws if instance not in use', () => {
-      const badUse = () => methodCache.call('methodOne', 'key1')
-      expect(badUse).to.throw()
+      methodCache.call('methodOne', 'key1')
+        .then(() => { throw new Error('was not supposed to succeed') })
+        .catch((e) => { expect(e).to.be.instanceof(Error) })
     })
     it('throws if method does not exist', () => {
       methodCache.use(mockInstance)
-      const badUse = () => methodCache.call('bad', 'key1')
-      expect(badUse).to.throw()
+      methodCache.call('bad', 'key1')
+        .then(() => { throw new Error('was not supposed to succeed') })
+        .catch((e) => { expect(e).to.be.instanceof(Error) })
     })
     it('returns a promise', () => {
       methodCache.use(mockInstance)
@@ -56,20 +58,17 @@ describe('methodCache', () => {
         expect(result).to.equal('value1')
       })
     })
-    it('only calls the method once', () => {
+    it('only calls the method once', async () => {
       methodCache.use(mockInstance)
-      methodCache.call('methodOne', 'key1')
-      methodCache.call('methodOne', 'key1')
+      await methodCache.call('methodOne', 'key1')
+      await methodCache.call('methodOne', 'key1')
       expect(mockInstance.call.callCount).to.equal(1)
     })
-    it('returns cached result on subsequent calls', () => {
+    it('returns cached result on subsequent calls', async () => {
       methodCache.use(mockInstance)
-      return Promise.all([
-        methodCache.call('methodOne', 'key1'),
-        methodCache.call('methodOne', 'key1')
-      ]).then((results) => {
-        expect(results[0]).to.equal(results[1])
-      })
+      const result1 = await methodCache.call('methodOne', 'key1')
+      const result2 = await methodCache.call('methodOne', 'key1')
+      expect(result1).to.equal(result2)
     })
     it('calls again if cache expired', () => {
       const clock = sinon.useFakeTimers()
@@ -110,25 +109,25 @@ describe('methodCache', () => {
     })
   })
   describe('.reset', () => {
-    it('removes cached results for a method and key', () => {
+    it('removes cached results for a method and key', async () => {
       methodCache.use(mockInstance)
-      const result1 = methodCache.call('methodOne', 'key1')
+      const result1 = await methodCache.call('methodOne', 'key1')
       methodCache.reset('methodOne', 'key1')
-      const result2 = methodCache.call('methodOne', 'key1')
+      const result2 = await methodCache.call('methodOne', 'key1')
       expect(result1).not.to.equal(result2)
     })
-    it('does not remove cache of calls with different key', () => {
+    it('does not remove cache of calls with different key', async () => {
       methodCache.use(mockInstance)
-      methodCache.call('methodTwo', 'key1')
-      methodCache.call('methodTwo', 'key2')
+      await methodCache.call('methodTwo', 'key1')
+      await methodCache.call('methodTwo', 'key2')
       methodCache.reset('methodTwo', 'key1')
       const result = methodCache.get('methodTwo', 'key2')
       expect(result).to.equal('value2')
     })
-    it('without key, removes all results for method', () => {
+    it('without key, removes all results for method', async () => {
       methodCache.use(mockInstance)
-      methodCache.call('methodTwo', 'key1')
-      methodCache.call('methodTwo', 'key2')
+      await methodCache.call('methodTwo', 'key1')
+      await methodCache.call('methodTwo', 'key2')
       methodCache.reset('methodTwo')
       const result1 = methodCache.get('methodTwo', 'key1')
       const result2 = methodCache.get('methodTwo', 'key2')
@@ -137,13 +136,13 @@ describe('methodCache', () => {
     })
   })
   describe('.resetAll', () => {
-    it('resets all cached methods', () => {
+    it('resets all cached methods', async () => {
       methodCache.use(mockInstance)
-      methodCache.call('methodOne', 'key1')
-      methodCache.call('methodTwo', 'key1')
+      await methodCache.call('methodOne', 'key1')
+      await methodCache.call('methodTwo', 'key1')
       methodCache.resetAll()
-      methodCache.call('methodOne', 'key1')
-      methodCache.call('methodTwo', 'key1')
+      await methodCache.call('methodOne', 'key1')
+      await methodCache.call('methodTwo', 'key1')
       expect(mockInstance.call.callCount).to.equal(4)
     })
   })

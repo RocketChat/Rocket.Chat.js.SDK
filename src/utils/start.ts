@@ -33,7 +33,6 @@ async function demo (message: IMessage) {
     if (!match || !match[1]) return
     const sayWhat = `@${message.u!.username} says "${match[1]}"`
     const usernames = await api.users.allNames()
-    console.log('AAAAAAA', usernames)
     for (let username of usernames) {
       if (username && username !== botUser.username) {
         const toWhere = await driver.getDirectMessageRoomId(username)
