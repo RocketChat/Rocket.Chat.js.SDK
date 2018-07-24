@@ -125,7 +125,10 @@ export let silentMethods: Array<string> = ['replyClientCommand']
  * Custom Data set by the client that is using the SDK
  */
 export let customClientData: object = {
-  framework: 'Rocket.Chat JS SDK',
+  stack: [{
+    name: 'Rocket.Chat js.SDK',
+    version: settings.version
+  }],
   canPauseResumeMsgStream: true,
   canListenToHeartbeat: true,
   canGetStatistics: true,

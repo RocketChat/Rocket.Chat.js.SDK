@@ -1,3 +1,5 @@
+// Version of the package
+export { version } from '../../package.json'
 
 // Login settings - LDAP needs to be explicitly enabled
 export let username = process.env.ROCKETCHAT_USER || 'bot'
