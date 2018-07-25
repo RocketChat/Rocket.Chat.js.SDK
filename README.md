@@ -268,12 +268,24 @@ but have not been joined yet this method will join to those rooms automatically.
 
 If `allPublic` is true, the `rooms` option will be ignored.
 
+### `driver.addClientToStack(clientDetails)`
+
+Adds details about the client using the SDK to the stack of clients.
+
+It must be called before the `driver.login()` function, since the data is sent right after login.
+
+clientDetails has a `name` and a `version` field, both strings.
+
+```
+driver.addClientToStack({
+  name: 'ExampleBotFramework Rocket.Chat Adapter',
+  version: '0.4.2'
+})
+```
+
 ### `driver.setCustomClientData(clientData)`
 
 Set additional data about the client using the SDK to be sent to the server.
-
-In order to add information about your client on the clients array, you must push directly to the
-variable before calling the function.
 
 It must be called before the `driver.login()` function, since the data is sent right after login.
 
@@ -285,7 +297,7 @@ do not have this feature, so the bot manager interface in Rocket.Chat will have
 to differentiate between them, hence the need to define its data.
 
 ```
-driver.customClientData.clients.push({
+driver.addClientToStack({
   name: 'ExampleBotFramework Rocket.Chat Adapter',
   version: '0.4.2'
 })

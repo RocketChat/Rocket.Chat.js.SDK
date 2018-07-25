@@ -35,3 +35,16 @@ export interface IClientCommandHandler {
 export interface IClientCommandHandlerMap {
   [key: string]: IClientCommandHandler
 }
+
+/*
+ * Structure of the object of client data
+ */
+export interface ICustomClientData {
+  stack: Array<IClientDetails>,
+  [key: string]: any
+}
+
+export interface IClientDetails {
+  name: string,
+  version: string
+}

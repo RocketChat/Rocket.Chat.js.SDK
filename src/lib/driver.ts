@@ -20,7 +20,9 @@ import {
   IClientCommand,
   IClientCommandResponse,
   IClientCommandHandler,
-  IClientCommandHandlerMap
+  IClientCommandHandlerMap,
+  ICustomClientData,
+  IClientDetails
 } from '../config/commandInterfaces'
 
 /** Collection names */
@@ -124,7 +126,7 @@ export let silentMethods: Array<string> = ['replyClientCommand']
 /**
  * Custom Data set by the client that is using the SDK
  */
-export let customClientData: object = {
+export let customClientData: ICustomClientData = {
   stack: [{
     name: 'Rocket.Chat js.SDK',
     version: settings.version
@@ -697,6 +699,14 @@ export function registerCommandHandler (key: string, callback: IClientCommandHan
  */
 export function setCustomClientData (clientData: object) {
   Object.assign(customClientData, clientData)
+}
+
+/**
+ * Add client information to the client stack
+ * @param clientData Object containing additional data about the client using the SDK
+ */
+export function addClientToStack (clientDetails: IClientDetails) {
+  customClientData.stack.push(clientDetails)
 }
 
 /**
