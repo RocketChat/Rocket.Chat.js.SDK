@@ -272,7 +272,10 @@ If `allPublic` is true, the `rooms` option will be ignored.
 
 Set additional data about the client using the SDK to be sent to the server.
 
-It must be called before the `driver.login()` function, otherwise it will have no effect.
+In order to add information about your client on the clients array, you must push directly to the
+variable before calling the function.
+
+It must be called before the `driver.login()` function, since the data is sent right after login.
 
 Useful only when adding new features in Rocket.Chat that depend on the client.
 
@@ -282,14 +285,19 @@ do not have this feature, so the bot manager interface in Rocket.Chat will have
 to differentiate between them, hence the need to define its data.
 
 ```
+driver.customClientData.clients.push({
+  name: 'ExampleBotFramework Rocket.Chat Adapter',
+  version: '0.4.2'
+})
+
 driver.setCustomClientData({
   framework: 'ExampleBotFramework',
   canResetConnection: true
-});
+})
 ```
 
-Then, Rocket.Chat's interface will check if the bot is able to reset its connection and
-show an UI to allow the admin to do that.
+Then, Rocket.Chat's interface can check if the bot is able to reset its connection before enabling
+an UI with that feature.
 
 ### `driver.registerCommandHandler(key, callback)`
 
@@ -310,7 +318,7 @@ The `callback` receives a `ClientCommand` object as the first parameter and retu
 
 `ClientCommandResponse` object structure:
 - ClientCommandResponse.success: Boolean indicating the success status of the command
-- ClientCommandResponse.msg: Message response to the command
+- Along with any other relevant property to the response
 
 ### `driver.asyncCall(method, params)`
 
@@ -601,6 +609,7 @@ rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
 | `ROOM_CACHE_MAX_AGE`   | Max age of cache for room lookups                     |
 | `DM_ROOM_CACHE_SIZE`   | Size of cache for Direct Message room lookups         |
 | `DM_ROOM_CACHE_MAX_AGE`| Max age of cache for DM lookups                       |
+| `WAIT_CLIENT_COMMANDS` | Wait subscription of ClientCommands before login finishes.
 | **Test configs**       |                                                       |
 | `ADMIN_USERNAME`       | Admin user password for API                           |
 | `ADMIN_PASS`           | Admin user password for API                           |

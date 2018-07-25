@@ -31,4 +31,4 @@ export let roomCacheMaxAge = 1000 * parseInt(process.env.ROOM_CACHE_MAX_AGE || '
 export let dmCacheMaxSize = parseInt(process.env.DM_ROOM_CACHE_SIZE || '10', 10)
 export let dmCacheMaxAge = 1000 * parseInt(process.env.DM_ROOM_CACHE_MAX_AGE || '100', 10)
 
-export let waitForClientCommands = process.env.ROCKETCHAT_WAIT_CLIENT_COMMANDS
+export let waitForClientCommands = process.env.WAIT_CLIENT_COMMANDS
