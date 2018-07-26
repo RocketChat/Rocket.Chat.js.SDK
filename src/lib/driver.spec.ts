@@ -388,7 +388,7 @@ describe('driver', () => {
       await driver.connect()
       await driver.login()
       await driver.joinRooms(['general', tName])
-      expect(driver.joinedIds).to.eql(['GENERAL', tId])
+      expect(driver.joinedIds).to.have.members(['GENERAL', tId])
     })
   })
 })
