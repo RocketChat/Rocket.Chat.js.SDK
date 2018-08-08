@@ -52,11 +52,14 @@ export class EventEmitter {
 
   removeListener (event: string, listener: any): void {
     if (typeof this.events[event] === 'object') {
-      const idx = this.events[event].indexOf(listener)
-      if (idx > -1) {
-        this.events[event].splice(idx, 1)
-      }
-    }
+		  const idx = this.events[event].indexOf(listener)
+		  if (idx > -1) {
+			  this.events[event].splice(idx, 1)
+		  }
+		  if (this.events[event].length === 0) {
+			  delete this.events[event]
+		  }
+	  }
   }
 
   emit (event: string, ...args: any[]) {
@@ -199,7 +202,7 @@ export default class Socket extends EventEmitter {
       this.ddp.once(id, (data: any) => {
         // console.log(data)
         this.lastping = new Date()
-        this.ddp.removeListener(id, cancel)
+        this.ddp.removeListener('disconnected', cancel)
         return (data.error ? reject(data.error) : resolve({ id, ...data }))
       })
     })

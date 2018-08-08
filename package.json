@@ -66,7 +66,6 @@
   "dependencies": {
     "@types/lru-cache": "^4.1.0",
     "@types/node": "^9.4.6",
-    "asteroid": "rocketchat/asteroid",
     "ejson": "^2.1.2",
     "isomorphic-ws": "^4.0.1",
     "lru-cache": "^4.1.1",
