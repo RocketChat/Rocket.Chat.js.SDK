@@ -12,6 +12,7 @@ const api_1 = require("../lib/api");
 const config_1 = require("./config");
 /** Define common attributes for DRY tests */
 exports.testChannelName = 'tests';
+exports.testPrivateName = 'p-tests';
 /** Get information about a user */
 function userInfo(username) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -33,6 +34,13 @@ function channelInfo(query) {
     });
 }
 exports.channelInfo = channelInfo;
+/** Get information about a private group */
+function privateInfo(query) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return api_1.get('groups.info', query, true);
+    });
+}
+exports.privateInfo = privateInfo;
 /** Get the last messages sent to a channel (in last 10 minutes) */
 function lastMessages(roomId, count = 1) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -50,6 +58,13 @@ function createChannel(name, members = [], readOnly = false) {
     });
 }
 exports.createChannel = createChannel;
+/** Create a private group / room and catch if exists already */
+function createPrivate(name, members = [], readOnly = false) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return api_1.post('groups.create', { name, members, readOnly }, true);
+    });
+}
+exports.createPrivate = createPrivate;
 /** Send message from mock user to channel for tests to listen and respond */
 /** @todo Sometimes the post request completes before the change event emits
  *        the message to the streamer. That's why the interval is used for proof
@@ -122,7 +137,7 @@ function setup() {
             }
             // Verify or create user for bot
             let botInfo = yield userInfo(config_1.botUser.username);
-            if (!botInfo.success) {
+            if (!botInfo || !botInfo.success) {
                 console.log(`Bot user (${config_1.botUser.username}) not found`);
                 botInfo = yield createUser(config_1.botUser);
                 if (!botInfo.success) {
@@ -137,7 +152,7 @@ function setup() {
             }
             // Verify or create mock user for talking to bot
             let mockInfo = yield userInfo(config_1.mockUser.username);
-            if (!mockInfo.success) {
+            if (!mockInfo || !mockInfo.success) {
                 console.log(`Mock user (${config_1.mockUser.username}) not found`);
                 mockInfo = yield createUser(config_1.mockUser);
                 if (!mockInfo.success) {
@@ -152,7 +167,7 @@ function setup() {
             }
             // Verify or create channel for tests
             let testChannelInfo = yield channelInfo({ roomName: exports.testChannelName });
-            if (!testChannelInfo.success) {
+            if (!testChannelInfo || !testChannelInfo.success) {
                 console.log(`Test channel (${exports.testChannelName}) not found`);
                 testChannelInfo = yield createChannel(exports.testChannelName);
                 if (!testChannelInfo.success) {
@@ -164,6 +179,23 @@ function setup() {
             }
             else {
                 console.log(`Test channel (${exports.testChannelName}) exists`);
+            }
+            // Verify or create private room for tests
+            let testPrivateInfo = yield channelInfo({ roomName: exports.testPrivateName });
+            if (!testPrivateInfo || !testPrivateInfo.success) {
+                console.log(`Test private room (${exports.testPrivateName}) not found`);
+                testPrivateInfo = yield createPrivate(exports.testPrivateName, [
+                    config_1.apiUser.username, config_1.botUser.username, config_1.mockUser.username
+                ]);
+                if (!testPrivateInfo.success) {
+                    throw new Error(`Test private room (${exports.testPrivateName}) could not be created`);
+                }
+                else {
+                    console.log(`Test private room (${exports.testPrivateName}) created`);
+                }
+            }
+            else {
+                console.log(`Test private room (${exports.testPrivateName}) exists`);
             }
             yield api_1.logout();
         }
