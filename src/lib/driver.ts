@@ -235,20 +235,20 @@ export function login (credentials: ICredentials = {
   ldap: settings.ldap
 }): Promise<any> {
   let login: Promise<any>
-  if (credentials.ldap) {
-    logger.info(`[login] Logging in ${credentials.username} with LDAP`)
-    login = asteroid.loginWithLDAP(
-      credentials.email || credentials.username,
-      credentials.password,
-      { ldap: true, ldapOptions: credentials.ldapOptions || {} }
-    )
-  } else {
-    logger.info(`[login] Logging in ${credentials.username}`)
-    login = asteroid.loginWithPassword(
-      credentials.email || credentials.username!,
-      credentials.password
-    )
-  }
+  // if (credentials.ldap) {
+  //   logger.info(`[login] Logging in ${credentials.username} with LDAP`)
+  //   login = asteroid.loginWithLDAP(
+  //     credentials.email || credentials.username,
+  //     credentials.password,
+  //     { ldap: true, ldapOptions: credentials.ldapOptions || {} }
+  //   )
+  // } else {
+  logger.info(`[login] Logging in ${credentials.username}`)
+  login = asteroid.loginWithPassword(
+    credentials.email || credentials.username!,
+    credentials.password
+  )
+  // }
   return login
     .then((loggedInUserId) => {
       userId = loggedInUserId
