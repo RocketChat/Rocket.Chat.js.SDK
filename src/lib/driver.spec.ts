@@ -118,15 +118,6 @@ describe('driver', () => {
       expect(result.user.status).to.equal('online')
     })
   })
-  describe('.subscribeToMessages', () => {
-    it('resolves with subscription object', async () => {
-      await driver.connect()
-      await driver.login()
-      const subscription = await driver.subscribeToMessages()
-      expect(subscription).to.have.property('ready')
-      // expect(subscription.ready).to.have.property('state', 'fulfilled') ????
-    })
-  })
   describe('.reactToMessages', () => {
     afterEach(() => delay(500)) // avoid rate limit
     it('calls callback on every subscription update', async () => {

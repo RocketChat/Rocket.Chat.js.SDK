@@ -3,8 +3,7 @@ import { EventEmitter } from 'events'
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
-import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
-import { ICredentials, ISubscription } from '../config/asteroidInterfaces'
+import { IConnectOptions, IRespondOptions, ICallback, ILogger, ICredentials } from '../config/driverInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
 import Socket, { Subscription } from './ddp'
@@ -280,7 +279,7 @@ export function unsubscribeAll (): void {
  * Begin subscription to room events for user.
  * Older adapters used an option for this method but it was always the default.
  */
-export function subscribeToMessages (): Promise<ISubscription> {
+export function subscribeToMessages (): Promise<Subscription> {
   return subscribe(_messageCollectionName, _messageStreamName)
 }
 
