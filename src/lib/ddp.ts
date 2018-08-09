@@ -89,7 +89,7 @@ const hostToUrl = (host: String, ssl = false) => `ws${ssl ? 's' : ''}://${host}`
 export default class Socket extends EventEmitter {
 
   state = 'active'
-  lastping = new Date()
+  lastPing = new Date()
   id = 0
   subscriptions: Subscriptions
   ddp = new EventEmitter()
@@ -114,7 +114,7 @@ export default class Socket extends EventEmitter {
     }, timeout)
 
     const handlePing = async () => {
-      this.lastping = new Date()
+      this.lastPing = new Date()
       await this.send({ msg: 'pong' }, true)
       if (this.timeout) {
         clearTimeout(this.timeout)
@@ -123,7 +123,7 @@ export default class Socket extends EventEmitter {
     }
 
     const handlePong = () => {
-      this.lastping = new Date()
+      this.lastPing = new Date()
       if (this.timeout) {
         clearTimeout(this.timeout)
       }
@@ -160,10 +160,10 @@ export default class Socket extends EventEmitter {
   }
 
   check () {
-    if (!this.lastping) {
+    if (!this.lastPing) {
       return false
     }
-    if ((Math.abs(this.lastping.getTime() - new Date().getTime()) / 1000) > 50) {
+    if ((Math.abs(this.lastPing.getTime() - new Date().getTime()) / 1000) > 50) {
       return false
     }
     return true
@@ -199,7 +199,7 @@ export default class Socket extends EventEmitter {
       }
       const cancel = this.ddp.once('disconnected', reject)
       this.ddp.once(id, (data: any) => {
-        this.lastping = new Date()
+        this.lastPing = new Date()
         this.ddp.removeListener('disconnected', cancel)
         return (data.error ? reject(data.error) : resolve({ id, ...data }))
       })
@@ -224,7 +224,7 @@ export default class Socket extends EventEmitter {
 
   _connect () {
     return new Promise((resolve) => {
-      this.lastping = new Date()
+      this.lastPing = new Date()
       this._close()
       clearInterval(this.reconnectTimeout)
       this.reconnectTimeout = setInterval(() => (!this.connection || this.connection.readyState > 1 || !this.check()) && this.reconnect(), 5000)
