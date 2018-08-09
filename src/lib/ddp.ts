@@ -1,5 +1,6 @@
 import EJSON from 'ejson'
 import { timeout } from './settings'
+import { logger } from './log'
 import WebSocket from 'isomorphic-ws'
 
 export interface Event {
@@ -67,8 +68,8 @@ export class EventEmitter {
       this.events[event].forEach((listener: any) => {
         try {
           listener.apply(this, args)
-        } catch (e) {
-          console.log('EventEmitter.emit: ' + e)
+        } catch (err) {
+          logger.error(`[ddp] event emit error: ${err.message}`)
         }
       })
     }
@@ -154,7 +155,7 @@ export default class Socket extends EventEmitter {
     })
 
     this._connect().catch(e => {
-      console.log('ddp.constructor._connect', e)
+      logger.error(`[ddp] connection error: ${e.message}`)
     })
   }
 
@@ -189,18 +190,15 @@ export default class Socket extends EventEmitter {
   }
 
   async send (obj: any, ignore = false) {
-    console.log('send')
     return new Promise((resolve, reject) => {
       this.id += 1
       const id = obj.id || `ddp-${ this.id }`
-      // console.log('send', { ...obj, id })
       this.connection.send(EJSON.stringify({ ...obj, id }))
       if (ignore) {
         return
       }
       const cancel = this.ddp.once('disconnected', reject)
       this.ddp.once(id, (data: any) => {
-        // console.log(data)
         this.lastping = new Date()
         this.ddp.removeListener('disconnected', cancel)
         return (data.error ? reject(data.error) : resolve({ id, ...data }))
@@ -219,8 +217,8 @@ export default class Socket extends EventEmitter {
         this.connection.close(300, 'disconnect')
         delete this.connection
       }
-    } catch (e) {
-      // console.log(e)
+    } catch (err) {
+      logger.error(`[ddp] disconnect error: ${err.message}`)
     }
   }
 
@@ -239,16 +237,18 @@ export default class Socket extends EventEmitter {
         return this._login && this.login(this._login)
       }
 
-      this.connection.onclose = debounce((e: any) => { console.log('aer'); this.emit('disconnected', e) }, 300)
+      this.connection.onclose = debounce((e: any) => {
+        logger.info(`[ddp] disconnected`)
+        this.emit('disconnected', e)
+      }, 300)
 
       this.connection.onmessage = (e: any) => {
         try {
-          // console.log('received', e.data, e.target.readyState)
           const data = EJSON.parse(e.data)
           this.emit(data.msg, data)
           return data.collection && this.emit(data.collection, data)
         } catch (err) {
-          console.log('EJSON parse', err)
+          logger.error(`[ddp] EJSON parse error: ${e.message}`)
         }
       }
     })
@@ -276,8 +276,8 @@ export default class Socket extends EventEmitter {
       delete this._timer
       try {
         await this._connect()
-      } catch (e) {
-        console.log('ddp.reconnect._connect', e)
+      } catch (err) {
+        logger.error(`[ddp] reconnect error: ${err.message}`)
       }
     }, 1000)
   }
@@ -286,7 +286,7 @@ export default class Socket extends EventEmitter {
     return this.send({
       msg: 'method', method, params
     }).catch((err) => {
-      console.log('DDP call Error', err)
+      logger.error(`[ddp] call error: ${err.message}`)
       return Promise.reject(err)
     })
   }
@@ -300,13 +300,13 @@ export default class Socket extends EventEmitter {
       msg: 'unsub',
       id
     }).then((data: any) => data.result || data.subs).catch((err) => {
-      console.log('DDP unsubscribe Error', err)
+      logger.error(`[ddp] unsubscribe error: ${err.message}`)
       return Promise.reject(err)
     })
   }
 
   subscribe (name: any, ...params: any[]): Promise<Subscription> {
-    console.log(name, params)
+    logger.info(`[ddp] subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.send({
       msg: 'sub', name, params
     }).then(({ id }: any) => {
@@ -318,10 +318,9 @@ export default class Socket extends EventEmitter {
       }
 
       this.subscriptions[id] = args
-      // console.log(args)
       return args
     }).catch((err) => {
-      console.log('DDP subscribe Error', err)
+      logger.error(`[ddp] subscribe error: ${err.message}`)
       return Promise.reject(err)
     })
   }
