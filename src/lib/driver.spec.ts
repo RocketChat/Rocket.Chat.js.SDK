@@ -10,8 +10,10 @@ import * as methodCache from './methodCache'
 
 const delay = (ms) => new Promise((resolve, reject) => setTimeout(resolve, ms))
 let clock
-let tId // test channel ID populated before tests start
-let tName = utils.testChannelName // test channel name always the same
+let tId
+let pId
+const tName = utils.testChannelName
+const pName = utils.testPrivateName
 
 silence() // suppress log during tests (disable this while developing tests)
 
@@ -19,6 +21,8 @@ describe('driver', () => {
   before(async () => {
     const testChannel = await utils.channelInfo({ roomName: tName })
     tId = testChannel.channel._id
+    const testPrivate = await utils.privateInfo({ roomName: pName })
+    pId = testPrivate.group._id
   })
   after(async () => {
     await api.logout()
@@ -356,6 +360,20 @@ describe('driver', () => {
     //   expect(callback.firstCall.args[2].roomName).to.equal(undefined)
     // })
   })
+  describe('.getRoomId', () => {
+    beforeEach(async () => {
+      await driver.connect()
+      await driver.login()
+    })
+    it('returns the ID for a channel by ID', async () => {
+      const room = await driver.getRoomId(tName)
+      expect(room).to.equal(tId)
+    })
+    it('returns the ID for a private room name', async () => {
+      const room = await driver.getRoomId(pName)
+      expect(room).to.equal(pId)
+    })
+  })
   describe('.getRoomName', () => {
     beforeEach(async () => {
       await driver.connect()
@@ -364,6 +382,10 @@ describe('driver', () => {
     it('returns the name for a channel by ID', async () => {
       const room = await driver.getRoomName(tId)
       expect(room).to.equal(tName)
+    })
+    it('returns the name for a private group by ID', async () => {
+      const room = await driver.getRoomName(pId)
+      expect(room).to.equal(pName)
     })
     it('returns undefined for a DM room', async () => {
       const dmResult = await utils.setupDirectFromUser()
