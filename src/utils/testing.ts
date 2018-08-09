@@ -59,7 +59,7 @@ export async function createPrivate (
   name: string,
   members: string[] = [],
   readOnly: boolean = false
-): Promise<IChannelResultAPI> {
+): Promise<IGroupResultAPI> {
   return post('groups.create', { name, members, readOnly }, true)
 }
 
@@ -167,7 +167,7 @@ export async function setup () {
     }
 
     // Verify or create private room for tests
-    let testPrivateInfo = await channelInfo({ roomName: testPrivateName })
+    let testPrivateInfo = await privateInfo({ roomName: testPrivateName })
     if (!testPrivateInfo || !testPrivateInfo.success) {
       console.log(`Test private room (${testPrivateName}) not found`)
       testPrivateInfo = await createPrivate(testPrivateName, [

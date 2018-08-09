@@ -181,7 +181,7 @@ function setup() {
                 console.log(`Test channel (${exports.testChannelName}) exists`);
             }
             // Verify or create private room for tests
-            let testPrivateInfo = yield channelInfo({ roomName: exports.testPrivateName });
+            let testPrivateInfo = yield privateInfo({ roomName: exports.testPrivateName });
             if (!testPrivateInfo || !testPrivateInfo.success) {
                 console.log(`Test private room (${exports.testPrivateName}) not found`);
                 testPrivateInfo = yield createPrivate(exports.testPrivateName, [

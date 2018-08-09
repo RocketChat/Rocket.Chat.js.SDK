@@ -22,7 +22,7 @@ export declare function lastMessages(roomId: string, count?: number): Promise<IM
 /** Create a room for tests and catch the error if it exists already */
 export declare function createChannel(name: string, members?: string[], readOnly?: boolean): Promise<IChannelResultAPI>;
 /** Create a private group / room and catch if exists already */
-export declare function createPrivate(name: string, members?: string[], readOnly?: boolean): Promise<IChannelResultAPI>;
+export declare function createPrivate(name: string, members?: string[], readOnly?: boolean): Promise<IGroupResultAPI>;
 /** Send message from mock user to channel for tests to listen and respond */
 /** @todo Sometimes the post request completes before the change event emits
  *        the message to the streamer. That's why the interval is used for proof
