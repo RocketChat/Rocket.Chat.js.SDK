@@ -30,6 +30,17 @@ export declare function createPrivate(name: string, members?: string[], readOnly
  *        server side handling is complete. Would require PR to core.
  */
 export declare function sendFromUser(payload: any): Promise<IMessageResultAPI>;
+/** Leave user from room, to generate `ul` message (test channel by default) */
+export declare function leaveUser(room?: {
+    id?: string;
+    name?: string;
+}): Promise<Boolean>;
+/** Invite user to room, to generate `au` message (test channel by default) */
+export declare function inviteUser(room?: {
+    id?: string;
+    name?: string;
+}): Promise<Boolean>;
+/** @todo : Join user into room (enter) to generate `uj` message type. */
 /** Update message sent from mock user */
 export declare function updateFromUser(payload: IMessageUpdateAPI): Promise<IMessageResultAPI>;
 /** Create a direct message session with the mock user */

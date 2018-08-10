@@ -100,6 +100,29 @@ export async function sendFromUser (payload: any): Promise<IMessageResultAPI> {
   return result
 }
 
+/** Leave user from room, to generate `ul` message (test channel by default) */
+export async function leaveUser (room: { id?: string, name?: string } = {}): Promise<Boolean> {
+  await login({ username: mockUser.username, password: mockUser.password })
+  if (!room.id && !room.name) room.name = testChannelName
+  const roomId = (room.id)
+    ? room.id
+    : (await channelInfo({ roomName: room.name })).channel._id
+  return post('channels.leave', { roomId })
+}
+
+/** Invite user to room, to generate `au` message (test channel by default) */
+export async function inviteUser (room: { id?: string, name?: string } = {}): Promise<Boolean> {
+  let mockInfo = await userInfo(mockUser.username)
+  await login({ username: apiUser.username, password: apiUser.password })
+  if (!room.id && !room.name) room.name = testChannelName
+  const roomId = (room.id)
+    ? room.id
+    : (await channelInfo({ roomName: room.name })).channel._id
+  return post('channels.invite', { userId: mockInfo.user._id, roomId })
+}
+
+/** @todo : Join user into room (enter) to generate `uj` message type. */
+
 /** Update message sent from mock user */
 export async function updateFromUser (payload: IMessageUpdateAPI): Promise<IMessageResultAPI> {
   await login({ username: mockUser.username, password: mockUser.password })
@@ -156,7 +179,9 @@ export async function setup () {
     let testChannelInfo = await channelInfo({ roomName: testChannelName })
     if (!testChannelInfo || !testChannelInfo.success) {
       console.log(`Test channel (${testChannelName}) not found`)
-      testChannelInfo = await createChannel(testChannelName)
+      testChannelInfo = await createChannel(testChannelName, [
+        apiUser.username, botUser.username, mockUser.username
+      ])
       if (!testChannelInfo.success) {
         throw new Error(`Test channel (${testChannelName}) could not be created`)
       } else {
