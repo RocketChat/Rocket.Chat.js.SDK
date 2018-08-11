@@ -7,6 +7,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+}
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
@@ -15,7 +18,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 }
 Object.defineProperty(exports, "__esModule", { value: true });
-const node_rest_client_1 = require("node-rest-client");
+const axios_1 = __importDefault(require("axios"));
 const settings = __importStar(require("./settings"));
 const log_1 = require("./log");
 exports.currentLogin = null;
@@ -24,8 +27,7 @@ function loggedIn() {
     return (exports.currentLogin !== null);
 }
 exports.loggedIn = loggedIn;
-/** Initialise client and configs */
-exports.client = new node_rest_client_1.Client();
+/** Initialise configs */
 exports.host = settings.host;
 /**
  * Prepend protocol (or put back if removed from env settings for driver)
@@ -34,6 +36,10 @@ exports.host = settings.host;
 exports.url = ((exports.host.indexOf('http') === -1)
     ? exports.host.replace(/^(\/\/)?/, 'http://')
     : exports.host) + '/api/v1/';
+/** Initialize client */
+const client = axios_1.default.create({
+    baseURL: exports.url
+});
 /** Convert payload data to query string for GET requests */
 function getQueryString(data) {
     if (!data || typeof data !== 'object' || !Object.keys(data).length)
@@ -75,12 +81,10 @@ function clearHeaders() {
 exports.clearHeaders = clearHeaders;
 /** Check result data for success, allowing override to ignore some errors */
 function success(result, ignore) {
-    return ((typeof result.error === 'undefined' &&
-        typeof result.status === 'undefined' &&
-        typeof result.success === 'undefined') ||
-        (result.status && result.status === 'success') ||
-        (result.success && result.success === true) ||
-        (ignore && result.error && !ignore.test(result.error))) ? true : false;
+    const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/;
+    return (typeof result.status === 'undefined' ||
+        (result.status && regExpSuccess.test(result.status)) ||
+        (result.status && ignore && ignore.test(result.status))) ? true : false;
 }
 exports.success = success;
 /**
@@ -99,18 +103,13 @@ function post(endpoint, data, auth = true, ignore) {
             if (auth && !loggedIn())
                 yield login();
             let headers = getHeaders(auth);
-            const result = yield new Promise((resolve, reject) => {
-                exports.client.post(exports.url + endpoint, { headers, data }, (result) => {
-                    if (Buffer.isBuffer(result))
-                        reject('Result was buffer (HTML, not JSON)');
-                    else if (!success(result, ignore))
-                        reject(result);
-                    else
-                        resolve(result);
-                }).on('error', (err) => reject(err));
-            });
+            const result = yield client.post(endpoint, data, { headers });
+            if (Buffer.isBuffer(result.data))
+                throw new Error('Result was buffer (HTML, not JSON)');
+            else if (!success(result, ignore))
+                throw result;
             log_1.logger.debug('[API] POST result:', result);
-            return result;
+            return result.data;
         }
         catch (err) {
             console.error(err);
@@ -134,18 +133,13 @@ function get(endpoint, data, auth = true, ignore) {
                 yield login();
             let headers = getHeaders(auth);
             const query = getQueryString(data);
-            const result = yield new Promise((resolve, reject) => {
-                exports.client.get(exports.url + endpoint + query, { headers }, (result) => {
-                    if (Buffer.isBuffer(result))
-                        reject('Result was buffer (HTML, not JSON)');
-                    else if (!success(result, ignore))
-                        reject(result);
-                    else
-                        resolve(result);
-                }).on('error', (err) => reject(err));
-            });
+            const result = yield client.get(endpoint + query, { headers });
+            if (Buffer.isBuffer(result.data))
+                throw new Error('Result was buffer (HTML, not JSON)');
+            else if (!success(result, ignore))
+                throw result;
             log_1.logger.debug('[API] GET result:', result);
-            return result;
+            return result.data;
         }
         catch (err) {
             log_1.logger.error(`[API] GET error (${endpoint}):`, err);

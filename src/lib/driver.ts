@@ -374,12 +374,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     let currentReadTime = new Date(message.ts.$date)
 
     // Ignore edited messages if configured to
-    // unless it's newer than current read time (hasn't been seen before)
-    // @todo: test this logic, why not just return if edited and not responding
-    if (config.edited && typeof message.editedAt !== 'undefined') {
-      let edited = new Date(message.editedAt.$date)
-      if (edited > currentReadTime) currentReadTime = edited
-    }
+    if (!config.edited && typeof message.editedAt !== 'undefined') return
 
     // Ignore messages in stream that aren't new
     if (currentReadTime <= lastReadTime) return

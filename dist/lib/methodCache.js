@@ -1,4 +1,12 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 }
@@ -36,22 +44,24 @@ exports.create = create;
  * @param key Key to pass to method call and save results against
  */
 function call(method, key) {
-    if (!exports.results.has(method))
-        create(method); // create as needed
-    const methodCache = exports.results.get(method);
-    let callResults;
-    if (methodCache.has(key)) {
-        log_1.logger.debug(`[${method}] Calling (cached): ${key}`);
-        // return from cache if key has been used on method before
-        callResults = methodCache.get(key);
-    }
-    else {
-        // call and cache for next time, returning results
-        log_1.logger.debug(`[${method}] Calling (caching): ${key}`);
-        callResults = exports.instance.call(method, key).result;
-        methodCache.set(key, callResults);
-    }
-    return Promise.resolve(callResults);
+    return __awaiter(this, void 0, void 0, function* () {
+        if (!exports.results.has(method))
+            create(method); // create as needed
+        const methodCache = exports.results.get(method);
+        let callResults;
+        if (methodCache.has(key)) {
+            log_1.logger.debug(`[${method}] Calling (cached): ${key}`);
+            // return from cache if key has been used on method before
+            callResults = methodCache.get(key);
+        }
+        else {
+            // call and cache for next time, returning results
+            log_1.logger.debug(`[${method}] Calling (caching): ${key}`);
+            callResults = (yield exports.instance.call(method, key)).result;
+            methodCache.set(key, callResults);
+        }
+        return callResults;
+    });
 }
 exports.call = call;
 /**
