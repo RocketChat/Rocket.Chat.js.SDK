@@ -1,0 +1,16 @@
+export declare let username: string;
+export declare let password: string;
+export declare let ldap: boolean;
+export declare let host: string;
+export declare let useSsl: boolean;
+export declare let timeout: number;
+export declare let rooms: string[];
+export declare let allPublic: boolean;
+export declare let dm: boolean;
+export declare let livechat: boolean;
+export declare let edited: boolean;
+export declare let integrationId: string;
+export declare let roomCacheMaxSize: number;
+export declare let roomCacheMaxAge: number;
+export declare let dmCacheMaxSize: number;
+export declare let dmCacheMaxAge: number;

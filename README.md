@@ -412,9 +412,9 @@ Reset a cached method call's results
 
 ### API CLIENT
 
-[node-rest]: https://www.npmjs.com/package/node-rest-client
+[axios]: https://github.com/axios/axios
 [rest-api]: https://rocket.chat/docs/developer-guides/rest-api/
-We've included an [API client][node-rest] to make it super simple for bots and
+We've included an [API client][axios] to make it super simple for bots and
 apps consuming the SDK to call the [Rocket.Chat REST API][rest-api] endpoints.
 
 By default, it will attempt to login with the same defaults or env config as
