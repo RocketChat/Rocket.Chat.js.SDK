@@ -213,14 +213,17 @@ function login(credentials = {
     ldap: settings.ldap
 }) {
     let login;
-    if (credentials.ldap) {
-        log_1.logger.info(`[login] Logging in ${credentials.username} with LDAP`);
-        login = exports.asteroid.loginWithLDAP(credentials.email || credentials.username, credentials.password, { ldap: true, ldapOptions: credentials.ldapOptions || {} });
-    }
-    else {
-        log_1.logger.info(`[login] Logging in ${credentials.username}`);
-        login = exports.asteroid.loginWithPassword(credentials.email || credentials.username, credentials.password);
-    }
+    // if (credentials.ldap) {
+    //   logger.info(`[login] Logging in ${credentials.username} with LDAP`)
+    //   login = asteroid.loginWithLDAP(
+    //     credentials.email || credentials.username,
+    //     credentials.password,
+    //     { ldap: true, ldapOptions: credentials.ldapOptions || {} }
+    //   )
+    // } else {
+    log_1.logger.info(`[login] Logging in ${credentials.username}`);
+    login = exports.asteroid.loginWithPassword(credentials.email || credentials.username, credentials.password);
+    // }
     return login
         .then((loggedInUserId) => {
         exports.userId = loggedInUserId;
