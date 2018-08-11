@@ -94,11 +94,11 @@ export default class Socket extends EventEmitter {
   subscriptions: Subscriptions
   ddp = new EventEmitter()
   url: String
-  timeout!: NodeJS.Timer
-  reconnectTimeout!: NodeJS.Timer
+  timeout!: any
+  reconnectTimeout!: any
   connection: any
   private _login: any | null
-  private _timer!: NodeJS.Timer
+  private _timer!: any
   private _logged = false
 
   constructor (url: String, login?: any) {

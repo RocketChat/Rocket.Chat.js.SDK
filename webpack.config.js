@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 
 module.exports = {
   mode: 'production',
@@ -8,7 +9,7 @@ module.exports = {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
+        use: 'awesome-typescript-loader',
         exclude: /node_modules/
       }
     ]
@@ -17,9 +18,9 @@ module.exports = {
     extensions: [ '.ts', '.js' ]
   },
   output: {
-    filename: 'index.js',
+    filename: 'bundle.js',
     library: 'RocketChat',
     libraryTarget: 'umd',
-    path: path.resolve(__dirname, 'dist/bundle')
+    path: path.resolve(__dirname, 'dist/')
   }
 };

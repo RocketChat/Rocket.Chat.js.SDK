@@ -1,4 +1,3 @@
-/// <reference types="node" />
 export interface Event {
     [name: string]: any;
 }
@@ -27,8 +26,8 @@ export default class Socket extends EventEmitter {
     subscriptions: Subscriptions;
     ddp: EventEmitter;
     url: String;
-    timeout: NodeJS.Timer;
-    reconnectTimeout: NodeJS.Timer;
+    timeout: any;
+    reconnectTimeout: any;
     connection: any;
     private _login;
     private _timer;
