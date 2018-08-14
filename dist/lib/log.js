@@ -34,4 +34,3 @@ function silence() {
     });
 }
 exports.silence = silence;
-//# sourceMappingURL=log.js.map

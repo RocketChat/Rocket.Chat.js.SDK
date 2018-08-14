@@ -104,4 +104,3 @@ function resetAll() {
     exports.results.forEach((cache) => cache.reset());
 }
 exports.resetAll = resetAll;
-//# sourceMappingURL=methodCache.js.map

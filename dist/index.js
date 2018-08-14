@@ -15,4 +15,3 @@ const api = __importStar(require("./lib/api"));
 exports.api = api;
 const settings = __importStar(require("./lib/settings"));
 exports.settings = settings;
-//# sourceMappingURL=index.js.map

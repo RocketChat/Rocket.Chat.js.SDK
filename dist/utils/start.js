@@ -62,4 +62,3 @@ function demo(message) {
     });
 }
 start().catch((e) => console.error(e));
-//# sourceMappingURL=start.js.map

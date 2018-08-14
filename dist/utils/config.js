@@ -31,4 +31,3 @@ exports.mockUser = {
     sendWelcomeEmail: false,
     verified: true
 };
-//# sourceMappingURL=config.js.map

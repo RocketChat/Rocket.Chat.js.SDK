@@ -47,4 +47,3 @@ ${JSON.stringify(yield api.users.onlineIds(), null, '\t')}
     });
 }
 users().catch((e) => console.error(e));
-//# sourceMappingURL=users.js.map

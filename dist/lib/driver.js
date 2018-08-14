@@ -79,7 +79,7 @@ function connect(options = {}, callback) {
         const config = Object.assign({}, settings, options); // override defaults
         config.host = config.host.replace(/(^\w+:|^)\/\//, '');
         log_1.logger.info('[connect] Connecting', config);
-        exports.ddp = new ddp_1.default(config.host);
+        exports.ddp = new ddp_1.default(config.host, config.useSsl);
         setupMethodCache(exports.ddp); // init instance for later caching method calls
         // TODO: refact
         exports.ddp.on('connected', () => exports.events.emit('connected'));
@@ -513,4 +513,3 @@ function setReaction(emoji, messageId) {
     return asyncCall('setReaction', emoji, messageId);
 }
 exports.setReaction = setReaction;
-//# sourceMappingURL=driver.js.map
