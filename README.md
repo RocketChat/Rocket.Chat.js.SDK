@@ -3,7 +3,7 @@
 [rest]: https://rocket.chat/docs/developer-guides/rest-api/
 [start]: https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/master/src/utils/start.ts
 
-# Rocket.Chat Node.js SDK
+# Rocket.Chat JS SDK
 
 Application interface for server methods and message stream subscriptions.
 
