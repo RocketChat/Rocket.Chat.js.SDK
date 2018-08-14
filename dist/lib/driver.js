@@ -7,9 +7,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-}
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
@@ -17,20 +14,16 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 }
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+}
 Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = require("events");
-const asteroid_1 = __importDefault(require("asteroid"));
-// Asteroid v2 imports
-/*
-import { createClass } from 'asteroid'
-import WebSocket from 'ws'
-import { Map } from 'immutable'
-import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
-*/
 const settings = __importStar(require("./settings"));
 const methodCache = __importStar(require("./methodCache"));
 const message_1 = require("./message");
 const log_1 = require("./log");
+const ddp_1 = __importDefault(require("./ddp"));
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages';
 const _messageStreamName = '__my_messages__';
@@ -65,8 +58,8 @@ function useLog(externalLog) {
 }
 exports.useLog = useLog;
 /**
- * Initialise asteroid instance with given options or defaults.
- * Returns promise, resolved with Asteroid instance. Callback follows
+ * Initialise socket instance with given options or defaults.
+ * Returns promise, resolved with Socket instance. Callback follows
  * error-first-pattern. Error returned or promise rejected on timeout.
  * Removes http/s protocol to get connection hostname if taken from URL.
  * @example <caption>Use with callback</caption>
@@ -86,24 +79,19 @@ function connect(options = {}, callback) {
         const config = Object.assign({}, settings, options); // override defaults
         config.host = config.host.replace(/(^\w+:|^)\/\//, '');
         log_1.logger.info('[connect] Connecting', config);
-        exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
-        // Asteroid ^v2 interface...
-        /*
-        asteroid = new Asteroid({
-          endpoint: `ws://${options.host}/websocket`,
-          SocketConstructor: WebSocket
-        })
-        */
-        setupMethodCache(exports.asteroid); // init instance for later caching method calls
-        exports.asteroid.on('connected', () => exports.events.emit('connected'));
-        exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
+        exports.ddp = new ddp_1.default(config.host);
+        setupMethodCache(exports.ddp); // init instance for later caching method calls
+        // TODO: refact
+        exports.ddp.on('connected', () => exports.events.emit('connected'));
+        exports.ddp.on('reconnected', () => exports.events.emit('reconnected'));
+        // END
         let cancelled = false;
         const rejectionTimeout = setTimeout(function () {
             log_1.logger.info(`[connect] Timeout (${config.timeout})`);
-            const err = new Error('Asteroid connection timeout');
+            const err = new Error('Socket connection timeout');
             cancelled = true;
             exports.events.removeAllListeners('connected');
-            callback ? callback(err, exports.asteroid) : reject(err);
+            callback ? callback(err, exports.ddp) : reject(err);
         }, config.timeout);
         // if to avoid condition where timeout happens before listener to 'connected' is added
         // and this listener is not removed (because it was added after the removal)
@@ -113,8 +101,8 @@ function connect(options = {}, callback) {
                 // if (cancelled) return asteroid.ddp.disconnect() // cancel if already rejected
                 clearTimeout(rejectionTimeout);
                 if (callback)
-                    callback(null, exports.asteroid);
-                resolve(exports.asteroid);
+                    callback(null, exports.ddp);
+                resolve(exports.ddp);
             });
         }
     });
@@ -126,17 +114,17 @@ exports.connect = connect;
 function disconnect() {
     log_1.logger.info('Unsubscribing, logging out, disconnecting');
     unsubscribeAll();
-    return logout().then(() => Promise.resolve()); // asteroid.disconnect()) // v2 only
+    return logout().then(() => Promise.resolve());
 }
 exports.disconnect = disconnect;
 // ASYNC AND CACHE METHOD UTILS
 // -----------------------------------------------------------------------------
 /**
  * Setup method cache configs from env or defaults, before they are called.
- * @param asteroid The asteroid instance to cache method calls
+ * @param ddp The Socket instance to cache method calls
  */
-function setupMethodCache(asteroid) {
-    methodCache.use(asteroid);
+function setupMethodCache(ddp) {
+    methodCache.use(ddp);
     methodCache.create('getRoomIdByNameOrId', {
         max: settings.roomCacheMaxSize,
         maxAge: settings.roomCacheMaxAge
@@ -152,19 +140,17 @@ function setupMethodCache(asteroid) {
 }
 /**
  * Wraps method calls to ensure they return a Promise with caught exceptions.
- * @param method The Rocket.Chat server method, to call through Asteroid
+ * @param method The Rocket.Chat server method, to call through Socket
  * @param params Single or array of parameters of the method to call
  */
-function asyncCall(method, params) {
-    if (!Array.isArray(params))
-        params = [params]; // cast to array for apply
+function asyncCall(method, ...params) {
     log_1.logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`);
-    return Promise.resolve(exports.asteroid.apply(method, params).result)
+    return Promise.resolve(exports.ddp.call(method, ...params))
         .catch((err) => {
         log_1.logger.error(`[${method}] Error:`, err);
         throw err; // throw after log to stop async chain
     })
-        .then((result) => {
+        .then(({ result }) => {
         (result)
             ? log_1.logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
             : log_1.logger.debug(`[${method}] Success`);
@@ -173,7 +159,7 @@ function asyncCall(method, params) {
 }
 exports.asyncCall = asyncCall;
 /**
- * Call a method as async via Asteroid, or through cache if one is created.
+ * Call a method as async via Socket, or through cache if one is created.
  * If the method doesn't have or need parameters, it can't use them for caching
  * so it will always call asynchronously.
  * @param name The Rocket.Chat server method to call
@@ -186,8 +172,8 @@ function callMethod(name, params) {
 }
 exports.callMethod = callMethod;
 /**
- * Wraps Asteroid method calls, passed through method cache if cache is valid.
- * @param method The Rocket.Chat server method, to call through Asteroid
+ * Wraps Socket method calls, passed through method cache if cache is valid.
+ * @param method The Rocket.Chat server method, to call through Socket
  * @param key Single string parameters only, required to use as cache key
  */
 function cacheCall(method, key) {
@@ -197,7 +183,7 @@ function cacheCall(method, key) {
         throw err; // throw after log to stop async chain
     })
         .then((result) => {
-        (result)
+        result
             ? log_1.logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
             : log_1.logger.debug(`[${method}] Success`);
         return result;
@@ -206,28 +192,28 @@ function cacheCall(method, key) {
 exports.cacheCall = cacheCall;
 // LOGIN AND SUBSCRIBE TO ROOMS
 // -----------------------------------------------------------------------------
-/** Login to Rocket.Chat via Asteroid */
+/** Login to Rocket.Chat via Socket */
 function login(credentials = {
     username: settings.username,
     password: settings.password,
     ldap: settings.ldap
 }) {
     let login;
-    // if (credentials.ldap) {
-    //   logger.info(`[login] Logging in ${credentials.username} with LDAP`)
-    //   login = asteroid.loginWithLDAP(
-    //     credentials.email || credentials.username,
-    //     credentials.password,
-    //     { ldap: true, ldapOptions: credentials.ldapOptions || {} }
-    //   )
-    // } else {
-    log_1.logger.info(`[login] Logging in ${credentials.username}`);
-    login = exports.asteroid.loginWithPassword(credentials.email || credentials.username, credentials.password);
-    // }
+    if (credentials.ldap) {
+        log_1.logger.info(`[login] Logging in ${credentials.username} with LDAP`);
+        login = exports.ddp.login({ ldap: true, ldapOptions: credentials.ldapOptions || {}, ldapPass: credentials.password, username: credentials.username });
+    }
+    else {
+        log_1.logger.info(`[login] Logging in ${credentials.username}`);
+        login = exports.ddp.login({
+            user: { username: credentials.username, email: credentials.email },
+            password: credentials.password
+        });
+    }
     return login
-        .then((loggedInUserId) => {
-        exports.userId = loggedInUserId;
-        return loggedInUserId;
+        .then((loggedInUser) => {
+        exports.userId = loggedInUser.id;
+        return loggedInUser.id;
     })
         .catch((err) => {
         log_1.logger.info('[login] Error:', err);
@@ -235,9 +221,9 @@ function login(credentials = {
     });
 }
 exports.login = login;
-/** Logout of Rocket.Chat via Asteroid */
+/** Logout of Rocket.Chat via Socket */
 function logout() {
-    return exports.asteroid.logout().catch((err) => {
+    return exports.ddp.logout().catch((err) => {
         log_1.logger.error('[Logout] Error:', err);
         throw err; // throw after log to stop async chain
     });
@@ -246,31 +232,17 @@ exports.logout = logout;
 /**
  * Subscribe to Meteor subscription
  * Resolves with subscription (added to array), with ID property
- * @todo - 3rd param of asteroid.subscribe is deprecated in Rocket.Chat?
+ * @todo - 3rd param of ddp.subscribe is deprecated in Rocket.Chat?
  */
 function subscribe(topic, roomId) {
     return new Promise((resolve, reject) => {
         log_1.logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`);
-        const subscription = exports.asteroid.subscribe(topic, roomId, true);
-        exports.subscriptions.push(subscription);
-        return subscription.ready.then((id) => {
-            log_1.logger.info(`[subscribe] Stream ready: ${id}`);
+        const promiseSubscription = exports.ddp.subscribe(topic, roomId, true);
+        return promiseSubscription.then((subscription) => {
+            exports.subscriptions.push(subscription);
+            log_1.logger.info(`[subscribe] Stream ready: ${subscription.id}`);
             resolve(subscription);
         });
-        // Asteroid ^v2 interface...
-        /*
-        subscription.on('ready', () => {
-          console.log(`[${topic}] Subscribe ready`)
-          events.emit('subscription-ready', subscription)
-          subscriptions.push(subscription)
-          resolve(subscription)
-        })
-        subscription.on('error', (err: Error) => {
-          console.error(`[${topic}] Subscribe error:`, err)
-          events.emit('subscription-error', roomId, err)
-          reject(err)
-        })
-        */
     });
 }
 exports.subscribe = subscribe;
@@ -279,10 +251,13 @@ function unsubscribe(subscription) {
     const index = exports.subscriptions.indexOf(subscription);
     if (index === -1)
         return;
-    subscription.stop();
-    // asteroid.unsubscribe(subscription.id) // v2
-    exports.subscriptions.splice(index, 1); // remove from collection
-    log_1.logger.info(`[${subscription.id}] Unsubscribed`);
+    subscription.unsubscribe().then(() => {
+        exports.subscriptions.splice(index, 1); // remove from collection
+        log_1.logger.info(`[${subscription.id}] Unsubscribed`);
+    }).catch((err) => {
+        log_1.logger.error('[Unsubscribe] Error:', err);
+        throw err;
+    });
 }
 exports.unsubscribe = unsubscribe;
 /** Unsubscribe from all subscriptions in collection */
@@ -295,13 +270,7 @@ exports.unsubscribeAll = unsubscribeAll;
  * Older adapters used an option for this method but it was always the default.
  */
 function subscribeToMessages() {
-    return subscribe(_messageCollectionName, _messageStreamName)
-        .then((subscription) => {
-        exports.messages = exports.asteroid.getCollection(_messageCollectionName);
-        // v2
-        // messages = asteroid.collections.get(_messageCollectionName) || Map()
-        return subscription;
-    });
+    return subscribe(_messageCollectionName, _messageStreamName);
 }
 exports.subscribeToMessages = subscribeToMessages;
 /**
@@ -328,11 +297,10 @@ exports.subscribeToMessages = subscribeToMessages;
  *  - Third argument is additional attributes, such as `roomType`
  */
 function reactToMessages(callback) {
-    log_1.logger.info(`[reactive] Listening for change events in collection ${exports.messages.name}`);
-    exports.messages.reactiveQuery({}).on('change', (_id) => {
-        const changedMessageQuery = exports.messages.reactiveQuery({ _id });
-        if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {
-            const changedMessage = changedMessageQuery.result[0];
+    log_1.logger.info(`[reactive] Listening for change events in collection ${_messageCollectionName}`);
+    exports.ddp.on(_messageCollectionName, (obj) => {
+        const changedMessage = obj.fields;
+        if (changedMessage && changedMessage.args.length > 0) {
             if (Array.isArray(changedMessage.args)) {
                 log_1.logger.info(`[received] Message in room ${changedMessage.args[0].rid}`);
                 callback(null, changedMessage.args[0], changedMessage.args[1]);
@@ -392,13 +360,8 @@ function respondToMessages(callback, options = {}) {
         // Set current time for comparison to incoming
         let currentReadTime = new Date(message.ts.$date);
         // Ignore edited messages if configured to
-        // unless it's newer than current read time (hasn't been seen before)
-        // @todo: test this logic, why not just return if edited and not responding
-        if (config.edited && typeof message.editedAt !== 'undefined') {
-            let edited = new Date(message.editedAt.$date);
-            if (edited > currentReadTime)
-                currentReadTime = edited;
-        }
+        if (!config.edited && typeof message.editedAt !== 'undefined')
+            return;
         // Ignore messages in stream that aren't new
         if (currentReadTime <= exports.lastReadTime)
             return;
@@ -420,26 +383,6 @@ function respondToMessages(callback, options = {}) {
     return promise;
 }
 exports.respondToMessages = respondToMessages;
-/**
- * Get every new element added to DDP in Asteroid (v2)
- * @todo Resolve this functionality within Rocket.Chat with team
- * @param callback Function to call with element details
- */
-/*
-export function onAdded (callback: ICallback): void {
-  console.log('Setting up reactive message list...')
-  try {
-    asteroid.ddp.on('added', ({ collection, id, fields }) => {
-      console.log(`Element added to collection ${ collection }`)
-      console.log(id)
-      console.log(fields)
-      callback(null, id)
-    })
-  } catch (err) {
-    callback(err)
-  }
-}
-*/
 // PREPARE AND SEND MESSAGES
 // -----------------------------------------------------------------------------
 /** Get ID for a room by name (or ID). */
@@ -567,7 +510,7 @@ exports.editMessage = editMessage;
  * @param messageId ID for a previously sent message
  */
 function setReaction(emoji, messageId) {
-    return asyncCall('setReaction', [emoji, messageId]);
+    return asyncCall('setReaction', emoji, messageId);
 }
 exports.setReaction = setReaction;
 //# sourceMappingURL=driver.js.map

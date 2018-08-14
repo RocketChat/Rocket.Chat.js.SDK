@@ -1,4 +1,4 @@
-import { Client } from 'node-rest-client'
+import axios from 'axios'
 import * as settings from './settings'
 import { logger } from './log'
 import { IUserAPI } from '../utils/interfaces'
@@ -26,8 +26,7 @@ export function loggedIn (): boolean {
   return (currentLogin !== null)
 }
 
-/** Initialise client and configs */
-export const client = new Client()
+/** Initialise configs */
 export const host = settings.host
 
 /**
@@ -37,6 +36,11 @@ export const host = settings.host
 export const url = ((host.indexOf('http') === -1)
   ? host.replace(/^(\/\/)?/, 'http://')
   : host) + '/api/v1/'
+
+/** Initialize client */
+const client = axios.create({
+  baseURL: url
+})
 
 /** Convert payload data to query string for GET requests */
 export function getQueryString (data: any) {
@@ -80,15 +84,11 @@ export function clearHeaders () {
 
 /** Check result data for success, allowing override to ignore some errors */
 export function success (result: any, ignore?: RegExp) {
+  const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
   return (
-    (
-      typeof result.error === 'undefined' &&
-      typeof result.status === 'undefined' &&
-      typeof result.success === 'undefined'
-    ) ||
-    (result.status && result.status === 'success') ||
-    (result.success && result.success === true) ||
-    (ignore && result.error && !ignore.test(result.error))
+    typeof result.status === 'undefined' ||
+    (result.status && regExpSuccess.test(result.status)) ||
+    (result.status && ignore && ignore.test(result.status))
   ) ? true : false
 }
 
@@ -111,15 +111,11 @@ export async function post (
     logger.debug(`[API] POST: ${endpoint}`, JSON.stringify(data))
     if (auth && !loggedIn()) await login()
     let headers = getHeaders(auth)
-    const result = await new Promise((resolve, reject) => {
-      client.post(url + endpoint, { headers, data }, (result: any) => {
-        if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
-        else if (!success(result, ignore)) reject(result)
-        else resolve(result)
-      }).on('error', (err: Error) => reject(err))
-    })
+    const result = await client.post(endpoint, data, { headers })
+    if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
+    else if (!success(result, ignore)) throw result
     logger.debug('[API] POST result:', result)
-    return result
+    return result.data
   } catch (err) {
     console.error(err)
     logger.error(`[API] POST error (${endpoint}):`, err)
@@ -144,15 +140,11 @@ export async function get (
     if (auth && !loggedIn()) await login()
     let headers = getHeaders(auth)
     const query = getQueryString(data)
-    const result = await new Promise((resolve, reject) => {
-      client.get(url + endpoint + query, { headers }, (result: any) => {
-        if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
-        else if (!success(result, ignore)) reject(result)
-        else resolve(result)
-      }).on('error', (err: Error) => reject(err))
-    })
+    const result = await client.get(endpoint + query, { headers })
+    if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
+    else if (!success(result, ignore)) throw result
     logger.debug('[API] GET result:', result)
-    return result
+    return result.data
   } catch (err) {
     logger.error(`[API] GET error (${endpoint}):`, err)
   }

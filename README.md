@@ -3,7 +3,7 @@
 [rest]: https://rocket.chat/docs/developer-guides/rest-api/
 [start]: https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/master/src/utils/start.ts
 
-# Rocket.Chat Node.js SDK
+# Rocket.Chat JS SDK
 
 Application interface for server methods and message stream subscriptions.
 
@@ -16,18 +16,18 @@ Create your own working BOT for Rocket.Chat, in seconds, at [glitch.com](https:/
 Add your own Rocket.Chat BOT, running on your favorite Linux, MacOS or Windows system.
 
 First, make sure you have the latest version of [nodeJS](https://nodejs.org/) (nodeJS 8.x or higher).   
-```
+```sh
 node -v
 v8.9.3
 ```
 In a project directory, add Rocket.Chat.js.SDK as dependency:
 
-```
+```sh
 npm install @rocket.chat/sdk --save
 ```
 
 Next, create _easybot.js_ with the following:
-```
+```js
 const { driver } = require('@rocket.chat/sdk');
 // customize the following with your server and BOT account information
 const HOST = 'myserver.com';
@@ -90,7 +90,7 @@ Make sure you customize the constants to your Rocket.Chat server account.
 
 Finally, run the bot:
 
-```
+```sh
 node easybot.js
 ```
 
@@ -111,8 +111,7 @@ the API helpers. Try messaging the bot directly one of the following:
 ## Overview
 
 Using this package third party apps can control and query a Rocket.Chat server
-instance, via Asteroid login and method calls as well as DDP for subscribing
-to stream events.
+instance, via WebSocket method calls as well as DDP for subscribing to stream events.
 
 Designed especially for chat automation, this SDK makes it easy for bot and
 integration developers to provide the best solutions and experience for their
@@ -134,7 +133,7 @@ Below is just a summary:
 ---
 
 The following modules are exported by the SDK:
-- `driver` - Handles connection, method calls, room subscriptions (via Asteroid)
+- `driver` - Handles connection, method calls, room subscriptions (via WebSocket)
 - `methodCache` - Manages results cache for calls to server (via LRU cache)
 - `api` - Provides a client for making requests with Rocket.Chat's REST API
 
@@ -144,16 +143,27 @@ For Node 8 / ES5
 
 `const { driver, methodCache, api } = require('@rocket.chat/sdk')`
 
-For ES6 supporting platforms
+For ES6 supporting platforms (server-side)
 
 `import { driver, methodCache, api } from '@rocket.chat/sdk'`
+
+For ES6 supporting platforms (client-side)
+
+`import { driver, methodCache, api } from '@rocket.chat/sdk/bundle'`
+
+For browsers
+
+```html
+<script src="node_modules/@rocket.chat/sdk/bundle.js"></script>
+<script>
+  // Here you access the modules using RocketChat.driver, RocketChat.api and etc
+  RocketChat.driver.connect( { host: 'myserver.com', useSsl: true});
+</script>
+```
 
 Any Rocket.Chat server method can be called via `driver.callMethod`,
 `driver.cacheCall` or `driver.asyncCall`. Server methods are not fully
 documented, most require searching the Rocket.Chat codebase.
-
-Driver methods use an [Asteroid][asteroid] DDP connection. See its own docs for
-more advanced methods that can be called from the `driver.asteroid` interface.
 
 Rocket.Chat REST API calls can be made via `api.get` or `api.post`, with
 parameters defining the endpoint, payload and if authorization is required
@@ -186,7 +196,7 @@ new `Message` class instances directly if detailed attributes are required.
 Connects to a Rocket.Chat server
 - Options accepts `host` and `timeout` attributes
 - Can return a promise, or use error-first callback pattern
-- Resolves with an [Asteroid][asteroid] instance
+- Resolves with an DDP instance
 
 ### `driver.disconnect()`
 
@@ -195,7 +205,7 @@ Unsubscribe, logout, disconnect from Rocket.Chat
 
 ### `driver.login([credentials])`
 
-Login to Rocket.Chat via Asteroid
+Login to Rocket.Chat via WebSocket
 - Accepts object with `username` and/or `email` and `password`
 - Uses defaults from env `ROCKETCHAT_USER` and `ROCKETCHAT_PASSWORD`
 - Returns promise
@@ -203,7 +213,7 @@ Login to Rocket.Chat via Asteroid
 
 ### `driver.logout()`
 
-Logout current user via Asteroid
+Logout current user via WebSocket
 - Returns promise
 
 ### `driver.subscribe(topic, roomId)`
@@ -367,7 +377,7 @@ vars allow configuring, creating and resetting caches for specific methods.
 ### `methodCache.use(instance)`
 
 Set the instance to call methods on, with cached results
-- Accepts an Asteroid instance (or possibly other classes)
+- Accepts an DDP instance (or possibly other classes)
 - Returns nothing
 
 ### `methodCache.create(method[, options])`
@@ -412,9 +422,9 @@ Reset a cached method call's results
 
 ### API CLIENT
 
-[node-rest]: https://www.npmjs.com/package/node-rest-client
+[axios]: https://github.com/axios/axios
 [rest-api]: https://rocket.chat/docs/developer-guides/rest-api/
-We've included an [API client][node-rest] to make it super simple for bots and
+We've included an [API client][axios] to make it super simple for bots and
 apps consuming the SDK to call the [Rocket.Chat REST API][rest-api] endpoints.
 
 By default, it will attempt to login with the same defaults or env config as
@@ -522,8 +532,8 @@ ES6 module, using async
 ```
 import * as rocketchat from '@rocket.chat/sdk'
 
-const asteroid = await rocketchat.driver.connect({ host: 'localhost:3000' })
-console.log('connected', asteroid)
+const ddp = await rocketchat.driver.connect({ host: 'localhost:3000' })
+console.log('connected', ddp)
 ```
 
 ES5 module, using callback
@@ -531,9 +541,9 @@ ES5 module, using callback
 ```
 const rocketchat = require('@rocket.chat/sdk')
 
-rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
+rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, ddp) {
   if (err) console.error(err)
-  else console.log('connected', asteroid)
+  else console.log('connected', ddp)
 })
 ```
 
