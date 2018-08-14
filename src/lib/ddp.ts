@@ -43,6 +43,11 @@ export class EventEmitter {
     this.events = {}
   }
 
+  /**
+   * Listen to an event and remove the listener when it occurs.
+   * @param event The event name to listen
+   * @param listener A function which will be called when the event ocurr
+   */
   on (event: string, listener: any) {
     if (typeof this.events[event] !== 'object') {
       this.events[event] = []
@@ -51,6 +56,11 @@ export class EventEmitter {
     return listener
   }
 
+  /**
+   * Removes a event listener.
+   * @param event The name of the event that won't be listened anymore
+   * @param listener The listener to be removed
+   */
   removeListener (event: string, listener: any): void {
     if (typeof this.events[event] === 'object') {
 		  const idx = this.events[event].indexOf(listener)
@@ -63,6 +73,11 @@ export class EventEmitter {
 	  }
   }
 
+  /**
+   * Emits an event to all subscriptions.
+   * @param event Name of the event to be emitted
+   * @param args Parameters to be passed in the event
+   */
   emit (event: string, ...args: any[]) {
     if (typeof this.events[event] === 'object') {
       this.events[event].forEach((listener: any) => {
@@ -75,6 +90,11 @@ export class EventEmitter {
     }
   }
 
+  /**
+   * Listen to an event and remove the listener when it occurs once.
+   * @param event The event name to listen
+   * @param listener A function which will be called when the event ocurr
+   */
   once (event: string, listener: any) {
     this.on(event, function g (this: any, ...args: any[]) {
       this.removeListener(event, g)
@@ -101,10 +121,10 @@ export default class Socket extends EventEmitter {
   private _timer!: any
   private _logged = false
 
-  constructor (url: String, login?: any) {
+  constructor (url: String, useSsl = false, login?: any) {
     super()
     this._login = login
-    this.url = hostToUrl(url) // .replace(/^http/, 'ws')
+    this.url = hostToUrl(url, useSsl) // put wss on the beginning if useSsl is true
     this.subscriptions = {}
 
     const waitTimeout = () => setTimeout(async () => {
@@ -159,6 +179,9 @@ export default class Socket extends EventEmitter {
     })
   }
 
+  /**
+   * Check if the ping-pong to the server is working.
+   */
   check () {
     if (!this.lastPing) {
       return false
@@ -169,6 +192,12 @@ export default class Socket extends EventEmitter {
     return true
   }
 
+  /**
+   * Login to server via socket, returns a promise resolved with the
+   * user information and emit the event `logged` when it's successfully
+   * done or `loginError` when an error occurs.
+   * @param params User credentials which can be username/password or LDAP
+   */
   async login (params: any) {
     try {
       this.emit('login', params)
@@ -189,6 +218,10 @@ export default class Socket extends EventEmitter {
     }
   }
 
+  /**
+   * Send an object to the server via Socket.
+   * @param obj the Object to be sent.
+   */
   async send (obj: any, ignore = false) {
     return new Promise((resolve, reject) => {
       this.id += 1
@@ -206,6 +239,9 @@ export default class Socket extends EventEmitter {
     })
   }
 
+  /**
+   * Check if the DDP is connected, ready and logged.
+   */
   get status () {
     return this.connection && this.connection.readyState === 1 && this.check() && !!this._logged
   }
@@ -254,17 +290,26 @@ export default class Socket extends EventEmitter {
     })
   }
 
+  /**
+   * Logs out the current User from the server via Socket.
+   */
   logout (): Promise<any> {
     this._login = null
     return this.call('logout').then(() => this.subscriptions = {})
   }
 
+  /**
+   * Disconnect the DDP from server and clear all subscriptions.
+   */
   disconnect () {
     this._close()
     this._login = null
     this.subscriptions = {}
   }
 
+  /**
+   * Clear connection and try to connect again.
+   */
   async reconnect () {
     if (this._timer) {
       return
@@ -282,7 +327,13 @@ export default class Socket extends EventEmitter {
     }, 1000)
   }
 
-  call (method: any, ...params: any[]): Promise<any> {
+  /**
+   * Calls a method on the server and returns a promise resolved
+   * with the result of the method.
+   * @param method The name of the method to be called
+   * @param params An array with the parameters to be sent
+   */
+  call (method: string, ...params: any[]): Promise<any> {
     return this.send({
       msg: 'method', method, params
     }).catch((err) => {
@@ -291,6 +342,11 @@ export default class Socket extends EventEmitter {
     })
   }
 
+  /**
+   * Unsubscribe to a stream from server and returns a promise resolved
+   * with the result of the unsubscription request.
+   * @param id Stream's id
+   */
   unsubscribe (id: any) {
     if (!this.subscriptions[id]) {
       return Promise.reject(id)
@@ -305,7 +361,13 @@ export default class Socket extends EventEmitter {
     })
   }
 
-  subscribe (name: any, ...params: any[]): Promise<Subscription> {
+  /**
+   * Subscribe to a stream on server via socket and returns a promise resolved
+   * with the subscription object when the subscription is ready.
+   * @param name Stream's name to subscribe to
+   * @param params Params sent to the subscription request
+   */
+  subscribe (name: string, ...params: any[]): Promise<Subscription> {
     logger.info(`[ddp] subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.send({
       msg: 'sub', name, params

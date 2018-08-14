@@ -83,7 +83,7 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
     config.host = config.host.replace(/(^\w+:|^)\/\//, '')
     logger.info('[connect] Connecting', config)
 
-    ddp = new Socket(config.host)
+    ddp = new Socket(config.host, config.useSsl)
 
     setupMethodCache(ddp) // init instance for later caching method calls
 
