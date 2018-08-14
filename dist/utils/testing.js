@@ -106,6 +106,34 @@ function sendFromUser(payload) {
     });
 }
 exports.sendFromUser = sendFromUser;
+/** Leave user from room, to generate `ul` message (test channel by default) */
+function leaveUser(room = {}) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
+        if (!room.id && !room.name)
+            room.name = exports.testChannelName;
+        const roomId = (room.id)
+            ? room.id
+            : (yield channelInfo({ roomName: room.name })).channel._id;
+        return api_1.post('channels.leave', { roomId });
+    });
+}
+exports.leaveUser = leaveUser;
+/** Invite user to room, to generate `au` message (test channel by default) */
+function inviteUser(room = {}) {
+    return __awaiter(this, void 0, void 0, function* () {
+        let mockInfo = yield userInfo(config_1.mockUser.username);
+        yield api_1.login({ username: config_1.apiUser.username, password: config_1.apiUser.password });
+        if (!room.id && !room.name)
+            room.name = exports.testChannelName;
+        const roomId = (room.id)
+            ? room.id
+            : (yield channelInfo({ roomName: room.name })).channel._id;
+        return api_1.post('channels.invite', { userId: mockInfo.user._id, roomId });
+    });
+}
+exports.inviteUser = inviteUser;
+/** @todo : Join user into room (enter) to generate `uj` message type. */
 /** Update message sent from mock user */
 function updateFromUser(payload) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -169,7 +197,9 @@ function setup() {
             let testChannelInfo = yield channelInfo({ roomName: exports.testChannelName });
             if (!testChannelInfo || !testChannelInfo.success) {
                 console.log(`Test channel (${exports.testChannelName}) not found`);
-                testChannelInfo = yield createChannel(exports.testChannelName);
+                testChannelInfo = yield createChannel(exports.testChannelName, [
+                    config_1.apiUser.username, config_1.botUser.username, config_1.mockUser.username
+                ]);
                 if (!testChannelInfo.success) {
                     throw new Error(`Test channel (${exports.testChannelName}) could not be created`);
                 }
