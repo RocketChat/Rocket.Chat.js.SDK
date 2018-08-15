@@ -201,7 +201,12 @@ function login(credentials = {
     let login;
     if (credentials.ldap) {
         log_1.logger.info(`[login] Logging in ${credentials.username} with LDAP`);
-        login = exports.ddp.login({ ldap: true, ldapOptions: credentials.ldapOptions || {}, ldapPass: credentials.password, username: credentials.username });
+        login = exports.ddp.login({
+            ldap: true,
+            ldapOptions: credentials.ldapOptions || {},
+            ldapPass: credentials.password,
+            username: credentials.username
+        });
     }
     else {
         log_1.logger.info(`[login] Logging in ${credentials.username}`);
@@ -326,7 +331,8 @@ exports.reactToMessages = reactToMessages;
  */
 function respondToMessages(callback, options = {}) {
     const config = Object.assign({}, settings, options);
-    let promise = Promise.resolve(); // return value, may be replaced by async ops
+    // return value, may be replaced by async ops
+    let promise = Promise.resolve();
     // Join configured rooms if they haven't been already, unless listening to all
     // public rooms, in which case it doesn't matter
     if (!config.allPublic &&
@@ -366,8 +372,11 @@ function respondToMessages(callback, options = {}) {
         if (currentReadTime <= exports.lastReadTime)
             return;
         // At this point, message has passed checks and can be responded to
-        log_1.logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`);
-        log_1.logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`);
+        log_1.logger.info(`Message ID ${message._id} received at ${currentReadTime}`);
+        const messageDetail = (message.file !== undefined)
+            ? message.attachments[0].title
+            : message.msg;
+        log_1.logger.info(`[Incoming] ${message.u.username}: ${messageDetail}`);
         exports.lastReadTime = currentReadTime;
         /**
          * @todo Fix below by adding to meta from Rocket.Chat instead of getting on

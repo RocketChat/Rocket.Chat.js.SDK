@@ -3,7 +3,13 @@ import { EventEmitter } from 'events'
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
-import { IConnectOptions, IRespondOptions, ICallback, ILogger, ICredentials } from '../config/driverInterfaces'
+import {
+  IConnectOptions,
+  IRespondOptions,
+  ICallback,
+  ILogger,
+  ICredentials
+} from '../config/driverInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
 import Socket, { Subscription } from './ddp'
@@ -77,7 +83,10 @@ export function useLog (externalLog: ILogger) {
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export function connect (options: IConnectOptions = {}, callback?: ICallback): Promise<Socket> {
+export function connect (
+  options: IConnectOptions = {},
+  callback?: ICallback
+): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const config = Object.assign({}, settings, options) // override defaults
     config.host = config.host.replace(/(^\w+:|^)\/\//, '')
@@ -212,7 +221,12 @@ export function login (credentials: ICredentials = {
   if (credentials.ldap) {
     logger.info(`[login] Logging in ${credentials.username} with LDAP`)
     login = ddp.login(
-      { ldap: true, ldapOptions: credentials.ldapOptions || {}, ldapPass: credentials.password, username: credentials.username }
+      {
+        ldap: true,
+        ldapOptions: credentials.ldapOptions || {},
+        ldapPass: credentials.password,
+        username: credentials.username
+      }
     )
   } else {
     logger.info(`[login] Logging in ${credentials.username}`)
@@ -332,9 +346,13 @@ export function reactToMessages (callback: ICallback): void {
  *  - Third argument is additional attributes, such as `roomType`
  * @param options Sets filters for different event/message types.
  */
-export function respondToMessages (callback: ICallback, options: IRespondOptions = {}): Promise<void | void[]> {
+export function respondToMessages (
+  callback: ICallback,
+  options: IRespondOptions = {}
+): Promise<void | void[]> {
   const config = Object.assign({}, settings, options)
-  let promise: Promise<void | void[]> = Promise.resolve() // return value, may be replaced by async ops
+  // return value, may be replaced by async ops
+  let promise: Promise<void | void[]> = Promise.resolve()
 
   // Join configured rooms if they haven't been already, unless listening to all
   // public rooms, in which case it doesn't matter
@@ -380,8 +398,11 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     if (currentReadTime <= lastReadTime) return
 
     // At this point, message has passed checks and can be responded to
-    logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`)
-    logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`)
+    logger.info(`Message ID ${message._id} received at ${currentReadTime}`)
+    const messageDetail = (message.file !== undefined)
+      ? message.attachments[0].title
+      : message.msg
+    logger.info(`[Incoming] ${message.u.username}: ${messageDetail}`)
     lastReadTime = currentReadTime
 
     /**
@@ -454,7 +475,10 @@ export function joinRooms (rooms: string[]): Promise<void[]> {
  * Structure message content, optionally addressing to room ID.
  * Accepts message text string or a structured message object.
  */
-export function prepareMessage (content: string | IMessage, roomId?: string): Message {
+export function prepareMessage (
+  content: string | IMessage,
+  roomId?: string
+): Message {
   const message = new Message(content, integrationId)
   if (roomId) message.setRoomId(roomId)
   return message
@@ -477,7 +501,10 @@ export function sendMessage (message: IMessage): Promise<IMessageReceiptAPI> {
  *       Solution would probably be to always return an array, even for single
  *       send. This would be a breaking change, should hold until major version.
  */
-export function sendToRoomId (content: string | string[], roomId: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
+export function sendToRoomId (
+  content: string | string[] | IMessage,
+  roomId: string
+): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   if (!Array.isArray(content)) {
     return sendMessage(prepareMessage(content, roomId))
   } else {
@@ -492,7 +519,10 @@ export function sendToRoomId (content: string | string[], roomId: string): Promi
  * @param content Accepts message text string or array of strings.
  * @param room    A name (or ID) to resolve as ID to use in send.
  */
-export function sendToRoom (content: string | string[], room: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
+export function sendToRoom (
+  content: string | string[] | IMessage,
+  room: string
+): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   return getRoomId(room).then((roomId) => sendToRoomId(content, roomId))
 }
 
@@ -501,7 +531,10 @@ export function sendToRoom (content: string | string[], room: string): Promise<I
  * @param content   Accepts message text string or array of strings.
  * @param username  Name to create (or get) DM for room ID to use in send.
  */
-export function sendDirectToUser (content: string | string[], username: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
+export function sendDirectToUser (
+  content: string | string[] | IMessage,
+  username: string
+): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   return getDirectMessageRoomId(username).then((rid) => sendToRoomId(content, rid))
 }
 
