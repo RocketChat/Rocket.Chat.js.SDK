@@ -51,6 +51,6 @@ export interface IAttachment {
 
 export interface IAttachmentField {
   short?: boolean
-  title?: 'string'
-  value?: 'string'
+  title?: string
+  value?: string
 }
