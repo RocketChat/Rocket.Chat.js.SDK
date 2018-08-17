@@ -314,12 +314,25 @@ describe('driver', () => {
         text: 'SDK test `respondToMessages` sent'
       })
       driver.respondToMessages(callback, { rooms: [tName] })
-      const updated = await utils.updateFromUser({
+      await utils.updateFromUser({
         roomId: tId,
         msgId: sentMessage.message._id,
         text: 'SDK test `respondToMessages` edited'
       })
       sinon.assert.notCalled(callback)
+    })
+    it('ignores edited messages, after receiving original', async () => {
+      const callback = sinon.spy()
+      driver.respondToMessages(callback, { rooms: [tName] })
+      const sentMessage = await utils.sendFromUser({
+        text: 'SDK test `respondToMessages` sent'
+      })
+      await utils.updateFromUser({
+        roomId: tId,
+        msgId: sentMessage.message._id,
+        text: 'SDK test `respondToMessages` edited'
+      })
+      sinon.assert.calledOnce(callback)
     })
     it('fires callback on edited message if configured', async () => {
       const callback = sinon.spy()
@@ -327,7 +340,7 @@ describe('driver', () => {
         text: 'SDK test `respondToMessages` sent'
       })
       driver.respondToMessages(callback, { edited: true, rooms: [tName] })
-      const updated = await utils.updateFromUser({
+      await utils.updateFromUser({
         roomId: tId,
         msgId: sentMessage.message._id,
         text: 'SDK test `respondToMessages` edited'
