@@ -366,7 +366,7 @@ function respondToMessages(callback, options = {}) {
         // Set current time for comparison to incoming
         let currentReadTime = new Date(message.ts.$date);
         // Ignore edited messages if configured to
-        if (!config.edited && typeof message.editedAt !== 'undefined')
+        if (!config.edited && message.editedAt)
             return;
         // Ignore messages in stream that aren't new
         if (currentReadTime <= exports.lastReadTime)
