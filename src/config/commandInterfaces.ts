@@ -17,8 +17,9 @@ export interface IClientCommand {
  * Structure of the object to reply to a clientCommand
  */
 export interface IClientCommandResponse {
-  status?: number,
-  msg: string
+  success: boolean,
+  error?: Error,
+  [key: string]: any
 }
 
 /*
@@ -33,4 +34,17 @@ export interface IClientCommandHandler {
  */
 export interface IClientCommandHandlerMap {
   [key: string]: IClientCommandHandler
+}
+
+/*
+ * Structure of the object of client data
+ */
+export interface ICustomClientData {
+  stack: Array<IClientDetails>,
+  [key: string]: any
+}
+
+export interface IClientDetails {
+  name: string,
+  version: string
 }

@@ -43,3 +43,7 @@ export interface ILogger {
 export interface ICallback {
   (error: Error | null, ...args: any[]): void
 }
+
+export interface ISessionStatistics {
+  [key: string]: any
+}

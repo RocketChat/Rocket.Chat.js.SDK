@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
 import Asteroid from 'asteroid'
+import intercept from 'intercept-stdout'
 // Asteroid v2 imports
 /*
 import { createClass } from 'asteroid'
@@ -10,7 +11,7 @@ import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
-import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
+import { IConnectOptions, IRespondOptions, ICallback, ILogger, ISessionStatistics } from '../config/driverInterfaces'
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
@@ -19,14 +20,15 @@ import {
   IClientCommand,
   IClientCommandResponse,
   IClientCommandHandler,
-  IClientCommandHandlerMap
+  IClientCommandHandlerMap,
+  ICustomClientData,
+  IClientDetails
 } from '../config/commandInterfaces'
 
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
-const _clientCommandsCollectionName = 'rocketchat_clientcommand'
-const _clientCommandsSubscriptionName = 'clientCommands'
+const _clientCommandsStreamName = 'stream-client-commands'
 
 /**
  * Asteroid ^v2 interface below, suspended for work on future branch
@@ -38,6 +40,21 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 
 // CONNECTION SETUP AND CONFIGURE
 // -----------------------------------------------------------------------------
+
+/**
+ * Intercept all logging going to stdout and store the last maxLogSize entries
+ * That is the array sent to the server when the client receives a ClientCommand
+ * getLogs
+ */
+export let logs: Array<string> = []
+export let maxLogSize: number = 100
+intercept((log: string) => {
+  logs.push(log)
+  if (logs.length > maxLogSize) {
+    logs.splice(logs.length - maxLogSize, logs.length)
+  }
+  return log
+})
 
 /** Internal for comparing message and command update timestamps */
 export let messageLastReadTime: Date
@@ -97,12 +114,35 @@ export let clientCommands: ICollection
 export let commandHandlers: IClientCommandHandlerMap = {}
 
 /**
+ * ClientCommands that should not be logged
+ */
+export let silentClientCommands: Array<string> = ['heartbeat', 'getLogs']
+
+/**
+ * Method calls that should not be logged
+ */
+export let silentMethods: Array<string> = ['replyClientCommand']
+
+/**
  * Custom Data set by the client that is using the SDK
  */
-export let customClientData: object = {
-  framework: 'Rocket.Chat JS SDK',
+export let customClientData: ICustomClientData = {
+  stack: [{
+    name: 'Rocket.Chat js.SDK',
+    version: settings.version
+  }],
   canPauseResumeMsgStream: true,
-  canListenToHeartbeat: true
+  canListenToHeartbeat: true,
+  canGetStatistics: true,
+  canGetLogs: true
+}
+
+/**
+ * Map of session statistics collected by the SDK
+ */
+const sessionStatistics: ISessionStatistics = {
+  Bot_Stats_Read_Messages: 0,
+  Bot_Stats_Reconnect_Count: 0
 }
 
 /**
@@ -164,6 +204,10 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
         if (callback) callback(null, asteroid)
         resolve(asteroid)
       })
+
+      events.on('reconnected', () => {
+        sessionStatistics.Bot_Stats_Reconnect_Count += 1
+      })
     }
   })
 }
@@ -207,16 +251,21 @@ function setupMethodCache (asteroid: IAsteroid): void {
  */
 export function asyncCall (method: string, params: any | any[]): Promise<any> {
   if (!Array.isArray(params)) params = [params] // cast to array for apply
-  logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
+
+  const shouldLog: boolean = silentMethods.indexOf(method) === -1
+  if (shouldLog) logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
+
   return Promise.resolve(asteroid.apply(method, params).result)
     .catch((err: Error) => {
       logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
     })
     .then((result: any) => {
-      (result)
-        ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
-        : logger.debug(`[${method}] Success`)
+      if (shouldLog) {
+        (result)
+          ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
+          : logger.debug(`[${method}] Success`)
+      }
       return result
     })
 }
@@ -280,11 +329,16 @@ export function login (credentials: ICredentials = {
   return login
     .then((loggedInUserId) => {
       userId = loggedInUserId
+      // Calling function to listen to commands and answer to them
       return loggedInUserId
     })
-    .then(() => {
-      // Calling function to listen to commands and answer to them
-      return respondToCommands()
+    .then(async (loggedInUserId) => {
+      if (settings.waitForClientCommands) {
+        await respondToCommands(loggedInUserId)
+      } else {
+        respondToCommands(loggedInUserId).catch(() => {/**/})
+      }
+      return loggedInUserId
     })
     .catch((err: Error) => {
       logger.info('[login] Error:', err)
@@ -312,7 +366,7 @@ export function subscribe (subscriptionName: string, ...params: any[]): Promise<
     const subscription = asteroid.subscribe(subscriptionName, ...params)
     subscriptions.push(subscription)
     return subscription.ready.then((id) => {
-      logger.info(`[subscribe] Stream ready: ${id}`)
+      logger.info(`[subscribe] Subscription ${subscriptionName} ready: ${id}`)
       resolve(subscription)
     })
     // Asteroid ^v2 interface...
@@ -479,6 +533,7 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     // if (!isDM && !isLC) meta.roomName = await getRoomName(message.rid)
 
     // Processing completed, call callback to respond to message
+    sessionStatistics.Bot_Stats_Read_Messages += 1
     callback(null, message, meta)
   })
   return promise
@@ -487,11 +542,9 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
 /**
  * Begin subscription to clientCommands for user and returns the collection
  */
-async function subscribeToCommands (): Promise<ICollection> {
-  await subscribe(_clientCommandsSubscriptionName)
-  clientCommands = asteroid.getCollection(_clientCommandsCollectionName)
-  // v2
-  // clientCommands = asteroid.collections.get(_clientCommandsCollectionName) || Map()
+async function subscribeToCommands (userId: string): Promise<ICollection> {
+  await subscribe(_clientCommandsStreamName, userId, true)
+  clientCommands = asteroid.getCollection(_clientCommandsStreamName)
   return clientCommands
 }
 
@@ -503,9 +556,8 @@ async function subscribeToCommands (): Promise<ICollection> {
  *  - Uses error-first callback pattern
  *  - Second argument is the the command received
  */
-async function reactToCommands (callback: ICallback): Promise<void> {
-  const clientCommands = await subscribeToCommands()
-
+async function reactToCommands (userId: string, callback: ICallback): Promise<void> {
+  const clientCommands = await subscribeToCommands(userId)
   await asyncCall('setCustomClientData', customClientData)
 
   logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
@@ -513,7 +565,13 @@ async function reactToCommands (callback: ICallback): Promise<void> {
     const changedCommandQuery = clientCommands.reactiveQuery({ _id })
     if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
       const changedCommand = changedCommandQuery.result[0]
-      callback(null, changedCommand)
+      if (Array.isArray(changedCommand.args)) {
+        callback(null, changedCommand.args[0])
+      } else {
+        logger.debug('[ClientCommand] Stream received update without args, probably a reconnect')
+        logger.debug('[ClientCommand] Recalling setCustomClientData to ensure consistence')
+        asyncCall('setCustomClientData', customClientData)
+      }
     }
   })
 }
@@ -521,11 +579,11 @@ async function reactToCommands (callback: ICallback): Promise<void> {
 /**
  * Calls reactToCommands with a callback to read latest clientCommands and reply to them
  */
-async function respondToCommands (): Promise<void | void[]> {
+async function respondToCommands (userId: string): Promise<void | void[]> {
   commandLastReadTime = new Date() // init before any message read
-  await reactToCommands(async (err, command) => {
+  await reactToCommands(userId, async (err, command) => {
     if (err) {
-      logger.error(`Unable to receive commands ${JSON.stringify(err)}`)
+      logger.error(`[ClientCommand] Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
       throw err
     }
 
@@ -535,8 +593,12 @@ async function respondToCommands (): Promise<void | void[]> {
     // Ignore commands in stream that aren't new
     if (currentReadTime <= commandLastReadTime) return
 
+    // Only log the command when needed
+    if (silentClientCommands.indexOf(command.cmd.key) === -1) {
+      logger.info(`[ClientCommand] Received '${command.cmd.key}' at ${currentReadTime}`)
+    }
+
     // At this point, command has passed checks and can be responded to
-    logger.info(`[Command] Received command '${command.cmd.key}' at ${currentReadTime}`)
     commandLastReadTime = currentReadTime
 
     // Processing completed, call callback to respond to command
@@ -551,32 +613,66 @@ async function respondToCommands (): Promise<void | void[]> {
  * @param command Command object
  */
 async function commandHandler (command: IClientCommand): Promise<void | void[]> {
-  switch (command.cmd.key) {
-    // SDK-level command to pause the message stream, interrupting all messages from the server
-    case 'pauseMessageStream':
-      subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
-      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
-      break
+  let result: IClientCommandResponse = {
+    success: true
+  }
+  // Only log the command when needed
+  const shouldLog: boolean = silentClientCommands.indexOf(command.cmd.key) === -1
 
-    // SDK-level command to resubscribe to the message stream
-    case 'resumeMessageStream':
-      await subscribeToMessages()
-      messageLastReadTime = new Date() // reset time of last read message
-      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
-      break
+  try {
+    const handler = commandHandlers[command.cmd.key]
+    switch (command.cmd.key) {
+      // SDK-level command to check for aliveness of the bot regarding commands
+      case 'heartbeat':
+        break
 
-    // SDK-level command to check for aliveness of the bot regarding commands
-    case 'heartbeat':
-      await asyncCall('replyClientCommand', [command._id, { msg: 'OK' }])
-      break
+      // SDK-level command to reply with the latest maxLogSize logs
+      case 'getLogs':
+        result.logs = logs
+        break
 
-    // If command is not at the SDK-level, it tries to call a handler added by the user
-    default:
-      const handler = commandHandlers[command.cmd.key]
-      if (handler) {
-        const result = await handler(command)
-        await asyncCall('replyClientCommand', [command._id, result])
-      }
+      // SDK-level command to pause the message stream, interrupting all messages from the server
+      case 'pauseMessageStream':
+        subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
+        break
+
+      // SDK-level command to resubscribe to the message stream
+      case 'resumeMessageStream':
+        await subscribeToMessages()
+        messageLastReadTime = new Date() // reset time of last read message
+        break
+
+      case 'getStatistics':
+        const statistics: any = {}
+        statistics.sdk = sessionStatistics
+        statistics.sdk.Bot_Stats_Latest_Read = messageLastReadTime ? messageLastReadTime.toUTCString() : undefined
+        if (handler) {
+          statistics.adapter = await handler(command)
+        }
+        result.statistics = statistics
+        break
+
+      // If command is not at the SDK-level, it tries to call a handler added by the user
+      default:
+        if (handler) {
+          if (shouldLog) logger.info(`[ClientCommand] Calling custom handler of command '${command.cmd.key}'`)
+          result = await handler(command)
+        } else {
+          throw Error('Handler not found')
+        }
+    }
+  } catch (err) {
+    logger.info(`[ClientCommand] Error on handling of '${command.cmd.key}'. ${JSON.stringify(err)}`)
+    result.success = false
+    result.error = err
+  }
+
+  try {
+    if (shouldLog) logger.info(`[ClientCommand] Replying to '${command.cmd.key}' with result ${JSON.stringify(result)}`)
+    await asyncCall('replyClientCommand', [command._id, result])
+    if (shouldLog) logger.info(`[ClientCommand] Successful reply to command '${command.cmd.key}'`)
+  } catch (err) {
+    logger.info(`[ClientCommand] Failed to reply to command'${command.cmd.key}'. Error: ${JSON.stringify(err)}`)
   }
 }
 
@@ -589,11 +685,11 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
 export function registerCommandHandler (key: string, callback: IClientCommandHandler) {
   const currentHandler = commandHandlers[key]
   if (currentHandler) {
-    logger.error(`[Command] Command '${key}' already has a handler`)
-    throw Error('Command in use')
+    logger.error(`[ClientCommand] Command '${key}' already has a handler`)
+    throw Error(`[ClientCommand] Command '${key}' already has a handler`)
   }
 
-  logger.info(`[Command] Registering handler for command '${key}'`)
+  logger.info(`[ClientCommand] Registering handler for command '${key}'`)
   commandHandlers[key] = callback
 }
 
@@ -603,6 +699,14 @@ export function registerCommandHandler (key: string, callback: IClientCommandHan
  */
 export function setCustomClientData (clientData: object) {
   Object.assign(customClientData, clientData)
+}
+
+/**
+ * Add client information to the client stack
+ * @param clientData Object containing additional data about the client using the SDK
+ */
+export function addClientToStack (clientDetails: IClientDetails) {
+  customClientData.stack.push(clientDetails)
 }
 
 /**
