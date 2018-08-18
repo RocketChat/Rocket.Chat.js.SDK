@@ -348,7 +348,9 @@ export function login (credentials: ICredentials = {
       if (settings.waitForClientCommands) {
         await respondToCommands(loggedInUserId)
       } else {
-        respondToCommands(loggedInUserId).catch(() => {/**/})
+        respondToCommands(loggedInUserId).catch((err: Error) => {
+          logger.info('[login] Error responding to client commands:', err)
+        })
       }
       return loggedInUserId
     })
@@ -451,7 +453,7 @@ export function subscribeToMessages (): Promise<ISubscription> {
  *  - Third argument is additional attributes, such as `roomType`
  */
 export function reactToMessages (callback: ICallback): void {
-  logger.info(`[reactive] Listening for change events in collection ${messages.name}`)
+  logger.info(`[reactToMessages] Listening for change in ${messages.name}`)
 
   messages.reactiveQuery({}).on('change', (_id: string) => {
     const changedMessageQuery = messages.reactiveQuery({ _id })
@@ -570,7 +572,7 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
   const clientCommands = await subscribeToCommands(userId)
   await asyncCall('setCustomClientData', customClientData)
 
-  logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
+  logger.info(`[reactToCommands] Listening for change in ${clientCommands.name}`)
   clientCommands.reactiveQuery({}).on('change', (_id: string) => {
     const changedCommandQuery = clientCommands.reactiveQuery({ _id })
     if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
@@ -578,9 +580,13 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
       if (Array.isArray(changedCommand.args)) {
         callback(null, changedCommand.args[0])
       } else {
-        logger.debug('[ClientCommand] Stream received update without args, probably a reconnect')
-        logger.debug('[ClientCommand] Recalling setCustomClientData to ensure consistence')
+        logger.debug('[reactToCommands] Stream received update without args, probably a reconnect')
+        logger.debug('[reactToCommands] Re-calling setCustomClientData to ensure consistency')
         asyncCall('setCustomClientData', customClientData)
+          .catch((err: Error) => {
+            logger.error(`[reactToCommands] Unable to set custom data: ${err.message}`)
+            throw err
+          })
       }
     }
   })
@@ -593,7 +599,7 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
   commandLastReadTime = new Date() // init before any message read
   await reactToCommands(userId, async (err, command) => {
     if (err) {
-      logger.error(`[ClientCommand] Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
+      logger.error(`[respondToCommands] Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
       throw err
     }
 
@@ -605,7 +611,7 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
 
     // Only log the command when needed
     if (silentClientCommands.indexOf(command.cmd.key) === -1) {
-      logger.info(`[ClientCommand] Received '${command.cmd.key}' at ${currentReadTime}`)
+      logger.info(`[respondToCommands] Received '${command.cmd.key}' at ${currentReadTime}`)
     }
 
     // At this point, command has passed checks and can be responded to
