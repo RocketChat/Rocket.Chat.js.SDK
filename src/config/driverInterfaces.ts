@@ -26,9 +26,7 @@ export interface IRespondOptions {
   edited?: boolean
 }
 
-/**
- * Loggers need to provide the same set of methods
- */
+/** Loggers need to provide the same set of methods */
 export interface ILogger {
   debug: (...args: any[]) => void
   info: (...args: any[]) => void
@@ -37,13 +35,12 @@ export interface ILogger {
   error: (...args: any[]) => void
 }
 
-/**
- * Error-first callback param type
- */
+/** Error-first callback param type */
 export interface ICallback {
   (error: Error | null, ...args: any[]): void
 }
 
+/** Session Statistics key/value collection */
 export interface ISessionStatistics {
   [key: string]: any
 }

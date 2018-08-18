@@ -121,6 +121,21 @@ export interface IChannelAPI {
         username: string;
     };
     ts: string;
+    default: boolean;
+}
+/** Group result schema */
+export interface IGroupAPI {
+    _id: string;
+    name: string;
+    usernames: string[];
+    t: 'c' | 'p' | 'l';
+    msgs: number;
+    u: {
+        _id: string;
+        username: string;
+    };
+    ts: string;
+    default: boolean;
 }
 /** Result structure for room creation (e.g. DM) */
 export interface IRoomResultAPI {
@@ -130,5 +145,10 @@ export interface IRoomResultAPI {
 /** Result structure for channel creation */
 export interface IChannelResultAPI {
     channel: IChannelAPI;
+    success: boolean;
+}
+/** Result structure for group creation */
+export interface IGroupResultAPI {
+    group: IGroupAPI;
     success: boolean;
 }

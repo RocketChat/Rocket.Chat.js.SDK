@@ -177,7 +177,7 @@ export async function login (user: ILoginCredentials = {
     }
   }
   const result = await post('login', user, false)
-  if (result.data && result.data.authToken) {
+  if (result && result.data && result.data.authToken) {
     currentLogin = {
       result: result, // keep to return if login requested again for same user
       username: user.username, // keep to compare with following login attempt
