@@ -33,7 +33,7 @@ export interface IMessage {
     };
 }
 export interface IAttachment {
-    fields: IAttachmentField[];
+    fields?: IAttachmentField[];
     color?: string;
     text?: string;
     ts?: string;
@@ -52,6 +52,6 @@ export interface IAttachment {
 }
 export interface IAttachmentField {
     short?: boolean;
-    title: 'string';
-    value: 'string';
+    title?: 'string';
+    value?: 'string';
 }
