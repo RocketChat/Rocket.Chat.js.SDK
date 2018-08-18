@@ -20,13 +20,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = require("events");
 const asteroid_1 = __importDefault(require("asteroid"));
-// Asteroid v2 imports
-/*
-import { createClass } from 'asteroid'
-import WebSocket from 'ws'
-import { Map } from 'immutable'
-import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
-*/
 const settings = __importStar(require("./settings"));
 const methodCache = __importStar(require("./methodCache"));
 const message_1 = require("./message");
@@ -87,13 +80,6 @@ function connect(options = {}, callback) {
         config.host = config.host.replace(/(^\w+:|^)\/\//, '');
         log_1.logger.info('[connect] Connecting', config);
         exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
-        // Asteroid ^v2 interface...
-        /*
-        asteroid = new Asteroid({
-          endpoint: `ws://${options.host}/websocket`,
-          SocketConstructor: WebSocket
-        })
-        */
         setupMethodCache(exports.asteroid); // init instance for later caching method calls
         exports.asteroid.on('connected', () => exports.events.emit('connected'));
         exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
@@ -120,13 +106,12 @@ function connect(options = {}, callback) {
     });
 }
 exports.connect = connect;
-/**
- * Remove all active subscriptions, logout and disconnect from Rocket.Chat
- */
+/** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
 function disconnect() {
     log_1.logger.info('Unsubscribing, logging out, disconnecting');
     unsubscribeAll();
-    return logout().then(() => Promise.resolve()); // asteroid.disconnect()) // v2 only
+    return logout()
+        .then(() => Promise.resolve());
 }
 exports.disconnect = disconnect;
 // ASYNC AND CACHE METHOD UTILS
@@ -237,7 +222,8 @@ function login(credentials = {
 exports.login = login;
 /** Logout of Rocket.Chat via Asteroid */
 function logout() {
-    return exports.asteroid.logout().catch((err) => {
+    return exports.asteroid.logout()
+        .catch((err) => {
         log_1.logger.error('[Logout] Error:', err);
         throw err; // throw after log to stop async chain
     });
@@ -253,24 +239,11 @@ function subscribe(topic, roomId) {
         log_1.logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`);
         const subscription = exports.asteroid.subscribe(topic, roomId, true);
         exports.subscriptions.push(subscription);
-        return subscription.ready.then((id) => {
+        return subscription.ready
+            .then((id) => {
             log_1.logger.info(`[subscribe] Stream ready: ${id}`);
             resolve(subscription);
         });
-        // Asteroid ^v2 interface...
-        /*
-        subscription.on('ready', () => {
-          console.log(`[${topic}] Subscribe ready`)
-          events.emit('subscription-ready', subscription)
-          subscriptions.push(subscription)
-          resolve(subscription)
-        })
-        subscription.on('error', (err: Error) => {
-          console.error(`[${topic}] Subscribe error:`, err)
-          events.emit('subscription-error', roomId, err)
-          reject(err)
-        })
-        */
     });
 }
 exports.subscribe = subscribe;
@@ -298,8 +271,6 @@ function subscribeToMessages() {
     return subscribe(_messageCollectionName, _messageStreamName)
         .then((subscription) => {
         exports.messages = exports.asteroid.getCollection(_messageCollectionName);
-        // v2
-        // messages = asteroid.collections.get(_messageCollectionName) || Map()
         return subscription;
     });
 }
@@ -358,21 +329,23 @@ exports.reactToMessages = reactToMessages;
  */
 function respondToMessages(callback, options = {}) {
     const config = Object.assign({}, settings, options);
-    let promise = Promise.resolve(); // return value, may be replaced by async ops
+    // return value, may be replaced by async ops
+    let promise = Promise.resolve();
     // Join configured rooms if they haven't been already, unless listening to all
     // public rooms, in which case it doesn't matter
     if (!config.allPublic &&
         exports.joinedIds.length === 0 &&
         config.rooms &&
         config.rooms.length > 0) {
-        promise = joinRooms(config.rooms).catch((err) => {
+        promise = joinRooms(config.rooms)
+            .catch((err) => {
             log_1.logger.error(`Failed to join rooms set in env: ${config.rooms}`, err);
         });
     }
     exports.lastReadTime = new Date(); // init before any message read
     reactToMessages((err, message, meta) => __awaiter(this, void 0, void 0, function* () {
         if (err) {
-            log_1.logger.error(`Unable to receive messages ${JSON.stringify(err)}`);
+            log_1.logger.error(`[received] Unable to receive: ${err.message}`);
             callback(err); // bubble errors back to adapter
         }
         // Ignore bot's own messages
@@ -401,43 +374,14 @@ function respondToMessages(callback, options = {}) {
         if (currentReadTime <= exports.lastReadTime)
             return;
         // At this point, message has passed checks and can be responded to
-        log_1.logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`);
-        log_1.logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`);
+        log_1.logger.info(`[received] Message ${message._id} from ${message.u.username}`);
         exports.lastReadTime = currentReadTime;
-        /**
-         * @todo Fix below by adding to meta from Rocket.Chat instead of getting on
-         *       each message event. It's inefficient and throws off tests that
-         *       await on send completion, because the callback has not yet fired.
-         *       Then re-enable last two `.respondToMessages` tests.
-         */
-        // Add room name to meta, is useful for some adapters (is promise)
-        // if (!isDM && !isLC) meta.roomName = await getRoomName(message.rid)
         // Processing completed, call callback to respond to message
         callback(null, message, meta);
     }));
     return promise;
 }
 exports.respondToMessages = respondToMessages;
-/**
- * Get every new element added to DDP in Asteroid (v2)
- * @todo Resolve this functionality within Rocket.Chat with team
- * @param callback Function to call with element details
- */
-/*
-export function onAdded (callback: ICallback): void {
-  console.log('Setting up reactive message list...')
-  try {
-    asteroid.ddp.on('added', ({ collection, id, fields }) => {
-      console.log(`Element added to collection ${ collection }`)
-      console.log(id)
-      console.log(fields)
-      callback(null, id)
-    })
-  } catch (err) {
-    callback(err)
-  }
-}
-*/
 // PREPARE AND SEND MESSAGES
 // -----------------------------------------------------------------------------
 /** Get ID for a room by name (or ID). */
@@ -456,7 +400,8 @@ exports.getRoomName = getRoomName;
  * @todo test why create resolves with object instead of simply ID
  */
 function getDirectMessageRoomId(username) {
-    return cacheCall('createDirectMessage', username).then((DM) => DM.rid);
+    return cacheCall('createDirectMessage', username)
+        .then((DM) => DM.rid);
 }
 exports.getDirectMessageRoomId = getDirectMessageRoomId;
 /** Join the bot into a room by its name or ID */
@@ -539,7 +484,8 @@ exports.sendToRoomId = sendToRoomId;
  * @param room    A name (or ID) to resolve as ID to use in send.
  */
 function sendToRoom(content, room) {
-    return getRoomId(room).then((roomId) => sendToRoomId(content, roomId));
+    return getRoomId(room)
+        .then((roomId) => sendToRoomId(content, roomId));
 }
 exports.sendToRoom = sendToRoom;
 /**
@@ -548,7 +494,8 @@ exports.sendToRoom = sendToRoom;
  * @param username  Name to create (or get) DM for room ID to use in send.
  */
 function sendDirectToUser(content, username) {
-    return getDirectMessageRoomId(username).then((rid) => sendToRoomId(content, rid));
+    return getDirectMessageRoomId(username)
+        .then((rid) => sendToRoomId(content, rid));
 }
 exports.sendDirectToUser = sendDirectToUser;
 /**

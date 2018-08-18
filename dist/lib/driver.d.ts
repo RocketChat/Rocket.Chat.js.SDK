@@ -5,10 +5,6 @@ import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces';
 import { IMessage } from '../config/messageInterfaces';
 import { IMessageReceiptAPI } from '../utils/interfaces';
-/**
- * Asteroid ^v2 interface below, suspended for work on future branch
- * @todo Upgrade to Asteroid v2 or find a better maintained ddp client
- */
 /** Internal for comparing message update timestamps */
 export declare let lastReadTime: Date;
 /**
@@ -69,9 +65,7 @@ export declare function useLog(externalLog: ILogger): void;
  *    .catch((err) => console.error(err))
  */
 export declare function connect(options?: IConnectOptions, callback?: ICallback): Promise<IAsteroid>;
-/**
- * Remove all active subscriptions, logout and disconnect from Rocket.Chat
- */
+/** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
 export declare function disconnect(): Promise<void>;
 /**
  * Wraps method calls to ensure they return a Promise with caught exceptions.
@@ -146,11 +140,6 @@ export declare function reactToMessages(callback: ICallback): void;
  * @param options Sets filters for different event/message types.
  */
 export declare function respondToMessages(callback: ICallback, options?: IRespondOptions): Promise<void | void[]>;
-/**
- * Get every new element added to DDP in Asteroid (v2)
- * @todo Resolve this functionality within Rocket.Chat with team
- * @param callback Function to call with element details
- */
 /** Get ID for a room by name (or ID). */
 export declare function getRoomId(name: string): Promise<string>;
 /** Get name for a room by ID. */
@@ -186,19 +175,19 @@ export declare function sendMessage(message: IMessage): Promise<IMessageReceiptA
  *       Solution would probably be to always return an array, even for single
  *       send. This would be a breaking change, should hold until major version.
  */
-export declare function sendToRoomId(content: string | string[], roomId: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI>;
+export declare function sendToRoomId(content: string | string[] | IMessage, roomId: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI>;
 /**
  * Prepare and send string/s to specified room name (or ID).
  * @param content Accepts message text string or array of strings.
  * @param room    A name (or ID) to resolve as ID to use in send.
  */
-export declare function sendToRoom(content: string | string[], room: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI>;
+export declare function sendToRoom(content: string | string[] | IMessage, room: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI>;
 /**
  * Prepare and send string/s to a user in a DM.
  * @param content   Accepts message text string or array of strings.
  * @param username  Name to create (or get) DM for room ID to use in send.
  */
-export declare function sendDirectToUser(content: string | string[], username: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI>;
+export declare function sendDirectToUser(content: string | string[] | IMessage, username: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI>;
 /**
  * Edit an existing message, replacing any attributes with those provided.
  * The given message object should have the ID of an existing message.

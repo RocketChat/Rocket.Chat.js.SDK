@@ -1,17 +1,20 @@
 import { EventEmitter } from 'events'
 import Asteroid from 'asteroid'
-// Asteroid v2 imports
-/*
-import { createClass } from 'asteroid'
-import WebSocket from 'ws'
-import { Map } from 'immutable'
-import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
-*/
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
-import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces'
-import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
+import {
+  IConnectOptions,
+  IRespondOptions,
+  ICallback,
+  ILogger
+} from '../config/driverInterfaces'
+import {
+  IAsteroid,
+  ICredentials,
+  ISubscription,
+  ICollection
+} from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
 import { IMessageReceiptAPI } from '../utils/interfaces'
@@ -19,14 +22,6 @@ import { IMessageReceiptAPI } from '../utils/interfaces'
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
-
-/**
- * Asteroid ^v2 interface below, suspended for work on future branch
- * @todo Upgrade to Asteroid v2 or find a better maintained ddp client
- */
-/*
-const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
-*/
 
 // CONNECTION SETUP AND CONFIGURE
 // -----------------------------------------------------------------------------
@@ -101,19 +96,16 @@ export function useLog (externalLog: ILogger) {
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export function connect (options: IConnectOptions = {}, callback?: ICallback): Promise<IAsteroid> {
+export function connect (
+  options: IConnectOptions = {},
+  callback?: ICallback
+): Promise<IAsteroid> {
   return new Promise((resolve, reject) => {
     const config = Object.assign({}, settings, options) // override defaults
     config.host = config.host.replace(/(^\w+:|^)\/\//, '')
     logger.info('[connect] Connecting', config)
     asteroid = new Asteroid(config.host, config.useSsl)
-    // Asteroid ^v2 interface...
-    /*
-    asteroid = new Asteroid({
-      endpoint: `ws://${options.host}/websocket`,
-      SocketConstructor: WebSocket
-    })
-    */
+
     setupMethodCache(asteroid) // init instance for later caching method calls
     asteroid.on('connected', () => events.emit('connected'))
     asteroid.on('reconnected', () => events.emit('reconnected'))
@@ -140,13 +132,12 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
   })
 }
 
-/**
- * Remove all active subscriptions, logout and disconnect from Rocket.Chat
- */
+/** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
 export function disconnect (): Promise<void> {
   logger.info('Unsubscribing, logging out, disconnecting')
   unsubscribeAll()
-  return logout().then(() => Promise.resolve()) // asteroid.disconnect()) // v2 only
+  return logout()
+    .then(() => Promise.resolve())
 }
 
 // ASYNC AND CACHE METHOD UTILS
@@ -262,10 +253,11 @@ export function login (credentials: ICredentials = {
 
 /** Logout of Rocket.Chat via Asteroid */
 export function logout (): Promise<void | null> {
-  return asteroid.logout().catch((err: Error) => {
-    logger.error('[Logout] Error:', err)
-    throw err // throw after log to stop async chain
-  })
+  return asteroid.logout()
+    .catch((err: Error) => {
+      logger.error('[Logout] Error:', err)
+      throw err // throw after log to stop async chain
+    })
 }
 
 /**
@@ -273,29 +265,19 @@ export function logout (): Promise<void | null> {
  * Resolves with subscription (added to array), with ID property
  * @todo - 3rd param of asteroid.subscribe is deprecated in Rocket.Chat?
  */
-export function subscribe (topic: string, roomId: string): Promise<ISubscription> {
+export function subscribe (
+  topic: string,
+  roomId: string
+): Promise<ISubscription> {
   return new Promise((resolve, reject) => {
     logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`)
     const subscription = asteroid.subscribe(topic, roomId, true)
     subscriptions.push(subscription)
-    return subscription.ready.then((id) => {
-      logger.info(`[subscribe] Stream ready: ${id}`)
-      resolve(subscription)
-    })
-    // Asteroid ^v2 interface...
-    /*
-    subscription.on('ready', () => {
-      console.log(`[${topic}] Subscribe ready`)
-      events.emit('subscription-ready', subscription)
-      subscriptions.push(subscription)
-      resolve(subscription)
-    })
-    subscription.on('error', (err: Error) => {
-      console.error(`[${topic}] Subscribe error:`, err)
-      events.emit('subscription-error', roomId, err)
-      reject(err)
-    })
-    */
+    return subscription.ready
+      .then((id) => {
+        logger.info(`[subscribe] Stream ready: ${id}`)
+        resolve(subscription)
+      })
   })
 }
 
@@ -322,8 +304,6 @@ export function subscribeToMessages (): Promise<ISubscription> {
   return subscribe(_messageCollectionName, _messageStreamName)
     .then((subscription) => {
       messages = asteroid.getCollection(_messageCollectionName)
-      // v2
-      // messages = asteroid.collections.get(_messageCollectionName) || Map()
       return subscription
     })
 }
@@ -379,9 +359,13 @@ export function reactToMessages (callback: ICallback): void {
  *  - Third argument is additional attributes, such as `roomType`
  * @param options Sets filters for different event/message types.
  */
-export function respondToMessages (callback: ICallback, options: IRespondOptions = {}): Promise<void | void[]> {
+export function respondToMessages (
+  callback: ICallback,
+  options: IRespondOptions = {}
+): Promise<void | void[]> {
   const config = Object.assign({}, settings, options)
-  let promise: Promise<void | void[]> = Promise.resolve() // return value, may be replaced by async ops
+  // return value, may be replaced by async ops
+  let promise: Promise<void | void[]> = Promise.resolve()
 
   // Join configured rooms if they haven't been already, unless listening to all
   // public rooms, in which case it doesn't matter
@@ -391,15 +375,16 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     config.rooms &&
     config.rooms.length > 0
   ) {
-    promise = joinRooms(config.rooms).catch((err) => {
-      logger.error(`Failed to join rooms set in env: ${config.rooms}`, err)
-    })
+    promise = joinRooms(config.rooms)
+      .catch((err) => {
+        logger.error(`Failed to join rooms set in env: ${config.rooms}`, err)
+      })
   }
 
   lastReadTime = new Date() // init before any message read
   reactToMessages(async (err, message, meta) => {
     if (err) {
-      logger.error(`Unable to receive messages ${JSON.stringify(err)}`)
+      logger.error(`[received] Unable to receive: ${err.message}`)
       callback(err) // bubble errors back to adapter
     }
 
@@ -430,45 +415,14 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     if (currentReadTime <= lastReadTime) return
 
     // At this point, message has passed checks and can be responded to
-    logger.info(`Message receive callback ID ${message._id} at ${currentReadTime}`)
-    logger.info(`[Incoming] ${message.u.username}: ${(message.file !== undefined) ? message.attachments[0].title : message.msg}`)
+    logger.info(`[received] Message ${message._id} from ${message.u.username}`)
     lastReadTime = currentReadTime
-
-    /**
-     * @todo Fix below by adding to meta from Rocket.Chat instead of getting on
-     *       each message event. It's inefficient and throws off tests that
-     *       await on send completion, because the callback has not yet fired.
-     *       Then re-enable last two `.respondToMessages` tests.
-     */
-    // Add room name to meta, is useful for some adapters (is promise)
-    // if (!isDM && !isLC) meta.roomName = await getRoomName(message.rid)
 
     // Processing completed, call callback to respond to message
     callback(null, message, meta)
   })
   return promise
 }
-
-/**
- * Get every new element added to DDP in Asteroid (v2)
- * @todo Resolve this functionality within Rocket.Chat with team
- * @param callback Function to call with element details
- */
-/*
-export function onAdded (callback: ICallback): void {
-  console.log('Setting up reactive message list...')
-  try {
-    asteroid.ddp.on('added', ({ collection, id, fields }) => {
-      console.log(`Element added to collection ${ collection }`)
-      console.log(id)
-      console.log(fields)
-      callback(null, id)
-    })
-  } catch (err) {
-    callback(err)
-  }
-}
-*/
 
 // PREPARE AND SEND MESSAGES
 // -----------------------------------------------------------------------------
@@ -489,7 +443,8 @@ export function getRoomName (id: string): Promise<string> {
  * @todo test why create resolves with object instead of simply ID
  */
 export function getDirectMessageRoomId (username: string): Promise<string> {
-  return cacheCall('createDirectMessage', username).then((DM) => DM.rid)
+  return cacheCall('createDirectMessage', username)
+    .then((DM) => DM.rid)
 }
 
 /** Join the bot into a room by its name or ID */
@@ -525,7 +480,10 @@ export function joinRooms (rooms: string[]): Promise<void[]> {
  * Structure message content, optionally addressing to room ID.
  * Accepts message text string or a structured message object.
  */
-export function prepareMessage (content: string | IMessage, roomId?: string): Message {
+export function prepareMessage (
+  content: string | IMessage,
+  roomId?: string
+): Message {
   const message = new Message(content, integrationId)
   if (roomId) message.setRoomId(roomId)
   return message
@@ -548,7 +506,10 @@ export function sendMessage (message: IMessage): Promise<IMessageReceiptAPI> {
  *       Solution would probably be to always return an array, even for single
  *       send. This would be a breaking change, should hold until major version.
  */
-export function sendToRoomId (content: string | string[], roomId: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
+export function sendToRoomId (
+  content: string | string[] | IMessage,
+  roomId: string
+): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   if (!Array.isArray(content)) {
     return sendMessage(prepareMessage(content, roomId))
   } else {
@@ -563,8 +524,12 @@ export function sendToRoomId (content: string | string[], roomId: string): Promi
  * @param content Accepts message text string or array of strings.
  * @param room    A name (or ID) to resolve as ID to use in send.
  */
-export function sendToRoom (content: string | string[], room: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
-  return getRoomId(room).then((roomId) => sendToRoomId(content, roomId))
+export function sendToRoom (
+  content: string | string[] | IMessage,
+  room: string
+): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
+  return getRoomId(room)
+    .then((roomId) => sendToRoomId(content, roomId))
 }
 
 /**
@@ -572,8 +537,12 @@ export function sendToRoom (content: string | string[], room: string): Promise<I
  * @param content   Accepts message text string or array of strings.
  * @param username  Name to create (or get) DM for room ID to use in send.
  */
-export function sendDirectToUser (content: string | string[], username: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
-  return getDirectMessageRoomId(username).then((rid) => sendToRoomId(content, rid))
+export function sendDirectToUser (
+  content: string | string[] | IMessage,
+  username: string
+): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
+  return getDirectMessageRoomId(username)
+    .then((rid) => sendToRoomId(content, rid))
 }
 
 /**
