@@ -22,6 +22,9 @@ export let dm = (process.env.RESPOND_TO_DM || 'false').toLowerCase() === 'true'
 export let livechat = (process.env.RESPOND_TO_LIVECHAT || 'false').toLowerCase() === 'true'
 export let edited = (process.env.RESPOND_TO_EDITED || 'false').toLowerCase() === 'true'
 
+// Respond to server requests
+export let shouldRespondRequests = (process.env.RESPOND_TO_REQUESTS || 'true').toLowerCase() === 'true'
+
 // Message attribute settings
 export let integrationId = process.env.INTEGRATION_ID || 'js.SDK'
 
@@ -30,6 +33,4 @@ export let roomCacheMaxSize = parseInt(process.env.ROOM_CACHE_SIZE || '10', 10)
 export let roomCacheMaxAge = 1000 * parseInt(process.env.ROOM_CACHE_MAX_AGE || '300', 10)
 export let dmCacheMaxSize = parseInt(process.env.DM_ROOM_CACHE_SIZE || '10', 10)
 export let dmCacheMaxAge = 1000 * parseInt(process.env.DM_ROOM_CACHE_MAX_AGE || '100', 10)
-
-export let waitForClientCommands = process.env.WAIT_CLIENT_COMMANDS
-export let maxLogEntriesStored = process.env.MAX_LOG_ENTRIES_STORED || 100
+export let maxLogEntriesStored = parseInt(process.env.MAX_LOG_ENTRIES_STORED || '100', 10)

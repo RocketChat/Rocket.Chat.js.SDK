@@ -59,9 +59,7 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
  * the server
  */
 export let logs: Array<string> = []
-// the plus unary operator implictly converts a string into an int
-// because the env var is a string while the default value is already an int
-export let maxLogEntriesStored: number = +settings.maxLogEntriesStored
+export let maxLogEntriesStored: number = settings.maxLogEntriesStored
 intercept((log: string) => {
   logs.push(log)
   if (logs.length > maxLogEntriesStored) {
@@ -347,12 +345,8 @@ export function login (credentials: ICredentials = {
     })
     .then(async (loggedInUserId) => {
       // Calling function to listen to requests and answer to them
-      if (settings.waitForClientCommands) {
+      if (settings.shouldRespondRequests) {
         await listenToServerRequests(loggedInUserId)
-      } else {
-        listenToServerRequests(loggedInUserId).catch((err: Error) => {
-          logger.info('[login] Error listening to server requests: ', err)
-        })
       }
       return loggedInUserId
     })

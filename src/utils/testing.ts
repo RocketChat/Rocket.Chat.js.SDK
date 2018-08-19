@@ -22,6 +22,11 @@ export async function userInfo (username: string): Promise<IUserResultAPI> {
   return get('users.info', { username }, true)
 }
 
+/** Get information about a bot's client data */
+export async function botClientData (username: string): Promise<IUserResultAPI> {
+  return get('bots.getCustomClientData', { username }, true)
+}
+
 /** Create a user and catch the error if they exist already */
 export async function createUser (user: INewUserAPI): Promise<IUserResultAPI> {
   return post('users.create', user, true, /already in use/i)

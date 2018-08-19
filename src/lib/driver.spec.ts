@@ -125,25 +125,22 @@ describe('driver', () => {
     })
   })
   describe('.serverRequests', () => {
-    /**
-     *  Note: For them to work you have to wait for server-requests subscription
-     * to be fully initialized, so set ROCKETCHAT_WAIT_CLIENT_COMMANDS to true
-     */
     it('sets customClientData from the SDK with no customizations', async () => {
       await driver.connect()
       await driver.login()
       await utils
-      const result = await utils.userInfo(botUser.username)
-      expect(result.user.customClientData).to.deep.include(driver.customClientData)
+      const result = await utils.botClientData(botUser.username)
+      console.log(result);
+      expect(result.customClientData).to.deep.include(driver.customClientData)
     })
     it('sets customClientData from the SDK with customizations', async () => {
       driver.setCustomClientData({ framework: 'Testing' })
       await driver.connect()
       await driver.login()
       await utils
-      const result = await utils.userInfo(botUser.username)
-      expect(result.user.customClientData).to.deep.include(driver.customClientData)
-      expect(result.user.customClientData.framework).to.equal('Testing')
+      const result = await utils.botClientData(botUser.username)
+      expect(result.customClientData).to.deep.include(driver.customClientData)
+      expect(result.customClientData.framework).to.equal('Testing')
     })
     it('custom handler is called once', async () => {
       driver.setCustomClientData({ framework: 'Testing' })

@@ -624,12 +624,12 @@ rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
 | `RESPOND_TO_DM`        | true/false, respond listens to DMs with bot           |
 | `RESPOND_TO_EDITED`    | true/false, respond listens to edited messages        |
 | `INTEGRATION_ID`       | ID applied to message object to integration source    |
+| `RESPOND_TO_REQUESTS`  | true/false, respond to requests coming from server    |
 | **Advanced configs**   |                                                       |
 | `ROOM_CACHE_SIZE`      | Size of cache (LRU) for room (ID or name) lookups     |
 | `ROOM_CACHE_MAX_AGE`   | Max age of cache for room lookups                     |
 | `DM_ROOM_CACHE_SIZE`   | Size of cache for Direct Message room lookups         |
 | `DM_ROOM_CACHE_MAX_AGE`| Max age of cache for DM lookups                       |
-| `WAIT_CLIENT_COMMANDS` | Wait subscription of ClientCommands before login finishes.
 | **Test configs**       |                                                       |
 | `ADMIN_USERNAME`       | Admin user password for API                           |
 | `ADMIN_PASS`           | Admin user password for API                           |
