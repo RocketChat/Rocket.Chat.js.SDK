@@ -42,16 +42,18 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 // -----------------------------------------------------------------------------
 
 /**
- * Intercept all logging going to stdout and store the last maxLogSize entries
+ * Intercept all logging going to stdout and store the last maxLogEntriesStored entries
  * That is the array sent to the server when the client receives a ClientCommand
  * getLogs
  */
 export let logs: Array<string> = []
-export let maxLogSize: number = 100
+// the plus unary operator implictly converts a string into an int
+// because the env var is a string while the default value is already an int
+export let maxLogEntriesStored: number = +settings.maxLogEntriesStored
 intercept((log: string) => {
   logs.push(log)
-  if (logs.length > maxLogSize) {
-    logs.splice(logs.length - maxLogSize, logs.length)
+  if (logs.length > maxLogEntriesStored) {
+    logs.splice(logs.length - maxLogEntriesStored, logs.length)
   }
   return log
 })
@@ -626,9 +628,9 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
       case 'heartbeat':
         break
 
-      // SDK-level command to reply with the latest maxLogSize logs
+      // SDK-level command to reply with the latest maxLogEntriesStored logs
       case 'getLogs':
-        result.logs = logs
+        result.logs = handler ? handler(command) : logs
         break
 
       // SDK-level command to pause the message stream, interrupting all messages from the server
@@ -646,9 +648,7 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
         const statistics: any = {}
         statistics.sdk = sessionStatistics
         statistics.sdk.Bot_Stats_Latest_Read = messageLastReadTime ? messageLastReadTime.toUTCString() : undefined
-        if (handler) {
-          statistics.adapter = await handler(command)
-        }
+        statistics.adapter = handler ? await handler(command) : undefined
         result.statistics = statistics
         break
 

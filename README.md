@@ -317,7 +317,7 @@ an UI with that feature.
 
 Register a function `callback` to handle incoming clientCommands that are not at the SDK-level and have the given `key`.
 
-The `callback` receives a `ClientCommand` object as the first parameter and returns a promise that resolves with a `ClientCommandResponse` object.
+The `callback` receives a `ClientCommand` object as the first parameter and returns a promise that resolves with a `ClientCommandResponse` object unless the ClientCommand belongs to the exceptions listed below.
 
 `ClientCommand` object structure:
 - ClientCommand._id: ID of the ClientCOmmand
@@ -331,6 +331,14 @@ The `callback` receives a `ClientCommand` object as the first parameter and retu
 `ClientCommandResponse` object structure:
 - ClientCommandResponse.success: Boolean indicating the success status of the command
 - Along with any other relevant property to the response
+
+#### Exceptions that are important to support
+
+- `getStatistics` - Specific ClientCommand keyword to retrieve live statistics from the client (such as a bot adapter). The custom handler must resolve with an object in which each key-value pair will be displayed in the Bot Details page of the bot. The page will also display an icon with an additional description of the statistic. That description is defined with the `{key}_desc` format in the i18n of Rocket.Chat.
+  - Example: `{ Bot_Stat_1: 3 }`. Both the `key` (`Bot_Stat_1`) and its description (`Bot_Stat_1_desc`) will be translated via i18n.
+- `getLogs` - The SDK stores a specified number of the last entires of the logger, which is then sent to the server when requested as an array of strings, in which each member is a log entry. The custom handler of this ClientCommand must resolve with an array of strings.
+  - The number of entries to be sent to the server is configured via the `MAX_LOG_ENTRIES_STORED` environment variable.
+  - This handler must be added whenever your adapter does not log to `stdout`. Then the adapter must either add the new handler or set the `customClientData` with `canGetLogs: false`.
 
 ### `driver.asyncCall(method, params)`
 
