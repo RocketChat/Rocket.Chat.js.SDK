@@ -313,30 +313,30 @@ an UI with that feature.
 
 ### `driver.registerRequestHandler(key, callback)`
 
-[Click here](https://rocket.chat/docs/developer-guides/ddp-requests/) to know more about DDP Requests
+[Click here](https://rocket.chat/docs/developer-guides/ddp-requests/) to know more about the requests that come from the server
 
-Register a function `callback` to handle incoming DDP Requests that are not at the SDK-level and have the given `key`.
+Register a function `callback` to handle incoming server requests that are not at the SDK-level and have the given `key`.
 
-The `callback` receives a `ddpRequest` object as the first parameter and returns a promise that resolves with a `ddpRequestResponse` object unless the ddpRequest belongs to the exceptions listed below.
+The `callback` receives a `serverRequest` object as the first parameter and returns a promise that resolves with a `serverRequest` object unless the ddpRequest belongs to the exceptions listed below.
 
-`ddpRequest` object structure:
-- ddpRequest._id: ID of the DDP Request
-- ddpRequest.u: Object representing the user that the request is targeted to, always set to the user that receives the request
-- ddpRequest.u._id: ID of the user,
-- ddpRequest.u.username: Username of the user
-- ddpRequest.data: Object with any additional data provided by the request sender
-- ddpRequest.key: String key of the request
-- ddpRequest.ts: Timestamp of when the request was issued
+`serverRequest` object structure:
+- serverRequest._id: ID of the server request
+- serverRequest.u: Object representing the user that the request is targeted to, always set to the user that receives the request
+- serverRequest.u._id: ID of the user,
+- serverRequest.u.username: Username of the user
+- serverRequest.data: Object with any additional data provided by the request sender
+- serverRequest.key: String key of the request
+- serverRequest.ts: Timestamp of when the request was issued
 
-`ddpRequestResponse` object structure:
-- ddpRequestResponse.success: Boolean indicating the success status of the request
+`serverRequestResponse` object structure:
+- serverRequestResponse.success: Boolean indicating the success status of the request
 - data: Object with any additional data wanted by the request sender
 
 #### Exceptions that are important to support
 
-- `getStatistics` - Specific DDP Request keyword to retrieve live statistics from the client (such as a bot adapter). The custom handler must resolve with an object in which each key-value pair will be displayed in the Bot Details page of the bot. The page will also display an icon with an additional description of the statistic. That description is defined with the `{key}_desc` format in the i18n of Rocket.Chat.
+- `getStatistics` - Specific server request keyword to retrieve live statistics from the client (such as a bot adapter). The custom handler must resolve with an object in which each key-value pair will be displayed in the Bot Details page of the bot. The page will also display an icon with an additional description of the statistic. That description is defined with the `{key}_desc` format in the i18n of Rocket.Chat.
   - Example: `{ Bot_Stat_1: 3 }`. Both the `key` (`Bot_Stat_1`) and its description (`Bot_Stat_1_desc`) will be translated via i18n.
-- `getLogs` - The SDK stores a specified number of the last entires of the logger, which is then sent to the server when requested as an array of strings, in which each member is a log entry. The custom handler of this DDP Request must resolve with an array of strings.
+- `getLogs` - The SDK stores a specified number of the last entires of the logger, which is then sent to the server when requested as an array of strings, in which each member is a log entry. The custom handler of this server request must resolve with an array of strings.
   - The number of entries to be sent to the server is configured via the `MAX_LOG_ENTRIES_STORED` environment variable.
   - This handler must be added whenever your adapter does not log to `stdout`. Then the adapter must either add the new handler or set the `customClientData` with `canGetLogs: false`.
 

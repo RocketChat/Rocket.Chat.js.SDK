@@ -23,7 +23,7 @@ async function start () {
     edited: true,
     livechat: false
   })
-  driver.registerCommandHandler('testCommand', async (command) => {
+  driver.registerRequestHandler('testCommand', async (request) => {
     return { success: true, msg: 'OK' }
   })
 }
