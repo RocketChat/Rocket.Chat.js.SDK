@@ -6,13 +6,13 @@ export interface IMessage {
   t?: string // type e.g. rm
   msg?: string // text content
   alias?: string // ??
-  emoji?: string // emoji code
+  emoji?: string // emoji to use as avatar
   avatar?: string // url
   groupable?: boolean // ?
   bot?: any // integration details
   urls?: string[] // ?
   mentions?: string[] // ?
-  reactions?: { [emoji: string]: string[] } // emoji: [usernames]
+  reactions?: { [emoji: string]: { usernames: string[] } } // emoji: [usernames]
   location?: {
     type: string // e.g. Point
     coordinates: string[] // longitude latitude

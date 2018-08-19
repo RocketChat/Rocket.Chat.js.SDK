@@ -11,10 +11,22 @@ import immutableCollectionMixin from 'asteroid-immutable-collections-mixin'
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
-import { IConnectOptions, IRespondOptions, ICallback, ILogger, ISessionStatistics } from '../config/driverInterfaces'
-import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces'
+import {
+  IConnectOptions,
+  IRespondOptions,
+  ICallback,
+  ILogger,
+  ISessionStatistics
+} from '../config/driverInterfaces'
+import {
+  IAsteroid,
+  ICredentials,
+  ISubscription,
+  ICollection
+} from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
+import { IMessageReceiptAPI } from '../utils/interfaces'
 
 import {
   IClientCommand,
@@ -314,20 +326,20 @@ export function login (credentials: ICredentials = {
   ldap: settings.ldap
 }): Promise<any> {
   let login: Promise<any>
-  if (credentials.ldap) {
-    logger.info(`[login] Logging in ${credentials.username} with LDAP`)
-    login = asteroid.loginWithLDAP(
-      credentials.email || credentials.username,
-      credentials.password,
-      { ldap: true, ldapOptions: credentials.ldapOptions || {} }
-    )
-  } else {
-    logger.info(`[login] Logging in ${credentials.username}`)
-    login = asteroid.loginWithPassword(
-      credentials.email || credentials.username!,
-      credentials.password
-    )
-  }
+  // if (credentials.ldap) {
+  //   logger.info(`[login] Logging in ${credentials.username} with LDAP`)
+  //   login = asteroid.loginWithLDAP(
+  //     credentials.email || credentials.username,
+  //     credentials.password,
+  //     { ldap: true, ldapOptions: credentials.ldapOptions || {} }
+  //   )
+  // } else {
+  logger.info(`[login] Logging in ${credentials.username}`)
+  login = asteroid.loginWithPassword(
+    credentials.email || credentials.username!,
+    credentials.password
+  )
+  // }
   return login
     .then((loggedInUserId) => {
       userId = loggedInUserId
@@ -338,7 +350,9 @@ export function login (credentials: ICredentials = {
       if (settings.waitForClientCommands) {
         await respondToCommands(loggedInUserId)
       } else {
-        respondToCommands(loggedInUserId).catch(() => {/**/})
+        respondToCommands(loggedInUserId).catch((err: Error) => {
+          logger.info('[login] Error responding to client commands:', err)
+        })
       }
       return loggedInUserId
     })
@@ -441,7 +455,7 @@ export function subscribeToMessages (): Promise<ISubscription> {
  *  - Third argument is additional attributes, such as `roomType`
  */
 export function reactToMessages (callback: ICallback): void {
-  logger.info(`[reactive] Listening for change events in collection ${messages.name}`)
+  logger.info(`[reactToMessages] Listening for change in ${messages.name}`)
 
   messages.reactiveQuery({}).on('change', (_id: string) => {
     const changedMessageQuery = messages.reactiveQuery({ _id })
@@ -510,12 +524,10 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
     let currentReadTime = new Date(message.ts.$date)
 
     // Ignore edited messages if configured to
-    // unless it's newer than current read time (hasn't been seen before)
-    // @todo: test this logic, why not just return if edited and not responding
-    if (config.edited && typeof message.editedAt !== 'undefined') {
-      let edited = new Date(message.editedAt.$date)
-      if (edited > currentReadTime) currentReadTime = edited
-    }
+    if (!config.edited && message.editedAt) return
+
+    // Set read time as time of edit, if message is edited
+    if (message.editedAt) currentReadTime = new Date(message.editedAt.$date)
 
     // Ignore messages in stream that aren't new
     if (currentReadTime <= messageLastReadTime) return
@@ -562,7 +574,7 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
   const clientCommands = await subscribeToCommands(userId)
   await asyncCall('setCustomClientData', customClientData)
 
-  logger.info(`[reactive] Listening for change events in collection ${clientCommands.name}`)
+  logger.info(`[reactToCommands] Listening for change in ${clientCommands.name}`)
   clientCommands.reactiveQuery({}).on('change', (_id: string) => {
     const changedCommandQuery = clientCommands.reactiveQuery({ _id })
     if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
@@ -570,9 +582,13 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
       if (Array.isArray(changedCommand.args)) {
         callback(null, changedCommand.args[0])
       } else {
-        logger.debug('[ClientCommand] Stream received update without args, probably a reconnect')
-        logger.debug('[ClientCommand] Recalling setCustomClientData to ensure consistence')
+        logger.debug('[reactToCommands] Stream received update without args, probably a reconnect')
+        logger.debug('[reactToCommands] Re-calling setCustomClientData to ensure consistency')
         asyncCall('setCustomClientData', customClientData)
+          .catch((err: Error) => {
+            logger.error(`[reactToCommands] Unable to set custom data: ${err.message}`)
+            throw err
+          })
       }
     }
   })
@@ -585,7 +601,7 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
   commandLastReadTime = new Date() // init before any message read
   await reactToCommands(userId, async (err, command) => {
     if (err) {
-      logger.error(`[ClientCommand] Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
+      logger.error(`[respondToCommands] Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
       throw err
     }
 
@@ -597,7 +613,7 @@ async function respondToCommands (userId: string): Promise<void | void[]> {
 
     // Only log the command when needed
     if (silentClientCommands.indexOf(command.cmd.key) === -1) {
-      logger.info(`[ClientCommand] Received '${command.cmd.key}' at ${currentReadTime}`)
+      logger.info(`[respondToCommands] Received '${command.cmd.key}' at ${currentReadTime}`)
     }
 
     // At this point, command has passed checks and can be responded to
@@ -648,7 +664,9 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
         const statistics: any = {}
         statistics.sdk = sessionStatistics
         statistics.sdk.Bot_Stats_Latest_Read = messageLastReadTime ? messageLastReadTime.toUTCString() : undefined
-        statistics.adapter = handler ? await handler(command) : undefined
+        if (handler) {
+          statistics.adapter = await handler(command)
+        }
         result.statistics = statistics
         break
 
@@ -795,7 +813,7 @@ export function prepareMessage (content: string | IMessage, roomId?: string): Me
  * Send a prepared message object (with pre-defined room ID).
  * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
  */
-export function sendMessage (message: IMessage): Promise<IMessage> {
+export function sendMessage (message: IMessage): Promise<IMessageReceiptAPI> {
   return asyncCall('sendMessage', message)
 }
 
@@ -803,8 +821,12 @@ export function sendMessage (message: IMessage): Promise<IMessage> {
  * Prepare and send string/s to specified room ID.
  * @param content Accepts message text string or array of strings.
  * @param roomId  ID of the target room to use in send.
+ * @todo Returning one or many gets complicated with type checking not allowing
+ *       use of a property because result may be array, when you know it's not.
+ *       Solution would probably be to always return an array, even for single
+ *       send. This would be a breaking change, should hold until major version.
  */
-export function sendToRoomId (content: string | string[], roomId: string): Promise<IMessage[] | IMessage> {
+export function sendToRoomId (content: string | string[], roomId: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   if (!Array.isArray(content)) {
     return sendMessage(prepareMessage(content, roomId))
   } else {
@@ -819,7 +841,7 @@ export function sendToRoomId (content: string | string[], roomId: string): Promi
  * @param content Accepts message text string or array of strings.
  * @param room    A name (or ID) to resolve as ID to use in send.
  */
-export function sendToRoom (content: string | string[], room: string): Promise<IMessage[] | IMessage> {
+export function sendToRoom (content: string | string[], room: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   return getRoomId(room).then((roomId) => sendToRoomId(content, roomId))
 }
 
@@ -828,6 +850,23 @@ export function sendToRoom (content: string | string[], room: string): Promise<I
  * @param content   Accepts message text string or array of strings.
  * @param username  Name to create (or get) DM for room ID to use in send.
  */
-export function sendDirectToUser (content: string | string[], username: string): Promise<IMessage[] | IMessage> {
+export function sendDirectToUser (content: string | string[], username: string): Promise<IMessageReceiptAPI[] | IMessageReceiptAPI> {
   return getDirectMessageRoomId(username).then((rid) => sendToRoomId(content, rid))
+}
+
+/**
+ * Edit an existing message, replacing any attributes with those provided.
+ * The given message object should have the ID of an existing message.
+ */
+export function editMessage (message: IMessage): Promise<IMessage> {
+  return asyncCall('updateMessage', message)
+}
+
+/**
+ * Send a reaction to an existing message. Simple proxy for method call.
+ * @param emoji     Accepts string like `:thumbsup:` to add 👍 reaction
+ * @param messageId ID for a previously sent message
+ */
+export function setReaction (emoji: string, messageId: string) {
+  return asyncCall('setReaction', [emoji, messageId])
 }

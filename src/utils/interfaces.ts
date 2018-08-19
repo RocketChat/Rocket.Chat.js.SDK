@@ -125,13 +125,29 @@ export interface IRoomAPI {
 export interface IChannelAPI {
   _id: string          // Channel ID
   name: string         // Channel name
-  t: 'c' | 'p' | 'l'   // Channel type (channel, private, livechat)
+  t: 'c' | 'p' | 'l'   // Channel type (channel always c)
   msgs: number         // Count of messages in room
   u: {
     _id: string        // Owner user ID
     username: string    // Owner username
   }
   ts: string           // ISO timestamp (current time in room?)
+  default: boolean     // Is default channel
+}
+
+/** Group result schema */
+export interface IGroupAPI {
+  _id: string          // Group ID
+  name: string         // Group name
+  usernames: string[]  // Users in group
+  t: 'c' | 'p' | 'l'   // Group type (private always p)
+  msgs: number         // Count of messages in room
+  u: {
+    _id: string        // Owner user ID
+    username: string   // Owner username
+  }
+  ts: string           // ISO timestamp (current time in room?)
+  default: boolean     // Is default channel (would be false)
 }
 
 /** Result structure for room creation (e.g. DM) */
@@ -143,5 +159,11 @@ export interface IRoomResultAPI {
 /** Result structure for channel creation */
 export interface IChannelResultAPI {
   channel: IChannelAPI
+  success: boolean
+}
+
+/** Result structure for group creation */
+export interface IGroupResultAPI {
+  group: IGroupAPI
   success: boolean
 }

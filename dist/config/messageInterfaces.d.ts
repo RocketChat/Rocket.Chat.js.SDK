@@ -12,7 +12,9 @@ export interface IMessage {
     urls?: string[];
     mentions?: string[];
     reactions?: {
-        [emoji: string]: string[];
+        [emoji: string]: {
+            usernames: string[];
+        };
     };
     location?: {
         type: string;

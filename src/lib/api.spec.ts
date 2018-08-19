@@ -62,7 +62,8 @@ describe('api', () => {
     it('returns data from complex calls with auth and parameters', async () => {
       await api.login()
       const result = await api.get('users.list', {
-        fields: { 'username': 1 }
+        fields: { 'username': 1 },
+        query: { type: { $in: ['user', 'bot'] } }
       }, true)
       const users = result.users.map((user) => user.username)
       expect(users).to.include(botUser.username, mockUser.username)
