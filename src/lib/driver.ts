@@ -29,18 +29,18 @@ import { logger, replaceLog } from './log'
 import { IMessageReceiptAPI } from '../utils/interfaces'
 
 import {
-  IClientCommand,
-  IClientCommandResponse,
-  IClientCommandHandler,
-  IClientCommandHandlerMap,
+  IServerRequest,
+  IServerRequestResponse,
+  IServerRequestHandler,
+  IServerRequestHandlerMap,
   ICustomClientData,
   IClientDetails
-} from '../config/commandInterfaces'
+} from '../config/serverRequestInterfaces'
 
 /** Collection names */
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
-const _clientCommandsStreamName = 'stream-client-commands'
+const _serverRequestsStreamName = 'stream-ddp-requests'
 
 /**
  * Asteroid ^v2 interface below, suspended for work on future branch
@@ -55,8 +55,8 @@ const Asteroid: IAsteroid = createClass([immutableCollectionMixin])
 
 /**
  * Intercept all logging going to stdout and store the last maxLogEntriesStored entries
- * That is the array sent to the server when the client receives a ClientCommand
- * getLogs
+ * That is the array sent to the server when the client receives a getLogs request from
+ * the server
  */
 export let logs: Array<string> = []
 // the plus unary operator implictly converts a string into an int
@@ -70,9 +70,9 @@ intercept((log: string) => {
   return log
 })
 
-/** Internal for comparing message and command update timestamps */
+/** Internal for comparing message and request update timestamps */
 export let messageLastReadTime: Date
-export let commandLastReadTime: Date
+export let requestLastReceivedTime: Date
 
 /**
  * The integration property is applied as an ID on sent messages `bot.i` param
@@ -118,24 +118,24 @@ export let joinedIds: string[] = []
 export let messages: ICollection
 
 /**
- * Array of client commands received from reactive collection
+ * Array of server requests received from reactive collection
  */
-export let clientCommands: ICollection
+export let serverRequests: ICollection
 
 /**
- * Map of command handlers added by the client of the sdk
+ * Map of request handlers added by the client of the sdk
  */
-export let commandHandlers: IClientCommandHandlerMap = {}
+export let serverRequestHandlers: IServerRequestHandlerMap = {}
 
 /**
- * ClientCommands that should not be logged
+ * Server requests that should not be logged
  */
-export let silentClientCommands: Array<string> = ['heartbeat', 'getLogs']
+export let silentServerRequests: Array<string> = ['heartbeat', 'getLogs']
 
 /**
  * Method calls that should not be logged
  */
-export let silentMethods: Array<string> = ['replyClientCommand']
+export let silentMethods: Array<string> = ['replyToDdpRequest']
 
 /**
  * Custom Data set by the client that is using the SDK
@@ -343,15 +343,15 @@ export function login (credentials: ICredentials = {
   return login
     .then((loggedInUserId) => {
       userId = loggedInUserId
-      // Calling function to listen to commands and answer to them
       return loggedInUserId
     })
     .then(async (loggedInUserId) => {
+      // Calling function to listen to requests and answer to them
       if (settings.waitForClientCommands) {
-        await respondToCommands(loggedInUserId)
+        await listenToServerRequests(loggedInUserId)
       } else {
-        respondToCommands(loggedInUserId).catch((err: Error) => {
-          logger.info('[login] Error responding to client commands:', err)
+        listenToServerRequests(loggedInUserId).catch((err: Error) => {
+          logger.info('[login] Error listening to server requests: ', err)
         })
       }
       return loggedInUserId
@@ -554,39 +554,39 @@ export function respondToMessages (callback: ICallback, options: IRespondOptions
 }
 
 /**
- * Begin subscription to clientCommands for user and returns the collection
+ * Begin subscription to server requests directed to the account and returns the collection
  */
-async function subscribeToCommands (userId: string): Promise<ICollection> {
-  await subscribe(_clientCommandsStreamName, userId, true)
-  clientCommands = asteroid.getCollection(_clientCommandsStreamName)
-  return clientCommands
+async function subscribeToServerRequests (userId: string): Promise<ICollection> {
+  await subscribe(_serverRequestsStreamName, userId, true)
+  serverRequests = asteroid.getCollection(_serverRequestsStreamName)
+  return serverRequests
 }
 
 /**
- * Once a subscription is created, using `subscribeToCommands` this method
- * can be used to attach a callback to changes in the clientCommands stream.
+ * Once a subscription is created, using `subscribeToServerRequests` this method
+ * can be used to attach a callback to changes in the serverRequests stream.
  *
- * @param callback Function called with every change in subscription of clientCommands.
+ * @param callback Function called with every change in subscription of server requests.
  *  - Uses error-first callback pattern
- *  - Second argument is the the command received
+ *  - Second argument is the the request received
  */
-async function reactToCommands (userId: string, callback: ICallback): Promise<void> {
-  const clientCommands = await subscribeToCommands(userId)
+async function reactToServerRequests (userId: string, callback: ICallback): Promise<void> {
+  const serverRequests = await subscribeToServerRequests(userId)
   await asyncCall('setCustomClientData', customClientData)
 
-  logger.info(`[reactToCommands] Listening for change in ${clientCommands.name}`)
-  clientCommands.reactiveQuery({}).on('change', (_id: string) => {
-    const changedCommandQuery = clientCommands.reactiveQuery({ _id })
-    if (changedCommandQuery.result && changedCommandQuery.result.length > 0) {
-      const changedCommand = changedCommandQuery.result[0]
-      if (Array.isArray(changedCommand.args)) {
-        callback(null, changedCommand.args[0])
+  logger.info(`[reactToServerRequests] Listening for change in ${serverRequests.name}`)
+  serverRequests.reactiveQuery({}).on('change', (_id: string) => {
+    const changedRequestQuery = serverRequests.reactiveQuery({ _id })
+    if (changedRequestQuery.result && changedRequestQuery.result.length > 0) {
+      const request = changedRequestQuery.result[0]
+      if (Array.isArray(request.args)) {
+        callback(null, request.args[0])
       } else {
-        logger.debug('[reactToCommands] Stream received update without args, probably a reconnect')
-        logger.debug('[reactToCommands] Re-calling setCustomClientData to ensure consistency')
+        logger.debug('[reactToServerRequests] Stream received update without args, probably a reconnect')
+        logger.debug('[reactToServerRequests] Re-calling setCustomClientData to ensure consistency')
         asyncCall('setCustomClientData', customClientData)
           .catch((err: Error) => {
-            logger.error(`[reactToCommands] Unable to set custom data: ${err.message}`)
+            logger.error(`[reactToServerRequests] Unable to set custom data: ${err.message}`)
             throw err
           })
       }
@@ -595,66 +595,68 @@ async function reactToCommands (userId: string, callback: ICallback): Promise<vo
 }
 
 /**
- * Calls reactToCommands with a callback to read latest clientCommands and reply to them
+ * Calls reactToServerRequests with a callback to read latest server requests and reply to them
  */
-async function respondToCommands (userId: string): Promise<void | void[]> {
-  commandLastReadTime = new Date() // init before any message read
-  await reactToCommands(userId, async (err, command) => {
+async function listenToServerRequests (userId: string): Promise<void | void[]> {
+  requestLastReceivedTime = new Date() // init before any message read
+  await reactToServerRequests(userId, async (err, request) => {
     if (err) {
-      logger.error(`[respondToCommands] Unable to receive command ${command.cmd.key}. ${JSON.stringify(err)}`)
+      logger.error(`[listenToServerRequests] Unable to receive request ${request.key}.` +
+        `${JSON.stringify(err)}`)
       throw err
     }
 
     // Set current time for comparison to incoming
-    let currentReadTime = new Date(command.ts.$date)
+    let currentReadTime = new Date(request.ts.$date)
 
-    // Ignore commands in stream that aren't new
-    if (currentReadTime <= commandLastReadTime) return
+    // Ignore requests in stream that aren't new
+    if (currentReadTime <= requestLastReceivedTime) return
 
-    // Only log the command when needed
-    if (silentClientCommands.indexOf(command.cmd.key) === -1) {
-      logger.info(`[respondToCommands] Received '${command.cmd.key}' at ${currentReadTime}`)
+    // Only log the request when needed
+    if (silentServerRequests.indexOf(request.key) === -1) {
+      logger.info(`[listenToServerRequests] Received '${request.key}' at ${currentReadTime}`)
     }
 
-    // At this point, command has passed checks and can be responded to
-    commandLastReadTime = currentReadTime
+    // At this point, request has passed checks and can be responded to
+    requestLastReceivedTime = currentReadTime
 
-    // Processing completed, call callback to respond to command
-    return commandHandler(command)
+    // Processing completed, call callback to respond to request
+    return serverRequestHandler(request)
   })
 }
 
 /**
- * Middleware function to reply to predefined clientCommands or to call a
- * handler registered by the user
+ * Middleware function to reply to predefined server requests or to call a
+ * handler registered by the user of the driver
  *
- * @param command Command object
+ * @param request Request object
  */
-async function commandHandler (command: IClientCommand): Promise<void | void[]> {
-  let result: IClientCommandResponse = {
-    success: true
+async function serverRequestHandler (request: IServerRequest): Promise<void | void[]> {
+  let result: IServerRequestResponse = {
+    success: true,
+    data: {}
   }
-  // Only log the command when needed
-  const shouldLog: boolean = silentClientCommands.indexOf(command.cmd.key) === -1
+  // Only log the request when needed
+  const shouldLog: boolean = silentServerRequests.indexOf(request.key) === -1
 
   try {
-    const handler = commandHandlers[command.cmd.key]
-    switch (command.cmd.key) {
-      // SDK-level command to check for aliveness of the bot regarding commands
+    const handler = serverRequestHandlers[request.key]
+    switch (request.key) {
+      // SDK-level request to check for aliveness of the bot regarding requests
       case 'heartbeat':
         break
 
-      // SDK-level command to reply with the latest maxLogEntriesStored logs
+      // SDK-level request to reply with the latest maxLogEntriesStored logs
       case 'getLogs':
-        result.logs = handler ? handler(command) : logs
+        result.data = handler ? handler(request) : logs
         break
 
-      // SDK-level command to pause the message stream, interrupting all messages from the server
+      // SDK-level request to pause the message stream, interrupting all messages from the server
       case 'pauseMessageStream':
         subscriptions.map((s: ISubscription) => (s._name === _messageCollectionName ? unsubscribe(s) : undefined))
         break
 
-      // SDK-level command to resubscribe to the message stream
+      // SDK-level request to resubscribe to the message stream
       case 'resumeMessageStream':
         await subscribeToMessages()
         messageLastReadTime = new Date() // reset time of last read message
@@ -665,50 +667,50 @@ async function commandHandler (command: IClientCommand): Promise<void | void[]> 
         statistics.sdk = sessionStatistics
         statistics.sdk.Bot_Stats_Latest_Read = messageLastReadTime ? messageLastReadTime.toUTCString() : undefined
         if (handler) {
-          statistics.adapter = await handler(command)
+          statistics.adapter = await handler(request)
         }
-        result.statistics = statistics
+        result.data = statistics
         break
 
-      // If command is not at the SDK-level, it tries to call a handler added by the user
+      // If request is not at the SDK-level, it tries to call a handler added by the user
       default:
         if (handler) {
-          if (shouldLog) logger.info(`[ClientCommand] Calling custom handler of command '${command.cmd.key}'`)
-          result = await handler(command)
+          if (shouldLog) logger.info(`[serverRequest] Calling custom handler of request '${request.key}'`)
+          result = await handler(request)
         } else {
           throw Error('Handler not found')
         }
     }
   } catch (err) {
-    logger.info(`[ClientCommand] Error on handling of '${command.cmd.key}'. ${JSON.stringify(err)}`)
+    logger.info(`[serverRequest] Error on handling of '${request.key}'. ${JSON.stringify(err)}`)
     result.success = false
     result.error = err
   }
 
   try {
-    if (shouldLog) logger.info(`[ClientCommand] Replying to '${command.cmd.key}' with result ${JSON.stringify(result)}`)
-    await asyncCall('replyClientCommand', [command._id, result])
-    if (shouldLog) logger.info(`[ClientCommand] Successful reply to command '${command.cmd.key}'`)
+    if (shouldLog) logger.info(`[serverRequest] Replying to '${request.key}' with result ${JSON.stringify(result)}`)
+    await asyncCall('replyToDdpRequest', [request._id, result])
+    if (shouldLog) logger.info(`[serverRequest] Successful reply to request '${request.key}'`)
   } catch (err) {
-    logger.info(`[ClientCommand] Failed to reply to command'${command.cmd.key}'. Error: ${JSON.stringify(err)}`)
+    logger.info(`[serverRequest] Failed to reply to request'${request.key}'. Error: ${JSON.stringify(err)}`)
   }
 }
 
 /**
- * Method to register a handler for a given clientCommand coming from the server
+ * Method to register a handler for a given request coming from the server
  *
- * @param key String representing the key of the clientCommand
- * @param callback Function to be called when the clientCommand with the given key is received
+ * @param key String representing the key of the server request
+ * @param callback Function to be called when the server request with the given key is received
  */
-export function registerCommandHandler (key: string, callback: IClientCommandHandler) {
-  const currentHandler = commandHandlers[key]
+export function registerRequestHandler (key: string, callback: IServerRequestHandler) {
+  const currentHandler = serverRequestHandlers[key]
   if (currentHandler) {
-    logger.error(`[ClientCommand] Command '${key}' already has a handler`)
-    throw Error(`[ClientCommand] Command '${key}' already has a handler`)
+    logger.error(`[registerRequestHandler] Request '${key}' already has a handler`)
+    throw Error(`[registerRequestHandler] Request '${key}' already has a handler`)
   }
 
-  logger.info(`[ClientCommand] Registering handler for command '${key}'`)
-  commandHandlers[key] = callback
+  logger.info(`[registerRequestHandler] Registering handler for request '${key}'`)
+  serverRequestHandlers[key] = callback
 }
 
 /**
