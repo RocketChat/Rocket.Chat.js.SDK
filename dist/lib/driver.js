@@ -339,7 +339,7 @@ function respondToMessages(callback, options = {}) {
         config.rooms.length > 0) {
         promise = joinRooms(config.rooms)
             .catch((err) => {
-            log_1.logger.error(`Failed to join rooms set in env: ${config.rooms}`, err);
+            log_1.logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`);
         });
     }
     exports.lastReadTime = new Date(); // init before any message read
@@ -410,7 +410,7 @@ function joinRoom(room) {
         let roomId = yield getRoomId(room);
         let joinedIndex = exports.joinedIds.indexOf(room);
         if (joinedIndex !== -1) {
-            log_1.logger.error(`tried to join room that was already joined`);
+            log_1.logger.error(`[joinRoom] room was already joined`);
         }
         else {
             yield asyncCall('joinRoom', roomId);
@@ -425,7 +425,7 @@ function leaveRoom(room) {
         let roomId = yield getRoomId(room);
         let joinedIndex = exports.joinedIds.indexOf(room);
         if (joinedIndex === -1) {
-            log_1.logger.error(`leave room ${room} failed because bot has not joined in room`);
+            log_1.logger.error(`[leaveRoom] failed because bot has not joined ${room}`);
         }
         else {
             yield asyncCall('leaveRoom', roomId);
