@@ -1,6 +1,6 @@
 {
   "name": "@rocket.chat/sdk",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Node.js SDK for Rocket.Chat. Application interface for server methods and message streams.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
