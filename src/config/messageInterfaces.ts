@@ -53,14 +53,16 @@ export interface IAttachmentField {
 }
 
 export interface IMessageAction {
-  type?: string,
-  text?: string,
-  url?: string,
-  image_url?: string,
-  is_webview?: boolean,
-  webview_height_ratio?: string,
-  msg?: string,
+  type?: string
+  text?: string
+  url?: string
+  image_url?: string
+  is_webview?: boolean
+  webview_height_ratio?: 'compact' | 'tall' | 'full'
+  msg?: string
   msg_in_chat_window?: boolean
+  button_alignment?: 'vertical' | 'horizontal'
+  temporary_buttons?: boolean
 }
 
 export interface IMessageLocation {
