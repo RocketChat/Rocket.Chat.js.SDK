@@ -2,6 +2,7 @@ import { Client } from 'node-rest-client'
 import * as settings from './settings'
 import { logger } from './log'
 import { IUserAPI } from '../utils/interfaces'
+import { livechat } from '../livechat/lib/api'
 
 /** Result object from an API login */
 export interface ILoginResultAPI {
@@ -159,6 +160,74 @@ export async function get (
 }
 
 /**
+ * Do a PUT request to an API endpoint.
+ * If it needs a token, login first (with defaults) to set auth headers.
+ * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
+ * @param endpoint The API endpoint (including version) e.g. `chat.update`
+ * @param data     Payload for PUT request to endpoint
+ * @param auth     Require auth headers for endpoint, default true
+ * @param ignore   Allows certain matching error messages to not count as errors
+ */
+export async function put (
+  endpoint: string,
+  data: any,
+  auth: boolean = true,
+  ignore?: RegExp
+): Promise<any> {
+  try {
+    logger.debug(`[API] PUT: ${endpoint}`, JSON.stringify(data))
+    if (auth && !loggedIn()) await login()
+    let headers = getHeaders(auth)
+    const result = await new Promise((resolve, reject) => {
+      client.put(url + endpoint, { headers, data }, (result: any) => {
+        if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
+        else if (!success(result, ignore)) reject(result)
+        else resolve(result)
+      }).on('error', (err: Error) => reject(err))
+    })
+    logger.debug('[API] PUT result:', result)
+    return result
+  } catch (err) {
+    console.error(err)
+    logger.error(`[API] PUT error (${endpoint}):`, err)
+  }
+}
+
+/**
+ * Do a DELETE request to an API endpoint.
+ * If it needs a token, login first (with defaults) to set auth headers.
+ * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
+ * @param endpoint The API endpoint (including version) e.g. `chat.update`
+ * @param data     Payload for DELETE request to endpoint
+ * @param auth     Require auth headers for endpoint, default true
+ * @param ignore   Allows certain matching error messages to not count as errors
+ */
+export async function del (
+	endpoint: string,
+	data: any,
+	auth: boolean = true,
+	ignore?: RegExp
+  ): Promise<any> {
+  try {
+	  logger.debug(`[API] DELETE: ${endpoint}`, JSON.stringify(data))
+	  if (auth && !loggedIn()) await login()
+	  let headers = getHeaders(auth)
+	  const result = await new Promise((resolve, reject) => {
+	  client.delete(url + endpoint, { headers, data }, (result: any) => {
+		  if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
+		  else if (!success(result, ignore)) reject(result)
+		  else resolve(result)
+    }).on('error', (err: Error) => reject(err))
+  })
+	  logger.debug('[API] DELETE result:', result)
+	  return result
+  } catch (err) {
+	  console.error(err)
+	  logger.error(`[API] DELETE error (${endpoint}):`, err)
+  }
+}
+
+/**
  * Login a user for further API calls
  * Result should come back with a token, to authorise following requests.
  * Use env default credentials, unless overridden by login arguments.
@@ -217,3 +286,5 @@ export const users: any = {
   onlineNames: () => get('users.list', { fields: { 'username': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r) => r.users.map((u: IUserAPI) => u.username)),
   onlineIds: () => get('users.list', { fields: { '_id': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r) => r.users.map((u: IUserAPI) => u._id))
 }
+
+export { livechat }
