@@ -19,8 +19,7 @@ export declare let currentLogin: {
 } | null;
 /** Check for existing login */
 export declare function loggedIn(): boolean;
-/** Initialise client and configs */
-export declare const client: any;
+/** Initialise configs */
 export declare const host: string;
 /**
  * Prepend protocol (or put back if removed from env settings for driver)

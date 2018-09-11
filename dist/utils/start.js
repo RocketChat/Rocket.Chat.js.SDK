@@ -47,7 +47,7 @@ function demo(message) {
             const sayWhat = `@${message.u.username} says "${match[1]}"`;
             const usernames = yield __1.api.users.allNames();
             for (let username of usernames) {
-                if (username !== config_1.botUser.username) {
+                if (username && username !== config_1.botUser.username) {
                     const toWhere = yield __1.driver.getDirectMessageRoomId(username);
                     yield __1.driver.sendToRoomId(sayWhat, toWhere); // DM ID hax
                     yield delay(200); // delay to prevent rate-limit error

@@ -1,1 +1,0 @@
-declare module 'asteroid-immutable-collections-mixin'
