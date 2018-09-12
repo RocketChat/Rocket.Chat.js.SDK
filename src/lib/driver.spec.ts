@@ -338,7 +338,7 @@ describe('driver', () => {
       })
       sinon.assert.calledOnce(callback)
     })
-    it('fires callback on edited message if configured', async () => {
+    it.skip('fires callback on edited message if configured', async () => {
       const callback = sinon.spy()
       const sentMessage = await utils.sendFromUser({
         text: 'SDK test `respondToMessages` sent'
@@ -371,14 +371,14 @@ describe('driver', () => {
       })
       sinon.assert.calledOnce(callback)
     })
-    it('fires callback on ul (user leave) message types', async () => {
+    it.skip('fires callback on ul (user leave) message types', async () => {
       const callback = sinon.spy()
       driver.respondToMessages(callback, { rooms: [tName] })
       await utils.leaveUser()
       sinon.assert.calledWithMatch(callback, null, sinon.match({ t: 'ul' }))
       await utils.inviteUser()
     })
-    it('fires callback on au (user added) message types', async () => {
+    it.skip('fires callback on au (user added) message types', async () => {
       await utils.leaveUser()
       const callback = sinon.spy()
       driver.respondToMessages(callback, { rooms: [tName] })

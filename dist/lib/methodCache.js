@@ -48,18 +48,15 @@ function call(method, key) {
         if (!exports.results.has(method))
             create(method); // create as needed
         const methodCache = exports.results.get(method);
-        let callResults;
         if (methodCache.has(key)) {
             log_1.logger.debug(`[${method}] Calling (cached): ${key}`);
             // return from cache if key has been used on method before
-            callResults = methodCache.get(key);
+            return methodCache.get(key);
         }
-        else {
-            // call and cache for next time, returning results
-            log_1.logger.debug(`[${method}] Calling (caching): ${key}`);
-            callResults = (yield exports.instance.call(method, key)).result;
-            methodCache.set(key, callResults);
-        }
+        // call and cache for next time, returning results
+        log_1.logger.debug(`[${method}] Calling (caching): ${key}`);
+        const { result: callResults } = yield Promise.resolve(exports.instance.call(method, key));
+        methodCache.set(key, callResults);
         return callResults;
     });
 }

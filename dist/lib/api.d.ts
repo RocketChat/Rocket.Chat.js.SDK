@@ -1,3 +1,4 @@
+import { livechat } from '../livechat/lib/api';
 /** Result object from an API login */
 export interface ILoginResultAPI {
     status: string;
@@ -68,6 +69,26 @@ export declare function post(endpoint: string, data: any, auth?: boolean, ignore
  */
 export declare function get(endpoint: string, data?: any, auth?: boolean, ignore?: RegExp): Promise<any>;
 /**
+ * Do a PUT request to an API endpoint.
+ * If it needs a token, login first (with defaults) to set auth headers.
+ * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
+ * @param endpoint The API endpoint (including version) e.g. `chat.update`
+ * @param data     Payload for PUT request to endpoint
+ * @param auth     Require auth headers for endpoint, default true
+ * @param ignore   Allows certain matching error messages to not count as errors
+ */
+export declare function put(endpoint: string, data: any, auth?: boolean, ignore?: RegExp): Promise<any>;
+/**
+ * Do a DELETE request to an API endpoint.
+ * If it needs a token, login first (with defaults) to set auth headers.
+ * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
+ * @param endpoint The API endpoint (including version) e.g. `chat.update`
+ * @param data     Payload for DELETE request to endpoint
+ * @param auth     Require auth headers for endpoint, default true
+ * @param ignore   Allows certain matching error messages to not count as errors
+ */
+export declare function del(endpoint: string, data: any, auth?: boolean, ignore?: RegExp): Promise<any>;
+/**
  * Login a user for further API calls
  * Result should come back with a token, to authorise following requests.
  * Use env default credentials, unless overridden by login arguments.
@@ -84,3 +105,4 @@ export declare const userFields: {
 };
 /** Query helpers for user collection requests */
 export declare const users: any;
+export { livechat };

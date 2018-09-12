@@ -19,10 +19,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 }
 Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = require("events");
-<<<<<<< HEAD
-const asteroid_1 = __importDefault(require("asteroid"));
-=======
->>>>>>> dfb4d624be27e1795ff24cdabd8536f636357dd4
 const settings = __importStar(require("./settings"));
 const methodCache = __importStar(require("./methodCache"));
 const message_1 = require("./message");
@@ -83,19 +79,17 @@ function connect(options = {}, callback) {
         const config = Object.assign({}, settings, options); // override defaults
         config.host = config.host.replace(/(^\w+:|^)\/\//, '');
         log_1.logger.info('[connect] Connecting', config);
-<<<<<<< HEAD
-        exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
-        setupMethodCache(exports.asteroid); // init instance for later caching method calls
-        exports.asteroid.on('connected', () => exports.events.emit('connected'));
-        exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
-=======
-        exports.ddp = new ddp_1.default(config.host);
+        try {
+            exports.ddp = new ddp_1.default(config.host, config.useSsl);
+        }
+        catch (error) {
+            return reject(error) && callback && callback(error);
+        }
         setupMethodCache(exports.ddp); // init instance for later caching method calls
         // TODO: refact
         exports.ddp.on('connected', () => exports.events.emit('connected'));
         exports.ddp.on('reconnected', () => exports.events.emit('reconnected'));
         // END
->>>>>>> dfb4d624be27e1795ff24cdabd8536f636357dd4
         let cancelled = false;
         const rejectionTimeout = setTimeout(function () {
             log_1.logger.info(`[connect] Timeout (${config.timeout})`);
@@ -123,12 +117,7 @@ exports.connect = connect;
 function disconnect() {
     log_1.logger.info('Unsubscribing, logging out, disconnecting');
     unsubscribeAll();
-<<<<<<< HEAD
-    return logout()
-        .then(() => Promise.resolve());
-=======
     return logout().then(() => Promise.resolve());
->>>>>>> dfb4d624be27e1795ff24cdabd8536f636357dd4
 }
 exports.disconnect = disconnect;
 // ASYNC AND CACHE METHOD UTILS
@@ -237,12 +226,7 @@ function login(credentials = {
 exports.login = login;
 /** Logout of Rocket.Chat via Socket */
 function logout() {
-<<<<<<< HEAD
-    return exports.asteroid.logout()
-        .catch((err) => {
-=======
     return exports.ddp.logout().catch((err) => {
->>>>>>> dfb4d624be27e1795ff24cdabd8536f636357dd4
         log_1.logger.error('[Logout] Error:', err);
         throw err; // throw after log to stop async chain
     });
@@ -256,18 +240,10 @@ exports.logout = logout;
 function subscribe(topic, roomId) {
     return new Promise((resolve, reject) => {
         log_1.logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`);
-<<<<<<< HEAD
-        const subscription = exports.asteroid.subscribe(topic, roomId, true);
-        exports.subscriptions.push(subscription);
-        return subscription.ready
-            .then((id) => {
-            log_1.logger.info(`[subscribe] Stream ready: ${id}`);
-=======
         const promiseSubscription = exports.ddp.subscribe(topic, roomId, true);
         return promiseSubscription.then((subscription) => {
             exports.subscriptions.push(subscription);
             log_1.logger.info(`[subscribe] Stream ready: ${subscription.id}`);
->>>>>>> dfb4d624be27e1795ff24cdabd8536f636357dd4
             resolve(subscription);
         });
     });
@@ -297,15 +273,7 @@ exports.unsubscribeAll = unsubscribeAll;
  * Older adapters used an option for this method but it was always the default.
  */
 function subscribeToMessages() {
-<<<<<<< HEAD
-    return subscribe(_messageCollectionName, _messageStreamName)
-        .then((subscription) => {
-        exports.messages = exports.asteroid.getCollection(_messageCollectionName);
-        return subscription;
-    });
-=======
     return subscribe(_messageCollectionName, _messageStreamName);
->>>>>>> dfb4d624be27e1795ff24cdabd8536f636357dd4
 }
 exports.subscribeToMessages = subscribeToMessages;
 /**
@@ -397,16 +365,8 @@ function respondToMessages(callback, options = {}) {
         // Set current time for comparison to incoming
         let currentReadTime = new Date(message.ts.$date);
         // Ignore edited messages if configured to
-<<<<<<< HEAD
-        if (!config.edited && message.editedAt)
-            return;
-        // Set read time as time of edit, if message is edited
-        if (message.editedAt)
-            currentReadTime = new Date(message.editedAt.$date);
-=======
         if (!config.edited && typeof message.editedAt !== 'undefined')
             return;
->>>>>>> dfb4d624be27e1795ff24cdabd8536f636357dd4
         // Ignore messages in stream that aren't new
         if (currentReadTime <= exports.lastReadTime)
             return;

@@ -56,15 +56,8 @@ export declare function useLog(externalLog: ILogger): void;
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-<<<<<<< HEAD
-export declare function connect(options?: IConnectOptions, callback?: ICallback): Promise<IAsteroid>;
-/** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
-=======
 export declare function connect(options?: IConnectOptions, callback?: ICallback): Promise<Socket>;
-/**
- * Remove all active subscriptions, logout and disconnect from Rocket.Chat
- */
->>>>>>> dfb4d624be27e1795ff24cdabd8536f636357dd4
+/** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
 export declare function disconnect(): Promise<void>;
 /**
  * Wraps method calls to ensure they return a Promise with caught exceptions.

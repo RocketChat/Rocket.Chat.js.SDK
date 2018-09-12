@@ -82,8 +82,11 @@ export function connect (options: IConnectOptions = {}, callback?: ICallback): P
     const config = Object.assign({}, settings, options) // override defaults
     config.host = config.host.replace(/(^\w+:|^)\/\//, '')
     logger.info('[connect] Connecting', config)
-
-    ddp = new Socket(config.host, config.useSsl)
+    try {
+      ddp = new Socket(config.host, config.useSsl)
+    } catch (error) {
+      return reject(error) && callback && callback(error)
+    }
 
     setupMethodCache(ddp) // init instance for later caching method calls
 

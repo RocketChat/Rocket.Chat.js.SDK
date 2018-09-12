@@ -1,7 +1,7 @@
 import EJSON from 'ejson'
 import { timeout } from './settings'
 import { logger } from './log'
-import WebSocket from 'isomorphic-ws'
+import WebSocket from 'universal-websocket-client'
 
 export interface Event {
   [name: string]: any
@@ -63,14 +63,14 @@ export class EventEmitter {
    */
   removeListener (event: string, listener: any): void {
     if (typeof this.events[event] === 'object') {
-		  const idx = this.events[event].indexOf(listener)
-		  if (idx > -1) {
-			  this.events[event].splice(idx, 1)
-		  }
-		  if (this.events[event].length === 0) {
-			  delete this.events[event]
-		  }
-	  }
+      const idx = this.events[event].indexOf(listener)
+      if (idx > -1) {
+        this.events[event].splice(idx, 1)
+      }
+      if (this.events[event].length === 0) {
+        delete this.events[event]
+      }
+    }
   }
 
   /**
@@ -259,12 +259,17 @@ export default class Socket extends EventEmitter {
   }
 
   _connect () {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.lastPing = new Date()
       this._close()
       clearInterval(this.reconnectTimeout)
       this.reconnectTimeout = setInterval(() => (!this.connection || this.connection.readyState > 1 || !this.check()) && this.reconnect(), 5000)
-      this.connection = new WebSocket(`${ this.url }/websocket`)
+      try {
+        this.connection = new WebSocket(`${ this.url }/websocket`)
+        this.connection.onerror = reject
+      } catch (error) {
+        return reject(error)
+      }
 
       this.connection.onopen = () => {
         this.emit('open')

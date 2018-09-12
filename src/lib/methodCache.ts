@@ -37,18 +37,16 @@ export function create (method: string, options: LRU.Options = {}): LRU.Cache<st
 export async function call (method: string, key: string): Promise<any> {
   if (!results.has(method)) create(method) // create as needed
   const methodCache = results.get(method)!
-  let callResults
 
   if (methodCache.has(key)) {
     logger.debug(`[${method}] Calling (cached): ${key}`)
     // return from cache if key has been used on method before
-    callResults = methodCache.get(key)
-  } else {
-    // call and cache for next time, returning results
-    logger.debug(`[${method}] Calling (caching): ${key}`)
-    callResults = (await instance.call(method, key)).result
-    methodCache.set(key, callResults)
+    return methodCache.get(key)
   }
+    // call and cache for next time, returning results
+  logger.debug(`[${method}] Calling (caching): ${key}`)
+  const { result: callResults } = await Promise.resolve(instance.call(method, key))
+  methodCache.set(key, callResults)
   return callResults
 }
 

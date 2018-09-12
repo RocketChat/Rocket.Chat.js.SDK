@@ -21,6 +21,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = __importDefault(require("axios"));
 const settings = __importStar(require("./settings"));
 const log_1 = require("./log");
+const api_1 = require("../livechat/lib/api");
+exports.livechat = api_1.livechat;
 exports.currentLogin = null;
 /** Check for existing login */
 function loggedIn() {
@@ -147,6 +149,78 @@ function get(endpoint, data, auth = true, ignore) {
     });
 }
 exports.get = get;
+/**
+ * Do a PUT request to an API endpoint.
+ * If it needs a token, login first (with defaults) to set auth headers.
+ * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
+ * @param endpoint The API endpoint (including version) e.g. `chat.update`
+ * @param data     Payload for PUT request to endpoint
+ * @param auth     Require auth headers for endpoint, default true
+ * @param ignore   Allows certain matching error messages to not count as errors
+ */
+function put(endpoint, data, auth = true, ignore) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            log_1.logger.debug(`[API] PUT: ${endpoint}`, JSON.stringify(data));
+            if (auth && !loggedIn())
+                yield login();
+            let headers = getHeaders(auth);
+            const result = yield new Promise((resolve, reject) => {
+                client.put(exports.url + endpoint, { headers, data }, (result) => {
+                    if (Buffer.isBuffer(result))
+                        reject('Result was buffer (HTML, not JSON)');
+                    else if (!success(result, ignore))
+                        reject(result);
+                    else
+                        resolve(result);
+                }).on('error', (err) => reject(err));
+            });
+            log_1.logger.debug('[API] PUT result:', result);
+            return result;
+        }
+        catch (err) {
+            console.error(err);
+            log_1.logger.error(`[API] PUT error (${endpoint}):`, err);
+        }
+    });
+}
+exports.put = put;
+/**
+ * Do a DELETE request to an API endpoint.
+ * If it needs a token, login first (with defaults) to set auth headers.
+ * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
+ * @param endpoint The API endpoint (including version) e.g. `chat.update`
+ * @param data     Payload for DELETE request to endpoint
+ * @param auth     Require auth headers for endpoint, default true
+ * @param ignore   Allows certain matching error messages to not count as errors
+ */
+function del(endpoint, data, auth = true, ignore) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            log_1.logger.debug(`[API] DELETE: ${endpoint}`, JSON.stringify(data));
+            if (auth && !loggedIn())
+                yield login();
+            let headers = getHeaders(auth);
+            const result = yield new Promise((resolve, reject) => {
+                client.delete(exports.url + endpoint, { headers, data }, (result) => {
+                    if (Buffer.isBuffer(result))
+                        reject('Result was buffer (HTML, not JSON)');
+                    else if (!success(result, ignore))
+                        reject(result);
+                    else
+                        resolve(result);
+                }).on('error', (err) => reject(err));
+            });
+            log_1.logger.debug('[API] DELETE result:', result);
+            return result;
+        }
+        catch (err) {
+            console.error(err);
+            log_1.logger.error(`[API] DELETE error (${endpoint}):`, err);
+        }
+    });
+}
+exports.del = del;
 /**
  * Login a user for further API calls
  * Result should come back with a token, to authorise following requests.
