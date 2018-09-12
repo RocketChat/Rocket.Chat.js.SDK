@@ -217,7 +217,7 @@ export async function del (
 		  if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
 		  else if (!success(result, ignore)) reject(result)
 		  else resolve(result)
-    }).on('error', (err: Error) => reject(err))
+  }).on('error', (err: Error) => reject(err))
   })
 	  logger.debug('[API] DELETE result:', result)
 	  return result
