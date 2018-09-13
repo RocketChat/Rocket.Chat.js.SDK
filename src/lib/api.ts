@@ -170,15 +170,11 @@ export async function put (
     logger.debug(`[API] PUT: ${endpoint}`, JSON.stringify(data))
     if (auth && !loggedIn()) await login()
     let headers = getHeaders(auth)
-    const result = await new Promise((resolve, reject) => {
-      client.put(url + endpoint, { headers, data }, (result: any) => {
-        if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
-        else if (!success(result, ignore)) reject(result)
-        else resolve(result)
-      }).on('error', (err: Error) => reject(err))
-    })
+    const result = await client.post(endpoint, data, { headers })
+    if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
+    else if (!success(result, ignore)) throw result
     logger.debug('[API] PUT result:', result)
-    return result
+    return result.data
   } catch (err) {
     console.error(err)
     logger.error(`[API] PUT error (${endpoint}):`, err)
@@ -203,14 +199,10 @@ export async function del (
   try {
 	  logger.debug(`[API] DELETE: ${endpoint}`, JSON.stringify(data))
 	  if (auth && !loggedIn()) await login()
-	  let headers = getHeaders(auth)
-	  const result = await new Promise((resolve, reject) => {
-	  client.delete(url + endpoint, { headers, data }, (result: any) => {
-		  if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
-		  else if (!success(result, ignore)) reject(result)
-		  else resolve(result)
-  }).on('error', (err: Error) => reject(err))
-  })
+    let headers = getHeaders(auth)
+    const result = await client.delete(endpoint, { headers, data })
+    if (Buffer.isBuffer(result)) throw new Error('Result was buffer (HTML, not JSON)')
+    else if (!success(result, ignore)) throw result
 	  logger.debug('[API] DELETE result:', result)
 	  return result
   } catch (err) {

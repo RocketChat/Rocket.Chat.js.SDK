@@ -165,18 +165,13 @@ function put(endpoint, data, auth = true, ignore) {
             if (auth && !loggedIn())
                 yield login();
             let headers = getHeaders(auth);
-            const result = yield new Promise((resolve, reject) => {
-                client.put(exports.url + endpoint, { headers, data }, (result) => {
-                    if (Buffer.isBuffer(result))
-                        reject('Result was buffer (HTML, not JSON)');
-                    else if (!success(result, ignore))
-                        reject(result);
-                    else
-                        resolve(result);
-                }).on('error', (err) => reject(err));
-            });
+            const result = yield client.post(endpoint, data, { headers });
+            if (Buffer.isBuffer(result.data))
+                throw new Error('Result was buffer (HTML, not JSON)');
+            else if (!success(result, ignore))
+                throw result;
             log_1.logger.debug('[API] PUT result:', result);
-            return result;
+            return result.data;
         }
         catch (err) {
             console.error(err);
@@ -201,16 +196,11 @@ function del(endpoint, data, auth = true, ignore) {
             if (auth && !loggedIn())
                 yield login();
             let headers = getHeaders(auth);
-            const result = yield new Promise((resolve, reject) => {
-                client.delete(exports.url + endpoint, { headers, data }, (result) => {
-                    if (Buffer.isBuffer(result))
-                        reject('Result was buffer (HTML, not JSON)');
-                    else if (!success(result, ignore))
-                        reject(result);
-                    else
-                        resolve(result);
-                }).on('error', (err) => reject(err));
-            });
+            const result = yield client.delete(endpoint, { headers, data });
+            if (Buffer.isBuffer(result))
+                throw new Error('Result was buffer (HTML, not JSON)');
+            else if (!success(result, ignore))
+                throw result;
             log_1.logger.debug('[API] DELETE result:', result);
             return result;
         }
