@@ -107,7 +107,12 @@ export function connect (
     asteroid = new Asteroid(config.host, config.useSsl)
 
     setupMethodCache(asteroid) // init instance for later caching method calls
-    asteroid.on('connected', () => events.emit('connected'))
+    asteroid.on('connected', () => {
+      asteroid.resumeLoginPromise.catch(function () {
+        // pass
+      })
+      events.emit('connected')
+    })
     asteroid.on('reconnected', () => events.emit('reconnected'))
     let cancelled = false
     const rejectionTimeout = setTimeout(function () {
