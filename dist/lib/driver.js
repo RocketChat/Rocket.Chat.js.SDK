@@ -81,7 +81,10 @@ function connect(options = {}, callback) {
         log_1.logger.info('[connect] Connecting', config);
         exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
         setupMethodCache(exports.asteroid); // init instance for later caching method calls
-        exports.asteroid.on('connected', () => exports.events.emit('connected'));
+        exports.asteroid.on('connected', () => {
+            exports.asteroid.resumeLoginPromise.catch();
+            exports.events.emit('connected');
+        });
         exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
         let cancelled = false;
         const rejectionTimeout = setTimeout(function () {

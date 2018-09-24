@@ -26,6 +26,7 @@ export interface IAsteroid extends EventEmitter {
     call: (method: string, ...params: any[]) => IMethodResult;
     apply: (method: string, params: any[]) => IMethodResult;
     getCollection: (name: string) => ICollection;
+    resumeLoginPromise: Promise<string>;
     ddp: IAsteroidDDP;
 }
 /**
