@@ -108,7 +108,9 @@ export function connect (
 
     setupMethodCache(asteroid) // init instance for later caching method calls
     asteroid.on('connected', () => {
-      asteroid.resumeLoginPromise.catch()
+      asteroid.resumeLoginPromise.catch(function () {
+        // pass
+      })
       events.emit('connected')
     })
     asteroid.on('reconnected', () => events.emit('reconnected'))

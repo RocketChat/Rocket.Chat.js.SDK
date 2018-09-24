@@ -82,7 +82,9 @@ function connect(options = {}, callback) {
         exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
         setupMethodCache(exports.asteroid); // init instance for later caching method calls
         exports.asteroid.on('connected', () => {
-            exports.asteroid.resumeLoginPromise.catch();
+            exports.asteroid.resumeLoginPromise.catch(function () {
+                // pass
+            });
             exports.events.emit('connected');
         });
         exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
