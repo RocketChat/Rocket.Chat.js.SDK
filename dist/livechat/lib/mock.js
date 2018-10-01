@@ -28,4 +28,36 @@ exports.mockOfflineMessage = {
     email: 'sample@rocket.chat',
     message: 'This is a Message!'
 };
+exports.mockVisitorNavigation = {
+    token: '123456789',
+    rid: '',
+    pageInfo: {
+        change: 'url',
+        title: 'Livechat Demo Page',
+        location: {
+            href: 'http://localhost:3000/assets/demo.html#page-1'
+        }
+    }
+};
+exports.mockCustomField = {
+    token: '123456789',
+    key: 'address',
+    value: 'Rocket.Chat Avenue',
+    overwrite: true
+};
+exports.mockCustomFields = {
+    token: '123456789',
+    customFields: [
+        {
+            key: 'address',
+            value: 'Rocket.Chat Avenue - Porto Alegre',
+            overwrite: true
+        },
+        {
+            key: 'state',
+            value: 'RS',
+            overwrite: true
+        }
+    ]
+};
 //# sourceMappingURL=mock.js.map

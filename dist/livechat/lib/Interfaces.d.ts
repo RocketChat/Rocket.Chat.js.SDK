@@ -2,8 +2,8 @@
 export interface ILivechatTokenAPI {
     token: string;
 }
-/** Structure for livechat room credencial api */
-export interface ILivechatRoomCredencialAPI {
+/** Structure for livechat room credential api */
+export interface ILivechatRoomCredentialAPI {
     token: string;
     rid?: string;
     department?: string;
@@ -180,5 +180,73 @@ export interface INewLivechatOfflineMessageAPI {
 /** Result structure for Livechat Offline Message */
 export interface ILivechatOfflineMessageResultAPI {
     message: string;
+    success: boolean;
+}
+/** Navigation object structure for livechat endpoints */
+export interface ILivechatNavigation {
+    change: string;
+    title: string;
+    location: {
+        href: string;
+    };
+    token?: string;
+}
+/** Payload structure for new Livechat Visitor Navigation */
+export interface INewLivechatNavigationAPI {
+    token: string;
+    rid: string;
+    pageInfo: ILivechatNavigation;
+}
+/** Result structure for Livechat Navigation */
+export interface ILivechatNavigationResultAPI {
+    page?: {
+        msg: string;
+        navigation: ILivechatNavigation;
+    };
+    success: boolean;
+}
+/** Result structure for Livechat Transcript */
+export interface ILivechatTranscriptResultAPI {
+    message: string;
+    success: boolean;
+}
+/** Livechat VideoCall object structure */
+export interface ILivechatVideoCallAPI {
+    rid: string;
+    domain: string;
+    provider: string;
+    room: string;
+}
+/** Result structure for Livechat VideoCall */
+export interface ILivechatVideoCallResultAPI {
+    videoCall: ILivechatVideoCallAPI;
+    success: boolean;
+}
+/** Payload structure for new Livechat CustomField */
+export interface ILivechaCustomFieldAPI {
+    key: string;
+    value: string;
+    overwrite: boolean;
+}
+/** Livechat CustomField object structure */
+export interface INewLivechatCustomFieldAPI {
+    token: string;
+    key: string;
+    value: string;
+    overwrite: boolean;
+}
+/** Result structure for Livechat CustomField */
+export interface ILivechatCustomFieldResultAPI {
+    field: ILivechaCustomFieldAPI;
+    success: boolean;
+}
+/** Structure for Livechat CustomFields api */
+export interface INewLivechatCustomFieldsAPI {
+    token: string;
+    customFields: ILivechaCustomFieldAPI[];
+}
+/** Result structure for Livechat CustomFields */
+export interface ILivechatCustomFieldsResultAPI {
+    fields: ILivechaCustomFieldAPI[];
     success: boolean;
 }

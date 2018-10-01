@@ -29,6 +29,12 @@ Demo of API livechat query helpers
 Create Livechat Visitor \`api.livechat.grantVisitor()\`:
 ${JSON.stringify(yield api.livechat.grantVisitor(mock_1.mockVisitor), null, '\t')}
 
+Add new Livechat CustomField \`api.livechat.sendCustomField()\`:
+${JSON.stringify(yield api.livechat.sendCustomField(mock_1.mockCustomField), null, '\t')}
+
+Add new Livechat CustomFields \`api.livechat.sendCustomFields()\`:
+${JSON.stringify(yield api.livechat.sendCustomFields(mock_1.mockCustomFields), null, '\t')}
+
 \`api.livechat.visitor()\`:
 ${JSON.stringify(yield api.livechat.visitor({ token }), null, '\t')}
 

@@ -44,6 +44,7 @@ function rooms() {
         const room = yield getRoom(token);
         const rid = room && room._id;
         const department = settings.deparmentId;
+        const email = 'sample@rocket.chat';
         console.log(`
 
 Demo of API livechat query helpers
@@ -57,8 +58,14 @@ ${JSON.stringify(yield api.livechat.transferChat({ rid, token, department }), nu
 Livechat Survey \`api.livechat.chatSurvey()\`:
 ${JSON.stringify(yield api.livechat.chatSurvey({ rid, token, data: mock_1.mockSurvey }), null, '\t')}
 
+Request Livechat VideoCall \`api.livechat.videoCall()\`:
+${JSON.stringify(yield api.livechat.videoCall({ rid, token }), null, '\t')}
+
 Close Livechat Room \`api.livechat.closeChat()\`:
 ${JSON.stringify(yield api.livechat.closeChat({ rid, token }), null, '\t')}
+
+Request Livechat Transcript \`api.livechat.requestTranscript()\`:
+${JSON.stringify(yield api.livechat.requestTranscript(email, { rid, token }), null, '\t')}
 
   `);
     });

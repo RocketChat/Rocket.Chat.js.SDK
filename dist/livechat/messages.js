@@ -55,6 +55,8 @@ function messages() {
         };
         const result = yield api.livechat.sendMessage(newMessage);
         const _id = result && result.message && result.message._id;
+        const roomCredential = { token, rid };
+        const pageInfo = Object.assign({}, mock_1.mockVisitorNavigation, { rid });
         console.log(`
 
 Demo of API livechat query helpers
@@ -73,6 +75,9 @@ ${JSON.stringify(yield api.livechat.deleteMessage(_id, { token, rid }), null, '\
 
 Send Livechat Offline Message \`api.livechat.sendOfflineMessage()\`:
 ${JSON.stringify(yield api.livechat.sendOfflineMessage(mock_1.mockOfflineMessage), null, '\t')}
+
+Send Livechat Visitor Navigation \`api.livechat.sendVisitorNavigation()\`:
+${JSON.stringify(yield api.livechat.sendVisitorNavigation(roomCredential, pageInfo), null, '\t')}
 
   `);
     });
