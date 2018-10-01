@@ -28,15 +28,8 @@ export interface IAsteroid extends EventEmitter {
   call: (method: string, ...params: any[]) => IMethodResult
   apply: (method: string, params: any[]) => IMethodResult
   getCollection: (name: string) => ICollection
+  resumeLoginPromise: Promise<string>
   ddp: IAsteroidDDP
-  // v2 Interface
-  /*
-  collections: Map<string, any>,
-  unsubscribe: (id: string) => void,
-  createUser: (options: IUserOptions) => Promise<string>,
-  loginWithPassword: (options: IUserOptions) => Promise<string>,
-  login: (params: any) => Promise<string>,
-  */
 }
 
 /**
