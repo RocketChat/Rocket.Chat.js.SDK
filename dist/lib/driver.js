@@ -9,14 +9,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
-}
+};
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
     if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
     result["default"] = mod;
     return result;
-}
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const events_1 = require("events");
 const asteroid_1 = __importDefault(require("asteroid"));
@@ -81,7 +81,12 @@ function connect(options = {}, callback) {
         log_1.logger.info('[connect] Connecting', config);
         exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
         setupMethodCache(exports.asteroid); // init instance for later caching method calls
-        exports.asteroid.on('connected', () => exports.events.emit('connected'));
+        exports.asteroid.on('connected', () => {
+            exports.asteroid.resumeLoginPromise.catch(function () {
+                // pass
+            });
+            exports.events.emit('connected');
+        });
         exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
         let cancelled = false;
         const rejectionTimeout = setTimeout(function () {
@@ -339,7 +344,7 @@ function respondToMessages(callback, options = {}) {
         config.rooms.length > 0) {
         promise = joinRooms(config.rooms)
             .catch((err) => {
-            log_1.logger.error(`Failed to join rooms set in env: ${config.rooms}`, err);
+            log_1.logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`);
         });
     }
     exports.lastReadTime = new Date(); // init before any message read
@@ -410,7 +415,7 @@ function joinRoom(room) {
         let roomId = yield getRoomId(room);
         let joinedIndex = exports.joinedIds.indexOf(room);
         if (joinedIndex !== -1) {
-            log_1.logger.error(`tried to join room that was already joined`);
+            log_1.logger.error(`[joinRoom] room was already joined`);
         }
         else {
             yield asyncCall('joinRoom', roomId);
@@ -425,7 +430,7 @@ function leaveRoom(room) {
         let roomId = yield getRoomId(room);
         let joinedIndex = exports.joinedIds.indexOf(room);
         if (joinedIndex === -1) {
-            log_1.logger.error(`leave room ${room} failed because bot has not joined in room`);
+            log_1.logger.error(`[leaveRoom] failed because bot has not joined ${room}`);
         }
         else {
             yield asyncCall('leaveRoom', roomId);

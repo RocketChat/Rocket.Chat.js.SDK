@@ -164,17 +164,32 @@ describe('driver', () => {
     })
     it('sends a custom message', async () => {
       const message = driver.prepareMessage({
+        rid: tId,
         msg: ':point_down:',
         emoji: ':point_right:',
         reactions: { ':thumbsup:': { usernames: [botUser.username] } },
-        groupable: false,
-        rid: tId
+        groupable: false
       })
-      const result = await driver.sendMessage(message)
+      await driver.sendMessage(message)
       const last = (await utils.lastMessages(tId))[0]
       expect(last).to.have.deep.property('reactions', message.reactions)
       expect(last).to.have.property('emoji', ':point_right:')
       expect(last).to.have.property('msg', ':point_down:')
+    })
+    it('sends a message with actions', async () => {
+      const attachments = [{
+        actions: [
+          { type: 'button', text: 'Action 1', msg: 'Testing Action 1', msg_in_chat_window: true },
+          { type: 'button', text: 'Action 2', msg: 'Testing Action 2', msg_in_chat_window: true }
+        ]
+      }]
+      await driver.sendMessage({
+        rid: tId,
+        msg: 'SDK test `prepareMessage` actions',
+        attachments
+      })
+      const last = (await utils.lastMessages(tId))[0]
+      expect(last.attachments).to.eql(attachments)
     })
   })
   describe('.editMessage', () => {

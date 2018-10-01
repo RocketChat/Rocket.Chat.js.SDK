@@ -107,7 +107,12 @@ export function connect (
     asteroid = new Asteroid(config.host, config.useSsl)
 
     setupMethodCache(asteroid) // init instance for later caching method calls
-    asteroid.on('connected', () => events.emit('connected'))
+    asteroid.on('connected', () => {
+      asteroid.resumeLoginPromise.catch(function () {
+        // pass
+      })
+      events.emit('connected')
+    })
     asteroid.on('reconnected', () => events.emit('reconnected'))
     let cancelled = false
     const rejectionTimeout = setTimeout(function () {
@@ -377,7 +382,7 @@ export function respondToMessages (
   ) {
     promise = joinRooms(config.rooms)
       .catch((err) => {
-        logger.error(`Failed to join rooms set in env: ${config.rooms}`, err)
+        logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
       })
   }
 
@@ -452,7 +457,7 @@ export async function joinRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
   let joinedIndex = joinedIds.indexOf(room)
   if (joinedIndex !== -1) {
-    logger.error(`tried to join room that was already joined`)
+    logger.error(`[joinRoom] room was already joined`)
   } else {
     await asyncCall('joinRoom', roomId)
     joinedIds.push(roomId)
@@ -464,7 +469,7 @@ export async function leaveRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
   let joinedIndex = joinedIds.indexOf(room)
   if (joinedIndex === -1) {
-    logger.error(`leave room ${room} failed because bot has not joined in room`)
+    logger.error(`[leaveRoom] failed because bot has not joined ${room}`)
   } else {
     await asyncCall('leaveRoom', roomId)
     delete joinedIds[joinedIndex]
