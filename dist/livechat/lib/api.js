@@ -10,11 +10,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const api = __importStar(require("../../lib/api"));
 /** Query helpers for livechat REST requests */
 exports.livechat = {
+<<<<<<< HEAD
     config: (params) => api.get(`livechat/config/${params && params.token}`).then((r) => r),
     room: (credentials) => api.get('livechat/room', credentials).then((r) => r),
     closeChat: (credentials) => (api.post(`livechat/room.close/${credentials.rid}`, { token: credentials.token }, false)).then((r) => r),
     transferChat: (credentials) => (api.post(`livechat/room.transfer/${credentials.rid}`, { token: credentials.token, department: credentials.department }, false)).then((r) => r),
     chatSurvey: (survey) => (api.post(`livechat/room.survey/${survey.rid}`, { token: survey.token, data: survey.data }, false)).then((r) => r),
+=======
+    config: (params) => api.get('livechat/config', params).then((r) => r),
+    room: (credentials) => api.get('livechat/room', credentials).then((r) => r),
+    closeChat: (credentials) => (api.post('livechat/room.close', { rid: credentials.rid, token: credentials.token }, false)).then((r) => r),
+    transferChat: (credentials) => (api.post('livechat/room.transfer', { rid: credentials.rid, token: credentials.token, department: credentials.department }, false)).then((r) => r),
+    chatSurvey: (survey) => (api.post('livechat/room.survey', { rid: survey.rid, token: survey.token, data: survey.data }, false)).then((r) => r),
+>>>>>>> origin/new-livechat-api-helper
     visitor: (params) => api.get(`livechat/visitor/${params.token}`).then((r) => r),
     grantVisitor: (guest) => (api.post('livechat/visitor', guest, false)).then((r) => r),
     agent: (credentials) => api.get(`livechat/agent.info/${credentials && credentials.rid}/${credentials && credentials.token}`).then((r) => r),

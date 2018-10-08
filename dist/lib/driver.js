@@ -79,6 +79,7 @@ function connect(options = {}, callback) {
         const config = Object.assign({}, settings, options); // override defaults
         config.host = config.host.replace(/(^\w+:|^)\/\//, '');
         log_1.logger.info('[connect] Connecting', config);
+<<<<<<< HEAD
         try {
             exports.ddp = new ddp_1.default(config.host, config.useSsl);
         }
@@ -90,6 +91,17 @@ function connect(options = {}, callback) {
         exports.ddp.on('connected', () => exports.events.emit('connected'));
         exports.ddp.on('reconnected', () => exports.events.emit('reconnected'));
         // END
+=======
+        exports.asteroid = new asteroid_1.default(config.host, config.useSsl);
+        setupMethodCache(exports.asteroid); // init instance for later caching method calls
+        exports.asteroid.on('connected', () => {
+            exports.asteroid.resumeLoginPromise.catch(function () {
+                // pass
+            });
+            exports.events.emit('connected');
+        });
+        exports.asteroid.on('reconnected', () => exports.events.emit('reconnected'));
+>>>>>>> origin/new-livechat-api-helper
         let cancelled = false;
         const rejectionTimeout = setTimeout(function () {
             log_1.logger.info(`[connect] Timeout (${config.timeout})`);
