@@ -246,10 +246,10 @@ export function logout (): Promise<void | null> {
  * Resolves with subscription (added to array), with ID property
  * @todo - 3rd param of ddp.subscribe is deprecated in Rocket.Chat?
  */
-export function subscribe (topic: string, roomId: string): Promise<any> {
+export function subscribe (topic: string, roomId: string, ...params: any[]): Promise<any> {
   return new Promise((resolve, reject) => {
     logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`)
-    const promiseSubscription = ddp.subscribe(topic, roomId, true)
+    const promiseSubscription = ddp.subscribe(topic, roomId, ...params, true)
     return promiseSubscription.then((subscription) => {
       subscriptions.push(subscription)
       logger.info(`[subscribe] Stream ready: ${subscription.id}`)
@@ -283,7 +283,22 @@ export function unsubscribeAll (): void {
 export function subscribeToMessages (): Promise<Subscription> {
   return subscribe(_messageCollectionName, _messageStreamName)
 }
-
+export function on (collection: string, callback: ICallback): void {
+  logger.info(`[reactive] Listening for change events in collection ${collection}`)
+  ddp.on(collection, (obj: any) => {
+    const changedMessage = obj.fields
+    if (changedMessage && changedMessage.args.length > 0) {
+      if (Array.isArray(changedMessage.args)) {
+        logger.info(`[received] Message in room ${changedMessage.args[0].rid}`)
+        callback(null, changedMessage.args[0], changedMessage.args[1])
+      } else {
+        logger.debug('[received] Update without message args')
+      }
+    } else {
+      logger.debug('[received] Reactive query at ID ${ _id } without results')
+    }
+  })
+}
 /**
  * Once a subscription is created, using `subscribeToMessages` this method
  * can be used to attach a callback to changes in the message stream.
@@ -308,20 +323,7 @@ export function subscribeToMessages (): Promise<Subscription> {
  *  - Third argument is additional attributes, such as `roomType`
  */
 export function reactToMessages (callback: ICallback): void {
-  logger.info(`[reactive] Listening for change events in collection ${_messageCollectionName}`)
-  ddp.on(_messageCollectionName, (obj: any) => {
-    const changedMessage = obj.fields
-    if (changedMessage && changedMessage.args.length > 0) {
-      if (Array.isArray(changedMessage.args)) {
-        logger.info(`[received] Message in room ${ changedMessage.args[0].rid }`)
-        callback(null, changedMessage.args[0], changedMessage.args[1])
-      } else {
-        logger.debug('[received] Update without message args')
-      }
-    } else {
-      logger.debug('[received] Reactive query at ID ${ _id } without results')
-    }
-  })
+  return on(_messageCollectionName, callback)
 }
 
 /**
