@@ -88,7 +88,7 @@ export declare function logout(): Promise<void | null>;
  * Resolves with subscription (added to array), with ID property
  * @todo - 3rd param of ddp.subscribe is deprecated in Rocket.Chat?
  */
-export declare function subscribe(topic: string, roomId: string): Promise<any>;
+export declare function subscribe(topic: string, roomId: string, ...params: any[]): Promise<any>;
 /** Unsubscribe from Meteor subscription */
 export declare function unsubscribe(subscription: Subscription): void;
 /** Unsubscribe from all subscriptions in collection */
@@ -98,6 +98,7 @@ export declare function unsubscribeAll(): void;
  * Older adapters used an option for this method but it was always the default.
  */
 export declare function subscribeToMessages(): Promise<Subscription>;
+export declare function on(collection: string, callback: ICallback): void;
 /**
  * Once a subscription is created, using `subscribeToMessages` this method
  * can be used to attach a callback to changes in the message stream.
