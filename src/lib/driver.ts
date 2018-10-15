@@ -155,9 +155,9 @@ function setupMethodCache (ddp: Socket): void {
  */
 export function asyncCall (method: string, ...params: any[]): Promise <any> {
   logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
-  return Promise.resolve(ddp.call(method, ...params))
+  return ddp.call(method, ...params)
     .catch((err: Error) => {
-      logger.error(`[${method}] Error:`, err)
+      // logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
     })
     .then(({ result }: any) => {
@@ -189,7 +189,7 @@ export function callMethod (name: string, params?: any | any[]): Promise<any> {
 export function cacheCall (method: string, key: string): Promise<any> {
   return methodCache.call(method, key)
     .catch((err: Error) => {
-      logger.error(`[${method}] Error:`, err)
+      // logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
     })
     .then((result: any) => {
@@ -215,6 +215,26 @@ export function login (credentials: ICredentials = {
     login = ddp.login(
       { ldap: true, ldapOptions: credentials.ldapOptions || {}, ldapPass: credentials.password, username: credentials.username }
     )
+  } else if (credentials.crowd) {
+    logger.info(`[login] Logging in ${credentials.username} with CROWD`)
+    login = ddp.login({ crowd: true, username: credentials.username, crowdPassword: credentials.password })
+  } else if (credentials.totp) {
+    logger.info(`[login] Logging in ${credentials.username} with TOTP`)
+    login = ddp.login({
+      totp: {
+        login: {
+          user: { username: credentials.username, email: credentials.email },
+          password: credentials.password
+        },
+        code: credentials.code
+      }
+    })
+  } else if (credentials.resume) {
+    logger.info(`[login] Logging in with resume token`)
+    login = ddp.login({ resume: credentials.resume })
+  } else if (credentials.oauth) {
+    logger.info(`[login] Logging in with OAuth`)
+    login = ddp.login({ oauth: credentials.oauth })
   } else {
     logger.info(`[login] Logging in ${credentials.username}`)
     login = ddp.login({
@@ -236,7 +256,7 @@ export function login (credentials: ICredentials = {
 /** Logout of Rocket.Chat via Socket */
 export function logout (): Promise<void | null> {
   return ddp.logout().catch((err: Error) => {
-    logger.error('[Logout] Error:', err)
+    // logger.error('[Logout] Error:', err)
     throw err // throw after log to stop async chain
   })
 }
@@ -266,7 +286,7 @@ export function unsubscribe (subscription: Subscription): void {
     subscriptions.splice(index, 1) // remove from collection
     logger.info(`[${subscription.id}] Unsubscribed`)
   }).catch((err: Error) => {
-    logger.error('[Unsubscribe] Error:', err)
+    // logger.error('[Unsubscribe] Error:', err)
     throw err
   })
 }
@@ -285,18 +305,8 @@ export function subscribeToMessages (): Promise<Subscription> {
 }
 export function on (collection: string, callback: ICallback): void {
   logger.info(`[reactive] Listening for change events in collection ${collection}`)
-  ddp.on(collection, (obj: any) => {
-    const changedMessage = obj.fields
-    if (changedMessage && changedMessage.args.length > 0) {
-      if (Array.isArray(changedMessage.args)) {
-        logger.info(`[received] Message in room ${changedMessage.args[0].rid}`)
-        callback(null, changedMessage.args[0], changedMessage.args[1])
-      } else {
-        logger.debug('[received] Update without message args')
-      }
-    } else {
-      logger.debug('[received] Reactive query at ID ${ _id } without results')
-    }
+  ddp.on(collection, (result: object) => {
+    callback(null, result)
   })
 }
 /**
@@ -353,14 +363,14 @@ export function respondToMessages (
   ) {
     promise = joinRooms(config.rooms)
       .catch((err) => {
-        logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
+        // logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
       })
   }
 
   lastReadTime = new Date() // init before any message read
   reactToMessages(async (err, message, meta) => {
     if (err) {
-      logger.error(`[received] Unable to receive: ${err.message}`)
+      // logger.error(`[received] Unable to receive: ${err.message}`)
       callback(err) // bubble errors back to adapter
     }
 
@@ -425,7 +435,7 @@ export async function joinRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
   let joinedIndex = joinedIds.indexOf(room)
   if (joinedIndex !== -1) {
-    logger.error(`[joinRoom] room was already joined`)
+    // logger.error(`[joinRoom] room was already joined`)
   } else {
     await asyncCall('joinRoom', roomId)
     joinedIds.push(roomId)
@@ -437,7 +447,7 @@ export async function leaveRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
   let joinedIndex = joinedIds.indexOf(room)
   if (joinedIndex === -1) {
-    logger.error(`[leaveRoom] failed because bot has not joined ${room}`)
+    // logger.error(`[leaveRoom] failed because bot has not joined ${room}`)
   } else {
     await asyncCall('leaveRoom', roomId)
     delete joinedIds[joinedIndex]

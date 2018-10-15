@@ -46,9 +46,14 @@ export interface ICallback {
 
 /** Credentials for login method */
 export interface ICredentials {
-  password: string,
+  password?: string,
   username?: string,
   email?: string,
   ldap?: boolean,
-  ldapOptions?: object
+  ldapOptions?: object,
+  totp?: boolean,
+  code?: number,
+  resume?: string,
+  crowd?: boolean,
+  oauth?: any
 }

@@ -27,6 +27,7 @@ export declare const host: string;
  * Hard code endpoint prefix, because all syntax depends on this version
  */
 export declare const url: string;
+export declare function setBaseUrl(host: string): void;
 /** Convert payload data to query string for GET requests */
 export declare function getQueryString(data: any): string;
 /** Setup default headers with empty auth for now */

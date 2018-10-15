@@ -17,7 +17,7 @@ module.exports = {
     extensions: [ '.ts', '.js' ]
   },
   output: {
-    filename: 'bundle.js',
+    filename: 'index.js',
     library: 'RocketChat',
     libraryTarget: 'umd',
     path: path.resolve(__dirname, 'dist/')

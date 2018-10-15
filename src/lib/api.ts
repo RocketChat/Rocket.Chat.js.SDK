@@ -30,18 +30,27 @@ export function loggedIn (): boolean {
 /** Initialise configs */
 export const host = settings.host
 
+function getUrl (host: string) {
+  return ((host.indexOf('http') === -1)
+  ? host.replace(/^(\/\/)?/, 'http://')
+  : host) + '/api/v1/'
+}
+
+
 /**
  * Prepend protocol (or put back if removed from env settings for driver)
  * Hard code endpoint prefix, because all syntax depends on this version
  */
-export const url = ((host.indexOf('http') === -1)
-  ? host.replace(/^(\/\/)?/, 'http://')
-  : host) + '/api/v1/'
+export const url = getUrl(host)
 
 /** Initialize client */
 const client = axios.create({
   baseURL: url
 })
+
+export function setBaseUrl (host: string) {
+  client.defaults.baseURL = getUrl(host)
+}
 
 /** Convert payload data to query string for GET requests */
 export function getQueryString (data: any) {
@@ -118,8 +127,7 @@ export async function post (
     logger.debug('[API] POST result:', result)
     return result.data
   } catch (err) {
-    console.error(err)
-    logger.error(`[API] POST error (${endpoint}):`, err)
+    throw new Error(`[API] POST error (${endpoint}): ${ err }`)
   }
 }
 
@@ -147,7 +155,7 @@ export async function get (
     logger.debug('[API] GET result:', result)
     return result.data
   } catch (err) {
-    logger.error(`[API] GET error (${endpoint}):`, err)
+    throw new Error(`[API] GET error (${endpoint}): ${ err }`)
   }
 }
 
@@ -176,8 +184,7 @@ export async function put (
     logger.debug('[API] PUT result:', result)
     return result.data
   } catch (err) {
-    console.error(err)
-    logger.error(`[API] PUT error (${endpoint}):`, err)
+    throw new Error(`[API] PUT error (${endpoint}): ${ err }`)
   }
 }
 
@@ -206,8 +213,7 @@ export async function del (
 	  logger.debug('[API] DELETE result:', result)
 	  return result
   } catch (err) {
-	  console.error(err)
-	  logger.error(`[API] DELETE error (${endpoint}):`, err)
+    throw new Error(`[API] DELETE error (${endpoint}): ${ err }`)
   }
 }
 
