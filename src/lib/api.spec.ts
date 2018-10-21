@@ -18,19 +18,19 @@ describe('api', () => {
   after(() => process.env = initEnv)
   afterEach(() => api.logout())
   describe('.success', () => {
-    it('returns true when result status is success', () => {
-      expect(api.success({ status: 'success' })).to.equal(true)
+    it('returns true when result status is 200', () => {
+      expect(api.success({ status: 200 })).to.equal(true)
     })
-    it('returns true when success is true', () => {
-      expect(api.success({ success: true })).to.equal(true)
+    it('returns true when success is 300', () => {
+      expect(api.success({ status: 300 })).to.equal(true)
     })
-    it('returns false when result status is not success', () => {
-      expect(api.success({ status: 'error' })).to.equal(false)
+    it('returns false when result status is 400', () => {
+      expect(api.success({ status: 401 })).to.equal(false)
     })
-    it('returns false when success is not true', () => {
-      expect(api.success({ success: false })).to.equal(false)
+    it('returns false when success is 500', () => {
+      expect(api.success({ status: 500 })).to.equal(false)
     })
-    it('returns true if neither status or success given', () => {
+    it('returns true if status is not given', () => {
       expect(api.success({})).to.equal(true)
     })
   })
@@ -63,7 +63,7 @@ describe('api', () => {
       await api.login()
       const result = await api.get('users.list', {
         fields: { 'username': 1 },
-        query: { type: { $in: ['user', 'bot'] } }
+        query: { username: botUser.username, type: { $in: ['user', 'bot'] } }
       }, true)
       const users = result.users.map((user) => user.username)
       expect(users).to.include(botUser.username, mockUser.username)

@@ -35,7 +35,7 @@
   "scripts": {
     "webpack": "webpack",
     "pretest": "tslint -p . && ts-node src/utils/setup.ts",
-    "test": "nyc mocha './src/lib/**/*.spec.ts'",
+    "test": "nyc mocha './src/lib/**/*.spec.ts' './src/livechat/**/*.spec.ts'",
     "test:hook": "mocha './**/*.spec.ts'",
     "test:debug": "mocha  --inspect --debug-brk 'src/**/*.spec.ts'",
     "test:package": "preview && mocha 'src/index.spec.ts'",

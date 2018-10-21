@@ -103,7 +103,7 @@ export function connect (
     let cancelled = false
     const rejectionTimeout = setTimeout(function () {
       logger.info(`[connect] Timeout (${config.timeout})`)
-      const err = new Error('Asteroid connection timeout')
+      const err = new Error('Socket connection timeout')
       cancelled = true
       events.removeAllListeners('connected')
       callback ? callback(err, ddp) : reject(err)
@@ -158,8 +158,7 @@ function setupMethodCache (ddp: Socket): void {
  * @param method The Rocket.Chat server method, to call through socket
  * @param params Single or array of parameters of the method to call
  */
-export function asyncCall (method: string, params: any | any[]): Promise<any> {
-  if (!Array.isArray(params)) params = [params] // cast to array for apply
+export function asyncCall (method: string, ...params: any[]) {
   logger.debug(`[${method}] Calling (async): ${JSON.stringify(params)}`)
   return ddp.call(method, ...params)
     .catch((err: Error) => {
@@ -271,7 +270,22 @@ export function unsubscribeAll () {
 export function subscribeToMessages () {
   return ddp.subscribe(_messageCollectionName, [_messageStreamName, true])
 }
-
+export function on (collection: string, callback: ICallback): void {
+  logger.info(`[reactive] Listening for change events in collection ${collection}`)
+  ddp.on(collection, (obj: any) => {
+    const changedMessage = obj.fields
+    if (changedMessage && changedMessage.args.length > 0) {
+      if (Array.isArray(changedMessage.args)) {
+        logger.info(`[received] Message in room ${changedMessage.args[0].rid}`)
+        callback(null, changedMessage.args[0], changedMessage.args[1])
+      } else {
+        logger.debug('[received] Update without message args')
+      }
+    } else {
+      logger.debug('[received] Reactive query at ID ${ _id } without results')
+    }
+  })
+}
 /**
  * Subscribe and add callback for changes in the message stream.
  * This can be called directly for custom extensions, but for most usage (e.g.
@@ -366,10 +380,7 @@ export function respondToMessages (
     let currentReadTime = (message.ts) ? new Date(message.ts.$date) : new Date()
 
     // Ignore edited messages if configured to
-    if (!config.edited && message.editedAt) return
-
-    // Set read time as time of edit, if message is edited
-    if (message.editedAt) currentReadTime = new Date(message.editedAt.$date)
+    if (!config.edited && typeof message.editedAt !== 'undefined') return
 
     // Ignore messages in stream that aren't new
     if (currentReadTime <= lastReadTime) return
@@ -520,5 +531,5 @@ export function editMessage (message: IMessage): Promise<IMessage> {
  * @param messageId ID for a previously sent message
  */
 export function setReaction (emoji: string, messageId: string) {
-  return asyncCall('setReaction', [emoji, messageId])
+  return asyncCall('setReaction', emoji, messageId)
 }
