@@ -5,10 +5,14 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Current Spec",
       "type": "node",
-      "request": "attach",
-      "name": "Attach",
-      "port": 9229
+      "sourceMaps": true,
+      "request": "launch",
+      "program": "${workspaceRoot}/node_modules/.bin/_mocha",
+      "args": ["${relativeFile}"],
+      "cwd": "${workspaceRoot}",
+      "protocol": "inspector"
     }
   ]
 }

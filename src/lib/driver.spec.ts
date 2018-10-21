@@ -2,7 +2,7 @@ import 'mocha'
 import sinon from 'sinon'
 import { expect } from 'chai'
 import { silence } from './log'
-import { botUser, mockUser, apiUser } from '../utils/config'
+import { botUser, mockUser } from '../utils/config'
 import * as api from './api'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
@@ -37,32 +37,29 @@ describe('driver', () => {
         promise.catch((err) => console.error(err))
         return promise
       })
-      it('accepts an error-first callback, providing asteroid', (done) => {
-        driver.connect({}, (err, asteroid) => {
+      it('accepts an error-first callback, providing socket', (done) => {
+        driver.connect({}, (err, socket) => {
           expect(err).to.equal(null)
-          expect(asteroid).to.be.an('object')
+          expect(socket).to.be.an('object')
           done()
         })
       })
       it('without url takes localhost as default', (done) => {
-        driver.connect({}, (err, asteroid) => {
+        driver.connect({}, (err, socket) => {
           expect(err).to.eql(null)
-          // const connectionHost = asteroid.endpoint
-          const connectionHost = asteroid._host
-          expect(connectionHost).to.contain('localhost:3000')
+          expect(socket.host).to.contain('localhost:3000')
           done()
         })
       })
-      it('promise resolves with asteroid in successful state', () => {
-        return driver.connect({}).then((asteroid) => {
-          const isActive = (asteroid.ddp.readyState === 1)
-          // const isActive = asteroid.ddp.status === 'connected'
+      it('promise resolves with socket in successful state', () => {
+        return driver.connect().then((socket) => {
+          const isActive = (socket.connection.readyState === 1)
           expect(isActive).to.equal(true)
         })
       })
-      it('provides the asteroid instance to method cache', () => {
-        return driver.connect().then((asteroid) => {
-          expect(methodCache.instance).to.eql(asteroid)
+      it('provides the socket instance to method cache', () => {
+        return driver.connect().then((socket) => {
+          expect(methodCache.instance).to.eql(socket)
         })
       })
     })
@@ -70,9 +67,9 @@ describe('driver', () => {
       before(() => clock = sinon.useFakeTimers(0))
       after(() => clock.restore())
       it('with url, attempts connection at URL', (done) => {
-        driver.connect({ host: 'localhost:9999', timeout: 100 }, (err, asteroid) => {
+        driver.connect({ host: 'localhost:9999', timeout: 100 }, (err, socket) => {
           expect(err).to.be.an('error')
-          const connectionHost = asteroid.endpoint || asteroid._host
+          const connectionHost = socket.connection.endpoint || socket.connection._host
           expect(connectionHost).to.contain('localhost:9999')
           done()
         })

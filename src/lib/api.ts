@@ -3,17 +3,6 @@ import * as settings from './settings'
 import { logger } from './log'
 import { IUserAPI } from '../utils/interfaces'
 
-/** Result object from an API login */
-export interface ILoginResultAPI {
-  status: string // e.g. 'success'
-  data: { authToken: string, userId: string }
-}
-
-/** Structure for passing and keeping login credentials */
-export interface ILoginCredentials {
-  username: string,
-  password: string
-}
 export let currentLogin: {
   username: string,
   userId: string,
@@ -22,7 +11,7 @@ export let currentLogin: {
 } | null = null
 
 /** Check for existing login */
-export function loggedIn (): boolean {
+export function loggedIn () {
   return (currentLogin !== null)
 }
 
@@ -106,7 +95,7 @@ export async function post (
   data: any,
   auth: boolean = true,
   ignore?: RegExp
-): Promise<any> {
+) {
   try {
     logger.debug(`[API] POST: ${endpoint}`, JSON.stringify(data))
     if (auth && !loggedIn()) await login()
@@ -138,7 +127,7 @@ export async function get (
   data?: any,
   auth: boolean = true,
   ignore?: RegExp
-): Promise<any> {
+) {
   try {
     logger.debug(`[API] GET: ${endpoint}`, data)
     if (auth && !loggedIn()) await login()
@@ -163,7 +152,7 @@ export async function get (
  * Result should come back with a token, to authorise following requests.
  * Use env default credentials, unless overridden by login arguments.
  */
-export async function login (user: ILoginCredentials = {
+export async function login (user: ICredentialsAPI = {
   username: settings.username,
   password: settings.password
 }): Promise<ILoginResultAPI> {

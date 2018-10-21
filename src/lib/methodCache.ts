@@ -13,7 +13,7 @@ export const defaults: LRU.Options = {
  * Set the instance to call methods on, with cached results.
  * @param instanceToUse Instance of a class
  */
-export function use (instanceToUse: object): void {
+export function use (instanceToUse: object) {
   instance = instanceToUse
 }
 
@@ -23,7 +23,7 @@ export function use (instanceToUse: object): void {
  * @param options.max Maximum size of cache
  * @param options.maxAge Maximum age of cache
  */
-export function create (method: string, options: LRU.Options = {}): LRU.Cache<string, any> | undefined {
+export function create (method: string, options: LRU.Options = {}) {
   options = Object.assign(defaults, options)
   results.set(method, new LRU(options))
   return results.get(method)
@@ -34,7 +34,7 @@ export function create (method: string, options: LRU.Options = {}): LRU.Cache<st
  * @param method Method name, to call on instance in use
  * @param key Key to pass to method call and save results against
  */
-export function call (method: string, key: string): Promise<any> {
+export function call (method: string, key: string) {
   if (!results.has(method)) create(method) // create as needed
   const methodCache = results.get(method)!
   let callResults
@@ -57,7 +57,7 @@ export function call (method: string, key: string): Promise<any> {
  * Cache may exist from manual creation, or prior call.
  * @param method Method name for cache to get
  */
-export function has (method: string): boolean {
+export function has (method: string) {
   return results.has(method)
 }
 
@@ -66,7 +66,7 @@ export function has (method: string): boolean {
  * @param method Method name for cache to get
  * @param key Key for method result set to return
  */
-export function get (method: string, key: string): LRU.Cache<string, any> | undefined {
+export function get (method: string, key: string) {
   if (results.has(method)) return results.get(method)!.get(key)
 }
 
@@ -75,16 +75,14 @@ export function get (method: string, key: string): LRU.Cache<string, any> | unde
  * @param method Method name for cache to clear
  * @param key Key for method result set to clear
  */
-export function reset (method: string, key?: string): void {
+export function reset (method: string, key?: string) {
   if (results.has(method)) {
     if (key) return results.get(method)!.del(key)
     else return results.get(method)!.reset()
   }
 }
 
-/**
- * Reset cached results for all methods.
- */
-export function resetAll (): void {
+/** Reset cached results for all methods. */
+export function resetAll () {
   results.forEach((cache) => cache.reset())
 }

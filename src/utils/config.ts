@@ -1,4 +1,4 @@
-import { INewUserAPI } from './interfaces'
+import { INewUserAPI } from '../interfaces'
 
 // The API user, should be provisioned on build with local Rocket.Chat
 export const apiUser: INewUserAPI = {
@@ -8,7 +8,7 @@ export const apiUser: INewUserAPI = {
 
 // The Bot user, will attempt to login and run methods in tests
 export const botUser: INewUserAPI = {
-  email: 'bot@localhost',
+  email: 'bit-bucket@test.smtp.org',
   name: 'Bot',
   password: process.env.ROCKETCHAT_PASSWORD || 'pass',
   username: process.env.ROCKETCHAT_USER || 'bot',
@@ -22,7 +22,7 @@ export const botUser: INewUserAPI = {
 
 // The Mock user, will send messages via API for the bot to respond to
 export const mockUser: INewUserAPI = {
-  email: 'mock@localhost',
+  email: 'bit-bucket@test.smtp.org',
   name: 'Mock User',
   password: 'mock',
   username: 'mock',

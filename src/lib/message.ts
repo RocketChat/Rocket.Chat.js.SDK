@@ -1,4 +1,4 @@
-import { IMessage } from '../config/messageInterfaces'
+import { IMessage } from '../interfaces'
 
 // Message class declaration implicitly implements interface
 // https://github.com/Microsoft/TypeScript/issues/340
@@ -10,13 +10,13 @@ export interface Message extends IMessage {}
  * @param content Accepts message text or a preformed message object
  * @todo Potential for SDK usage that isn't bots, bot prop should be optional?
  */
-export class Message {
+export class Message implements IMessage {
   constructor (content: string | IMessage, integrationId: string) {
     if (typeof content === 'string') this.msg = content
     else Object.assign(this, content)
     this.bot = { i: integrationId }
   }
-  setRoomId (roomId: string): Message {
+  setRoomId (roomId: string) {
     this.rid = roomId
     return this
   }
