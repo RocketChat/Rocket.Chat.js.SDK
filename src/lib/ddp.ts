@@ -71,7 +71,7 @@ export class Socket extends EventEmitter {
       }, ms)
       try {
         connection = new WebSocket(this.host)
-        connection!.onerror = reject
+        connection.onerror = reject
       } catch (err) {
         return reject(err)
       }
@@ -90,7 +90,7 @@ export class Socket extends EventEmitter {
       support: ['1', 'pre2', 'pre1']
     }, 'connected')
     this.session = connected.session
-    this.ping()
+    this.ping().catch((err) => logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
     if (this.resume) await this.login(this.resume)
     return callback(this.connection)
@@ -123,7 +123,6 @@ export class Socket extends EventEmitter {
         (!handler.id || !data.id || handler.id === data.id)
       ))
     }
-    let i = -1
     // tslint:disable-next-line
     for (let i = 0; i < this.handlers.length; i++) {
       if (matcher(this.handlers[i])) {
@@ -217,7 +216,7 @@ export class Socket extends EventEmitter {
       this.send({ msg: 'ping' }, 'pong')
         .then(() => {
           this.lastPing = Date.now()
-          this.ping()
+          return this.ping()
         })
         .catch(() => this.reopen())
     }, this.config.ping)
@@ -250,7 +249,6 @@ export class Socket extends EventEmitter {
    */
   async login (credentials: any) {
     const params = this.loginParams(credentials)
-    if (!params) return
     this.resume = (await this.call('login', params) as ILoginResult)
     await this.subscribeAll()
     this.emit('login', this.resume)

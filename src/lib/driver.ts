@@ -23,9 +23,6 @@ import {
 const _messageCollectionName = 'stream-room-messages'
 const _messageStreamName = '__my_messages__'
 
-// CONNECTION SETUP AND CONFIGURE
-// -----------------------------------------------------------------------------
-
 /** Compares message update timestamps */
 export let lastReadTime: Date
 
@@ -97,7 +94,10 @@ export function connect (
     ddp = new Socket(config)
     subscriptions = ddp.subscriptions
     setupMethodCache(ddp) // init instance for later caching method calls
-    ddp.open()
+    ddp.open().catch((err) => {
+      logger.error(`[connect] Failed to connect: ${err.message}`)
+      reject(err)
+    })
     ddp.on('connected', () => events.emit('connected')) // echo ddp event
 
     let cancelled = false
@@ -122,16 +122,6 @@ export function connect (
     }
   })
 }
-
-/** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
-export function disconnect () {
-  logger.info('Unsubscribing, logging out, disconnecting')
-  unsubscribeAll()
-  return logout()
-}
-
-// ASYNC AND CACHE METHOD UTILS
-// -----------------------------------------------------------------------------
 
 /**
  * Setup method cache configs from env or defaults, before they are called.
@@ -205,9 +195,6 @@ export function cacheCall (method: string, key: string): Promise<any> {
     })
 }
 
-// LOGIN AND SUBSCRIBE TO ROOMS
-// -----------------------------------------------------------------------------
-
 /** Login to Rocket.Chat via Asteroid */
 export async function login (credentials: ICredentials = {
   username: settings.username,
@@ -228,12 +215,19 @@ export async function login (credentials: ICredentials = {
     logger.info(`[login] Logging in ${credentials.username}`)
     login = await ddp.login(credentials)
   }
-  userId = login!.id
+  userId = login.id
   return userId
 }
 
 /** Proxy socket logout */
 export const logout = () => ddp.logout()
+
+/** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
+export function disconnect () {
+  logger.info('Unsubscribing, logging out, disconnecting')
+  unsubscribeAll().catch((err) => logger.error(`[ddp] Failed unsubscribe on disconnect: ${err.message}`))
+  return logout()
+}
 
 /**
  * Subscribe to Meteor stream. Proxy for socket subscribe.
@@ -335,7 +329,7 @@ export function respondToMessages (
 ): Promise<void | void[]> {
   const config = Object.assign({}, settings, options)
   // return value, may be replaced by async ops
-  let promise: Promise<void | void[]> = Promise.resolve()
+  let promise = Promise.resolve()
 
   // Join configured rooms if they haven't been already, unless listening to all
   // public rooms, in which case it doesn't matter
@@ -345,14 +339,15 @@ export function respondToMessages (
     config.rooms &&
     config.rooms.length > 0
   ) {
-    promise = joinRooms(config.rooms)
+    promise.then(() => joinRooms(config.rooms)
       .catch((err) => {
         logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
       })
+    )
   }
 
   lastReadTime = new Date() // init before any message read
-  reactToMessages(async (err, message, meta) => {
+  promise.then(() => reactToMessages(async (err, message, meta) => {
     if (err) {
       logger.error(`[received] Unable to receive: ${err.message}`)
       return callback(err) // bubble errors back to adapter
@@ -392,12 +387,9 @@ export function respondToMessages (
 
     // Processing completed, call callback to respond to message
     callback(null, message, meta)
-  })
+  }))
   return promise
 }
-
-// PREPARE AND SEND MESSAGES
-// -----------------------------------------------------------------------------
 
 /** Get ID for a room by name (or ID). */
 export function getRoomId (name: string): Promise<string> {

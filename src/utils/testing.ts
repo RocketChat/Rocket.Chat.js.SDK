@@ -9,7 +9,6 @@ import {
   IRoomResultAPI,
   IChannelResultAPI,
   IGroupResultAPI,
-  IMessage,
   IHistoryAPI,
   IMessageReceipt
 } from '../interfaces'
