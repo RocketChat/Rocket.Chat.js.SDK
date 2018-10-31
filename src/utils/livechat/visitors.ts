@@ -1,6 +1,6 @@
-import * as api from './lib/api'
-import { silence } from '../lib/log'
-import { mockVisitor, mockCustomField, mockCustomFields } from './lib/mock'
+import * as api from '../../lib/api'
+import { silence } from '../../lib/log'
+import { mockVisitor, mockCustomField, mockCustomFields } from '../config'
 
 silence()
 

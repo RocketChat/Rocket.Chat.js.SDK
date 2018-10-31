@@ -1,7 +1,7 @@
-import * as api from './lib/api'
-import { silence } from '../lib/log'
-import { mockVisitor, mockSurvey } from './lib/mock'
-import * as settings from './lib/settings'
+import * as api from '../../lib/api'
+import * as settings from '../../lib/settings'
+import { silence } from '../../lib/log'
+import { mockVisitor, mockSurvey } from '../config'
 
 silence()
 
@@ -12,7 +12,6 @@ async function getVisitorToken () {
     const { visitor } = await api.livechat.grantVisitor(mockVisitor)
     token = visitor && visitor.token
   }
-
   return token
 }
 
@@ -24,12 +23,9 @@ async function getRoom (token: string) {
 
 async function rooms () {
   const token = await getVisitorToken()
-
   const room = await getRoom(token)
   const rid = room && room._id
-
-  const department = settings.deparmentId
-
+  const department = settings.department
   const email = 'sample@rocket.chat'
 
   console.log(`

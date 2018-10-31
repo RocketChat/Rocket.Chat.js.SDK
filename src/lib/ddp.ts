@@ -1,3 +1,8 @@
+/**
+ * @module DDP
+ * Handles low-level websocket connection and event subscriptions
+ */
+
 import WebSocket from 'universal-websocket-client'
 import EventEmitter from 'eventemitter3'
 import {
@@ -98,7 +103,7 @@ export class Socket extends EventEmitter {
 
   /** Emit close event so it can be used for promise resolve in close() */
   onClose (e: any) {
-    logger.info(`[ddp] close (${e.code}) ${e.reason}`)
+    logger.info(`[ddp] Close (${e.code}) ${e.reason}`)
     this.emit('close', e)
     if (e.code !== 1000) return this.reopen()
   }
@@ -158,7 +163,7 @@ export class Socket extends EventEmitter {
     this.openTimeout = setTimeout(async () => {
       delete this.openTimeout
       await this.open()
-        .catch((err) => logger.error(`[ddp] reopen error: ${err.message}`))
+        .catch((err) => logger.error(`[ddp] Reopen error: ${err.message}`))
     }, this.config.reopen)
   }
 
@@ -237,7 +242,7 @@ export class Socket extends EventEmitter {
   async call (method: string, ...params: any[]) {
     const response = await this.send({ msg: 'method', method, params })
       .catch((err) => {
-        logger.error(`[ddp] call error: ${err.message}`)
+        logger.error(`[ddp] Call error: ${err.message}`)
         throw err
       })
     return (response.result) ? response.result : response
@@ -294,6 +299,11 @@ export class Socket extends EventEmitter {
       .then(() => this.call('logout'))
   }
 
+  /** Register a callback to trigger on message events in subscription */
+  onEvent (id: string, collection: string, callback: ISocketMessageCallback) {
+    this.handlers.push({ id, collection, persist: true, callback })
+  }
+
   /**
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
@@ -301,25 +311,19 @@ export class Socket extends EventEmitter {
    * @param params    Params sent to the subscription request
    */
   subscribe (name: string, params: any[], callback?: ISocketMessageCallback) {
-    logger.info(`[ddp] subscribe to ${name}, param: ${JSON.stringify(params)}`)
+    logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.send({ msg: 'sub', name, params }, 'ready')
       .then((result) => {
         const id = (result.subs) ? result.subs[0] : undefined
         const unsubscribe = this.unsubscribe.bind(this, id)
-        if (callback) {
-          this.handlers.push({
-            id,
-            collection: name,
-            persist: true,
-            callback
-          })
-        }
-        const args = { id, name, params, unsubscribe }
-        this.subscriptions[id] = args
-        return args
+        const onEvent = this.onEvent.bind(this, id, name)
+        const subscription = { id, name, params, unsubscribe, onEvent }
+        if (callback) subscription.onEvent(callback)
+        this.subscriptions[id] = subscription
+        return subscription
       })
       .catch((err) => {
-        logger.error(`[ddp] subscribe error: ${err.message}`)
+        logger.error(`[ddp] Subscribe error: ${err.message}`)
         throw err
       })
   }
@@ -341,7 +345,7 @@ export class Socket extends EventEmitter {
       .then((data: any) => data.result || data.subs)
       .catch((err) => {
         if (!err.msg && err.msg !== 'nosub') {
-          logger.error(`[ddp] unsubscribe error: ${err.message}`)
+          logger.error(`[ddp] Unsubscribe error: ${err.message}`)
           throw err
         }
       })

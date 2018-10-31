@@ -7,6 +7,7 @@ import * as api from './api'
 import * as utils from '../utils/testing'
 import * as driver from './driver'
 import * as methodCache from './methodCache'
+import { Socket } from './ddp'
 
 const delay = (ms) => new Promise((resolve, reject) => setTimeout(resolve, ms))
 let clock
@@ -14,6 +15,13 @@ let tId
 let pId
 const tName = utils.testChannelName
 const pName = utils.testPrivateName
+const loginDelay = () => delay(250) // avoid rate-limit
+  .then(() => driver.login())
+  .catch((err) => {
+    console.error(err)
+    throw err
+  })
+const limitDelay = () => delay(2000)
 
 silence() // suppress log during tests (disable this while developing tests)
 
@@ -69,20 +77,18 @@ describe('driver', () => {
       it('with url, attempts connection at URL', (done) => {
         driver.connect({ host: 'localhost:9999', timeout: 100 }, (err, socket) => {
           expect(err).to.be.an('error')
-          const connectionHost = socket.connection.endpoint || socket.connection._host
-          expect(connectionHost).to.contain('localhost:9999')
+          expect(socket.config.host).to.contain('localhost:9999')
           done()
-        })
+        }).catch(() => null)
         clock.tick(200)
       })
       it('returns error', (done) => {
         let opts = { host: 'localhost:9999', timeout: 100 }
-        driver.connect(opts, (err, asteroid) => {
-          const isActive = (asteroid.ddp.readyState === 1)
+        driver.connect(opts, (err, socket: Socket) => {
           expect(err).to.be.an('error')
-          expect(isActive).to.eql(false)
+          expect(!!socket.connected).to.eql(false)
           done()
-        })
+        }).catch(() => null)
         clock.tick(200)
       })
       it('without callback, triggers promise catch', () => {
@@ -95,58 +101,39 @@ describe('driver', () => {
         driver.connect({ host: 'localhost:9999', timeout: 100 }, (err) => {
           expect(err).to.be.an('error')
           done()
-        })
+        }).catch(() => null)
         clock.tick(200)
       })
     })
   })
-
-  // describe('disconnect', () => {
-    // Disabled for now, as only Asteroid v2 has a disconnect method
-    // it('disconnects from asteroid', async () => {
-    //   await driver.connect()
-    //   const asteroid = await driver.connect()
-    //   await driver.disconnect()
-    //   const isActive = asteroid.ddp.readyState === 1
-    //   // const isActive = asteroid.ddp.status === 'connected'
-    //   expect(isActive).to.equal(false)
-    // })
-  // })
   describe('.login', () => {
+    afterEach(() => driver.logout())
     it('sets the bot user status to online', async () => {
-      await driver.connect()
       await driver.login()
-      await utils
       const result = await utils.userInfo(botUser.username)
       expect(result.user.status).to.equal('online')
     })
   })
   describe('.subscribeToMessages', () => {
     it('resolves with subscription object', async () => {
-      await driver.connect()
       await driver.login()
       const subscription = await driver.subscribeToMessages()
-      expect(subscription).to.have.property('ready')
-      // expect(subscription.ready).to.have.property('state', 'fulfilled') ????
+      expect(subscription).to.include.keys(['id', 'name', 'unsubscribe', 'onEvent'])
     })
+    after(() => driver.unsubscribeAll())
   })
   describe('.reactToMessages', () => {
-    afterEach(() => delay(500)) // avoid rate limit
+    before(() => loginDelay())
+    afterEach(() => driver.unsubscribeAll())
     it('calls callback on every subscription update', async () => {
-      await driver.connect()
-      await driver.login()
-      await driver.subscribeToMessages()
       const callback = sinon.spy()
       driver.reactToMessages(callback)
       await utils.sendFromUser({ text: 'SDK test `reactToMessages` 1' })
-      await delay(500)
+      await delay(500) // avoid rate limit
       await utils.sendFromUser({ text: 'SDK test `reactToMessages` 2' })
       expect(callback.callCount).to.equal(2)
     })
     it('calls callback with sent message object', async () => {
-      await driver.connect()
-      await driver.login()
-      await driver.subscribeToMessages()
       const callback = sinon.spy()
       driver.reactToMessages(callback)
       await utils.sendFromUser({ text: 'SDK test `reactToMessages` 3' })
@@ -154,11 +141,27 @@ describe('driver', () => {
       expect(messageArgs.msg).to.equal('SDK test `reactToMessages` 3')
     })
   })
-  describe('.sendMessage', () => {
-    before(async () => {
-      await driver.connect()
-      await driver.login()
+  describe('.setupMethodCache', () => {
+    beforeEach(() => methodCache.resetAll())
+    // @todo needs better testing (maybe use `getServerInfo` as test call without requiring login/connect)
+    // stub instance class to make sure it's only calling on instance first time, instead of hacky timers
+    it('returns subsequent cached method results from cache', async () => {
+      await driver.login() // calls setupMethodCache with DDP once connected
+      const now = Date.now()
+      const liveId = await driver.callMethod('getRoomNameById', 'GENERAL')
+      const after = Date.now()
+      const cacheId = await driver.callMethod('getRoomNameById', 'GENERAL')
+      const final = Date.now()
+      const firstCall = after - now
+      const cacheCall = final - after
+      expect(liveId).to.equal(cacheId)
+      expect(firstCall).to.be.gt(cacheCall)
+      expect(cacheCall).to.be.lte(10)
     })
+  })
+  describe('.sendMessage', () => {
+    before(() => loginDelay())
+    afterEach(() => limitDelay())
     it('sends a custom message', async () => {
       const message = driver.prepareMessage({
         rid: tId,
@@ -186,14 +189,12 @@ describe('driver', () => {
         attachments
       })
       const last = (await utils.lastMessages(tId))[0]
-      expect(last.attachments).to.eql(attachments)
+      expect(last.attachments[0].actions).to.eql(attachments[0].actions)
     })
   })
   describe('.editMessage', () => {
-    before(async () => {
-      await driver.connect()
-      await driver.login()
-    })
+    before(() => loginDelay())
+    afterEach(() => limitDelay())
     it('edits the last sent message', async () => {
       const original = driver.prepareMessage({
         msg: ':point_down:',
@@ -207,6 +208,7 @@ describe('driver', () => {
         _id: sent._id,
         msg: ':point_up:'
       })
+      await delay(500)
       await driver.editMessage(update)
       const last = (await utils.lastMessages(tId))[0]
       expect(last).to.have.property('msg', ':point_up:')
@@ -215,11 +217,64 @@ describe('driver', () => {
       })
     })
   })
-  describe('.setReaction', () => {
-    before(async () => {
+  describe('.sendToRoomId', () => {
+    before(() => loginDelay())
+    afterEach(() => limitDelay())
+    it('sends string to the given room id', async () => {
+      const result = await driver.sendToRoomId('SDK test `sendToRoomId`', tId)
+      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+    it('sends array of strings to the given room id', async () => {
+      const result = await driver.sendToRoomId([
+        'SDK test `sendToRoomId` A',
+        'SDK test `sendToRoomId` B'
+      ], tId)
+      expect(result).to.be.an('array')
+      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
+      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+  })
+  describe('.sendToRoom', () => {
+    before(() => loginDelay())
+    afterEach(() => limitDelay())
+    it('sends string to the given room name', async () => {
+      await driver.subscribeToMessages()
+      const result = await driver.sendToRoom('SDK test `sendToRoom`', tName)
+      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+    it('sends array of strings to the given room name', async () => {
+      await driver.subscribeToMessages()
+      const result = await driver.sendToRoom([
+        'SDK test `sendToRoom` A',
+        'SDK test `sendToRoom` B'
+      ], tName)
+      expect(result).to.be.an('array')
+      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
+      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+  })
+  describe('.sendDirectToUser', () => {
+    before(() => loginDelay())
+    afterEach(() => limitDelay())
+    it('sends string to the given room name', async () => {
       await driver.connect()
       await driver.login()
+      const result = await driver.sendDirectToUser('SDK test `sendDirectToUser`', mockUser.username)
+      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
     })
+    it('sends array of strings to the given room name', async () => {
+      const result = await driver.sendDirectToUser([
+        'SDK test `sendDirectToUser` A',
+        'SDK test `sendDirectToUser` B'
+      ], mockUser.username)
+      expect(result).to.be.an('array')
+      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
+      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
+    })
+  })
+  describe('.setReaction', () => {
+    before(() => loginDelay())
+    afterEach(() => limitDelay())
     it('adds emoji reaction to message', async () => {
       let sent = await driver.sendToRoomId('test reactions', tId)
       if (Array.isArray(sent)) sent = sent[0] // see todo on `sendToRoomId`
@@ -240,69 +295,9 @@ describe('driver', () => {
       expect(last).to.not.have.property('reactions')
     })
   })
-  describe('.sendToRoomId', () => {
-    it('sends string to the given room id', async () => {
-      const result = await driver.sendToRoomId('SDK test `sendToRoomId`', tId)
-      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
-    })
-    it('sends array of strings to the given room id', async () => {
-      const result = await driver.sendToRoomId([
-        'SDK test `sendToRoomId` A',
-        'SDK test `sendToRoomId` B'
-      ], tId)
-      expect(result).to.be.an('array')
-      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
-      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
-    })
-  })
-  describe('.sendToRoom', () => {
-    it('sends string to the given room name', async () => {
-      await driver.connect()
-      await driver.login()
-      await driver.subscribeToMessages()
-      const result = await driver.sendToRoom('SDK test `sendToRoom`', tName)
-      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
-    })
-    it('sends array of strings to the given room name', async () => {
-      await driver.connect()
-      await driver.login()
-      await driver.subscribeToMessages()
-      const result = await driver.sendToRoom([
-        'SDK test `sendToRoom` A',
-        'SDK test `sendToRoom` B'
-      ], tName)
-      expect(result).to.be.an('array')
-      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
-      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
-    })
-  })
-  describe('.sendDirectToUser', () => {
-    before(async () => {
-      await driver.connect()
-      await driver.login()
-    })
-    it('sends string to the given room name', async () => {
-      await driver.connect()
-      await driver.login()
-      const result = await driver.sendDirectToUser('SDK test `sendDirectToUser`', mockUser.username)
-      expect(result).to.include.all.keys(['msg', 'rid', '_id'])
-    })
-    it('sends array of strings to the given room name', async () => {
-      const result = await driver.sendDirectToUser([
-        'SDK test `sendDirectToUser` A',
-        'SDK test `sendDirectToUser` B'
-      ], mockUser.username)
-      expect(result).to.be.an('array')
-      expect(result[0]).to.include.all.keys(['msg', 'rid', '_id'])
-      expect(result[1]).to.include.all.keys(['msg', 'rid', '_id'])
-    })
-  })
   describe('.respondToMessages', () => {
-    beforeEach(async () => {
-      await driver.connect()
-      await driver.login()
-      await driver.subscribeToMessages()
-    })
+    before(() => loginDelay())
+    afterEach(() => limitDelay())
     it('joins rooms if not already joined', async () => {
       expect(driver.joinedIds).to.have.lengthOf(0)
       await driver.respondToMessages(() => null, { rooms: ['general', tName] })
@@ -393,28 +388,25 @@ describe('driver', () => {
       await utils.inviteUser()
       sinon.assert.calledWithMatch(callback, null, sinon.match({ t: 'au' }))
     })
-    // it('appends room name to event meta in channels', async () => {
-    //   const callback = sinon.spy()
-    //   driver.respondToMessages(callback, { dm: true, rooms: [tName] })
-    //   await utils.sendFromUser({ text: 'SDK test `respondToMessages` DM' })
-    //   expect(callback.firstCall.args[2].roomName).to.equal(tName)
-    // })
-    // it('room name is undefined in direct messages', async () => {
-    //   const dmResult = await utils.setupDirectFromUser()
-    //   const callback = sinon.spy()
-    //   driver.respondToMessages(callback, { dm: true, rooms: [tName] })
-    //   await utils.sendFromUser({
-    //     text: 'SDK test `respondToMessages` DM',
-    //     roomId: dmResult.room._id
-    //   })
-    //   expect(callback.firstCall.args[2].roomName).to.equal(undefined)
-    // })
+    it('appends room name to event meta in channels', async () => {
+      const callback = sinon.spy()
+      driver.respondToMessages(callback, { dm: true, rooms: [tName] })
+      await utils.sendFromUser({ text: 'SDK test `respondToMessages` DM' })
+      expect(callback.firstCall.args[2].roomName).to.equal(tName)
+    })
+    it('room name is undefined in direct messages', async () => {
+      const dmResult = await utils.setupDirectFromUser()
+      const callback = sinon.spy()
+      driver.respondToMessages(callback, { dm: true, rooms: [tName] })
+      await utils.sendFromUser({
+        text: 'SDK test `respondToMessages` DM',
+        roomId: dmResult.room._id
+      })
+      expect(callback.firstCall.args[2].roomName).to.equal(undefined)
+    })
   })
   describe('.getRoomId', () => {
-    beforeEach(async () => {
-      await driver.connect()
-      await driver.login()
-    })
+    before(() => loginDelay())
     it('returns the ID for a channel by ID', async () => {
       const room = await driver.getRoomId(tName)
       expect(room).to.equal(tId)
@@ -425,10 +417,7 @@ describe('driver', () => {
     })
   })
   describe('.getRoomName', () => {
-    beforeEach(async () => {
-      await driver.connect()
-      await driver.login()
-    })
+    before(() => loginDelay())
     it('returns the name for a channel by ID', async () => {
       const room = await driver.getRoomName(tId)
       expect(room).to.equal(tName)
@@ -444,10 +433,9 @@ describe('driver', () => {
     })
   })
   describe('.joinRooms', () => {
+    before(() => loginDelay())
     it('joins all the rooms in array, keeping IDs', async () => {
       driver.joinedIds.splice(0, driver.joinedIds.length) // clear const array
-      await driver.connect()
-      await driver.login()
       await driver.joinRooms(['general', tName])
       expect(driver.joinedIds).to.have.members(['GENERAL', tId])
     })

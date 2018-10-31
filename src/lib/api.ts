@@ -1,8 +1,37 @@
+/**
+ * @module API
+ * Provides a client for making requests with Rocket.Chat's REST API
+ */
+
 import axios from 'axios'
-import * as settings from './settings'
+import { host, username, password } from './settings'
 import { logger } from './log'
-import { IUserAPI } from '../utils/interfaces'
-import { livechat } from '../livechat/lib/api'
+import {
+  IUserAPI,
+  ILoginResultAPI,
+  ICredentialsAPI,
+  ILivechatTokenAPI,
+  ILivechatRoomCredentialAPI,
+  ILivechatRoomResultAPI,
+  INewLivechatGuestAPI,
+  ILivechatVisitorResultAPI,
+  ILivechatConfigResultAPI,
+  ILivechatRoomSurveyAPI,
+  ILivechatAgentResultAPI,
+  INewLivechatMessageAPI,
+  ILivechatMessageResultAPI,
+  ILivechatRoomMessagesAPI,
+  INewLivechatOfflineMessageAPI,
+  ILivechatOfflineMessageResultAPI,
+  INewLivechatNavigationAPI,
+  ILivechatNavigationResultAPI,
+  ILivechatTranscriptResultAPI,
+  ILivechatVideoCallResultAPI,
+  INewLivechatCustomFieldAPI,
+  ILivechatCustomFieldResultAPI,
+  INewLivechatCustomFieldsAPI,
+  ILivechatCustomFieldsResultAPI
+} from '../interfaces'
 
 export let currentLogin: {
   username: string,
@@ -16,20 +45,16 @@ export function loggedIn () {
   return (currentLogin !== null)
 }
 
-/** Initialise configs */
-export const host = settings.host
-
 /**
  * Prepend protocol (or put back if removed from env settings for driver)
  * Hard code endpoint prefix, because all syntax depends on this version
  */
-export const url = ((host.indexOf('http') === -1)
-  ? host.replace(/^(\/\/)?/, 'http://')
-  : host) + '/api/v1/'
+export const url = `${(host.indexOf('http') === -1) ? host.replace(/^(\/\/)?/, 'http://') : host}/api/v1/`
 
 /** Initialize client */
 const client = axios.create({
-  baseURL: url
+  baseURL: url,
+  headers: { 'Content-Type': 'application/json' }
 })
 
 /** Convert payload data to query string for GET requests */
@@ -43,33 +68,16 @@ export function getQueryString (data: any) {
   }).join('&')
 }
 
-/** Setup default headers with empty auth for now */
-export const basicHeaders = { 'Content-Type': 'application/json' }
-export const authHeaders = { 'X-Auth-Token': '', 'X-User-Id': '' }
-
 /** Populate auth headers (from response data on login) */
 export function setAuth (authData: {authToken: string, userId: string}) {
-  authHeaders['X-Auth-Token'] = authData.authToken
-  authHeaders['X-User-Id'] = authData.userId
-}
-
-/** Join basic headers with auth headers if required */
-export function getHeaders (authRequired = false) {
-  if (!authRequired) return basicHeaders
-  if (
-    (!('X-Auth-Token' in authHeaders) || !('X-User-Id' in authHeaders)) ||
-    authHeaders['X-Auth-Token'] === '' ||
-    authHeaders['X-User-Id'] === ''
-  ) {
-    throw new Error('Auth required endpoint cannot be called before login')
-  }
-  return Object.assign({}, basicHeaders, authHeaders)
+  client.defaults.headers.common['X-Auth-Token'] = authData.authToken
+  client.defaults.headers.common['X-User-Id'] = authData.userId
 }
 
 /** Clear headers so they can't be used without logging in again */
 export function clearHeaders () {
-  delete authHeaders['X-Auth-Token']
-  delete authHeaders['X-User-Id']
+  delete client.defaults.headers.common['X-Auth-Token']
+  delete client.defaults.headers.common['X-User-Id']
 }
 
 /** Check result data for success, allowing override to ignore some errors */
@@ -98,17 +106,15 @@ export async function post (
   ignore?: RegExp
 ) {
   try {
-    logger.debug(`[API] POST: ${endpoint}`, JSON.stringify(data))
+    logger.debug(`[API] POST ${endpoint}`, JSON.stringify(data))
     if (auth && !loggedIn()) await login()
-    let headers = getHeaders(auth)
-    const result = await client.post(endpoint, data, { headers })
+    const result = await client.post(endpoint, data)
     if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
     else if (!success(result, ignore)) throw result
-    logger.debug('[API] POST result:', result)
+    logger.debug(`[API] POST result ${result.status}`)
     return result.data
   } catch (err) {
-    console.error(err)
-    logger.error(`[API] POST error (${endpoint}):`, err)
+    logger.error(`[API] POST error (${endpoint}): ${err.message}`)
   }
 }
 
@@ -126,17 +132,16 @@ export async function get (
   ignore?: RegExp
 ) {
   try {
-    logger.debug(`[API] GET: ${endpoint}`, data)
+    logger.debug(`[API] GET ${endpoint}`, data)
     if (auth && !loggedIn()) await login()
-    let headers = getHeaders(auth)
     const query = getQueryString(data)
-    const result = await client.get(endpoint + query, { headers })
+    const result = await client.get(endpoint + query)
     if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
     else if (!success(result, ignore)) throw result
-    logger.debug('[API] GET result:', result)
+    logger.debug(`[API] GET result ${result.status}`)
     return result.data
   } catch (err) {
-    logger.error(`[API] GET error (${endpoint}):`, err)
+    logger.error(`[API] GET error (${endpoint}): ${err.message}`)
   }
 }
 
@@ -156,17 +161,15 @@ export async function put (
   ignore?: RegExp
 ): Promise<any> {
   try {
-    logger.debug(`[API] PUT: ${endpoint}`, JSON.stringify(data))
+    logger.debug(`[API] PUT ${endpoint}`, JSON.stringify(data))
     if (auth && !loggedIn()) await login()
-    let headers = getHeaders(auth)
-    const result = await client.post(endpoint, data, { headers })
+    const result = await client.put(endpoint, data)
     if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
     else if (!success(result, ignore)) throw result
-    logger.debug('[API] PUT result:', result)
+    logger.debug(`[API] PUT result ${result.status}`)
     return result.data
   } catch (err) {
-    console.error(err)
-    logger.error(`[API] PUT error (${endpoint}):`, err)
+    logger.error(`[API] PUT error (${endpoint}): ${err.message}`)
   }
 }
 
@@ -186,17 +189,15 @@ export async function del (
 	ignore?: RegExp
   ): Promise<any> {
   try {
-	  logger.debug(`[API] DELETE: ${endpoint}`, JSON.stringify(data))
+	  logger.debug(`[API] DELETE ${endpoint}`, JSON.stringify(data))
 	  if (auth && !loggedIn()) await login()
-    let headers = getHeaders(auth)
-    const result = await client.delete(endpoint, { headers, data })
+    const result = await client.delete(endpoint, { data })
     if (Buffer.isBuffer(result)) throw new Error('Result was buffer (HTML, not JSON)')
     else if (!success(result, ignore)) throw result
-	  logger.debug('[API] DELETE result:', result)
+	  logger.debug(`[API] DELETE result ${result.status}`)
 	  return result
   } catch (err) {
-	  console.error(err)
-	  logger.error(`[API] DELETE error (${endpoint}):`, err)
+	  logger.error(`[API] DELETE error (${endpoint}): ${err.message}`)
   }
 }
 
@@ -205,10 +206,7 @@ export async function del (
  * Result should come back with a token, to authorise following requests.
  * Use env default credentials, unless overridden by login arguments.
  */
-export async function login (user: ICredentialsAPI = {
-  username: settings.username,
-  password: settings.password
-}): Promise<ILoginResultAPI> {
+export async function login (user: ICredentialsAPI = { username, password }) {
   logger.info(`[API] Logging in ${user.username}`)
   if (currentLogin !== null) {
     logger.debug(`[API] Already logged in`)
@@ -218,7 +216,7 @@ export async function login (user: ICredentialsAPI = {
       await logout()
     }
   }
-  const result = await post('login', user, false)
+  const result = (await post('login', user, false) as ILoginResultAPI)
   if (result && result.data && result.data.authToken) {
     currentLogin = {
       result: result, // keep to return if login requested again for same user
@@ -260,4 +258,25 @@ export const users: any = {
   onlineIds: () => get('users.list', { fields: { '_id': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r) => r.users.map((u: IUserAPI) => u._id))
 }
 
-export { livechat }
+/** Query helpers for livechat REST requests */
+export const livechat: any = {
+  config: (params: ILivechatTokenAPI) => get('livechat/config', params, false).then((r: ILivechatConfigResultAPI) => r),
+  room: (credentials: ILivechatRoomCredentialAPI) => get('livechat/room', credentials, false).then((r: ILivechatRoomResultAPI) => r),
+  closeChat: (credentials: ILivechatRoomCredentialAPI) => (post('livechat/room.close', { rid: credentials.rid, token: credentials.token }, false)).then((r) => r),
+  transferChat: (credentials: ILivechatRoomCredentialAPI) => (post('livechat/room.transfer', { rid: credentials.rid, token: credentials.token, department: credentials.department }, false)).then((r) => r),
+  chatSurvey: (survey: ILivechatRoomSurveyAPI) => (post('livechat/room.survey', { rid: survey.rid, token: survey.token, data: survey.data }, false)).then((r) => r),
+  visitor: (params: ILivechatTokenAPI) => get(`livechat/visitor/${params.token}`).then((r: ILivechatVisitorResultAPI) => r),
+  grantVisitor: (guest: INewLivechatGuestAPI) => (post('livechat/visitor', guest, false)).then((r: ILivechatVisitorResultAPI) => r),
+  agent: (credentials: ILivechatRoomCredentialAPI) => get(`livechat/agent.info/${credentials && credentials.rid}/${credentials && credentials.token}`).then((r: ILivechatAgentResultAPI) => r),
+  nextAgent: (credentials: ILivechatRoomCredentialAPI) => get(`livechat/agent.next/${credentials && credentials.token}`, { department: credentials.department }).then((r: ILivechatAgentResultAPI) => r),
+  sendMessage: (message: INewLivechatMessageAPI) => (post('livechat/message', message, false)).then((r: ILivechatMessageResultAPI) => r),
+  editMessage: (id: string, message: INewLivechatMessageAPI) => (put(`livechat/message/${id}`, message, false)).then((r: ILivechatMessageResultAPI) => r),
+  deleteMessage: (id: string, credentials: ILivechatRoomCredentialAPI) => (del(`livechat/message/${id}`, credentials, false)).then((r) => r),
+  loadMessages: (id: string, params: ILivechatRoomMessagesAPI) => get(`livechat/messages.history/${id}`, params, false).then((r) => r),
+  sendOfflineMessage: (message: INewLivechatOfflineMessageAPI) => (post('livechat/offline.message', message, false)).then((r: ILivechatOfflineMessageResultAPI) => r),
+  sendVisitorNavigation: (credentials: ILivechatRoomCredentialAPI, page: INewLivechatNavigationAPI) => (post('livechat/page.visited', { token: credentials.token, rid: credentials.rid, ...page }, false)).then((r: ILivechatNavigationResultAPI) => r),
+  requestTranscript: (email: string, credentials: ILivechatRoomCredentialAPI) => (post('livechat/transcript', { token: credentials.token, rid: credentials.rid, email }, false)).then((r: ILivechatTranscriptResultAPI) => r),
+  videoCall: (credentials: ILivechatRoomCredentialAPI) => (get(`livechat/video.call/${credentials.token}`, { rid: credentials.rid }, false)).then((r: ILivechatVideoCallResultAPI) => r),
+  sendCustomField: (field: INewLivechatCustomFieldAPI) => (post('livechat/custom.field', field, false)).then((r: ILivechatCustomFieldResultAPI) => r),
+  sendCustomFields: (fields: INewLivechatCustomFieldsAPI) => (post('livechat/custom.fields', fields, false)).then((r: ILivechatCustomFieldsResultAPI) => r)
+}

@@ -24,7 +24,8 @@ export async function userInfo (username: string) {
 
 /** Create a user and catch the error if they exist already */
 export async function createUser (user: INewUserAPI) {
-  return (await post('users.create', user, true, /already in use/i) as IUserResultAPI)
+  const result: IUserResultAPI = await post('users.create', user, true, /already in use/i)
+  return result
 }
 
 /** Get information about a channel */
@@ -142,7 +143,7 @@ export async function setup () {
   try {
     // Verify API user can login
     const loginInfo = await login(apiUser)
-    if (loginInfo.status !== 'success') {
+    if (!loginInfo || loginInfo.status !== 'success') {
       throw new Error(`API user (${apiUser.username}) could not login`)
     } else {
       console.log(`API user (${apiUser.username}) logged in`)
@@ -167,7 +168,7 @@ export async function setup () {
     if (!mockInfo || !mockInfo.success) {
       console.log(`Mock user (${mockUser.username}) not found`)
       mockInfo = await createUser(mockUser)
-      if (!mockInfo.success) {
+      if (!mockInfo || mockInfo.success) {
         throw new Error(`Mock user (${mockUser.username}) could not be created`)
       } else {
         console.log(`Mock user (${mockUser.username}) created`)

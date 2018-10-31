@@ -28,3 +28,8 @@ export let roomCacheMaxSize = parseInt(process.env.ROOM_CACHE_SIZE || '10', 10)
 export let roomCacheMaxAge = 1000 * parseInt(process.env.ROOM_CACHE_MAX_AGE || '300', 10)
 export let dmCacheMaxSize = parseInt(process.env.DM_ROOM_CACHE_SIZE || '10', 10)
 export let dmCacheMaxAge = 1000 * parseInt(process.env.DM_ROOM_CACHE_MAX_AGE || '100', 10)
+
+// Livechat settings
+export let token = process.env.LIVECHAT_TOKEN || ''
+export let rid = process.env.LIVECHAT_ROOM || ''
+export let department = process.env.LIVECHAT_DEPARTMENT || ''

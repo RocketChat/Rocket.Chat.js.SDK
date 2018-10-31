@@ -1,4 +1,3 @@
-[asteroid]: https://www.npmjs.com/package/asteroid
 [lru]: https://www.npmjs.com/package/lru
 [rest]: https://rocket.chat/docs/developer-guides/rest-api/
 [start]: https://github.com/RocketChat/Rocket.Chat.js.SDK/blob/master/src/utils/start.ts

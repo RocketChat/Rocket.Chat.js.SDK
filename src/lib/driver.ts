@@ -1,3 +1,8 @@
+/**
+ * @module driver
+ * Provides high-level helpers for DDP connection, method calls, subscriptions.
+ */
+
 import { EventEmitter } from 'events'
 import * as settings from './settings'
 import * as methodCache from './methodCache'
@@ -43,7 +48,7 @@ export const integrationId = settings.integrationId
 export const events = new EventEmitter()
 
 /**
- * An Asteroid instance for interacting with Rocket.Chat.
+ * An Websocket instance for interacting with Rocket.Chat.
  * Variable not initialised until `connect` called.
  */
 export let ddp: Socket
@@ -54,6 +59,9 @@ export let ddp: Socket
  * @deprecated Use `ddp.Socket` instance subscriptions instead.
  */
 export let subscriptions: { [id: string]: ISubscription } = {}
+
+/** Save messages subscription to ensure only one created */
+export let messages: ISubscription | undefined
 
 /** Current user object populated from resolved login */
 export let userId: string
@@ -90,19 +98,21 @@ export function connect (
   return new Promise((resolve, reject) => {
     const config: ISocketOptions = Object.assign({}, settings, options) // override defaults
     config.host = config.host.replace(/(^\w+:|^)\/\//, '') // strip protocol
-    logger.info('[connect] Connecting', config)
+    const safeConfig: any = Object.assign({}, config)
+    if (safeConfig.password) safeConfig.password = safeConfig.password.replace(/./g, '*')
+    logger.info('[driver] Connecting', safeConfig)
     ddp = new Socket(config)
     subscriptions = ddp.subscriptions
     setupMethodCache(ddp) // init instance for later caching method calls
     ddp.open().catch((err) => {
-      logger.error(`[connect] Failed to connect: ${err.message}`)
+      logger.error(`[driver] Failed to connect: ${err.message}`)
       reject(err)
     })
-    ddp.on('connected', () => events.emit('connected')) // echo ddp event
+    ddp.on('open', () => events.emit('connected')) // echo ddp event
 
     let cancelled = false
     const rejectionTimeout = setTimeout(function () {
-      logger.info(`[connect] Timeout (${config.timeout})`)
+      logger.info(`[driver] Timeout (${config.timeout})`)
       const err = new Error('Socket connection timeout')
       cancelled = true
       events.removeAllListeners('connected')
@@ -113,7 +123,7 @@ export function connect (
     // and this listener is not removed (because it was added after the removal)
     if (!cancelled) {
       events.once('connected', () => {
-        logger.info('[connect] Connected')
+        logger.info('[driver] Connected')
         if (cancelled) return ddp.close() // cancel if already rejected
         clearTimeout(rejectionTimeout)
         if (callback) callback(null, ddp)
@@ -127,7 +137,8 @@ export function connect (
  * Setup method cache configs from env or defaults, before they are called.
  * @param ddp The socket instance to cache `.call` results
  */
-function setupMethodCache (ddp: Socket): void {
+export function setupMethodCache (ddp: Socket): void {
+  logger.debug('[driver] Setting up method catch')
   methodCache.use(ddp)
   methodCache.create('getRoomIdByNameOrId', {
     max: settings.roomCacheMaxSize,
@@ -148,14 +159,15 @@ function setupMethodCache (ddp: Socket): void {
  * @param method The Rocket.Chat server method, to call through socket
  * @param params Single or array of parameters of the method to call
  */
-export function asyncCall (method: string, ...params: any[]) {
+export function asyncCall (method: string, params: any) {
+  if (!Array.isArray(params)) params = [params] // cast to array for apply
   logger.debug(`[${method}] Calling (async): ${JSON.stringify(params)}`)
   return ddp.call(method, ...params)
-    .catch((err: Error) => {
+    .catch((err) => {
       logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
     })
-    .then(({ result }: any) => {
+    .then((result) => {
       (result)
         ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
         : logger.debug(`[${method}] Success`)
@@ -170,10 +182,10 @@ export function asyncCall (method: string, ...params: any[]) {
  * @param name The Rocket.Chat server method to call
  * @param params Single or array of parameters of the method to call
  */
-export function callMethod (name: string, params?: any | any[]): Promise<any> {
-  return (methodCache.has(name) || typeof params === 'undefined')
-    ? asyncCall(name, params)
-    : cacheCall(name, params)
+export function callMethod (name: string, ...params: any[]): Promise<any> {
+  return (methodCache.has(name) && typeof params !== 'undefined')
+    ? cacheCall(name, params[0])
+    : asyncCall(name, params)
 }
 
 /**
@@ -182,6 +194,7 @@ export function callMethod (name: string, params?: any | any[]): Promise<any> {
  * @param key Single string parameters only, required to use as cache key
  */
 export function cacheCall (method: string, key: string): Promise<any> {
+  logger.debug(`[driver] returning cached result for ${method}(${key})`)
   return methodCache.call(method, key)
     .catch((err: Error) => {
       logger.error(`[${method}] Error:`, err)
@@ -195,16 +208,16 @@ export function cacheCall (method: string, key: string): Promise<any> {
     })
 }
 
-/** Login to Rocket.Chat via Asteroid */
+/** Login to Rocket.Chat via DDP */
 export async function login (credentials: ICredentials = {
   username: settings.username,
   password: settings.password,
   ldap: settings.ldap
 }) {
   let login: ILoginResult | undefined
+  if (!ddp || !ddp.connected) await connect()
   if (credentials.ldap) {
-    logger.info(`[login] Logging in ${credentials.username} with LDAP`)
-    if (!ddp || !ddp.connected) await connect()
+    logger.info(`[driver] Logging in ${credentials.username} with LDAP`)
     login = await ddp.login({
       ldap: true,
       ldapOptions: credentials.ldapOptions || {},
@@ -212,7 +225,7 @@ export async function login (credentials: ICredentials = {
       username: credentials.username
     })
   } else {
-    logger.info(`[login] Logging in ${credentials.username}`)
+    logger.info(`[driver] Logging in ${credentials.username}`)
     login = await ddp.login(credentials)
   }
   userId = login.id
@@ -220,12 +233,15 @@ export async function login (credentials: ICredentials = {
 }
 
 /** Proxy socket logout */
-export const logout = () => ddp.logout()
+export const logout = () => {
+  unsubscribeAll()
+  return ddp.logout()
+}
 
 /** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
 export function disconnect () {
   logger.info('Unsubscribing, logging out, disconnecting')
-  unsubscribeAll().catch((err) => logger.error(`[ddp] Failed unsubscribe on disconnect: ${err.message}`))
+  unsubscribeAll().catch((err) => logger.error(`[driver] Failed unsubscribe on disconnect: ${err.message}`))
   return logout()
 }
 
@@ -237,51 +253,39 @@ export function subscribe (
   topic: string,
   roomId: string
 ) {
-  logger.info(`[subscribe] Subscribing to ${topic} | ${roomId}`)
+  logger.info(`[driver] Subscribing to ${topic} | ${roomId}`)
   return ddp.subscribe(topic, [roomId, true]).then(({ id }) => id)
 }
 
-/**
- * Unsubscribe from Meteor stream. Proxy for socket unsubscribe.
- * @deprecated Use `ddp.Socket` instance unsubscribe instead.
- */
+/** Unsubscribe from Meteor stream. Proxy for socket unsubscribe. */
 export function unsubscribe (subscription: ISubscription) {
   return ddp.unsubscribe(subscription.id)
 }
 
-/**
- * Unsubscribe from all subscriptions. Proxy for socket unsubscribeAll
- * @deprecated Use `ddp.Socket` instance unsubscribeAll instead.
- */
+/** Unsubscribe from all subscriptions. Proxy for socket unsubscribeAll */
 export function unsubscribeAll () {
   return ddp.unsubscribeAll()
 }
 
-/**
- * Begin subscription to room events for user.
- * @deprecated Use respondToMessages to subscribe and add callback in one call.
- */
-export function subscribeToMessages () {
-  return ddp.subscribe(_messageCollectionName, [_messageStreamName, true])
+/** Begin subscription to user's "global" message stream. Will only allow one. */
+export async function subscribeToMessages () {
+  if (!messages) {
+    messages = await ddp.subscribe(
+      _messageCollectionName,
+      [_messageStreamName, true],
+      (data) => logger.debug(`[driver] subscription event ${JSON.stringify(data)}`)
+    )
+  }
+  // make sure singleton messages instance removes itself if unsubscribed
+  messages.unsubscribe = async function () {
+    await ddp.unsubscribe(this.id)
+    messages = undefined
+  }
+  return messages
 }
-export function on (collection: string, callback: ICallback): void {
-  logger.info(`[reactive] Listening for change events in collection ${collection}`)
-  ddp.on(collection, (obj: any) => {
-    const changedMessage = obj.fields
-    if (changedMessage && changedMessage.args.length > 0) {
-      if (Array.isArray(changedMessage.args)) {
-        logger.info(`[received] Message in room ${changedMessage.args[0].rid}`)
-        callback(null, changedMessage.args[0], changedMessage.args[1])
-      } else {
-        logger.debug('[received] Update without message args')
-      }
-    } else {
-      logger.debug('[received] Reactive query at ID ${ _id } without results')
-    }
-  })
-}
+
 /**
- * Subscribe and add callback for changes in the message stream.
+ * Add callback for changes in the message stream, subscribing if not already.
  * This can be called directly for custom extensions, but for most usage (e.g.
  * for bots) the respondToMessages is more useful to only receive messages
  * matching configuration.
@@ -291,8 +295,7 @@ export function on (collection: string, callback: ICallback): void {
  *  - Second argument is the changed message
  *  - Third argument is additional attributes, such as `roomType`
  */
-export function reactToMessages (callback: IMessageCallback) {
-  logger.info(`[reactive] Listening for changes in ${_messageCollectionName}`)
+export async function reactToMessages (callback: IMessageCallback) {
   const handler = (e: ISubscriptionEvent) => {
     try {
       const message: IMessage = e.fields.args[0]
@@ -303,11 +306,13 @@ export function reactToMessages (callback: IMessageCallback) {
         callback(null, message, meta)
       }
     } catch (err) {
-      logger.error(`[reactive] Message handler err: ${err.message}`)
+      logger.error(`[driver] Message handler err: ${err.message}`)
       callback(err)
     }
   }
-  return ddp.subscribe(_messageCollectionName, [_messageStreamName, true], handler)
+  messages = await subscribeToMessages()
+  messages.onEvent(handler)
+  logger.info(`[driver] Added event handler for ${messages!.name} subscription`)
 }
 
 /**
@@ -323,13 +328,11 @@ export function reactToMessages (callback: IMessageCallback) {
  *  - Third argument is additional attributes, such as `roomType`
  * @param options Sets filters for different event/message types.
  */
-export function respondToMessages (
+export async function respondToMessages (
   callback: IMessageCallback,
   options: IRespondOptions = {}
-): Promise<void | void[]> {
+) {
   const config = Object.assign({}, settings, options)
-  // return value, may be replaced by async ops
-  let promise = Promise.resolve()
 
   // Join configured rooms if they haven't been already, unless listening to all
   // public rooms, in which case it doesn't matter
@@ -339,21 +342,20 @@ export function respondToMessages (
     config.rooms &&
     config.rooms.length > 0
   ) {
-    promise.then(() => joinRooms(config.rooms)
+    await joinRooms(config.rooms)
       .catch((err) => {
-        logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
+        logger.error(`[driver] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
       })
-    )
   }
 
   lastReadTime = new Date() // init before any message read
-  promise.then(() => reactToMessages(async (err, message, meta) => {
+  return reactToMessages(async (err, message, meta) => {
     if (err) {
-      logger.error(`[received] Unable to receive: ${err.message}`)
+      logger.error(`[driver] Unable to receive: ${err.message}`)
       return callback(err) // bubble errors back to adapter
     }
     if (typeof message === 'undefined' || typeof meta === 'undefined') {
-      logger.error(`[received] Message or meta undefined`)
+      logger.error(`[driver] Message or meta undefined`)
       return callback(err)
     }
 
@@ -382,13 +384,12 @@ export function respondToMessages (
 
     // At this point, message has passed checks and can be responded to
     const username = (message.u) ? message.u.username : 'unknown'
-    logger.info(`[received] Message ${message._id} from ${username}`)
+    logger.info(`[driver] Message ${message._id} from ${username}`)
     lastReadTime = currentReadTime
 
     // Processing completed, call callback to respond to message
     callback(null, message, meta)
-  }))
-  return promise
+  })
 }
 
 /** Get ID for a room by name (or ID). */
@@ -416,7 +417,7 @@ export async function joinRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
   let joinedIndex = joinedIds.indexOf(room)
   if (joinedIndex !== -1) {
-    logger.error(`[joinRoom] room was already joined`)
+    logger.error(`[driver] Join room failed, already joined`)
   } else {
     await asyncCall('joinRoom', roomId)
     joinedIds.push(roomId)
@@ -428,7 +429,7 @@ export async function leaveRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
   let joinedIndex = joinedIds.indexOf(room)
   if (joinedIndex === -1) {
-    logger.error(`[leaveRoom] failed because bot has not joined ${room}`)
+    logger.error(`[driver] Leave room failed, bot has not joined ${room}`)
   } else {
     await asyncCall('leaveRoom', roomId)
     delete joinedIds[joinedIndex]
@@ -523,5 +524,5 @@ export function editMessage (message: IMessage): Promise<IMessage> {
  * @param messageId ID for a previously sent message
  */
 export function setReaction (emoji: string, messageId: string) {
-  return asyncCall('setReaction', emoji, messageId)
+  return asyncCall('setReaction', [emoji, messageId])
 }

@@ -1,6 +1,7 @@
 import sinon from 'sinon'
 import { expect } from 'chai'
 import LRU from 'lru-cache'
+import { silence } from './log'
 import * as methodCache from './methodCache'
 
 // Instance method variance for testing cache
@@ -9,6 +10,8 @@ mockInstance.call.withArgs('methodOne').onCall(0).returns({ result: 'foo' })
 mockInstance.call.withArgs('methodOne').onCall(1).returns({ result: 'bar' })
 mockInstance.call.withArgs('methodTwo', 'key1').returns({ result: 'value1' })
 mockInstance.call.withArgs('methodTwo', 'key2').returns({ result: 'value2' })
+
+silence() // suppress log during tests (disable this while developing tests)
 
 describe('methodCache', () => {
   beforeEach(() => mockInstance.call.resetHistory())

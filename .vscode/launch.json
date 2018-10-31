@@ -5,14 +5,27 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Current Spec",
       "type": "node",
-      "sourceMaps": true,
       "request": "launch",
+      "name": "Setup for Tests",
+      "cwd": "${workspaceRoot}",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/node_modules/ts-node/dist/bin.js",
+      "args": ["${workspaceFolder}/src/utils/setup.ts"],
+      "protocol": "inspector",
+      "stopOnEntry": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Current Spec",
+      "sourceMaps": true,
       "program": "${workspaceRoot}/node_modules/.bin/_mocha",
       "args": ["${relativeFile}"],
       "cwd": "${workspaceRoot}",
-      "protocol": "inspector"
+      "protocol": "inspector",
+      "console": "integratedTerminal"
     }
   ]
 }

@@ -1,7 +1,7 @@
-import * as api from './lib/api'
-import { silence } from '../lib/log'
-import { mockVisitor, mockOfflineMessage, mockVisitorNavigation } from './lib/mock'
-import * as settings from './lib/settings'
+import * as api from '../../lib/api'
+import * as settings from '../../lib/settings'
+import { silence } from '../../lib/log'
+import { mockVisitor, mockOfflineMessage, mockVisitorNavigation } from '../config'
 
 silence()
 
@@ -24,25 +24,12 @@ async function getRoom (token: string) {
 
 async function messages () {
   const token = await getVisitorToken()
-
   const room = await getRoom(token)
   const rid = room && room._id
-
-  const newMessage = {
-	  token,
-	  rid,
-	  msg: 'sending livechat message..'
-  }
-
-  const editMessage = {
-	  token,
-	  rid,
-	  msg: 'editing livechat message..'
-  }
-
+  const newMessage = { token, rid, msg: 'sending livechat message..' }
+  const editMessage = { token, rid, msg: 'editing livechat message..' }
   const result = await api.livechat.sendMessage(newMessage)
   const _id = result && result.message && result.message._id
-
   const roomCredential = { token, rid }
   const pageInfo = Object.assign({}, mockVisitorNavigation, { rid })
 

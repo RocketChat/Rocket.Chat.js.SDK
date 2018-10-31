@@ -1,7 +1,7 @@
-import * as api from './lib/api'
-import { silence } from '../lib/log'
-import { mockVisitor } from './lib/mock'
-import * as settings from './lib/settings'
+import * as api from '../../lib/api'
+import * as settings from '../../lib/settings'
+import { silence } from '../../lib/log'
+import { mockVisitor } from '../config'
 
 silence()
 
@@ -24,19 +24,17 @@ async function getRoom (token: string) {
 
 async function agent () {
   const token = await getVisitorToken()
-
   const room = await getRoom(token)
   const rid = room && room._id
-
-  const department = settings.deparmentId
+  const department = settings.department
 
   console.log(`
 
-    Get Livechat Agent \`api.livechat.agent()\`:
-    ${JSON.stringify(await api.livechat.agent({ rid, token }), null, '\t')}
+Get Livechat Agent \`api.livechat.agent()\`:
+${JSON.stringify(await api.livechat.agent({ rid, token }), null, '\t')}
 
-    Get Livechat Next Agent \`api.livechat.nextAgent()\`:
-    ${JSON.stringify(await api.livechat.nextAgent({ token, department }), null, '\t')}
+Get Livechat Next Agent \`api.livechat.nextAgent()\`:
+${JSON.stringify(await api.livechat.nextAgent({ token, department }), null, '\t')}
 
   `)
 }

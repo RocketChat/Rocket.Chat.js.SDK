@@ -1,4 +1,9 @@
-import { ILogger } from '../config/driverInterfaces'
+/**
+ * @module log
+ * Basic log handling with ability to override when used within another module.
+ */
+
+import { ILogger } from '../interfaces'
 
 /** Temp logging, should override form adapter's log */
 class InternalLog implements ILogger {
@@ -19,13 +24,16 @@ class InternalLog implements ILogger {
   }
 }
 
-let logger: ILogger = new InternalLog()
+/** Default basic console logging */
+export let logger: ILogger = new InternalLog()
 
-function replaceLog (externalLog: ILogger) {
+/** Substitute logging handler */
+export function replaceLog (externalLog: ILogger) {
   logger = externalLog
 }
 
-function silence () {
+/** Null all log outputs */
+export function silence () {
   replaceLog({
     debug: () => null,
     info: () => null,
@@ -33,10 +41,4 @@ function silence () {
     warning: () => null,
     error: () => null
   })
-}
-
-export {
-  logger,
-  replaceLog,
-  silence
 }

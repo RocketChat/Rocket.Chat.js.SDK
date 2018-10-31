@@ -1,3 +1,8 @@
+/**
+ * @module methodCache
+ * Manages results cache for calls to server (via LRU cache)
+ */
+
 import LRU from 'lru-cache'
 import { logger } from './log'
 
@@ -37,17 +42,16 @@ export function create (method: string, options: LRU.Options = {}) {
 export async function call (method: string, key: string) {
   if (!results.has(method)) create(method) // create as needed
   const methodCache = results.get(method)!
-
   if (methodCache.has(key)) {
-    logger.debug(`[${method}] Calling (cached): ${key}`)
+    logger.debug(`[cache] Returning cached ${method}(${key})`)
     // return from cache if key has been used on method before
     return methodCache.get(key)
   }
-    // call and cache for next time, returning results
-  logger.debug(`[${method}] Calling (caching): ${key}`)
-  const { result: callResults } = await Promise.resolve(instance.call(method, key))
-  methodCache.set(key, callResults)
-  return callResults
+  // call and cache for next time, returning results
+  logger.debug(`[${method}] Caching new results of ${method}(${key})`)
+  const result = await Promise.resolve(instance.call(method, key))
+  methodCache.set(key, result)
+  return result
 }
 
 /**
