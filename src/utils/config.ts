@@ -42,17 +42,19 @@ export const mockUser: INewUserAPI = {
   verified: true
 }
 
+// @todo fix custom field handling, either by using pre-test script to add
+//       required fields to test instance or by handling error without failing
 export const mockVisitor: INewLivechatGuestAPI = {
   visitor: {
     name: 'Livechat Visitor',
     email: 'visitor@rocket.chat',
     token: '123456789',
-    phone: '55 51 5555-5555',
-    customFields: [{
-      key: 'address',
-      value: 'Rocket.Chat street',
-      overwrite: true
-    }]
+    phone: '55 51 5555-5555'
+    // customFields: [{
+    //   key: 'address',
+    //   value: 'Rocket.Chat street',
+    //   overwrite: true
+    // }]
   }
 }
 

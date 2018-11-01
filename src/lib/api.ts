@@ -3,10 +3,11 @@
  * Provides a client for making requests with Rocket.Chat's REST API
  */
 
-import axios from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import { host, username, password } from './settings'
 import { logger } from './log'
 import {
+  IAPIRequest,
   IUserAPI,
   ILoginResultAPI,
   ICredentialsAPI,
@@ -57,17 +58,6 @@ const client = axios.create({
   headers: { 'Content-Type': 'application/json' }
 })
 
-/** Convert payload data to query string for GET requests */
-export function getQueryString (data: any) {
-  if (!data || typeof data !== 'object' || !Object.keys(data).length) return ''
-  return '?' + Object.keys(data).map((k) => {
-    const value = (typeof data[k] === 'object')
-      ? JSON.stringify(data[k])
-      : encodeURIComponent(data[k])
-    return `${encodeURIComponent(k)}=${value}`
-  }).join('&')
-}
-
 /** Populate auth headers (from response data on login) */
 export function setAuth (authData: {authToken: string, userId: string}) {
   client.defaults.headers.common['X-Auth-Token'] = authData.authToken
@@ -91,115 +81,53 @@ export function success (result: any, ignore?: RegExp) {
 }
 
 /**
- * Do a POST request to an API endpoint.
+ * Do a request to an API endpoint.
  * If it needs a token, login first (with defaults) to set auth headers.
- * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
+ * @param method   Request method GET | POST | PUT | DEL
  * @param endpoint The API endpoint (including version) e.g. `chat.update`
  * @param data     Payload for POST request to endpoint
  * @param auth     Require auth headers for endpoint, default true
  * @param ignore   Allows certain matching error messages to not count as errors
  */
-export async function post (
+export async function request (
+  method: 'POST' | 'GET' | 'PUT' | 'DELETE',
   endpoint: string,
-  data: any,
+  data: any = {},
   auth: boolean = true,
   ignore?: RegExp
 ) {
+  logger.debug(`[API] ${method} ${endpoint}: ${JSON.stringify(data)}`)
   try {
-    logger.debug(`[API] POST ${endpoint}`, JSON.stringify(data))
     if (auth && !loggedIn()) await login()
-    const result = await client.post(endpoint, data)
-    if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
-    else if (!success(result, ignore)) throw result
-    logger.debug(`[API] POST result ${result.status}`)
-    return result.data
+    let result: AxiosResponse
+    switch (method) {
+      case 'GET': result = await client.get(endpoint, { params: data }); break
+      case 'PUT': result = await client.put(endpoint, data); break
+      case 'DELETE': result = await client.delete(endpoint, { data }); break
+      default:
+      case 'POST': result = await client.post(endpoint, data); break
+    }
+    if (!result) throw new Error(`API ${method} ${endpoint} result undefined`)
+    if (!success(result, ignore)) throw result
+    logger.debug(`[API] ${method} ${endpoint} result ${result.status}`)
+    return (method === 'DELETE') ? result : result.data
   } catch (err) {
-    logger.error(`[API] POST error (${endpoint}): ${err.message}`)
+    logger.error(`[API] POST error (${endpoint}): ${err.response.data.message}`)
+    throw err.response.data
   }
 }
 
-/**
- * Do a GET request to an API endpoint
- * @param endpoint   The API endpoint (including version) e.g. `users.info`
- * @param data       Object to serialise for GET request query string
- * @param auth       Require auth headers for endpoint, default true
- * @param ignore     Allows certain matching error messages to not count as errors
- */
-export async function get (
-  endpoint: string,
-  data?: any,
-  auth: boolean = true,
-  ignore?: RegExp
-) {
-  try {
-    logger.debug(`[API] GET ${endpoint}`, data)
-    if (auth && !loggedIn()) await login()
-    const query = getQueryString(data)
-    const result = await client.get(endpoint + query)
-    if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
-    else if (!success(result, ignore)) throw result
-    logger.debug(`[API] GET result ${result.status}`)
-    return result.data
-  } catch (err) {
-    logger.error(`[API] GET error (${endpoint}): ${err.message}`)
-  }
-}
+/** Do a POST request to an API endpoint. */
+export const post: IAPIRequest = (endpoint, data, auth, ignore) => request('POST', endpoint, data, auth, ignore)
 
-/**
- * Do a PUT request to an API endpoint.
- * If it needs a token, login first (with defaults) to set auth headers.
- * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
- * @param endpoint The API endpoint (including version) e.g. `chat.update`
- * @param data     Payload for PUT request to endpoint
- * @param auth     Require auth headers for endpoint, default true
- * @param ignore   Allows certain matching error messages to not count as errors
- */
-export async function put (
-  endpoint: string,
-  data: any,
-  auth: boolean = true,
-  ignore?: RegExp
-): Promise<any> {
-  try {
-    logger.debug(`[API] PUT ${endpoint}`, JSON.stringify(data))
-    if (auth && !loggedIn()) await login()
-    const result = await client.put(endpoint, data)
-    if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
-    else if (!success(result, ignore)) throw result
-    logger.debug(`[API] PUT result ${result.status}`)
-    return result.data
-  } catch (err) {
-    logger.error(`[API] PUT error (${endpoint}): ${err.message}`)
-  }
-}
+/** Do a GET request to an API endpoint. */
+export const get: IAPIRequest = (endpoint, data, auth, ignore) => request('GET', endpoint, data, auth, ignore)
 
-/**
- * Do a DELETE request to an API endpoint.
- * If it needs a token, login first (with defaults) to set auth headers.
- * @todo Look at why some errors return HTML (caught as buffer) instead of JSON
- * @param endpoint The API endpoint (including version) e.g. `chat.update`
- * @param data     Payload for DELETE request to endpoint
- * @param auth     Require auth headers for endpoint, default true
- * @param ignore   Allows certain matching error messages to not count as errors
- */
-export async function del (
-	endpoint: string,
-	data: any,
-	auth: boolean = true,
-	ignore?: RegExp
-  ): Promise<any> {
-  try {
-	  logger.debug(`[API] DELETE ${endpoint}`, JSON.stringify(data))
-	  if (auth && !loggedIn()) await login()
-    const result = await client.delete(endpoint, { data })
-    if (Buffer.isBuffer(result)) throw new Error('Result was buffer (HTML, not JSON)')
-    else if (!success(result, ignore)) throw result
-	  logger.debug(`[API] DELETE result ${result.status}`)
-	  return result
-  } catch (err) {
-	  logger.error(`[API] DELETE error (${endpoint}): ${err.message}`)
-  }
-}
+/** Do a PUT request to an API endpoint. */
+export const put: IAPIRequest = (endpoint, data, auth, ignore) => request('PUT', endpoint, data, auth, ignore)
+
+/** Do a DELETE request to an API endpoint. */
+export const del: IAPIRequest = (endpoint, data, auth, ignore) => request('DELETE', endpoint, data, auth, ignore)
 
 /**
  * Login a user for further API calls
@@ -210,11 +138,8 @@ export async function login (user: ICredentialsAPI = { username, password }) {
   logger.info(`[API] Logging in ${user.username}`)
   if (currentLogin !== null) {
     logger.debug(`[API] Already logged in`)
-    if (currentLogin.username === user.username) {
-      return currentLogin.result
-    } else {
-      await logout()
-    }
+    if (currentLogin.username === user.username) return currentLogin.result
+    else await logout()
   }
   const result = (await post('login', user, false) as ILoginResultAPI)
   if (result && result.data && result.data.authToken) {
@@ -225,7 +150,7 @@ export async function login (user: ICredentialsAPI = { username, password }) {
       userId: result.data.userId
     }
     setAuth(currentLogin)
-    logger.info(`[API] Logged in ID ${ currentLogin.userId }`)
+    logger.info(`[API] Logged in ID ${currentLogin.userId}`)
     return result
   } else {
     throw new Error(`[API] Login failed for ${user.username}`)

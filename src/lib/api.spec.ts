@@ -48,22 +48,6 @@ describe('api', () => {
       expect(api.success({})).to.equal(true)
     })
   })
-  describe('.getQueryString', () => {
-    it('converts object to query params string', () => {
-      expect(api.getQueryString({
-        foo: 'bar',
-        baz: 'qux'
-      })).to.equal('?foo=bar&baz=qux')
-    })
-    it('returns empty if nothing in object', () => {
-      expect(api.getQueryString({})).to.equal('')
-    })
-    it('returns nested objects without serialising', () => {
-      expect(api.getQueryString({
-        fields: { 'username': 1 }
-      })).to.equal('?fields={"username":1}')
-    })
-  })
   describe('.get', () => {
     before(() => driver.login())
     it('returns data from basic call without auth', async () => {
@@ -114,21 +98,16 @@ describe('api', () => {
   })
   describe('.livechat', () => {
     before(async () => {
-      try {
-        if (token === '') {
-          const { visitor } = await api.livechat.grantVisitor(mockVisitor)
-          token = visitor && visitor.token
-        }
-        const result = await api.livechat.room({ token })
-        room = result.room
-        rid = room && room._id
-        newMessage = { token, rid, msg: 'sending livechat message..' }
-        editMessage = { token, rid, msg: 'editing livechat message..' }
-        pageInfo = Object.assign({}, mockVisitorNavigation, { rid })
-      } catch (err) {
-        console.error(err)
-        throw(err)
+      if (token === '') {
+        const { visitor } = await api.livechat.grantVisitor(mockVisitor)
+        token = visitor && visitor.token
       }
+      const result = await api.livechat.room({ token })
+      room = result.room
+      rid = room && room._id
+      newMessage = { token, rid, msg: 'sending livechat message...' }
+      editMessage = { token, rid, msg: 'editing livechat message...' }
+      pageInfo = Object.assign({}, mockVisitorNavigation, { rid })
     })
     describe('.config', () => {
       it('returns data from basic Livechat initial config', async () => {
