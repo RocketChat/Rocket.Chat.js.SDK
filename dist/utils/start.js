@@ -57,7 +57,7 @@ class L {
         // return this.warning(...args)
     }
     error(...args) {
-        console.error(...args);
+        // console.error(...args)
     }
 }
 const driver = new Bot_1.default({ host: exports.host, useSsl: exports.useSsl, timeout: exports.timeout, logger: new L() });
@@ -100,7 +100,6 @@ function demo(message) {
             for (let username of usernames) {
                 if (username && username !== config_1.botUser.username) {
                     const toWhere = yield driver.getDirectMessageRoomId(username);
-                    console.log(yield driver.sendToRoomId(sayWhat, toWhere)); // DM ID hax
                     yield delay(200); // delay to prevent rate-limit error
                 }
             }

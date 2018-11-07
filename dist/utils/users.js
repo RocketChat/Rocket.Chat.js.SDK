@@ -12,10 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 // Test script uses standard methods and env config to connect and log streams
-const Client_1 = __importDefault(require("../lib/api/Client"));
+const RocketChat_1 = __importDefault(require("../lib/api/RocketChat"));
 const log_1 = require("../lib/log");
 log_1.silence();
-const api = new Client_1.default({});
+const api = new RocketChat_1.default({});
 function users() {
     return __awaiter(this, void 0, void 0, function* () {
         console.log(`

@@ -1,5 +1,5 @@
 // Test script uses standard methods and env config to connect and log streams
-import ClientRest from '../lib/api/Client'
+import ClientRest from '../lib/api/RocketChat'
 import { silence } from '../lib/log'
 silence()
 

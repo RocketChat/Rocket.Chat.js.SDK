@@ -23,7 +23,6 @@ class Client {
         return Object.assign({ 'Content-Type': 'application/json' }, this._headers);
     }
     get(url, data, options) {
-        console.log(this.getParams(data));
         return fetch(`${this.host}/api/v1/${url}?${this.getParams(data)}`, {
             method: 'GET',
             headers: this.headers
@@ -81,7 +80,6 @@ class Api extends tiny_events_1.EventEmitter {
         this.del = (endpoint, data, auth, ignore) => this.request('DELETE', endpoint, data, auth, ignore);
         this.client = client || new Client({ host });
         this.logger = logger;
-        console.log('EEEEE', logger);
     }
     loggedIn() {
         return Object.keys(this.currentLogin || {}).every((e) => e);

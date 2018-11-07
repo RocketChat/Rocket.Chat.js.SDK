@@ -176,7 +176,7 @@ class BotClient extends Rocketchat_1.default {
                     return;
                 // At this point, message has passed checks and can be responded to
                 const username = (message.u) ? message.u.username : 'unknown';
-                log_1.logger.info(`[driver] Message ${message._id} from ${username}`);
+                this.logger.info(`[driver] Message ${message._id} from ${username}`);
                 this.lastReadTime = currentReadTime;
                 callback(null, message, meta);
             }));
