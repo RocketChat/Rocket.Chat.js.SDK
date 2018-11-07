@@ -1,4 +1,4 @@
-import { IMessage } from '../config/messageInterfaces';
+import { IMessage } from '../interfaces';
 export interface Message extends IMessage {
 }
 /**
@@ -7,7 +7,6 @@ export interface Message extends IMessage {
  * @param content Accepts message text or a preformed message object
  * @todo Potential for SDK usage that isn't bots, bot prop should be optional?
  */
-export declare class Message {
-    constructor(content: string | IMessage, integrationId: string);
-    setRoomId(roomId: string): Message;
+export declare class Message implements IMessage {
+    constructor(content: string | IMessage, { integrationId, ...others }: any);
 }

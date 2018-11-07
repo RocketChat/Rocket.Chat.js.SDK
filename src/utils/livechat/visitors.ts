@@ -1,29 +1,29 @@
-import * as api from '../../lib/api'
-import { silence } from '../../lib/log'
-import { mockVisitor, mockCustomField, mockCustomFields } from '../config'
+// import * as api from '../../lib/api'
+// import { silence } from '../../lib/log'
+// import { mockVisitor, mockCustomField, mockCustomFields } from '../config'
 
-silence()
+// silence()
 
-const { token } = mockVisitor.visitor
+// const { token } = mockVisitor.visitor
 
-async function visitors () {
-  console.log(`
+// async function visitors () {
+//   console.log(`
 
-Demo of API livechat query helpers
+// Demo of API livechat query helpers
 
-Create Livechat Visitor \`api.livechat.grantVisitor()\`:
-${JSON.stringify(await api.livechat.grantVisitor(mockVisitor), null, '\t')}
+// Create Livechat Visitor \`api.livechat.grantVisitor()\`:
+// ${JSON.stringify(await api.livechat.grantVisitor(mockVisitor), null, '\t')}
 
-Add new Livechat CustomField \`api.livechat.sendCustomField()\`:
-${JSON.stringify(await api.livechat.sendCustomField(mockCustomField), null, '\t')}
+// Add new Livechat CustomField \`api.livechat.sendCustomField()\`:
+// ${JSON.stringify(await api.livechat.sendCustomField(mockCustomField), null, '\t')}
 
-Add new Livechat CustomFields \`api.livechat.sendCustomFields()\`:
-${JSON.stringify(await api.livechat.sendCustomFields(mockCustomFields), null, '\t')}
+// Add new Livechat CustomFields \`api.livechat.sendCustomFields()\`:
+// ${JSON.stringify(await api.livechat.sendCustomFields(mockCustomFields), null, '\t')}
 
-\`api.livechat.visitor()\`:
-${JSON.stringify(await api.livechat.visitor({ token }), null, '\t')}
+// \`api.livechat.visitor()\`:
+// ${JSON.stringify(await api.livechat.visitor({ token }), null, '\t')}
 
-	`)
-}
+// 	`)
+// }
 
-visitors().catch((e) => console.error(e))
+// visitors().catch((e) => console.error(e))

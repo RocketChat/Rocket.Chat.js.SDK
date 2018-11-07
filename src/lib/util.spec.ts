@@ -5,7 +5,7 @@ import { silence } from './log'
 import { botUser } from '../utils/config'
 import * as util from './util'
 
-const delay = (ms) => new Promise((resolve, reject) => setTimeout(resolve, ms))
+const delay = (ms: number) => new Promise((resolve, reject) => setTimeout(resolve, ms))
 
 describe('[util]', () => {
   describe('debounce', () => {

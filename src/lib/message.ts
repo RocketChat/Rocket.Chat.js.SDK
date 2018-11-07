@@ -11,13 +11,14 @@ export interface Message extends IMessage {}
  * @todo Potential for SDK usage that isn't bots, bot prop should be optional?
  */
 export class Message implements IMessage {
-  constructor (content: string | IMessage, integrationId: string) {
-    if (typeof content === 'string') this.msg = content
-    else Object.assign(this, content)
-    this.bot = { i: integrationId }
-  }
-  setRoomId (roomId: string) {
-    this.rid = roomId
-    return this
+  constructor (content: string | IMessage, { integrationId, ...others }: any) {
+    if (typeof content === 'string') {
+      Object.assign(this, { msg: content }, others)
+    } else {
+      Object.assign(this, content, others)
+    }
+    if (integrationId) {
+      this.bot = { i: integrationId }
+    }
   }
 }

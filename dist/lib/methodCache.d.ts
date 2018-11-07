@@ -1,4 +1,7 @@
-/// <reference types="lru-cache" />
+/**
+ * @module methodCache
+ * Manages results cache for calls to server (via LRU cache)
+ */
 import LRU from 'lru-cache';
 /** @TODO: Remove ! post-fix expression when TypeScript #9619 resolved */
 export declare let instance: any;
@@ -33,14 +36,12 @@ export declare function has(method: string): boolean;
  * @param method Method name for cache to get
  * @param key Key for method result set to return
  */
-export declare function get(method: string, key: string): LRU.Cache<string, any> | undefined;
+export declare function get(method: string, key: string): any;
 /**
  * Reset a cached method call's results (all or only for given key).
  * @param method Method name for cache to clear
  * @param key Key for method result set to clear
  */
 export declare function reset(method: string, key?: string): void;
-/**
- * Reset cached results for all methods.
- */
+/** Reset cached results for all methods. */
 export declare function resetAll(): void;

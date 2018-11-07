@@ -1,4 +1,13 @@
 "use strict";
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) if (e.indexOf(p[i]) < 0)
+            t[p[i]] = s[p[i]];
+    return t;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * Rocket.Chat message class.
@@ -7,16 +16,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * @todo Potential for SDK usage that isn't bots, bot prop should be optional?
  */
 class Message {
-    constructor(content, integrationId) {
-        if (typeof content === 'string')
-            this.msg = content;
-        else
-            Object.assign(this, content);
-        this.bot = { i: integrationId };
-    }
-    setRoomId(roomId) {
-        this.rid = roomId;
-        return this;
+    constructor(content, _a) {
+        var { integrationId } = _a, others = __rest(_a, ["integrationId"]);
+        if (typeof content === 'string') {
+            Object.assign(this, { msg: content }, others);
+        }
+        else {
+            Object.assign(this, content, others);
+        }
+        if (integrationId) {
+            this.bot = { i: integrationId };
+        }
     }
 }
 exports.Message = Message;

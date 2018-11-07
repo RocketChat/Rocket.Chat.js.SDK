@@ -25,4 +25,8 @@ exports.roomCacheMaxSize = parseInt(process.env.ROOM_CACHE_SIZE || '10', 10);
 exports.roomCacheMaxAge = 1000 * parseInt(process.env.ROOM_CACHE_MAX_AGE || '300', 10);
 exports.dmCacheMaxSize = parseInt(process.env.DM_ROOM_CACHE_SIZE || '10', 10);
 exports.dmCacheMaxAge = 1000 * parseInt(process.env.DM_ROOM_CACHE_MAX_AGE || '100', 10);
+// Livechat settings
+exports.token = process.env.LIVECHAT_TOKEN || '';
+exports.rid = process.env.LIVECHAT_ROOM || '';
+exports.department = process.env.LIVECHAT_DEPARTMENT || '';
 //# sourceMappingURL=settings.js.map

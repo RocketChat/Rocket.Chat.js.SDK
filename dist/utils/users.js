@@ -7,18 +7,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-}
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 // Test script uses standard methods and env config to connect and log streams
-const api = __importStar(require("../lib/api"));
+const Client_1 = __importDefault(require("../lib/api/Client"));
 const log_1 = require("../lib/log");
 log_1.silence();
+const api = new Client_1.default({});
 function users() {
     return __awaiter(this, void 0, void 0, function* () {
         console.log(`

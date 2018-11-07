@@ -7,37 +7,42 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const api_1 = require("../lib/api");
+const api_1 = __importDefault(require("../lib/api/api"));
 const config_1 = require("./config");
+const api = new api_1.default({});
 /** Define common attributes for DRY tests */
 exports.testChannelName = 'tests';
 exports.testPrivateName = 'p-tests';
 /** Get information about a user */
 function userInfo(username) {
     return __awaiter(this, void 0, void 0, function* () {
-        return api_1.get('users.info', { username }, true);
+        return yield api.get('users.info', { username }, true);
     });
 }
 exports.userInfo = userInfo;
 /** Create a user and catch the error if they exist already */
 function createUser(user) {
     return __awaiter(this, void 0, void 0, function* () {
-        return api_1.post('users.create', user, true, /already in use/i);
+        const result = yield api.post('users.create', user, true, /already in use/i);
+        return result;
     });
 }
 exports.createUser = createUser;
 /** Get information about a channel */
 function channelInfo(query) {
     return __awaiter(this, void 0, void 0, function* () {
-        return api_1.get('channels.info', query, true);
+        return yield api.get('channels.info', query, true);
     });
 }
 exports.channelInfo = channelInfo;
 /** Get information about a private group */
 function privateInfo(query) {
     return __awaiter(this, void 0, void 0, function* () {
-        return api_1.get('groups.info', query, true);
+        return yield api.get('groups.info', query, true);
     });
 }
 exports.privateInfo = privateInfo;
@@ -47,21 +52,22 @@ function lastMessages(roomId, count = 1) {
         const now = new Date();
         const latest = now.toISOString();
         const oldest = new Date(now.setMinutes(now.getMinutes() - 10)).toISOString();
-        return (yield api_1.get('channels.history', { roomId, latest, oldest, count })).messages;
+        const history = yield api.get('channels.history', { roomId, latest, oldest, count });
+        return history.messages;
     });
 }
 exports.lastMessages = lastMessages;
 /** Create a room for tests and catch the error if it exists already */
 function createChannel(name, members = [], readOnly = false) {
     return __awaiter(this, void 0, void 0, function* () {
-        return api_1.post('channels.create', { name, members, readOnly }, true);
+        return yield api.post('channels.create', { name, members, readOnly }, true);
     });
 }
 exports.createChannel = createChannel;
 /** Create a private group / room and catch if exists already */
 function createPrivate(name, members = [], readOnly = false) {
     return __awaiter(this, void 0, void 0, function* () {
-        return api_1.post('groups.create', { name, members, readOnly }, true);
+        return yield api.post('groups.create', { name, members, readOnly }, true);
     });
 }
 exports.createPrivate = createPrivate;
@@ -73,7 +79,7 @@ exports.createPrivate = createPrivate;
  */
 function sendFromUser(payload) {
     return __awaiter(this, void 0, void 0, function* () {
-        const user = yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
+        const user = yield api.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
         const endpoint = (payload.roomId && payload.roomId.indexOf(user.data.userId) !== -1)
             ? 'dm.history'
             : 'channels.history';
@@ -83,11 +89,11 @@ function sendFromUser(payload) {
         const messageDefaults = { roomId };
         const data = Object.assign({}, messageDefaults, payload);
         const oldest = new Date().toISOString();
-        const result = yield api_1.post('chat.postMessage', data, true);
+        const result = yield api.post('chat.postMessage', data, true);
         const proof = new Promise((resolve, reject) => {
             let looked = 0;
             const look = setInterval(() => __awaiter(this, void 0, void 0, function* () {
-                const { messages } = yield api_1.get(endpoint, { roomId, oldest });
+                const { messages } = yield api.get(endpoint, { roomId, oldest });
                 const found = messages.some((message) => {
                     return result.message._id === message._id;
                 });
@@ -109,13 +115,13 @@ exports.sendFromUser = sendFromUser;
 /** Leave user from room, to generate `ul` message (test channel by default) */
 function leaveUser(room = {}) {
     return __awaiter(this, void 0, void 0, function* () {
-        yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
+        yield api.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
         if (!room.id && !room.name)
             room.name = exports.testChannelName;
         const roomId = (room.id)
             ? room.id
             : (yield channelInfo({ roomName: room.name })).channel._id;
-        return api_1.post('channels.leave', { roomId });
+        return yield api.post('channels.leave', { roomId });
     });
 }
 exports.leaveUser = leaveUser;
@@ -123,13 +129,13 @@ exports.leaveUser = leaveUser;
 function inviteUser(room = {}) {
     return __awaiter(this, void 0, void 0, function* () {
         let mockInfo = yield userInfo(config_1.mockUser.username);
-        yield api_1.login({ username: config_1.apiUser.username, password: config_1.apiUser.password });
+        yield api.login({ username: config_1.apiUser.username, password: config_1.apiUser.password });
         if (!room.id && !room.name)
             room.name = exports.testChannelName;
         const roomId = (room.id)
             ? room.id
             : (yield channelInfo({ roomName: room.name })).channel._id;
-        return api_1.post('channels.invite', { userId: mockInfo.user._id, roomId });
+        return yield api.post('channels.invite', { userId: mockInfo.user._id, roomId });
     });
 }
 exports.inviteUser = inviteUser;
@@ -137,16 +143,16 @@ exports.inviteUser = inviteUser;
 /** Update message sent from mock user */
 function updateFromUser(payload) {
     return __awaiter(this, void 0, void 0, function* () {
-        yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
-        return api_1.post('chat.update', payload, true);
+        yield api.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
+        return yield api.post('chat.update', payload, true);
     });
 }
 exports.updateFromUser = updateFromUser;
 /** Create a direct message session with the mock user */
 function setupDirectFromUser() {
     return __awaiter(this, void 0, void 0, function* () {
-        yield api_1.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
-        return api_1.post('im.create', { username: config_1.botUser.username }, true);
+        yield api.login({ username: config_1.mockUser.username, password: config_1.mockUser.password });
+        return yield api.post('im.create', { username: config_1.botUser.username }, true);
     });
 }
 exports.setupDirectFromUser = setupDirectFromUser;
@@ -156,8 +162,8 @@ function setup() {
         console.log('\nPreparing instance for tests...');
         try {
             // Verify API user can login
-            const loginInfo = yield api_1.login(config_1.apiUser);
-            if (loginInfo.status !== 'success') {
+            const loginInfo = yield api.login(config_1.apiUser);
+            if (!loginInfo || loginInfo.status !== 'success') {
                 throw new Error(`API user (${config_1.apiUser.username}) could not login`);
             }
             else {
@@ -183,7 +189,7 @@ function setup() {
             if (!mockInfo || !mockInfo.success) {
                 console.log(`Mock user (${config_1.mockUser.username}) not found`);
                 mockInfo = yield createUser(config_1.mockUser);
-                if (!mockInfo.success) {
+                if (!mockInfo || mockInfo.success) {
                     throw new Error(`Mock user (${config_1.mockUser.username}) could not be created`);
                 }
                 else {
@@ -227,7 +233,7 @@ function setup() {
             else {
                 console.log(`Test private room (${exports.testPrivateName}) exists`);
             }
-            yield api_1.logout();
+            yield api.logout();
         }
         catch (e) {
             throw e;

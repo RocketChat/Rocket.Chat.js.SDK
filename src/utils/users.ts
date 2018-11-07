@@ -1,8 +1,9 @@
 // Test script uses standard methods and env config to connect and log streams
-import * as api from '../lib/api'
+import ClientRest from '../lib/api/Client'
 import { silence } from '../lib/log'
 silence()
 
+const api = new ClientRest({})
 async function users () {
   console.log(`
 

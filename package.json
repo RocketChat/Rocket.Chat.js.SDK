@@ -76,12 +76,18 @@
     "webpack-cli": "^3.1.0"
   },
   "dependencies": {
+    "@types/event-emitter": "^0.3.2",
+    "@types/eventemitter3": "^2.0.2",
     "@types/lru-cache": "^4.1.0",
     "@types/node": "^9.4.6",
     "axios": "^0.18.0",
+    "create-hash": "^1.2.0",
+    "crypto-browserify": "^3.12.0",
     "eventemitter3": "^3.1.0",
-    "isomorphic-ws": "^4.0.1",
     "lru-cache": "^4.1.1",
+    "mqtt": "^2.18.8",
+    "node-fetch": "^2.2.1",
+    "tiny-events": "^1.0.1",
     "universal-websocket-client": "^1.0.2",
     "ws": "^5.2.0"
   },

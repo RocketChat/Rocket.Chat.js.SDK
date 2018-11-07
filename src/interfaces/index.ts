@@ -18,13 +18,13 @@ export interface ILogger {
  * @param integration Name added to message `bot` attribute to identify SDK use
  */
 export interface ISocketOptions {
-  host: string
-  useSsl: boolean
-  timeout: number
-  reopen: number
-  ping: number
-  close: number
-  integration: string
+  host?: string
+  useSsl?: boolean
+  timeout?: number
+  reopen?: number
+  ping?: number
+  close?: number
+  integration?: string
 }
 
 /**
@@ -614,7 +614,7 @@ export interface ILivechatRoomMessagesAPI {
   token: string   // Visitor token
   ts?: string     // ISO timestamp
   end?: string    // ISO timestamp
-  limit: number   // number of messages to load
+  limit?: number   // number of messages to load
 }
 
 /** Payload structure for livechat `room.transfer` endpoint */

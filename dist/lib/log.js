@@ -1,4 +1,8 @@
 "use strict";
+/**
+ * @module log
+ * Basic log handling with ability to override when used within another module.
+ */
 Object.defineProperty(exports, "__esModule", { value: true });
 /** Temp logging, should override form adapter's log */
 class InternalLog {
@@ -18,12 +22,14 @@ class InternalLog {
         console.error(...args);
     }
 }
-let logger = new InternalLog();
-exports.logger = logger;
+/** Default basic console logging */
+exports.logger = new InternalLog();
+/** Substitute logging handler */
 function replaceLog(externalLog) {
-    exports.logger = logger = externalLog;
+    exports.logger = externalLog;
 }
 exports.replaceLog = replaceLog;
+/** Null all log outputs */
 function silence() {
     replaceLog({
         debug: () => null,

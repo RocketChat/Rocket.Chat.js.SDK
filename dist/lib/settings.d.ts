@@ -14,3 +14,6 @@ export declare let roomCacheMaxSize: number;
 export declare let roomCacheMaxAge: number;
 export declare let dmCacheMaxSize: number;
 export declare let dmCacheMaxAge: number;
+export declare let token: string;
+export declare let rid: string;
+export declare let department: string;
