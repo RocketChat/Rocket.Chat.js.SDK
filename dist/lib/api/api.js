@@ -1,16 +1,6 @@
-"use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const log_1 = require("../log");
-const message_1 = require("../message");
-const tiny_events_1 = require("tiny-events");
+import { logger as Logger } from '../log';
+import { Message } from '../message';
+import { EventEmitter } from 'tiny-events';
 class Client {
     constructor({ host = 'http://localhost:3000' }) {
         this._headers = {};
@@ -20,7 +10,10 @@ class Client {
         this._headers = obj;
     }
     get headers() {
-        return Object.assign({ 'Content-Type': 'application/json' }, this._headers);
+        return {
+            'Content-Type': 'application/json',
+            ...this._headers
+        };
     }
     get(url, data, options) {
         return fetch(`${this.host}/api/v1/${url}?${this.getParams(data)}`, {
@@ -48,12 +41,10 @@ class Client {
             headers: this.headers
         }).then(this.handle);
     }
-    handle(r) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { status } = r;
-            const data = yield r.json();
-            return { status, data };
-        });
+    async handle(r) {
+        const { status } = r;
+        const data = await r.json();
+        return { status, data };
     }
     getParams(data) {
         return Object.keys(data).map(function (k) {
@@ -61,13 +52,13 @@ class Client {
         }).join('&');
     }
 }
-exports.regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/;
+export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/;
 /**
     * @module API
     * Provides a base client for handling requests with generic Rocket.Chat's REST API
     */
-class Api extends tiny_events_1.EventEmitter {
-    constructor({ client, host, logger = log_1.logger }) {
+export default class Api extends EventEmitter {
+    constructor({ client, host, logger = Logger }) {
         super();
         this.currentLogin = null;
         /** Do a POST request to an API endpoint. */
@@ -93,63 +84,59 @@ class Api extends tiny_events_1.EventEmitter {
         * @param auth     Require auth headers for endpoint, default true
         * @param ignore   Allows certain matching error messages to not count as errors
         */
-    request(method, endpoint, data = {}, auth = true, ignore) {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.logger.debug(`[API] ${method} ${endpoint}: ${JSON.stringify(data)}`);
-            try {
-                if (auth && !this.loggedIn()) {
-                    throw new Error('');
-                }
-                let result;
-                switch (method) {
-                    case 'GET':
-                        result = yield this.client.get(endpoint, data, {});
-                        break;
-                    case 'PUT':
-                        result = yield this.client.put(endpoint, data);
-                        break;
-                    case 'DELETE':
-                        result = yield this.client.delete(endpoint, data);
-                        break;
-                    default:
-                    case 'POST':
-                        result = yield this.client.post(endpoint, data);
-                        break;
-                }
-                if (!result)
-                    throw new Error(`API ${method} ${endpoint} result undefined`);
-                if (!this.success(result, ignore))
-                    throw result;
-                this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`);
-                return (method === 'DELETE') ? result : result.data;
+    async request(method, endpoint, data = {}, auth = true, ignore) {
+        this.logger.debug(`[API] ${method} ${endpoint}: ${JSON.stringify(data)}`);
+        try {
+            if (auth && !this.loggedIn()) {
+                throw new Error('');
             }
-            catch (err) {
-                this.logger.error(`[API] POST error(${endpoint}): ${JSON.stringify(err)}`);
-                throw err;
+            let result;
+            switch (method) {
+                case 'GET':
+                    result = await this.client.get(endpoint, data, {});
+                    break;
+                case 'PUT':
+                    result = await this.client.put(endpoint, data);
+                    break;
+                case 'DELETE':
+                    result = await this.client.delete(endpoint, data);
+                    break;
+                default:
+                case 'POST':
+                    result = await this.client.post(endpoint, data);
+                    break;
             }
-        });
+            if (!result)
+                throw new Error(`API ${method} ${endpoint} result undefined`);
+            if (!this.success(result, ignore))
+                throw result;
+            this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`);
+            return (method === 'DELETE') ? result : result.data;
+        }
+        catch (err) {
+            this.logger.error(`[API] POST error(${endpoint}): ${JSON.stringify(err)}`);
+            throw err;
+        }
     }
     /** Check result data for success, allowing override to ignore some errors */
     success(result, ignore) {
         return (typeof result.status === 'undefined' ||
-            (result.status && exports.regExpSuccess.test(result.status)) ||
+            (result.status && regExpSuccess.test(result.status)) ||
             (result.status && ignore && ignore.test(result.status))) ? true : false;
     }
-    login(credentials, args) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const { data } = yield this.post('login', Object.assign({}, credentials, args));
-            this.currentLogin = {
-                username: data.me.username,
-                userId: data.userId,
-                authToken: data.authToken,
-                result: data
-            };
-            this.client.headers = {
-                'X-Auth-Token': data.authToken,
-                'X-User-Id': data.userId
-            };
-            return data;
-        });
+    async login(credentials, args) {
+        const { data } = await this.post('login', { ...credentials, ...args });
+        this.currentLogin = {
+            username: data.me.username,
+            userId: data.userId,
+            authToken: data.authToken,
+            result: data
+        };
+        this.client.headers = {
+            'X-Auth-Token': data.authToken,
+            'X-User-Id': data.userId
+        };
+        return data;
     }
     logout() { return this.get('logout', {}, true); }
     /**
@@ -157,8 +144,7 @@ class Api extends tiny_events_1.EventEmitter {
      * Accepts message text string or a structured message object.
      */
     prepareMessage(content, rid, args) {
-        return new message_1.Message(content, Object.assign({ rid }, args));
+        return new Message(content, { rid, ...args });
     }
 }
-exports.default = Api;
 //# sourceMappingURL=api.js.map

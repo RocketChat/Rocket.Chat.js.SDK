@@ -53,6 +53,8 @@ export interface IDriver {
   subscribeNotifyUser (): Promise<any>
 
   subscribeNotifyUser (): Promise<IDriver>
+
+  onTyping (cb: ICallback): Promise<any>
 }
 
 export enum Protocols {

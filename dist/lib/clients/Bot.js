@@ -1,44 +1,18 @@
-"use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) if (e.indexOf(p[i]) < 0)
-            t[p[i]] = s[p[i]];
-    return t;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const log_1 = require("../log");
-const Rocketchat_1 = __importDefault(require("./Rocketchat"));
+import { logger } from '../log';
+import Rocketchat from './Rocketchat';
 const MY_MESSAGES = '__my_messages__';
 const TOPIC_MESSAGES = 'stream-room-messages';
-class BotClient extends Rocketchat_1.default {
-    constructor(_a) {
-        var { integrationId } = _a, config = __rest(_a, ["integrationId"]);
+export default class BotClient extends Rocketchat {
+    constructor({ integrationId, ...config }) {
         super(config);
         this.lastReadTime = new Date(-8640000000000000);
         this.joinedIds = [];
         this.messages = null;
         this.integrationId = integrationId;
     }
-    login(credentials) {
-        const _super = name => super[name];
-        return __awaiter(this, void 0, void 0, function* () {
-            yield _super("login").call(this, credentials);
-            return this.currentLogin && (yield this.socket).login({ token: this.currentLogin.authToken }, {});
-        });
+    async login(credentials) {
+        await super.login(credentials);
+        return this.currentLogin && (await this.socket).login({ token: this.currentLogin.authToken }, {});
     }
     /**
      * Initialise socket instance with given options or defaults.
@@ -57,31 +31,27 @@ class BotClient extends Rocketchat_1.default {
      *    .then(() => console.log('connected'))
      *    .catch((err) => console.error(err))
      */
-    connect(options, callback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const result = yield (yield this.socket).connect(options);
-                if (callback) {
-                    callback(null, result);
-                }
-                return result;
+    async connect(options, callback) {
+        try {
+            const result = await (await this.socket).connect(options);
+            if (callback) {
+                callback(null, result);
             }
-            catch (error) {
-                if (callback) {
-                    callback(error, null);
-                    return Promise.reject(error);
-                }
+            return result;
+        }
+        catch (error) {
+            if (callback) {
+                callback(error, null);
+                return Promise.reject(error);
             }
-        });
+        }
     }
     /** Begin subscription to user's "global" message stream. Will only allow one. */
-    subscribeToMessages() {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.messages) {
-                this.messages = yield this.subscribe(TOPIC_MESSAGES, MY_MESSAGES);
-            }
-            return this.messages;
-        });
+    async subscribeToMessages() {
+        if (!this.messages) {
+            this.messages = await this.subscribe(TOPIC_MESSAGES, MY_MESSAGES);
+        }
+        return this.messages;
     }
     /**
      * Add callback for changes in the message stream, subscribing if not already.
@@ -94,27 +64,25 @@ class BotClient extends Rocketchat_1.default {
      *  - Second argument is the changed message
      *  - Third argument is additional attributes, such as `roomType`
      */
-    reactToMessages(callback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const handler = (e) => {
-                try {
-                    const message = e.fields.args[0];
-                    if (!message || !message._id) {
-                        callback(new Error('Message handler fired on event without message or meta data'));
-                    }
-                    else {
-                        callback(null, message, {});
-                    }
+    async reactToMessages(callback) {
+        const handler = (e) => {
+            try {
+                const message = e.fields.args[0];
+                if (!message || !message._id) {
+                    callback(new Error('Message handler fired on event without message or meta data'));
                 }
-                catch (err) {
-                    this.logger.error(`[driver] Message handler err: ${err.message}`);
-                    callback(err);
+                else {
+                    callback(null, message, {});
                 }
-            };
-            this.messages = yield this.subscribeToMessages();
-            this.messages.onEvent(handler);
-            this.logger.info(`[driver] Added event handler for ${this.messages.name} subscription`);
-        });
+            }
+            catch (err) {
+                this.logger.error(`[driver] Message handler err: ${err.message}`);
+                callback(err);
+            }
+        };
+        this.messages = await this.subscribeToMessages();
+        this.messages.onEvent(handler);
+        this.logger.info(`[driver] Added event handler for ${this.messages.name} subscription`);
     }
     /**
      * Applies `reactToMessages` with some filtering of messages based on config.
@@ -129,57 +97,55 @@ class BotClient extends Rocketchat_1.default {
      *  - Third argument is additional attributes, such as `roomType`
      * @param options Sets filters for different event/message types.
      */
-    respondToMessages(callback, options = {}) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const config = Object.assign({}, this.config, options);
-            // Join configured rooms if they haven't been already, unless listening to all
-            // public rooms, in which case it doesn't matter
-            if (!config.allPublic && this.joinedIds.length === 0 && config.rooms && config.rooms.length > 0) {
-                try {
-                    yield this.joinRooms(config.rooms);
-                }
-                catch (err) {
-                    this.logger.error(`[driver] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`);
-                }
+    async respondToMessages(callback, options = {}) {
+        const config = { ...this.config, ...options };
+        // Join configured rooms if they haven't been already, unless listening to all
+        // public rooms, in which case it doesn't matter
+        if (!config.allPublic && this.joinedIds.length === 0 && config.rooms && config.rooms.length > 0) {
+            try {
+                await this.joinRooms(config.rooms);
             }
-            this.lastReadTime = new Date(); // init before any message read
-            return this.reactToMessages((err, message, meta) => __awaiter(this, void 0, void 0, function* () {
-                if (err) {
-                    log_1.logger.error(`[driver] Unable to receive: ${err.message}`);
-                    return callback(err); // bubble errors back to adapter
-                }
-                if (typeof message === 'undefined' || typeof meta === 'undefined') {
-                    log_1.logger.error(`[driver] Message or meta undefined`);
-                    return callback(err);
-                }
-                // Ignore bot's own messages
-                if (message.u && message.u._id === this.userId)
-                    return;
-                // Ignore DMs unless configured not to
-                const isDM = meta.roomType === 'd' || true;
-                if (isDM && !config.dm)
-                    return;
-                // Ignore Livechat unless configured not to
-                const isLC = meta.roomType === 'l';
-                if (isLC && !config.livechat)
-                    return;
-                // Ignore messages in un-joined public rooms unless configured not to
-                if (!config.allPublic && !isDM && !meta.roomParticipant)
-                    return;
-                // Set current time for comparison to incoming
-                let currentReadTime = (message.ts) ? new Date(message.ts.$date) : new Date();
-                // Ignore edited messages if configured to
-                if (!config.edited && typeof message.editedAt !== 'undefined')
-                    return;
-                // Ignore messages in stream that aren't new
-                if (currentReadTime <= this.lastReadTime)
-                    return;
-                // At this point, message has passed checks and can be responded to
-                const username = (message.u) ? message.u.username : 'unknown';
-                this.logger.info(`[driver] Message ${message._id} from ${username}`);
-                this.lastReadTime = currentReadTime;
-                callback(null, message, meta);
-            }));
+            catch (err) {
+                this.logger.error(`[driver] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`);
+            }
+        }
+        this.lastReadTime = new Date(); // init before any message read
+        return this.reactToMessages(async (err, message, meta) => {
+            if (err) {
+                logger.error(`[driver] Unable to receive: ${err.message}`);
+                return callback(err); // bubble errors back to adapter
+            }
+            if (typeof message === 'undefined' || typeof meta === 'undefined') {
+                logger.error(`[driver] Message or meta undefined`);
+                return callback(err);
+            }
+            // Ignore bot's own messages
+            if (message.u && message.u._id === this.userId)
+                return;
+            // Ignore DMs unless configured not to
+            const isDM = meta.roomType === 'd' || true;
+            if (isDM && !config.dm)
+                return;
+            // Ignore Livechat unless configured not to
+            const isLC = meta.roomType === 'l';
+            if (isLC && !config.livechat)
+                return;
+            // Ignore messages in un-joined public rooms unless configured not to
+            if (!config.allPublic && !isDM && !meta.roomParticipant)
+                return;
+            // Set current time for comparison to incoming
+            let currentReadTime = (message.ts) ? new Date(message.ts.$date) : new Date();
+            // Ignore edited messages if configured to
+            if (!config.edited && typeof message.editedAt !== 'undefined')
+                return;
+            // Ignore messages in stream that aren't new
+            if (currentReadTime <= this.lastReadTime)
+                return;
+            // At this point, message has passed checks and can be responded to
+            const username = (message.u) ? message.u.username : 'unknown';
+            this.logger.info(`[driver] Message ${message._id} from ${username}`);
+            this.lastReadTime = currentReadTime;
+            callback(null, message, meta);
         });
     }
     /** Get ID for a room by name (or ID). */
@@ -191,33 +157,28 @@ class BotClient extends Rocketchat_1.default {
         return super.getRoomNameById(rid);
     }
     /** Join the bot into a room by its name or ID */
-    joinRoom(room) {
-        const _super = name => super[name];
-        return __awaiter(this, void 0, void 0, function* () {
-            const roomId = yield this.getRoomId(room);
-            const joinedIndex = this.joinedIds.indexOf(room);
-            if (joinedIndex !== -1) {
-                log_1.logger.error(`[driver] Join room failed, already joined`);
-                throw new Error(`[driver] Join room failed, already joined`);
-            }
-            yield _super("joinRoom").call(this, roomId);
-            this.joinedIds.push(roomId);
-            return roomId;
-        });
+    async joinRoom(room) {
+        const roomId = await this.getRoomId(room);
+        const joinedIndex = this.joinedIds.indexOf(room);
+        if (joinedIndex !== -1) {
+            logger.error(`[driver] Join room failed, already joined`);
+            throw new Error(`[driver] Join room failed, already joined`);
+        }
+        await super.joinRoom(roomId);
+        this.joinedIds.push(roomId);
+        return roomId;
     }
     /** Exit a room the bot has joined */
-    leaveRoom(room) {
-        return __awaiter(this, void 0, void 0, function* () {
-            let roomId = yield this.getRoomId(room);
-            let joinedIndex = this.joinedIds.indexOf(room);
-            if (joinedIndex === -1) {
-                this.logger.error(`[driver] Leave room failed, bot has not joined ${room}`);
-                throw new Error(`[driver] Leave room failed, bot has not joined ${room}`);
-            }
-            yield this.leaveRoom(roomId);
-            delete this.joinedIds[joinedIndex];
-            return roomId;
-        });
+    async leaveRoom(room) {
+        let roomId = await this.getRoomId(room);
+        let joinedIndex = this.joinedIds.indexOf(room);
+        if (joinedIndex === -1) {
+            this.logger.error(`[driver] Leave room failed, bot has not joined ${room}`);
+            throw new Error(`[driver] Leave room failed, bot has not joined ${room}`);
+        }
+        await this.leaveRoom(roomId);
+        delete this.joinedIds[joinedIndex];
+        return roomId;
     }
     /** Join a set of rooms by array of names or IDs */
     joinRooms(rooms) {
@@ -272,5 +233,4 @@ class BotClient extends Rocketchat_1.default {
         return this.getRoomName(rid);
     }
 }
-exports.default = BotClient;
 //# sourceMappingURL=Bot.js.map

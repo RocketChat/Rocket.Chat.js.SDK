@@ -1,48 +1,54 @@
-"use strict";
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) if (e.indexOf(p[i]) < 0)
-            t[p[i]] = s[p[i]];
-    return t;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const browserMqtt_js_1 = __importDefault(require("mqtt/browserMqtt.js"));
-const tiny_events_1 = require("tiny-events");
-const log_1 = require("../log");
-class MQTTDriver extends tiny_events_1.EventEmitter {
-    constructor(_a) {
-        var { host, integrationId, config, logger = log_1.logger } = _a, moreConfigs = __rest(_a, ["host", "integrationId", "config", "logger"]);
+import { Client } from 'paho-mqtt/src/paho-mqtt';
+import { EventEmitter } from 'tiny-events';
+import { logger as Logger } from '../log';
+export class MQTTDriver extends EventEmitter {
+    constructor({ host = 'https://iot.eclipse.org', path = '/mqtt', integrationId, config, logger = Logger, ...moreConfigs }) {
         super();
-        this.config = Object.assign({}, config, moreConfigs, { host: host.replace(/(^\w+:|^)\/\//, ''), timeout: 20000 });
-        this.socket = browserMqtt_js_1.default;
+        host = 'http://test.mosquitto.org';
+        const [, _host = host, , port = 8080] = new RegExp('(.*?)(:([0-9]+))?$').exec(host || 'localhost:3000') || [];
+        this.config = {
+            ...config,
+            ...moreConfigs,
+            host: _host.replace(/^http/, 'ws'),
+            timeout: 20000,
+            port: port
+            // reopen: number
+            // ping: number
+            // close: number
+            // integration: string
+        };
         this.logger = logger;
+        if (/https/.test(host)) {
+            this.socket = new Client(this.config.host + path, 'clientId');
+        }
+        else {
+            this.socket = new Client((this.config.host || '').replace('http://', '').replace('ws://', ''), Number(port), path, 'clientId');
+        }
+        this.socket.onMessageArrived = ({ destinationName, payloadString }) => {
+            if (/room-message/.test(destinationName)) {
+                this.emit('message', { topic: destinationName, message: payloadString });
+            }
+        };
     }
     connect(options) {
-        this.socket.connect(this.config.host);
         return new Promise((resolve, reject) => {
-            // TODO: removelisteners
-            this.socket.once('connect', resolve);
-            this.socket.once('error', reject);
+            this.socket.connect({ onSuccess: resolve, mqttVersion: 3, onFailure: reject, useSSL: /https/.test(this.config.host || '') });
         });
     }
     disconnect() {
         this.socket.end();
         return Promise.resolve(this.socket);
     }
-    subscribe(topic, ...args) {
+    subscribe(topic, { qos = 0 }) {
         return new Promise((resolve, reject) => {
-            this.socket(topic, [...args, (err, granted) => {
-                    if (err) {
-                        return reject(err);
-                    }
-                    return resolve(granted);
-                }]);
+            this.socket.subscribe(topic, { qos, onFailure: (...args) => {
+                    console.log(...args);
+                    reject(args);
+                }, onSuccess: (...args) => {
+                    console.log(...args);
+                    resolve(args);
+                }
+            });
         });
     }
     unsubscribe(subscription, ...args) {
@@ -75,12 +81,19 @@ class MQTTDriver extends tiny_events_1.EventEmitter {
         return this.subscribe(`room-messages/${rid}`, { qos: 1 });
     }
     onMessage(cb) {
-        this.socket.on('message', (topic, message) => {
+        this.on('message', ({ topic, message }) => {
+            console.log(topic);
             if (/room-messages/.test(topic)) {
                 cb(message); // TODO apply msgpack
             }
         });
     }
+    async onTyping(cb) {
+        return new Promise((resolve) => {
+            resolve(this.on('notify-room', ({ fields: { args: [username, isTyping] } }) => {
+                cb(username, isTyping);
+            }));
+        });
+    }
 }
-exports.MQTTDriver = MQTTDriver;
 //# sourceMappingURL=mqtt.js.map

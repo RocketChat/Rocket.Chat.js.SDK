@@ -1,37 +1,15 @@
-"use strict";
 /**
  * @module DDPDriver
  * Handles low-level websocket ddp connections and event subscriptions
  */
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) if (e.indexOf(p[i]) < 0)
-            t[p[i]] = s[p[i]];
-    return t;
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const universal_websocket_client_1 = __importDefault(require("universal-websocket-client"));
-const tiny_events_1 = require("tiny-events");
-const log_1 = require("../log");
-const interfaces_1 = require("../../interfaces");
-const util_1 = require("../util");
-const create_hash_1 = __importDefault(require("create-hash"));
+import WebSocket from 'universal-websocket-client';
+import { EventEmitter } from 'tiny-events';
+import { logger as Logger } from '../log';
+import { isLoginPass, isLoginOAuth, isLoginAuthenticated, isLoginResult } from '../../interfaces';
+import { hostToWS } from '../util';
+import { sha256 } from 'js-sha256';
 /** Websocket handler class, manages connections and subscriptions */
-class Socket extends tiny_events_1.EventEmitter {
+export class Socket extends EventEmitter {
     /** Create a websocket handler */
     constructor(options, resume = null) {
         super();
@@ -46,8 +24,8 @@ class Socket extends tiny_events_1.EventEmitter {
             reopen: options.reopen || console.log,
             ping: options.timeout || 30000
         };
-        this.logger = options.logger || log_1.logger;
-        this.host = `${util_1.hostToWS(this.config.host, this.config.useSsl)}/websocket`;
+        this.logger = options.logger || Logger;
+        this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`;
         // Echo call results, emitting ID of DDP call for more specific listeners
         this.on('message.result', (data) => {
             const { id, result, error } = data;
@@ -60,17 +38,17 @@ class Socket extends tiny_events_1.EventEmitter {
      * Resumes login if given token.
      */
     open(ms = this.config.reopen) {
-        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+        return new Promise(async (resolve, reject) => {
             let connection;
             this.lastPing = Date.now();
-            yield this.close();
+            await this.close();
             if (this.reopenInterval)
                 clearInterval(this.reopenInterval);
             this.reopenInterval = setInterval(() => {
                 return !this.alive() && this.reopen();
             }, ms);
             try {
-                connection = new universal_websocket_client_1.default(this.host);
+                connection = new WebSocket(this.host);
                 connection.onerror = reject;
             }
             catch (err) {
@@ -80,23 +58,21 @@ class Socket extends tiny_events_1.EventEmitter {
             this.connection.onmessage = this.onMessage.bind(this);
             this.connection.onclose = this.onClose.bind(this);
             this.connection.onopen = this.onOpen.bind(this, resolve);
-        }));
+        });
     }
     /** Send handshake message to confirm connection, start pinging. */
-    onOpen(callback) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const connected = yield this.send({
-                msg: 'connect',
-                version: '1',
-                support: ['1', 'pre2', 'pre1']
-            }, 'connected');
-            this.session = connected.session;
-            this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`));
-            this.emit('open');
-            if (this.resume)
-                yield this.login(this.resume);
-            return callback(this.connection);
-        });
+    async onOpen(callback) {
+        const connected = await this.send({
+            msg: 'connect',
+            version: '1',
+            support: ['1', 'pre2', 'pre1']
+        }, 'connected');
+        this.session = connected.session;
+        this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`));
+        this.emit('open');
+        if (this.resume)
+            await this.login(this.resume);
+        return callback(this.connection);
     }
     /** Emit close event so it can be used for promise resolve in close() */
     onClose(e) {
@@ -138,33 +114,29 @@ class Socket extends tiny_events_1.EventEmitter {
             handler.callback(data);
     }
     /** Disconnect the DDP from server and clear all subscriptions. */
-    close() {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.connected) {
-                yield this.unsubscribeAll();
-                yield new Promise((resolve) => {
-                    this.connection.close(1000, 'disconnect');
-                    this.once('close', () => {
-                        delete this.connection;
-                        resolve();
-                    });
-                })
-                    .catch(() => this.close());
-            }
-        });
+    async close() {
+        if (this.connected) {
+            await this.unsubscribeAll();
+            await new Promise((resolve) => {
+                this.connection.close(1000, 'disconnect');
+                this.once('close', () => {
+                    delete this.connection;
+                    resolve();
+                });
+            })
+                .catch(() => this.close());
+        }
     }
     /** Clear connection and try to connect again. */
-    reopen() {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (this.openTimeout)
-                return;
-            yield this.close();
-            this.openTimeout = setTimeout(() => __awaiter(this, void 0, void 0, function* () {
-                delete this.openTimeout;
-                yield this.open()
-                    .catch((err) => this.logger.error(`[ddp] Reopen error: ${err.message}`));
-            }), this.config.reopen);
-        });
+    async reopen() {
+        if (this.openTimeout)
+            return;
+        await this.close();
+        this.openTimeout = setTimeout(async () => {
+            delete this.openTimeout;
+            await this.open()
+                .catch((err) => this.logger.error(`[ddp] Reopen error: ${err.message}`));
+        }, this.config.reopen);
     }
     /** Check if websocket connected and ready. */
     get connected() {
@@ -187,41 +159,37 @@ class Socket extends tiny_events_1.EventEmitter {
      * @param msg       The `data.msg` value to wait for in response
      * @param errorMsg  An alternate `data.msg` value indicating an error response
      */
-    send(obj, msg = 'result', errorMsg) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve, reject) => {
-                const id = obj.id || `ddp-${this.sent}`;
-                this.sent += 1;
-                const data = JSON.stringify(Object.assign({}, obj, (/connect|ping|pong/.test(obj.msg) ? {} : { id })));
-                if (!this.connection)
-                    throw new Error('[ddp] sending without open connection');
-                this.logger.debug(`[ddp] sending message: ${data}`);
-                this.connection.send(data);
-                if (typeof msg === 'string') {
-                    this.handlers.push({ id, msg, callback: (data) => (data.error)
-                            ? reject(data.error)
-                            : resolve(data)
-                    });
-                }
-                if (errorMsg) {
-                    this.handlers.push({ id, msg: errorMsg, callback: reject });
-                }
-                this.once('close', reject);
-            });
+    async send(obj, msg = 'result', errorMsg) {
+        return new Promise((resolve, reject) => {
+            const id = obj.id || `ddp-${this.sent}`;
+            this.sent += 1;
+            const data = JSON.stringify({ ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) });
+            if (!this.connection)
+                throw new Error('[ddp] sending without open connection');
+            this.logger.debug(`[ddp] sending message: ${data}`);
+            this.connection.send(data);
+            if (typeof msg === 'string') {
+                this.handlers.push({ id, msg, callback: (data) => (data.error)
+                        ? reject(data.error)
+                        : resolve(data)
+                });
+            }
+            if (errorMsg) {
+                this.handlers.push({ id, msg: errorMsg, callback: reject });
+            }
+            this.once('close', reject);
         });
     }
     /** Send ping, record time, re-open if nothing comes back, repeat */
-    ping() {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.pingTimeout = setTimeout(() => {
-                this.send({ msg: 'ping' }, 'pong')
-                    .then(() => {
-                    this.lastPing = Date.now();
-                    return this.ping();
-                })
-                    .catch(() => this.reopen());
-            }, this.config.ping);
-        });
+    async ping() {
+        this.pingTimeout = setTimeout(() => {
+            this.send({ msg: 'ping' }, 'pong')
+                .then(() => {
+                this.lastPing = Date.now();
+                return this.ping();
+            })
+                .catch(() => this.reopen());
+        }, this.config.ping);
     }
     /** Check if ping-pong to server is within tolerance of 1 missed ping */
     alive() {
@@ -235,37 +203,33 @@ class Socket extends tiny_events_1.EventEmitter {
      * @param method    The name of the method to be called
      * @param params    An array with the parameters to be sent
      */
-    call(method, ...params) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const response = yield this.send({ msg: 'method', method, params })
-                .catch((err) => {
-                this.logger.error(`[ddp] Call error: ${err.message}`);
-                throw err;
-            });
-            return (response.result) ? response.result : response;
+    async call(method, ...params) {
+        const response = await this.send({ msg: 'method', method, params })
+            .catch((err) => {
+            this.logger.error(`[ddp] Call error: ${err.message}`);
+            throw err;
         });
+        return (response.result) ? response.result : response;
     }
     /**
      * Login to server and resubscribe to all subs, resolve with user information.
      * @param credentials User credentials (username/password, oauth or token)
      */
-    login(credentials) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const params = this.loginParams(credentials);
-            this.resume = (yield this.call('login', params));
-            yield this.subscribeAll();
-            this.emit('login', this.resume);
-            return this.resume;
-        });
+    async login(credentials) {
+        const params = this.loginParams(credentials);
+        this.resume = await this.call('login', params);
+        await this.subscribeAll();
+        this.emit('login', this.resume);
+        return this.resume;
     }
     /** Take variety of login credentials object types for accepted params */
     loginParams(credentials) {
-        if (interfaces_1.isLoginPass(credentials) ||
-            interfaces_1.isLoginOAuth(credentials) ||
-            interfaces_1.isLoginAuthenticated(credentials)) {
+        if (isLoginPass(credentials) ||
+            isLoginOAuth(credentials) ||
+            isLoginAuthenticated(credentials)) {
             return credentials;
         }
-        if (interfaces_1.isLoginResult(credentials)) {
+        if (isLoginResult(credentials)) {
             const params = {
                 resume: credentials.token
             };
@@ -274,7 +238,7 @@ class Socket extends tiny_events_1.EventEmitter {
         const params = {
             user: { username: credentials.username },
             password: {
-                digest: create_hash_1.default('sha256').update(credentials.password).digest('hex'),
+                digest: sha256(credentials.password),
                 algorithm: 'sha-256'
             }
         };
@@ -345,10 +309,8 @@ class Socket extends tiny_events_1.EventEmitter {
             .then(() => this.subscriptions = {});
     }
 }
-exports.Socket = Socket;
-class DDPDriver extends tiny_events_1.EventEmitter {
-    constructor(_a) {
-        var { host, integrationId, config, logger = log_1.logger } = _a, moreConfigs = __rest(_a, ["host", "integrationId", "config", "logger"]);
+export class DDPDriver extends EventEmitter {
+    constructor({ host, integrationId, config, logger = Logger, ...moreConfigs }) {
         super();
         /**
          * Websocket subscriptions, exported for direct polling by adapters
@@ -360,8 +322,17 @@ class DDPDriver extends tiny_events_1.EventEmitter {
         this.userId = '';
         /** Array of joined room IDs (for reactive queries) */
         this.joinedIds = [];
-        this.config = Object.assign({}, config, moreConfigs, { host: host.replace(/(^\w+:|^)\/\//, ''), timeout: 20000 });
-        this.ddp = new Socket(Object.assign({}, this.config, { logger }));
+        this.config = {
+            ...config,
+            ...moreConfigs,
+            host: host.replace(/(^\w+:|^)\/\//, ''),
+            timeout: 20000
+            // reopen: number
+            // ping: number
+            // close: number
+            // integration: string
+        };
+        this.ddp = new Socket({ ...this.config, logger });
         this.logger = logger;
     }
     /**
@@ -376,7 +347,7 @@ class DDPDriver extends tiny_events_1.EventEmitter {
      *    .catch((err) => console.error(err))
      */
     connect() {
-        const config = Object.assign({}, this.config); // override defaults
+        const config = { ...this.config }; // override defaults
         return new Promise((resolve, reject) => {
             this.logger.info('[driver] Connecting', config);
             this.subscriptions = this.ddp.subscriptions;
@@ -455,16 +426,14 @@ class DDPDriver extends tiny_events_1.EventEmitter {
         ]);
     }
     /** Login to Rocket.Chat via DDP */
-    login(credentials, args) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!this.ddp || !this.ddp.connected) {
-                yield this.connect();
-            }
-            this.logger.info(`[DDP driver] Login with ${JSON.stringify(credentials)}`);
-            const login = yield this.ddp.login(credentials);
-            this.userId = login.id;
-            return login;
-        });
+    async login(credentials, args) {
+        if (!this.ddp || !this.ddp.connected) {
+            await this.connect();
+        }
+        this.logger.info(`[DDP driver] Login with ${JSON.stringify(credentials)}`);
+        const login = await this.ddp.login(credentials);
+        this.userId = login.id;
+        return login;
     }
     /** Unsubscribe from Meteor stream. Proxy for socket unsubscribe. */
     unsubscribe(subscription) {
@@ -478,10 +447,9 @@ class DDPDriver extends tiny_events_1.EventEmitter {
         this.ddp.on('stream-room-messages', ({ fields: { args: [message] } }) => cb(message));
     }
     onTyping(cb) {
-        this.ddp.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }) => {
+        return this.ddp.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }) => {
             cb(username, isTyping);
         });
     }
 }
-exports.DDPDriver = DDPDriver;
 //# sourceMappingURL=ddp.js.map

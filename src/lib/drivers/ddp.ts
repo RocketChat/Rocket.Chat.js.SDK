@@ -28,7 +28,7 @@ import {
 } from '../../interfaces'
 
 import { hostToWS } from '../util'
-import createHash from 'create-hash'
+import { sha256 } from 'js-sha256'
 
 /** Websocket handler class, manages connections and subscriptions */
 export class Socket extends EventEmitter {
@@ -296,7 +296,7 @@ export class Socket extends EventEmitter {
     const params: ICredentialsPass = {
       user: { username: credentials.username },
       password: {
-        digest: createHash('sha256').update(credentials.password).digest('hex'),
+        digest: sha256(credentials.password),
         algorithm: 'sha-256'
       }
     }
@@ -546,9 +546,9 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     this.ddp.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(message))
   }
 
-  onTyping (cb: ICallback): void {
-    this.ddp.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
+  onTyping (cb: ICallback): Promise<any> {
+    return this.ddp.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
       cb(username, isTyping)
-    })
+    }) as any
   }
 }

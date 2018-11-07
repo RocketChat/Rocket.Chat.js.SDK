@@ -1,12 +1,10 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
 // The API user, should be provisioned on build with local Rocket.Chat
-exports.apiUser = {
+export const apiUser = {
     username: process.env.ADMIN_USERNAME || 'admin',
     password: process.env.ADMIN_PASS || 'pass'
 };
 // The Bot user, will attempt to login and run methods in tests
-exports.botUser = {
+export const botUser = {
     email: 'bit-bucket+bot@test.smtp.org',
     name: 'Bot',
     password: process.env.ROCKETCHAT_PASSWORD || 'pass',
@@ -19,7 +17,7 @@ exports.botUser = {
     verified: true
 };
 // The Mock user, will send messages via API for the bot to respond to
-exports.mockUser = {
+export const mockUser = {
     email: 'bit-bucket+user@test.smtp.org',
     name: 'Mock User',
     password: 'mock',
@@ -33,7 +31,7 @@ exports.mockUser = {
 };
 // @todo fix custom field handling, either by using pre-test script to add
 //       required fields to test instance or by handling error without failing
-exports.mockVisitor = {
+export const mockVisitor = {
     visitor: {
         name: 'Livechat Visitor',
         email: 'visitor@rocket.chat',
@@ -46,7 +44,7 @@ exports.mockVisitor = {
         // }]
     }
 };
-exports.mockSurvey = [
+export const mockSurvey = [
     {
         name: 'satisfaction',
         value: '3'
@@ -56,12 +54,12 @@ exports.mockSurvey = [
         value: '5'
     }
 ];
-exports.mockOfflineMessage = {
+export const mockOfflineMessage = {
     name: 'Livechat Visitor',
     email: 'sample@rocket.chat',
     message: 'This is a Message!'
 };
-exports.mockVisitorNavigation = {
+export const mockVisitorNavigation = {
     token: '123456789',
     rid: '',
     pageInfo: {
@@ -72,13 +70,13 @@ exports.mockVisitorNavigation = {
         }
     }
 };
-exports.mockCustomField = {
+export const mockCustomField = {
     token: '123456789',
     key: 'address',
     value: 'Rocket.Chat Avenue',
     overwrite: true
 };
-exports.mockCustomFields = {
+export const mockCustomFields = {
     token: '123456789',
     customFields: [
         {
