@@ -183,7 +183,7 @@ export function asyncCall (method: string, params: any) {
  * @param params Single or array of parameters of the method to call
  */
 export function callMethod (name: string, ...params: any[]): Promise<any> {
-  return (methodCache.has(name) && typeof params !== 'undefined')
+  return (methodCache.has(name) && typeof params[0] !== 'undefined')
     ? cacheCall(name, params[0])
     : asyncCall(name, params)
 }
@@ -233,8 +233,8 @@ export async function login (credentials: ICredentials = {
 }
 
 /** Proxy socket logout */
-export const logout = () => {
-  unsubscribeAll()
+export const logout = async () => {
+  await unsubscribeAll()
   return ddp.logout()
 }
 
@@ -312,7 +312,7 @@ export async function reactToMessages (callback: IMessageCallback) {
   }
   messages = await subscribeToMessages()
   messages.onEvent(handler)
-  logger.info(`[driver] Added event handler for ${messages!.name} subscription`)
+  logger.info(`[driver] Added event handler for ${messages.name} subscription`)
 }
 
 /**
