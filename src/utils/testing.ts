@@ -12,6 +12,7 @@ import {
   IHistoryAPI,
   IMessageReceipt
 } from '../interfaces'
+import { Socket } from '../lib/ddp'
 
 /** Define common attributes for DRY tests */
 export const testChannelName = 'tests'
@@ -193,5 +194,21 @@ export async function setup () {
     console.log(`Test private room (${testPrivateName}) created`)
   }
 
+  // End of API setup usage
   await logout()
+
+  // Assign bot user as livechat agent
+  try {
+    const socket = new Socket()
+    await socket.open()
+    await socket.login({ username: apiUser.username, password: apiUser.password })
+    await socket.call('livechat:addAgent', botUser.username)
+    console.log('Bot user assigned as livechat agent')
+    await socket.close()
+  } catch (err) {
+    console.log('Could not assign bot user as livechat agent')
+    throw err
+  }
+
+  process.exit()
 }

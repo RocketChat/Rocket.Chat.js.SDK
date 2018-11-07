@@ -98,17 +98,24 @@ describe('api', () => {
   })
   describe('.livechat', () => {
     before(async () => {
-      if (token === '') {
-        const { visitor } = await api.livechat.grantVisitor(mockVisitor)
-        token = visitor && visitor.token
+      await driver.login() // make bot available as livechat agent
+      try {
+        if (token === '') {
+          const { visitor } = await api.livechat.grantVisitor(mockVisitor)
+          token = visitor && visitor.token
+        }
+        const result = await api.livechat.room({ token })
+        room = result.room
+        rid = room && room._id
+        newMessage = { token, rid, msg: 'sending livechat message...' }
+        editMessage = { token, rid, msg: 'editing livechat message...' }
+        pageInfo = Object.assign({}, mockVisitorNavigation, { rid })
+      } catch (err) {
+        console.error(err)
+        throw err
       }
-      const result = await api.livechat.room({ token })
-      room = result.room
-      rid = room && room._id
-      newMessage = { token, rid, msg: 'sending livechat message...' }
-      editMessage = { token, rid, msg: 'editing livechat message...' }
-      pageInfo = Object.assign({}, mockVisitorNavigation, { rid })
     })
+    after(() => driver.logout())
     describe('.config', () => {
       it('returns data from basic Livechat initial config', async () => {
         const result = await api.livechat.config()
