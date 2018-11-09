@@ -1,21 +1,16 @@
-import { Message } from '../message'
 import { logger } from '../log'
-import { Protocols, ISocket, IDriver } from '../drivers'
+import { ISocket, IDriver } from '../drivers'
 import Rocketchat from './Rocketchat'
 import {
-	ILogger,
 	ISocketOptions,
 	IRespondOptions,
 	ICallback,
 	IMessageCallback,
 	ISubscriptionEvent,
 	IMessage,
-	IMessageMeta,
 	IMessageReceipt,
 	ISubscription,
-	ICredentials,
-	ILoginResult,
-	IRoomResultAPI
+	ICredentials
 } from '../../interfaces'
 import { RID } from '../api/RocketChat'
 
@@ -105,7 +100,7 @@ export default class BotClient extends Rocketchat {
 
     this.messages.onEvent(handler)
 
-    this.logger.info(`[driver] Added event handler for ${this.messages!.name} subscription`)
+    this.logger.info(`[driver] Added event handler for ${this.messages.name} subscription`)
   }
 /**
  * Applies `reactToMessages` with some filtering of messages based on config.

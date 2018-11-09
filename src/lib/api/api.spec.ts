@@ -12,8 +12,8 @@ import {
   mockCustomField,
   mockCustomFields
 } from '../../utils/config'
-import BotDriver from '../drivers/BotDriver'
-import ClientApi from './Client'
+import BotDriver from '../clients/Bot'
+import ClientApi from './RocketChat'
 import LivechatApi from './Livechat'
 import * as settings from '../settings'
 import { IMessage } from '../../interfaces'

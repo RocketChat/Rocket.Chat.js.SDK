@@ -1,10 +1,10 @@
 import 'mocha'
 import sinon from 'sinon'
 import { expect } from 'chai'
-import { silence } from '../../log'
-import { botUser } from '../../../utils/config'
-import Socket from './ddp'
-import { isLoginResult } from '../../../interfaces'
+import { silence } from '../log'
+import { botUser } from '../../utils/config'
+import { Socket } from './ddp'
+import { isLoginResult } from '../../interfaces'
 
 silence() // suppress logs
 let socket: Socket

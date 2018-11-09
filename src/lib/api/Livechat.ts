@@ -4,7 +4,6 @@
  */
 
 import {
-	ILogger,
 	ILivechatTokenAPI,
 	ILivechatRoomCredentialAPI,
 	ILivechatRoomSurveyAPI,
@@ -20,7 +19,7 @@ import {
 import ApiBase from './api'
 
 export default class ApiLivechat extends ApiBase {
-  config (params: ILivechatTokenAPI) { return this.get('livechat/config', params, false) }
+  config (params?: ILivechatTokenAPI) { return this.get('livechat/config', params, false) }
   room (credentials: ILivechatRoomCredentialAPI) { return this.get('livechat/room', credentials, false) }
   closeChat (credentials: ILivechatRoomCredentialAPI) { return (this.post('livechat/room.close', { rid: credentials.rid, token: credentials.token }, false)) }
   transferChat (credentials: ILivechatRoomCredentialAPI) { return (this.post('livechat/room.transfer', { rid: credentials.rid, token: credentials.token, department: credentials.department }, false)) }

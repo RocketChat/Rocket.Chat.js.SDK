@@ -2,24 +2,14 @@
  * @module Socket
  * Provides high-level helpers for DDP connection, method calls, subscriptions.
  */
-import ClientRest from '../api/RocketChat'
 
 import { EventEmitter } from 'tiny-events'
-import { Message } from '../message'
-import { logger as Logger } from '../log'
 import {
   ILogger,
   ISocketOptions,
-  IRespondOptions,
   ICallback,
-  IMessageCallback,
-  ISubscriptionEvent,
-  IMessage,
-  IMessageMeta,
-  IMessageReceipt,
   ISubscription,
-  ICredentials,
-  ILoginResult
+  ICredentials
 } from '../../interfaces'
 
 export interface ISocket {

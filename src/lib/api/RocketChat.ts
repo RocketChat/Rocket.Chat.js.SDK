@@ -5,33 +5,7 @@
 
 export type RID = string
 import {
-	ILogger,
-	IAPIRequest,
 	IUserAPI,
-	ICredentials,
-	ILoginResultAPI,
-	ICredentialsAPI,
-	ILivechatTokenAPI,
-	ILivechatRoomCredentialAPI,
-	ILivechatRoomResultAPI,
-	INewLivechatGuestAPI,
-	ILivechatVisitorResultAPI,
-	ILivechatConfigResultAPI,
-	ILivechatRoomSurveyAPI,
-	ILivechatAgentResultAPI,
-	INewLivechatMessageAPI,
-	ILivechatMessageResultAPI,
-	ILivechatRoomMessagesAPI,
-	INewLivechatOfflineMessageAPI,
-	ILivechatOfflineMessageResultAPI,
-	INewLivechatNavigationAPI,
-	ILivechatNavigationResultAPI,
-	ILivechatTranscriptResultAPI,
-	ILivechatVideoCallResultAPI,
-	INewLivechatCustomFieldAPI,
-	ILivechatCustomFieldResultAPI,
-	INewLivechatCustomFieldsAPI,
-	ILivechatCustomFieldsResultAPI,
 	IMessage
 } from '../../interfaces'
 

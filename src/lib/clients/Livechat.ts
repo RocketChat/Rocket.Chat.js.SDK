@@ -8,15 +8,8 @@ import { logger as Logger } from '../log'
 import {
 	ILogger,
 	ISocketOptions,
-	IRespondOptions,
 	ICallback,
-	IMessageCallback,
-	ISubscriptionEvent,
-	IMessage,
-	IMessageMeta,
-	IMessageReceipt,
-	ISubscription,
-	ILoginResult
+	ISubscription
 } from '../../interfaces'
 
 export default class LivechatClient extends LivechatRest implements ISocket {

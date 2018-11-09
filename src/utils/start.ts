@@ -87,12 +87,13 @@ async function demo (message: IMessage) {
   if (/tell everyone/i.test(message.msg)) {
     const match = message.msg.match(/tell everyone (.*)/i)
     if (!match || !match[1]) return
-    const sayWhat = `@${message.u!.username} says "${match[1]}"`
+    // const sayWhat = `@${message.u!.username} says "${match[1]}"`
 
     const usernames = await driver.users.allNames()
     for (let username of usernames) {
       if (username && username !== botUser.username) {
-        const toWhere = await driver.getDirectMessageRoomId(username)
+				// const toWhere =
+        await driver.getDirectMessageRoomId(username)
         await delay(200) // delay to prevent rate-limit error
       }
     }
