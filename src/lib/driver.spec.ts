@@ -9,19 +9,12 @@ import * as driver from './driver'
 import * as methodCache from './methodCache'
 import { Socket } from './ddp'
 
-const delay = (ms) => new Promise((resolve, reject) => setTimeout(resolve, ms))
+// const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 let clock
 let tId
 let pId
 const tName = utils.testChannelName
 const pName = utils.testPrivateName
-const loginDelay = () => delay(250) // avoid rate-limit
-  .then(() => driver.login())
-  .catch((err) => {
-    console.error(err)
-    throw err
-  })
-const limitDelay = () => delay(2000)
 
 silence() // suppress log during tests (disable this while developing tests)
 
@@ -123,13 +116,12 @@ describe('driver', () => {
     after(() => driver.unsubscribeAll())
   })
   describe('.reactToMessages', () => {
-    before(() => loginDelay())
+    before(() => driver.login())
     afterEach(() => driver.unsubscribeAll())
     it('calls callback on every subscription update', async () => {
       const callback = sinon.spy()
       driver.reactToMessages(callback)
       await utils.sendFromUser({ text: 'SDK test `reactToMessages` 1' })
-      await delay(500) // avoid rate limit
       await utils.sendFromUser({ text: 'SDK test `reactToMessages` 2' })
       expect(callback.callCount).to.equal(2)
     })
@@ -137,8 +129,8 @@ describe('driver', () => {
       const callback = sinon.spy()
       driver.reactToMessages(callback)
       await utils.sendFromUser({ text: 'SDK test `reactToMessages` 3' })
-      const messageArgs = callback.getCall(0).args[1]
-      expect(messageArgs.msg).to.equal('SDK test `reactToMessages` 3')
+      const messageArgs = callback.getCall(0).args
+      expect(messageArgs[1].msg).to.equal('SDK test `reactToMessages` 3')
     })
   })
   describe('.setupMethodCache', () => {
@@ -160,8 +152,7 @@ describe('driver', () => {
     })
   })
   describe('.sendMessage', () => {
-    before(() => loginDelay())
-    afterEach(() => limitDelay())
+    before(() => driver.login())
     it('sends a custom message', async () => {
       const message = driver.prepareMessage({
         rid: tId,
@@ -193,8 +184,7 @@ describe('driver', () => {
     })
   })
   describe('.editMessage', () => {
-    before(() => loginDelay())
-    afterEach(() => limitDelay())
+    before(() => driver.login())
     it('edits the last sent message', async () => {
       const original = driver.prepareMessage({
         msg: ':point_down:',
@@ -208,7 +198,6 @@ describe('driver', () => {
         _id: sent._id,
         msg: ':point_up:'
       })
-      await delay(500)
       await driver.editMessage(update)
       const last = (await utils.lastMessages(tId))[0]
       expect(last).to.have.property('msg', ':point_up:')
@@ -218,8 +207,7 @@ describe('driver', () => {
     })
   })
   describe('.sendToRoomId', () => {
-    before(() => loginDelay())
-    afterEach(() => limitDelay())
+    before(() => driver.login())
     it('sends string to the given room id', async () => {
       const result = await driver.sendToRoomId('SDK test `sendToRoomId`', tId)
       expect(result).to.include.all.keys(['msg', 'rid', '_id'])
@@ -235,8 +223,7 @@ describe('driver', () => {
     })
   })
   describe('.sendToRoom', () => {
-    before(() => loginDelay())
-    afterEach(() => limitDelay())
+    before(() => driver.login())
     it('sends string to the given room name', async () => {
       await driver.subscribeToMessages()
       const result = await driver.sendToRoom('SDK test `sendToRoom`', tName)
@@ -254,8 +241,7 @@ describe('driver', () => {
     })
   })
   describe('.sendDirectToUser', () => {
-    before(() => loginDelay())
-    afterEach(() => limitDelay())
+    before(() => driver.login())
     it('sends string to the given room name', async () => {
       await driver.connect()
       await driver.login()
@@ -273,8 +259,7 @@ describe('driver', () => {
     })
   })
   describe('.setReaction', () => {
-    before(() => loginDelay())
-    afterEach(() => limitDelay())
+    before(() => driver.login())
     it('adds emoji reaction to message', async () => {
       let sent = await driver.sendToRoomId('test reactions', tId)
       if (Array.isArray(sent)) sent = sent[0] // see todo on `sendToRoomId`
@@ -296,8 +281,7 @@ describe('driver', () => {
     })
   })
   describe('.respondToMessages', () => {
-    before(() => loginDelay())
-    afterEach(() => limitDelay())
+    before(() => driver.login())
     it('joins rooms if not already joined', async () => {
       expect(driver.joinedIds).to.have.lengthOf(0)
       await driver.respondToMessages(() => null, { rooms: ['general', tName] })
@@ -406,7 +390,7 @@ describe('driver', () => {
     })
   })
   describe('.getRoomId', () => {
-    before(() => loginDelay())
+    before(() => driver.login())
     it('returns the ID for a channel by ID', async () => {
       const room = await driver.getRoomId(tName)
       expect(room).to.equal(tId)
@@ -417,7 +401,7 @@ describe('driver', () => {
     })
   })
   describe('.getRoomName', () => {
-    before(() => loginDelay())
+    before(() => driver.login())
     it('returns the name for a channel by ID', async () => {
       const room = await driver.getRoomName(tId)
       expect(room).to.equal(tName)
@@ -433,7 +417,7 @@ describe('driver', () => {
     })
   })
   describe('.joinRooms', () => {
-    before(() => loginDelay())
+    before(() => driver.login())
     it('joins all the rooms in array, keeping IDs', async () => {
       driver.joinedIds.splice(0, driver.joinedIds.length) // clear const array
       await driver.joinRooms(['general', tName])

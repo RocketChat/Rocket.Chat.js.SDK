@@ -1,3 +1,5 @@
+// import { inspect } from 'util'
+
 /**
  * @module DDP
  * Handles low-level websocket connection and event subscriptions
@@ -116,7 +118,7 @@ export class Socket extends EventEmitter {
    */
   onMessage (e: any) {
     const data = (e.data) ? JSON.parse(e.data) : undefined
-    // console.log(data) // 👈  very useful for debugging missing responses
+    // console.log(inspect({ data }, { depth: 4 })) // 👈  very useful for debugging missing responses
     if (!data) return logger.error(`[ddp] JSON parse error: ${e.message}`)
     if (data.collection) this.emit(data.collection, data)
     const handlers = []
