@@ -15,19 +15,21 @@ Create your own working BOT for Rocket.Chat, in seconds, at [glitch.com](https:/
 
 Add your own Rocket.Chat BOT, running on your favorite Linux, MacOS or Windows system.
 
-First, make sure you have the latest version of [nodeJS](https://nodejs.org/) (nodeJS 8.x or higher).   
-```
-node -v
+First, make sure you have the latest version of [nodeJS](https://nodejs.org/) (nodeJS 8.x or higher).
+
+```shell
+$ node -v
 v8.9.3
 ```
 In a project directory, add Rocket.Chat.js.SDK as dependency:
 
-```
-npm install @rocket.chat/sdk --save
+```shell
+$ npm install @rocket.chat/sdk --save
 ```
 
 Next, create _easybot.js_ with the following:
-```
+
+```javascript
 const { driver } = require('@rocket.chat/sdk');
 // customize the following with your server and BOT account information
 const HOST = 'myserver.com';
@@ -90,8 +92,8 @@ Make sure you customize the constants to your Rocket.Chat server account.
 
 Finally, run the bot:
 
-```
-node easybot.js
+```shell
+$ node easybot.js
 ```
 
 _TBD:  insert screenshot of bot working on a server_
@@ -142,11 +144,15 @@ Access these modules by importing them from SDK, e.g:
 
 For Node 8 / ES5
 
-`const { driver, methodCache, api } = require('@rocket.chat/sdk')`
+```javascript
+const { driver, methodCache, api } = require('@rocket.chat/sdk')
+```
 
 For ES6 supporting platforms
 
-`import { driver, methodCache, api } from '@rocket.chat/sdk'`
+```javascript
+import { driver, methodCache, api } from '@rocket.chat/sdk'
+```
 
 Any Rocket.Chat server method can be called via `driver.callMethod`,
 `driver.cacheCall` or `driver.asyncCall`. Server methods are not fully
@@ -519,7 +525,7 @@ interactions (i.e. bots) locally while in development.
 
 ES6 module, using async
 
-```
+```javascript
 import * as rocketchat from '@rocket.chat/sdk'
 
 const asteroid = await rocketchat.driver.connect({ host: 'localhost:3000' })
@@ -528,7 +534,7 @@ console.log('connected', asteroid)
 
 ES5 module, using callback
 
-```
+```javascript
 const rocketchat = require('@rocket.chat/sdk')
 
 rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
