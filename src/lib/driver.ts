@@ -214,8 +214,9 @@ export async function login (credentials: ICredentials = {
   password: settings.password,
   ldap: settings.ldap
 }) {
-  let login: ILoginResult | undefined
   if (!ddp || !ddp.connected) await connect()
+  if (ddp.loggedIn) return userId
+  let login: ILoginResult | undefined
   if (credentials.ldap) {
     logger.info(`[driver] Logging in ${credentials.username} with LDAP`)
     login = await ddp.login({
