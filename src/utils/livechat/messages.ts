@@ -1,61 +1,63 @@
-// import * as api from '../../lib/api'
-// import * as settings from '../../lib/settings'
-// import { silence } from '../../lib/log'
-// import { mockVisitor, mockOfflineMessage, mockVisitorNavigation } from '../config'
+import Api from '../../lib/api/Livechat'
+import * as settings from '../../lib/settings'
+import { silence } from '../../lib/log'
+import { mockVisitor, mockOfflineMessage, mockVisitorNavigation } from '../config'
 
-// silence()
+silence()
 
-// async function getVisitorToken () {
-//   console.log('\nPreparing visitor token for tests...')
-//   let token = settings.token
-//   if (!token || token === '') {
-//     const { visitor } = await api.livechat.grantVisitor(mockVisitor)
-//     token = visitor && visitor.token
-//   }
+const livechat = new Api({})
 
-//   return token
-// }
+async function getVisitorToken () {
+  console.log('\nPreparing visitor token for tests...')
+  let token = settings.token
+  if (!token || token === '') {
+    const { visitor } = await livechat.grantVisitor(mockVisitor)
+    token = visitor && visitor.token
+  }
 
-// async function getRoom (token: string) {
-//   console.log('\nPreparing room for tests...')
-//   const { room } = await api.livechat.room({ token })
-//   return room
-// }
+  return token
+}
 
-// async function messages () {
-//   const token = await getVisitorToken()
-//   const room = await getRoom(token)
-//   const rid = room && room._id
-//   const newMessage = { token, rid, msg: 'sending livechat message..' }
-//   const editMessage = { token, rid, msg: 'editing livechat message..' }
-//   const result = await api.livechat.sendMessage(newMessage)
-//   const _id = result && result.message && result.message._id
-//   const roomCredential = { token, rid }
-//   const pageInfo = Object.assign({}, mockVisitorNavigation, { rid })
+async function getRoom (token: string) {
+  console.log('\nPreparing room for tests...')
+  const { room } = await livechat.room({ token })
+  return room
+}
 
-//   console.log(`
+async function messages () {
+  const token = await getVisitorToken()
+  const room = await getRoom(token)
+  const rid = room && room._id
+  const newMessage = { token, rid, msg: 'sending livechat message..' }
+  const editMessage = { token, rid, msg: 'editing livechat message..' }
+  const result = await livechat.sendMessage(newMessage)
+  const _id = result && result.message && result.message._id
+  const roomCredential = { token, rid }
+  const pageInfo = Object.assign({}, mockVisitorNavigation, { rid })
 
-// Demo of API livechat query helpers
+  console.log(`
 
-// Send Livechat Message \`api.livechat.sendMessage()\`:
-// ${JSON.stringify(result, null, '\t')}
+Demo of API livechat query helpers
 
-// Edit Livechat Message \`api.livechat.editMessage()\`:
-// ${JSON.stringify(await api.livechat.editMessage(_id, editMessage), null, '\t')}
+Send Livechat Message \`livechat.sendMessage()\`:
+${JSON.stringify(result, null, '\t')}
 
-// Load Livechat Messages \`api.livechat.loadMessages()\`:
-// ${JSON.stringify(await api.livechat.loadMessages(rid, { token }), null, '\t')}
+Edit Livechat Message \`livechat.editMessage()\`:
+${JSON.stringify(await livechat.editMessage(_id, editMessage), null, '\t')}
 
-// Delete Livechat Message \`api.livechat.deleteMessage()\`:
-// ${JSON.stringify(await api.livechat.deleteMessage(_id, { token, rid }), null, '\t')}
+Load Livechat Messages \`livechat.loadMessages()\`:
+${JSON.stringify(await livechat.loadMessages(rid, { token }), null, '\t')}
 
-// Send Livechat Offline Message \`api.livechat.sendOfflineMessage()\`:
-// ${JSON.stringify(await api.livechat.sendOfflineMessage(mockOfflineMessage), null, '\t')}
+Delete Livechat Message \`livechat.deleteMessage()\`:
+${JSON.stringify(await livechat.deleteMessage(_id, { token, rid }), null, '\t')}
 
-// Send Livechat Visitor Navigation \`api.livechat.sendVisitorNavigation()\`:
-// ${JSON.stringify(await api.livechat.sendVisitorNavigation(roomCredential, pageInfo), null, '\t')}
+Send Livechat Offline Message \`livechat.sendOfflineMessage()\`:
+${JSON.stringify(await livechat.sendOfflineMessage(mockOfflineMessage), null, '\t')}
 
-//   `)
-// }
+Send Livechat Visitor Navigation \`livechat.sendVisitorNavigation()\`:
+${JSON.stringify(await livechat.sendVisitorNavigation(roomCredential, pageInfo), null, '\t')}
 
-// messages().catch((e) => console.error(e))
+  `)
+}
+
+messages().catch((e) => console.error(e))
