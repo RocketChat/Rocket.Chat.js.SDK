@@ -202,7 +202,7 @@ describe('driver', () => {
       const last = (await utils.lastMessages(tId))[0]
       expect(last).to.have.property('msg', ':point_up:')
       expect(last).to.have.deep.property('editedBy', {
-        _id: driver.userId, username: botUser.username
+        _id: driver.user.login.id, username: botUser.username
       })
     })
   })
@@ -289,13 +289,13 @@ describe('driver', () => {
     })
     it('ignores messages sent from bot', async () => {
       const callback = sinon.spy()
-      driver.respondToMessages(callback)
+      await driver.respondToMessages(callback)
       await driver.sendToRoomId('SDK test `respondToMessages`', tId)
       sinon.assert.notCalled(callback)
     })
     it('fires callback on messages in joined rooms', async () => {
       const callback = sinon.spy()
-      driver.respondToMessages(callback, { rooms: [tName] })
+      await driver.respondToMessages(callback, { rooms: [tName] })
       await utils.sendFromUser({ text: 'SDK test `respondToMessages` 1' })
       sinon.assert.calledOnce(callback)
     })
@@ -314,7 +314,7 @@ describe('driver', () => {
     })
     it('ignores edited messages, after receiving original', async () => {
       const callback = sinon.spy()
-      driver.respondToMessages(callback, { rooms: [tName] })
+      await driver.respondToMessages(callback, { rooms: [tName] })
       const sentMessage = await utils.sendFromUser({
         text: 'SDK test `respondToMessages` sent'
       })
@@ -330,7 +330,7 @@ describe('driver', () => {
       const sentMessage = await utils.sendFromUser({
         text: 'SDK test `respondToMessages` sent'
       })
-      driver.respondToMessages(callback, { edited: true, rooms: [tName] })
+      await driver.respondToMessages(callback, { edited: true, rooms: [tName] })
       await utils.updateFromUser({
         roomId: tId,
         msgId: sentMessage.message._id,
@@ -341,7 +341,7 @@ describe('driver', () => {
     it('by default ignores DMs', async () => {
       const dmResult = await utils.setupDirectFromUser()
       const callback = sinon.spy()
-      driver.respondToMessages(callback, { rooms: [tName] })
+      await driver.respondToMessages(callback, { rooms: [tName] })
       await utils.sendFromUser({
         text: 'SDK test `respondToMessages` DM',
         roomId: dmResult.room._id
@@ -351,7 +351,7 @@ describe('driver', () => {
     it('fires callback on DMs if configured', async () => {
       const dmResult = await utils.setupDirectFromUser()
       const callback = sinon.spy()
-      driver.respondToMessages(callback, { dm: true, rooms: [tName] })
+      await driver.respondToMessages(callback, { dm: true, rooms: [tName] })
       await utils.sendFromUser({
         text: 'SDK test `respondToMessages` DM',
         roomId: dmResult.room._id
@@ -360,7 +360,7 @@ describe('driver', () => {
     })
     it('fires callback on ul (user leave) message types', async () => {
       const callback = sinon.spy()
-      driver.respondToMessages(callback, { rooms: [tName] })
+      await driver.respondToMessages(callback, { rooms: [tName] })
       await utils.leaveUser()
       sinon.assert.calledWithMatch(callback, null, sinon.match({ t: 'ul' }))
       await utils.inviteUser()
@@ -368,20 +368,20 @@ describe('driver', () => {
     it('fires callback on au (user added) message types', async () => {
       await utils.leaveUser()
       const callback = sinon.spy()
-      driver.respondToMessages(callback, { rooms: [tName] })
+      await driver.respondToMessages(callback, { rooms: [tName] })
       await utils.inviteUser()
       sinon.assert.calledWithMatch(callback, null, sinon.match({ t: 'au' }))
     })
     it('appends room name to event meta in channels', async () => {
       const callback = sinon.spy()
-      driver.respondToMessages(callback, { dm: true, rooms: [tName] })
+      await driver.respondToMessages(callback, { dm: true, rooms: [tName] })
       await utils.sendFromUser({ text: 'SDK test `respondToMessages` DM' })
       expect(callback.firstCall.args[2].roomName).to.equal(tName)
     })
     it('room name is undefined in direct messages', async () => {
       const dmResult = await utils.setupDirectFromUser()
       const callback = sinon.spy()
-      driver.respondToMessages(callback, { dm: true, rooms: [tName] })
+      await driver.respondToMessages(callback, { dm: true, rooms: [tName] })
       await utils.sendFromUser({
         text: 'SDK test `respondToMessages` DM',
         roomId: dmResult.room._id

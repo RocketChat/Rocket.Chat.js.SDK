@@ -63,8 +63,11 @@ export let subscriptions: { [id: string]: ISubscription } = {}
 /** Save messages subscription to ensure only one created */
 export let messages: ISubscription | undefined
 
-/** Current user object populated from resolved login */
-export let userId: string
+/** Current user object populated on login */
+export let user: {
+  login: ILoginResult
+  credentials: ICredentials
+} | undefined
 
 /** Array of joined room IDs (for reactive queries) */
 export let joinedIds: string[] = []
@@ -116,7 +119,8 @@ export function connect (
       const err = new Error('Socket connection timeout')
       cancelled = true
       events.removeAllListeners('connected')
-      callback ? callback(err, ddp) : reject(err)
+      if (callback) callback(err, ddp)
+      reject(err)
     }, config.timeout)
 
     // if to avoid condition where timeout happens before listener to 'connected' is added
@@ -208,14 +212,15 @@ export function cacheCall (method: string, key: string): Promise<any> {
     })
 }
 
-/** Login to Rocket.Chat via DDP */
+/** Login to Rocket.Chat via DDP (if not already logged in) */
 export async function login (credentials: ICredentials = {
   username: settings.username,
   password: settings.password,
   ldap: settings.ldap
 }) {
-  let login: ILoginResult | undefined
+  if (loggedIn(credentials)) return user!.login.id
   if (!ddp || !ddp.connected) await connect()
+  let login: ILoginResult | undefined
   if (credentials.ldap) {
     logger.info(`[driver] Logging in ${credentials.username} with LDAP`)
     login = await ddp.login({
@@ -228,13 +233,21 @@ export async function login (credentials: ICredentials = {
     logger.info(`[driver] Logging in ${credentials.username}`)
     login = await ddp.login(credentials)
   }
-  userId = login.id
-  return userId
+  user = { login, credentials }
+  return login.id
+}
+
+/** Check if the given user credentials are currently logged in */
+export function loggedIn (credentials: ICredentials) {
+  if (!ddp || !ddp.loggedIn) return false
+  if (!user || !user.login) return false
+  return (JSON.stringify(user.credentials) === JSON.stringify(credentials))
 }
 
 /** Proxy socket logout */
-export const logout = async () => {
+export async function logout () {
   await unsubscribeAll()
+  user = undefined
   return ddp.logout()
 }
 
@@ -360,7 +373,7 @@ export async function respondToMessages (
     }
 
     // Ignore bot's own messages
-    if (message.u && message.u._id === userId) return
+    if (message.u && message.u._id === user!.login.id) return
 
     // Ignore DMs unless configured not to
     const isDM = meta.roomType === 'd'
@@ -370,6 +383,7 @@ export async function respondToMessages (
     const isLC = meta.roomType === 'l'
     if (isLC && !config.livechat) return
 
+    console.log({ message, meta })
     // Ignore messages in un-joined public rooms unless configured not to
     if (!config.allPublic && !isDM && !meta.roomParticipant) return
 

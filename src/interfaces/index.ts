@@ -137,7 +137,8 @@ export interface IAPIRequest {
 export interface ILoginResult {
   id: string, // userId
   token: string,
-  createCipher: { '$date': number }
+  tokenExpires?: { '$date': number },
+  type: string
 }
 
 /** Password login credential type guard */
