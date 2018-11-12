@@ -237,7 +237,7 @@ export interface IHistoryAPI {
  * @todo contribute these to @types/rocketchat and require
  */
 export interface IMessage {
-  rid: string | null
+  rid?: string
   _id?: string
   t?: string
   msg?: string
@@ -605,7 +605,10 @@ export interface ILivechatTokenAPI {
 /** Structure for livechat room credential api */
 export interface ILivechatRoomCredentialAPI {
   token: string
-  rid?: string
+}
+/** Structure for livechat room credential api */
+export interface ILivechatRoom {
+  rid: string
   department?: string
 }
 
@@ -631,7 +634,6 @@ export interface ILivechatSurveyAPI {
 
 /** Payload structure for livechat `room.transfer` endpoint */
 export interface ILivechatRoomSurveyAPI {
-  token: string
   rid: string
   data?: ILivechatSurveyAPI[] // See surcvey interface above
 }
@@ -863,7 +865,6 @@ export interface ILivechatCustomFieldAPI {
 
 /** Livechat CustomField object structure */
 export interface INewLivechatCustomFieldAPI {
-  token: string        // Visitor token
   key: string          // CustomField key
   value: string        // CustomField value
   overwrite: boolean   // Overwrite CustomField value if exists

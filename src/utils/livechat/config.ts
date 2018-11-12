@@ -10,11 +10,11 @@ const livechat = new Api(({}))
 async function config () {
   console.log(`
 
-Get default Livechat Config \`livechat.config()\`:
-${JSON.stringify(await livechat.config(), null, '\t')}
+		Get default Livechat Config \`livechat.config()\`:
+		${JSON.stringify(await livechat.config(), null, '\t')}
 
-Get Livechat Config with Token \`livechat.config({ token })\`:
-${JSON.stringify(await livechat.config({ token }), null, '\t')}
+		Get Livechat Config with Token \`livechat.config({ token })\`:
+		${JSON.stringify(await livechat.config({ token }), null, '\t')}
 
 	`)
 }

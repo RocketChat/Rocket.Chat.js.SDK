@@ -104,20 +104,20 @@ class Client implements IClient {
   }
 
   get (url: string, data: any, options?: any): Promise<any> {
-    return fetch(`${this.host}/api/v1/${url}?${this.getParams(data)}`, {
+    return fetch(`${this.host}/api/v1/${encodeURI(url)}?${this.getParams(data)}`, {
       method: 'GET',
       headers: this.headers
     }).then(this.handle) as Promise<any>
   }
   post (url: string, data: any, options?: any): Promise<any> {
-    return fetch(`${this.host}/api/v1/${url}`, {
+    return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'POST',
       body: JSON.stringify(data),
       headers: this.headers
     }).then(this.handle) as Promise<any>
   }
   put (url: string, data: any, options?: any): Promise<any> {
-    return fetch(`${this.host}/api/v1/${url}`, {
+    return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'PUT',
       body: JSON.stringify(data),
       headers: this.headers
@@ -125,7 +125,7 @@ class Client implements IClient {
   }
 
   delete (url: string, options?: any): Promise<any> {
-    return fetch(`${this.host}/api/v1/${url}`, {
+    return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'DEL',
       headers: this.headers
     }).then(this.handle) as Promise<any>
@@ -139,7 +139,7 @@ class Client implements IClient {
   }
   private getParams (data: any) {
     return Object.keys(data).map(function (k) {
-      return encodeURIComponent(k) + '=' + (typeof data[k] === 'object' ? JSON.stringify(data[k]) : encodeURIComponent(data[k]))
+      return encodeURIComponent(k) + '=' + (typeof data[k] === 'object' ? encodeURIComponent(JSON.stringify(data[k])) : encodeURIComponent(data[k]))
     }).join('&')
   }
 }
@@ -152,6 +152,7 @@ export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
 	*/
 
 export default class Api extends EventEmitter {
+  userId: string = ''
   logger: ILogger
   client: IClient
   currentLogin: {
@@ -164,7 +165,11 @@ export default class Api extends EventEmitter {
   constructor ({ client, host, logger = Logger }: any) {
     super()
     this.client = client || new Client({ host } as any)
-    this.logger = logger
+    this.logger = Logger
+  }
+
+  get username () {
+    return this.currentLogin && this.currentLogin.username
   }
 
   loggedIn () {
@@ -179,14 +184,14 @@ export default class Api extends EventEmitter {
 	* @param auth     Require auth headers for endpoint, default true
 	* @param ignore   Allows certain matching error messages to not count as errors
 	*/
-  async request (
+  request = async (
 		method: 'POST' | 'GET' | 'PUT' | 'DELETE',
 		endpoint: string,
 		data: any = {},
 		auth: boolean = true,
 		ignore?: RegExp
-	) {
-    this.logger.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
+	) => {
+    this.logger && this.logger.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
       if (auth && !this.loggedIn()) {
         throw new Error('')
@@ -201,10 +206,10 @@ export default class Api extends EventEmitter {
       }
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
-      this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`)
+      this.logger && this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`)
       return (method === 'DELETE') ? result : result.data
     } catch (err) {
-      this.logger.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
+      this.logger && this.logger.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
       throw err
     }
   }
@@ -231,6 +236,7 @@ export default class Api extends EventEmitter {
 
   async login (credentials: ICredentials, args?: any): Promise<any> {
     const { data } = await this.post('login', { ...credentials, ...args })
+    this.userId = data.userId
     this.currentLogin = {
       username: data.me.username,
       userId: data.userId,
@@ -243,7 +249,15 @@ export default class Api extends EventEmitter {
     }
     return data
   }
-  logout () { return this.get('logout', {}, true) }
+  async logout () {
+    if (!this.currentLogin) {
+      return null
+    }
+    const result = await this.post('logout', {}, true)
+    this.userId = ''
+    this.currentLogin = null
+    return result
+  }
 /**
  * Structure message content, optionally addressing to room ID.
  * Accepts message text string or a structured message object.
@@ -253,6 +267,6 @@ export default class Api extends EventEmitter {
 	rid?: string,
 	args?: any
 ): Message {
-    return new Message(content, { rid, ...args })
+    return new Message(content, { rid, roomId: rid, ...args })
   }
 }

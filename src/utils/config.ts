@@ -88,7 +88,6 @@ export const mockVisitorNavigation: INewLivechatNavigationAPI = {
 }
 
 export const mockCustomField: INewLivechatCustomFieldAPI = {
-  token: '123456789',
   key: 'address',
   value: 'Rocket.Chat Avenue',
   overwrite: true

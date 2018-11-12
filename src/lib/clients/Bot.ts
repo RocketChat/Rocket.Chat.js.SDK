@@ -1,6 +1,7 @@
 import { logger } from '../log'
-import { ISocket, IDriver } from '../drivers'
+import { IDriver } from '../drivers'
 import Rocketchat from './Rocketchat'
+import mem from 'mem'
 import {
 	ISocketOptions,
 	IRespondOptions,
@@ -8,9 +9,9 @@ import {
 	IMessageCallback,
 	ISubscriptionEvent,
 	IMessage,
-	IMessageReceipt,
 	ISubscription,
-	ICredentials
+	ICredentials,
+	IMessageReceipt
 } from '../../interfaces'
 import { RID } from '../api/RocketChat'
 
@@ -23,9 +24,15 @@ export default class BotClient extends Rocketchat {
   joinedIds: string[] = []
   messages: ISubscription | null = null
 
-  constructor ({ integrationId, ...config }: any) {
-    super(config)
+  constructor ({ allPublic = false, integrationId, cachedMethods = ['channelInfo','privateInfo','getRoomIdByNameOrId', 'getRoomId', 'getRoomName','getRoomNameById','getDirectMessageRoomId' ], ...config }: any) {
+    super({ ...config, allPublic })
     this.integrationId = integrationId
+
+    cachedMethods.forEach((name: string) => {
+      if ((this as any)[name]) {
+        (this as any)[name] = mem((this as any)[name].bind(this), { maxAge: 60 * 60 * 1000 }).bind(this)
+      }
+    })
   }
 
   async login (credentials: ICredentials) {
@@ -51,18 +58,22 @@ export default class BotClient extends Rocketchat {
 	 */
   async connect (options: ISocketOptions, callback?: ICallback): Promise<any> {
     try {
-      const result = await (await this.socket as ISocket).connect(options)
+      const result = await super.connect(options)
       if (callback) {
-        callback(null, result)
+        callback(null, (await this.socket))
       }
       return result
 
     } catch (error) {
       if (callback) {
-        callback(error, null)
-        return Promise.reject(error)
+        callback(error, this)
       }
+      return Promise.reject(error)
     }
+  }
+  async unsubscribeAll () {
+    delete this.messages
+    return super.unsubscribeAll()
   }
 /** Begin subscription to user's "global" message stream. Will only allow one. */
   async subscribeToMessages () {
@@ -82,13 +93,16 @@ export default class BotClient extends Rocketchat {
  *  - Second argument is the changed message
  *  - Third argument is additional attributes, such as `roomType`
  */
-  async reactToMessages (callback: IMessageCallback) {
+  async reactToMessages (callback: IMessageCallback, debug?: string) {
     const handler = (e: ISubscriptionEvent) => {
+
       try {
         const message: IMessage = e.fields.args[0]
+
         if (!message || !message._id) {
           callback(new Error('Message handler fired on event without message or meta data'))
         } else {
+
           callback(null, message, {} as any)
         }
       } catch (err) {
@@ -97,10 +111,8 @@ export default class BotClient extends Rocketchat {
       }
     }
     this.messages = await this.subscribeToMessages()
-
     this.messages.onEvent(handler)
-
-    this.logger.info(`[driver] Added event handler for ${this.messages.name} subscription`)
+    // this.logger.info(`[driver] Added event handler for ${this.messages.name} subscription`)
   }
 /**
  * Applies `reactToMessages` with some filtering of messages based on config.
@@ -127,14 +139,12 @@ export default class BotClient extends Rocketchat {
         this.logger.error(`[driver] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
       }
     }
-
-    this.lastReadTime = new Date() // init before any message read
     return this.reactToMessages(async (err, message, meta) => {
       if (err) {
         logger.error(`[driver] Unable to receive: ${err.message}`)
         return callback(err) // bubble errors back to adapter
       }
-      if (typeof message === 'undefined' || typeof meta === 'undefined') {
+      if (typeof message === 'undefined' /*|| typeof meta === 'undefined'*/) {
         logger.error(`[driver] Message or meta undefined`)
         return callback(err)
       }
@@ -143,59 +153,62 @@ export default class BotClient extends Rocketchat {
       if (message.u && message.u._id === this.userId) return
 
 			// Ignore DMs unless configured not to
-      const isDM = meta.roomType === 'd' || true
-      if (isDM && !config.dm) return
+      try {
 
-			// Ignore Livechat unless configured not to
-      const isLC = meta.roomType === 'l'
+        const room = await this.rooms.info({ rid: message.rid })
 
-      if (isLC && !config.livechat) return
+        const isDM = room.t === 'd'
+        if (isDM && !config.dm) return
+
+				// Ignore Livechat unless configured not to
+        const isLC = room.t === 'l'
+
+        if (isLC && !config.livechat) return
+      } catch (error) {
+        console.log(error)
+      }
 
 			// Ignore messages in un-joined public rooms unless configured not to
-      if (!config.allPublic && !isDM && !meta.roomParticipant) return
+      // if (!config.allPublic && !isDM && !meta.roomParticipant) return
 
 			// Set current time for comparison to incoming
       let currentReadTime = (message.ts) ? new Date(message.ts.$date) : new Date()
 
 			// Ignore edited messages if configured to
-      if (!config.edited && typeof message.editedAt !== 'undefined') return
+      if (!config.edited && message.editedAt) return
 
 			// Ignore messages in stream that aren't new
-      if (currentReadTime <= this.lastReadTime) return
 
+      if (currentReadTime < this.lastReadTime) return
 			// At this point, message has passed checks and can be responded to
-      const username = (message.u) ? message.u.username : 'unknown'
-      this.logger.info(`[driver] Message ${message._id} from ${username}`)
+      // const username = (message.u) ? message.u.username : 'unknown'
+      // this.logger.info(`[driver] Message ${message._id} from ${username}`)
       this.lastReadTime = currentReadTime
+
       callback(null, message, meta)
     })
   }
 
 	/** Get ID for a room by name (or ID). */
-  getRoomId (name: string): Promise<RID> {
+  getRoomId (name: string): Promise < RID > {
     return this.getRoomIdByNameOrId(name)
   }
 
-/** Get name for a room by ID. */
-  getRoomName (rid: RID): Promise<string> {
-    return super.getRoomNameById(rid)
-  }
-
 	/** Join the bot into a room by its name or ID */
-  async joinRoom (room: string): Promise<RID> {
-    const roomId = await this.getRoomId(room)
-    const joinedIndex = this.joinedIds.indexOf(room)
+  async joinRoom ({ rid }: any): Promise < RID > {
+    const roomId = await this.getRoomId(rid)
+    const joinedIndex = this.joinedIds.indexOf(rid)
     if (joinedIndex !== -1) {
       logger.error(`[driver] Join room failed, already joined`)
       throw new Error(`[driver] Join room failed, already joined`)
     }
-    await super.joinRoom(roomId)
+    await super.joinRoom({ rid: roomId })
     this.joinedIds.push(roomId)
     return roomId
   }
 
 	/** Exit a room the bot has joined */
-  async leaveRoom (room: string): Promise<RID> {
+  async leaveRoom (room: string): Promise < RID > {
     let roomId = await this.getRoomId(room)
     let joinedIndex = this.joinedIds.indexOf(room)
     if (joinedIndex === -1) {
@@ -209,7 +222,7 @@ export default class BotClient extends Rocketchat {
 
 	/** Join a set of rooms by array of names or IDs */
   joinRooms (rooms: string[]): Promise < RID[] > {
-    return Promise.all(rooms.map((rid) => this.joinRoom(rid)))
+    return Promise.all(rooms.map((rid) => this.joinRoom({ rid })))
   }
 	/**
 	 * Prepare and send string/s to specified room ID.
@@ -220,20 +233,20 @@ export default class BotClient extends Rocketchat {
 	 *       Solution would probably be to always return an array, even for single
 	 *       send. This would be a breaking change, should hold until major version.
 	 */
-  sendToRoomId (content: string | string[] | IMessage, roomId: string): Promise < IMessageReceipt[] | IMessageReceipt > {
+  sendToRoomId (content: IMessage | string | string[], roomId: string): Promise<IMessageReceipt[] | IMessageReceipt > {
     if (Array.isArray(content)) {
       return Promise.all(content.map((text) => {
-        return this.sendMessage(this.prepareMessage(text, roomId)) as Promise<IMessageReceipt>
+        return this.sendMessage(text, roomId)
       }))
     }
-    return this.sendMessage(this.prepareMessage(content, roomId)) as Promise<IMessageReceipt>
+    return this.sendMessage(content, roomId)
   }
 	/**
 	 * Prepare and send string/s to specified room name (or ID).
 	 * @param content Accepts message text string or array of strings.
 	 * @param room    A name (or ID) to resolve as ID to use in send.
 	 */
-  sendToRoom (content: string | string[] | IMessage, room: string): Promise < IMessageReceipt[] | IMessageReceipt > {
+  sendToRoom (content: IMessage | string | string[], room: string): Promise<IMessageReceipt[] | IMessageReceipt > {
     return this.getRoomId(room)
 		.then((roomId) => this.sendToRoomId(content, roomId))
   }
@@ -243,7 +256,7 @@ export default class BotClient extends Rocketchat {
 	 * @param content   Accepts message text string or array of strings.
 	 * @param username  Name to create (or get) DM for room ID to use in send.
 	 */
-  sendDirectToUser (content: string | string[] | IMessage, username: string): Promise < IMessageReceipt[] | IMessageReceipt > {
+  sendDirectToUser (content: IMessage | string | string[], username: string): Promise<IMessageReceipt[] | IMessageReceipt > {
     return this.getDirectMessageRoomId(username)
 		.then((rid) => this.sendToRoomId(content, rid))
   }
@@ -252,13 +265,9 @@ export default class BotClient extends Rocketchat {
 	 * Will create a DM (with the bot) if it doesn't exist already.
 	 * @todo test why create resolves with object instead of simply ID
 	 */
-  getDirectMessageRoomId (username: string): Promise <RID> {
+  getDirectMessageRoomId (username: string): Promise < RID > {
     return this.createDirectMessage(username).then((DM: any) => {
       return DM._id
     })
-  }
-
-  getRoomNameById (rid: string) {
-    return this.getRoomName(rid)
   }
 }

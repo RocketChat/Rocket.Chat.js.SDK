@@ -5,12 +5,12 @@ import {
   IMessageUpdateAPI,
   IMessageResultAPI,
   INewUserAPI,
-  IUserResultAPI,
   IRoomResultAPI,
   IChannelResultAPI,
   IGroupResultAPI,
   IHistoryAPI,
-  IMessageReceipt
+  IMessageReceipt,
+	IUserAPI
 } from '../interfaces'
 
 const api = new ApiBase({})
@@ -21,23 +21,22 @@ export const testPrivateName = 'p-tests'
 
 /** Get information about a user */
 export async function userInfo (username: string) {
-  return (await api.get('users.info', { username }, true) as IUserResultAPI)
+  return (await api.get('users.info', { username }, true) as IUserAPI)
 }
 
 /** Create a user and catch the error if they exist already */
 export async function createUser (user: INewUserAPI) {
-  const result: IUserResultAPI = await api.post('users.create', user, true, /already in use/i)
-  return result
+  return (await api.post('users.create', user, true, /already in use/i)) as IUserAPI
 }
 
 /** Get information about a channel */
 export async function channelInfo (query: { roomName?: string, roomId?: string }) {
-  return (await api.get('channels.info', query, true) as IChannelResultAPI)
+  return api.get('channels.info', query, true) as Promise<IChannelResultAPI>
 }
 
 /** Get information about a private group */
 export async function privateInfo (query: { roomName?: string, roomId?: string }) {
-  return (await api.get('groups.info', query, true) as IGroupResultAPI)
+  return api.get('groups.info', query, true) as Promise<IGroupResultAPI>
 }
 
 /** Get the last messages sent to a channel (in last 10 minutes) */
@@ -64,7 +63,7 @@ export async function createPrivate (
   members: string[] = [],
   readOnly: boolean = false
 ) {
-  return (await api.post('groups.create', { name, members, readOnly }, true) as IGroupResultAPI)
+  return (api.post('groups.create', { name, members, readOnly }, true))
 }
 
 /** Send message from mock user to channel for tests to listen and respond */
@@ -75,7 +74,7 @@ export async function createPrivate (
  */
 export async function sendFromUser (payload: any): Promise<IMessageResultAPI> {
   const user = await api.login({ username: mockUser.username, password: mockUser.password })
-  const endpoint = (payload.roomId && payload.roomId.indexOf(user.data.userId) !== -1)
+  const endpoint = (payload.roomId && payload.roomId.indexOf(user.userId) !== -1)
     ? 'dm.history'
     : 'channels.history'
   const roomId = (payload.roomId)
@@ -122,7 +121,7 @@ export async function inviteUser (room: { id?: string, name?: string } = {}) {
   const roomId = (room.id)
     ? room.id
     : (await channelInfo({ roomName: room.name })).channel._id
-  return (await api.post('channels.invite', { userId: mockInfo.user._id, roomId }) as boolean)
+  return (await api.post('channels.invite', { userId: mockInfo._id, roomId }) as boolean)
 }
 
 /** @todo : Join user into room (enter) to generate `uj` message type. */
@@ -143,76 +142,61 @@ export async function setupDirectFromUser () {
 export async function setup () {
   console.log('\nPreparing instance for tests...')
   try {
-    // Verify API user can login
-    const loginInfo = await api.login(apiUser)
-    if (!loginInfo || loginInfo.status !== 'success') {
-      throw new Error(`API user (${apiUser.username}) could not login`)
-    } else {
-      console.log(`API user (${apiUser.username}) logged in`)
-    }
-
-    // Verify or create user for bot
-    let botInfo = await userInfo(botUser.username)
-    if (!botInfo || !botInfo.success) {
-      console.log(`Bot user (${botUser.username}) not found`)
-      botInfo = await createUser(botUser)
-      if (!botInfo.success) {
-        throw new Error(`Bot user (${botUser.username}) could not be created`)
-      } else {
-        console.log(`Bot user (${botUser.username}) created`)
-      }
-    } else {
-      console.log(`Bot user (${botUser.username}) exists`)
-    }
-
-    // Verify or create mock user for talking to bot
-    let mockInfo = await userInfo(mockUser.username)
-    if (!mockInfo || !mockInfo.success) {
-      console.log(`Mock user (${mockUser.username}) not found`)
-      mockInfo = await createUser(mockUser)
-      if (!mockInfo || mockInfo.success) {
-        throw new Error(`Mock user (${mockUser.username}) could not be created`)
-      } else {
-        console.log(`Mock user (${mockUser.username}) created`)
-      }
-    } else {
-      console.log(`Mock user (${mockUser.username}) exists`)
-    }
-
-    // Verify or create channel for tests
-    let testChannelInfo = await channelInfo({ roomName: testChannelName })
-    if (!testChannelInfo || !testChannelInfo.success) {
-      console.log(`Test channel (${testChannelName}) not found`)
-      testChannelInfo = await createChannel(testChannelName, [
-        apiUser.username, botUser.username, mockUser.username
-      ])
-      if (!testChannelInfo.success) {
-        throw new Error(`Test channel (${testChannelName}) could not be created`)
-      } else {
-        console.log(`Test channel (${testChannelName}) created`)
-      }
-    } else {
-      console.log(`Test channel (${testChannelName}) exists`)
-    }
-
-    // Verify or create private room for tests
-    let testPrivateInfo = await privateInfo({ roomName: testPrivateName })
-    if (!testPrivateInfo || !testPrivateInfo.success) {
-      console.log(`Test private room (${testPrivateName}) not found`)
-      testPrivateInfo = await createPrivate(testPrivateName, [
-        apiUser.username, botUser.username, mockUser.username
-      ])
-      if (!testPrivateInfo.success) {
-        throw new Error(`Test private room (${testPrivateName}) could not be created`)
-      } else {
-        console.log(`Test private room (${testPrivateName}) created`)
-      }
-    } else {
-      console.log(`Test private room (${testPrivateName}) exists`)
-    }
-
-    await api.logout()
-  } catch (e) {
-    throw e
+		// Verify API user can login
+    await api.login({ password: apiUser.password, username: apiUser.username })
+    console.log(`API user (${apiUser.username}) logged in`)
+  } catch (error) {
+    console.log(error, apiUser)
+    throw new Error(`API user (${apiUser.username}) could not login`)
   }
+
+  try {
+    const botInfo = await userInfo(botUser.username)
+    console.log(`API user (${botInfo.username}) exists`)
+  } catch (error) {
+    console.log(`Bot user (${botUser.username}) not found`)
+    const botInfo = await createUser(botUser)
+    // if (!botInfo.success) {
+    //   throw new Error(`Bot user (${botUser.username}) could not be created`)
+    // }
+    console.log(`Bot user (${botInfo.username}) created`)
+  }
+  try {
+		// Verify or create mock user for talking to bot
+    let mockInfo = await userInfo(mockUser.username)
+    console.log(`Mock user (${mockInfo.username}) exists`)
+  } catch (error) {
+    console.log(`Mock user (${mockUser.username}) not found`)
+    const mockInfo = await createUser(mockUser)
+    // if (!mockInfo || mockInfo.success) {
+    //   throw new Error(`Mock user (${mockUser.username}) could not be created`)
+    // }
+    console.log(`Mock user (${mockInfo.username}) created`)
+  }
+  try {
+		// Verify or create user for bot
+    // Verify or create channel for tests
+    await channelInfo({ roomName: testChannelName })
+    console.log(`Test channel (${testChannelName}) exists`)
+  } catch (e) {
+    console.log(`Test channel (${testChannelName}) not found`)
+    await createChannel(testChannelName, [
+      apiUser.username, botUser.username, mockUser.username
+    ])
+    // if (!testChannelInfo.success) {
+    //   throw new Error(`Test channel (${testChannelName}) could not be created`)
+    // }
+    console.log(`Test channel (${testChannelName}) created`)
+  }
+  try {
+    // Verify or create private room for tests
+    await privateInfo({ roomName: testPrivateName })
+    console.log(`Test private room (${testPrivateName}) exists`)
+  } catch (error) {
+    const testPrivateInfo = await createPrivate(testPrivateName, [
+      apiUser.username, botUser.username, mockUser.username
+    ])
+    console.log(`Test private room (${testPrivateInfo.name}) created`)
+  }
+  await api.logout()
 }

@@ -30,6 +30,7 @@ export interface ISocket {
 }
 
 export interface IDriver {
+  config: any
   login (credentials: ICredentials, args: any): Promise<any>
 
   subscribeRoom (rid: string, ...args: any[]): Promise<ISubscription[]>

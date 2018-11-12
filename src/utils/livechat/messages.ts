@@ -20,7 +20,7 @@ async function getVisitorToken () {
 
 async function getRoom (token: string) {
   console.log('\nPreparing room for tests...')
-  const { room } = await livechat.room({ token })
+  const { room } = await livechat.room()
   return room
 }
 
@@ -49,7 +49,7 @@ Load Livechat Messages \`livechat.loadMessages()\`:
 ${JSON.stringify(await livechat.loadMessages(rid, { token }), null, '\t')}
 
 Delete Livechat Message \`livechat.deleteMessage()\`:
-${JSON.stringify(await livechat.deleteMessage(_id, { token, rid }), null, '\t')}
+${JSON.stringify(await livechat.deleteMessage(_id, { rid }), null, '\t')}
 
 Send Livechat Offline Message \`livechat.sendOfflineMessage()\`:
 ${JSON.stringify(await livechat.sendOfflineMessage(mockOfflineMessage), null, '\t')}

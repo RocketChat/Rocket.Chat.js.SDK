@@ -8,19 +8,19 @@ import { ILogger } from '../interfaces'
 /** Temp logging, should override form adapter's log */
 class InternalLog implements ILogger {
   debug (...args: any[]) {
-    console.log(...args)
+    // console.log(...args)
   }
   info (...args: any[]) {
-    console.log(...args)
+    // console.log(...args)
   }
   warning (...args: any[]) {
-    console.warn(...args)
+    // console.warn(...args)
   }
   warn (...args: any[]) { // legacy method
     return this.warning(...args)
   }
   error (...args: any[]) {
-    console.error(...args)
+    // console.error(...args)
   }
 }
 

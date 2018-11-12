@@ -9,6 +9,15 @@ import { EventEmitter } from 'tiny-events'
 import { logger as Logger } from '../log'
 import { ISocket, IDriver } from './index'
 
+EventEmitter.prototype.removeAllListeners = function (event?: string | any): any {
+  if (event) {
+    this._listeners[event] = []
+  } else {
+    this._listeners = {}
+  }
+  return [] as any
+}
+
 import {
   ISocketOptions,
   ISocketMessageHandler,
@@ -30,7 +39,7 @@ import {
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
-/** Websocket handler class, manages connections and subscriptions */
+/** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends EventEmitter {
   sent = 0
   host: string
@@ -52,7 +61,7 @@ export class Socket extends EventEmitter {
   ) {
     super()
     this.config = {
-      host: options.host || 'localhost:3000',
+      host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
       reopen: options.reopen || console.log,
       ping: options.timeout || 30000
@@ -86,6 +95,7 @@ export class Socket extends EventEmitter {
         connection = new WebSocket(this.host)
         connection.onerror = reject
       } catch (err) {
+        console.log(err)
         return reject(err)
       }
       this.connection = connection
@@ -111,9 +121,18 @@ export class Socket extends EventEmitter {
 
   /** Emit close event so it can be used for promise resolve in close() */
   onClose (e: any) {
-    this.logger.info(`[ddp] Close (${e.code}) ${e.reason}`)
-    this.emit('close', e)
-    if (e.code !== 1000) return this.reopen()
+    try {
+      this.emit('close', e)
+      if (e.code !== 1000) {
+        return this.reopen()
+      } else {
+        delete this.connection
+      }
+      this.logger.info(`[ddp] Close (${e.code}) ${e.reason}`)
+
+    } catch (error) {
+      console.log(error)
+    }
   }
 
   /**
@@ -155,14 +174,16 @@ export class Socket extends EventEmitter {
     if (this.connected) {
       await this.unsubscribeAll()
       await new Promise((resolve) => {
-        this.connection!.close(1000, 'disconnect')
-        this.once('close', () => {
-          delete this.connection
-          resolve()
-        })
+        if (this.connection) {
+          this.once('close', resolve)
+          this.once('close', resolve)
+          this.connection.close(1000, 'disconnect')
+          return
+        }
       })
-        .catch(() => this.close())
+      .catch(this.logger.error)
     }
+    return Promise.resolve()
   }
 
   /** Clear connection and try to connect again. */
@@ -178,7 +199,7 @@ export class Socket extends EventEmitter {
 
   /** Check if websocket connected and ready. */
   get connected () {
-    return (
+    return !!(
       this.connection &&
       this.connection.readyState === 1 &&
       this.alive()
@@ -307,7 +328,7 @@ export class Socket extends EventEmitter {
   logout () {
     this.resume = null
     return this.unsubscribeAll()
-      .then(() => this.call('logout'))
+			.then(() => this.call('logout'))
   }
 
   /** Register a callback to trigger on message events in subscription */
@@ -406,7 +427,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 	/** Array of joined room IDs (for reactive queries) */
   joinedIds: string[] = []
 
-  constructor ({ host, integrationId, config, logger = Logger, ...moreConfigs }: any) {
+  constructor ({ host = 'localhost:3000', integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
     super()
 
     this.config = {
@@ -434,8 +455,12 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 	 *    .then(() => console.log('connected'))
 	 *    .catch((err) => console.error(err))
 	 */
-  connect (): Promise<any> {
-    const config: ISocketOptions = { ...this.config } // override defaults
+  connect (c: any = {}): Promise<any> {
+    if (this.connected) {
+      return Promise.resolve(this)
+    }
+    const config: ISocketOptions = { ...this.config, ...c } // override defaults
+
     return new Promise((resolve, reject) => {
       this.logger.info('[driver] Connecting', config)
       this.subscriptions = this.ddp.subscriptions
@@ -451,7 +476,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
         this.logger.info(`[driver] Timeout (${config.timeout})`)
         const err = new Error('Socket connection timeout')
         cancelled = true
-        this.removeAllListeners('connected')
+        this.ddp.removeAllListeners('connected')
         reject(err)
       }, config.timeout)
 
@@ -468,6 +493,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     })
   }
 
+  get connected (): boolean {
+    return !!this.ddp.connected
+  }
+
   disconnect (): Promise<any> {
     return this.ddp.close()
   }
@@ -477,7 +506,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
   }
 
-  subscribeNotifyAll (): Promise<any> {
+  subscribeNotifyAll (): Promise< any> {
     const topic = 'stream-notify-all'
     return Promise.all([
       'roles-change',
@@ -532,6 +561,12 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     this.userId = login.id
     return login
   }
+  async logout () {
+    if (this.ddp && this.ddp.connected) {
+      await this.ddp.logout()
+    }
+
+  }
 	/** Unsubscribe from Meteor stream. Proxy for socket unsubscribe. */
   unsubscribe (subscription: ISubscription) {
     return this.ddp.unsubscribe(subscription.id)
@@ -546,7 +581,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     this.ddp.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(message))
   }
 
-  onTyping (cb: ICallback): Promise<any> {
+  onTyping (cb: ICallback): Promise<any > {
     return this.ddp.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
       cb(username, isTyping)
     }) as any

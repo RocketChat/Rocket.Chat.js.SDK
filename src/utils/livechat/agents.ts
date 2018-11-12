@@ -18,7 +18,7 @@ async function getVisitorToken () {
 
 async function getRoom (token: string) {
   console.log('\nPreparing room for tests...')
-  const { room } = await livechat.room({ token })
+  const { room } = await livechat.room()
   return room
 }
 
@@ -29,13 +29,11 @@ async function agent () {
   const department = settings.department
 
   console.log(`
+		Get Livechat Agent \`livechat.agent()\`:
+		${JSON.stringify(await livechat.agent({ rid, token }), null, '\t')}
 
-Get Livechat Agent \`livechat.agent()\`:
-${JSON.stringify(await livechat.agent({ rid, token }), null, '\t')}
-
-Get Livechat Next Agent \`livechat.nextAgent()\`:
-${JSON.stringify(await livechat.nextAgent({ token, department }), null, '\t')}
-
+		Get Livechat Next Agent \`livechat.nextAgent()\`:
+		${JSON.stringify(await livechat.nextAgent({ token, department }), null, '\t')}
   `)
 }
 

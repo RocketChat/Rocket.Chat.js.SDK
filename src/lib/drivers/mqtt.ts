@@ -1,34 +1,25 @@
-import ClientRest from '../api/RocketChat'
 import { Client } from 'paho-mqtt/src/paho-mqtt'
 import { EventEmitter } from 'tiny-events'
 
-import { Message } from '../message'
 import { logger as Logger } from '../log'
 import { ISocket, IDriver } from './index'
-
+import msgpack from 'msgpack-lite'
 import {
 	ILogger,
 	ISocketOptions,
-	IRespondOptions,
 	ICallback,
-	IMessageCallback,
-	ISubscriptionEvent,
-	IMessage,
-	IMessageMeta,
-	IMessageReceipt,
 	ISubscription,
-	ICredentials,
-	ILoginResult
+	ICredentials
 } from '../../interfaces'
 
 export class MQTTDriver extends EventEmitter implements ISocket, IDriver {
   logger: ILogger
   config: ISocketOptions
   socket: any
-  constructor ({ host = 'https://iot.eclipse.org', path = '/mqtt', integrationId, config, logger = Logger, ...moreConfigs }: any) {
+  constructor ({ host = 'localhost', path = '/', integrationId, config, logger = Logger, ...moreConfigs }: any) {
     super()
-    host = 'http://test.mosquitto.org'
-    const [, _host = host, , port = 8080] = new RegExp('(.*?)(:([0-9]+))?$').exec(host || 'localhost:3000') || []
+    host = 'localhost'
+    const [, _host = host, , port = 8081] = new RegExp('(.*?)(:([0-9]+))?$').exec(host || 'localhost:3000') || []
     this.config = {
       ...config,
       ...moreConfigs,
@@ -48,16 +39,16 @@ export class MQTTDriver extends EventEmitter implements ISocket, IDriver {
     } else {
       this.socket = new Client((this.config.host || '').replace('http://', '').replace('ws://', ''), Number(port), path, 'clientId')
     }
-    this.socket.onMessageArrived = ({ destinationName, payloadString }: any) => {
+    this.socket.onMessageArrived = ({ destinationName, payloadBytes }: any) => {
       if (/room-message/.test(destinationName)) {
-        this.emit('message', { topic: destinationName, message: payloadString })
+        this.emit('message', { topic: destinationName, message: msgpack.decode(payloadBytes) })
       }
     }
   }
 
   connect (options: ISocketOptions): Promise<any> {
     return new Promise((resolve, reject) => {
-      this.socket.connect({ onSuccess: resolve, mqttVersion: 3, onFailure: reject, useSSL: /https/.test(this.config.host || '') })
+      this.socket.connect({ userName: 'livechat-guest', password: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ2Ijp7InZpc2l0b3JUb2tlbiI6ImFqamVvY2N5dXhweXVlOTg3YzJ0NnMifSwidXNlciI6eyJ2Ijp7InZpc2l0b3JUb2tlbiI6ImFqamVvY2N5dXhweXVlOTg3YzJ0NnMifX0sIm5hbWUiOiJKb2huIERvZSIsImlhdCI6MTUxNjIzOTAyMn0.RTQz72NTgI6qWgQMCNHHaSNS13sDK3cz--ss2_5vAz8'	, onSuccess: resolve, onFailure: reject, useSSL: /https/.test(this.config.host || '') })
     })
   }
   disconnect (): Promise<any> {
@@ -109,13 +100,13 @@ export class MQTTDriver extends EventEmitter implements ISocket, IDriver {
   }
 	// usertyping room-messages deleted messages
   subscribeRoom (rid: string, ...args: any[]): Promise < ISubscription[] > {
-    return this.subscribe(`room-messages/${rid}`, { qos: 1 }) as any
+    return this.subscribe(`room-messages/${rid}`, { qos: 0 }) as any
   }
 
   onMessage (cb: ICallback): void {
     this.on('message', ({ topic, message }: any) => {
       if (/room-messages/.test(topic)) {
-        cb(message as any)// TODO apply msgpack
+        cb(message)// TODO apply msgpack
       }
     })
   }

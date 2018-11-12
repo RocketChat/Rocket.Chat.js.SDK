@@ -16,17 +16,17 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   userId: string = ''
   logger: ILogger = Logger
   socket: Promise<ISocket | IDriver> = Promise.resolve() as any
-  constructor ({ allPublic, rooms, integrationId, protocol, ...config }: any) {
-    super(config)
+  constructor ({ logger, allPublic, rooms, integrationId, protocol, ...config }: any) {
+    super({ logger, ...config })
     this.import(protocol, config)
   }
   import (protocol: Protocols, config: any) {
     switch (protocol) {
       case Protocols.MQTT:
-        this.socket = import(/* webpackChunkName: 'mqtttest' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver(config))
+        this.socket = import(/* webpackChunkName: 'mqtttest' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver({ logger: this.logger, ...config }))
         break
       case Protocols.DDP:
-        this.socket = import(/* webpackChunkName: 'ddptest' */ '../drivers/ddp').then(({ DDPDriver }) => new DDPDriver(config))
+        this.socket = import(/* webpackChunkName: 'ddptest' */ '../drivers/ddp').then(({ DDPDriver }) => new DDPDriver({ logger: this.logger, ...config }))
         break
       default:
         throw new Error(`Invalid Protocol: ${protocol}, valids: ${Object.keys(Protocols).join()}`)

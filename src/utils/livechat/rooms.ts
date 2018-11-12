@@ -17,7 +17,7 @@ async function getVisitorToken () {
 
 async function getRoom (token: string) {
   console.log('\nPreparing room for tests...')
-  const { room } = await livechat.room({ token })
+  const { room } = await livechat.room()
   return room
 }
 
@@ -36,19 +36,19 @@ Demo of API livechat query helpers
 ${JSON.stringify(room, null, '\t')}
 
 Transfer Livechat \`livechat.tranferChat()\`:
-${JSON.stringify(await livechat.transferChat({ rid, token, department }), null, '\t')}
+${JSON.stringify(await livechat.transferChat({ rid, department }), null, '\t')}
 
 Livechat Survey \`livechat.chatSurvey()\`:
-${JSON.stringify(await livechat.chatSurvey({ rid, token, data: mockSurvey }), null, '\t')}
+${JSON.stringify(await livechat.chatSurvey({ rid, data: mockSurvey }), null, '\t')}
 
 Request Livechat VideoCall \`livechat.videoCall()\`:
-${JSON.stringify(await livechat.videoCall({ rid, token }), null, '\t')}
+${JSON.stringify(await livechat.videoCall({ rid }), null, '\t')}
 
 Close Livechat Room \`livechat.closeChat()\`:
-${JSON.stringify(await livechat.closeChat({ rid, token }), null, '\t')}
+${JSON.stringify(await livechat.closeChat({ rid }), null, '\t')}
 
 Request Livechat Transcript \`livechat.requestTranscript()\`:
-${JSON.stringify(await livechat.requestTranscript(email, { rid, token }), null, '\t')}
+${JSON.stringify(await livechat.requestTranscript(email, { rid }), null, '\t')}
 
   `)
 }

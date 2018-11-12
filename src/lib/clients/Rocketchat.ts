@@ -24,7 +24,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     }
   }
 
-  async connect (options: ISocketOptions, callback?: ICallback): Promise<any> { return (await this.socket as ISocket).connect(options) }
+  async connect (options: ISocketOptions): Promise<any> { return (await this.socket as ISocket).connect(options) }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
   async subscribe (topic: string, ...args: any[]): Promise<ISubscription> { return (await this.socket as ISocket).subscribe(topic, ...args) }
   async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
@@ -33,7 +33,9 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   async subscribeNotifyAll (): Promise<any> { return (await this.socket as IDriver).subscribeNotifyAll() }
   async subscribeLoggedNotify (): Promise<any> { return (await this.socket as IDriver).subscribeLoggedNotify() }
   async subscribeNotifyUser (): Promise<any> { return (await this.socket as IDriver).subscribeNotifyUser() }
-
+  get url () {
+    return this.socket.then((socket) => (socket as IDriver).config.host)
+  }
   async onMessage (cb: ICallback): Promise<any> {
     return (await this.socket as IDriver).onMessage(cb)
   }
