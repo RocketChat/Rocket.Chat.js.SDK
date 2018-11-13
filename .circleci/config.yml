@@ -1,0 +1,73 @@
+version: 2
+
+defaults: &defaults
+  working_directory: ~/repo
+  docker:
+    - image: circleci/node:10.13
+
+jobs:
+  build:
+    <<: *defaults
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+          - v1-dependencies-
+	  # fallback to using the latest cache if no exact match is found
+          - v1-dependencies-
+
+      - run: npm install
+
+      # TODO: enable tests
+      # - run:
+      #     name: Run tests
+      #     command: npm test
+
+      - run:
+        name: Build
+        command: |
+          npm run builddist
+          npm run publish:prepare
+
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-
+
+      - persist_to_workspace:
+          root: ~/repo
+          paths:
+            - dist
+
+  deploy:
+    <<: *defaults
+    steps:
+      - attach_workspace:
+          at: ~/repo
+      - run:
+          name: Authenticate with registry
+          command: echo "//registry.npmjs.org/:_authToken=$npm_TOKEN" > ~/repo/dist/.npmrc
+      - run:
+          name: Publish package
+          command: |
+            cd dist
+            npm publish
+
+workflows:
+  version: 2
+  test-deploy:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-(rc|beta|alpha)\.[0-9]+)?$/
+      - deploy:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-(rc|beta|alpha)\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+

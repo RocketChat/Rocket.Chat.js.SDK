@@ -2,8 +2,8 @@
   "name": "@rocket.chat/sdk",
   "version": "1.0.0-alpha.3",
   "description": "Node.js SDK for Rocket.Chat. Application interface for server methods and message streams.",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": "https://github.com/RocketChat/Rocket.Chat.js.SDK.git",
   "author": "Tim Kinnane <tim.kinnane@rocket.chat>",
   "contributors": [
@@ -40,7 +40,8 @@
     "docs": "rimraf ./docs && typedoc --options ./typedoc.json ./src/lib",
     "prebuild": "npm run test",
     "build": "rimraf ./dist/* && tsc && webpack && npm run test:package",
-    "builddist": "rimraf ./dist/* && tsc"
+    "builddist": "rimraf ./dist/* && tsc",
+    "publish:prepare": "node .scripts/release.js"
   },
   "husky": {
     "hooks": {
