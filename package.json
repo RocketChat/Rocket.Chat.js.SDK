@@ -3,7 +3,8 @@
   "version": "1.0.0-alpha.5",
   "description": "Node.js SDK for Rocket.Chat. Application interface for server methods and message streams.",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+	"types": "dist/index.d.ts",
+	"sideEffects": false,
   "repository": "https://github.com/RocketChat/Rocket.Chat.js.SDK.git",
   "author": "Tim Kinnane <tim.kinnane@rocket.chat>",
   "contributors": [
