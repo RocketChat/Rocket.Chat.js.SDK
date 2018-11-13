@@ -62,7 +62,9 @@ describe('Bot Driver', () => {
   })
 
   describe('.reactToMessages', () => {
-    afterEach(() => botuser.unsubscribeAll())
+    afterEach(() => {
+      botuser.unsubscribeAll()
+    })
     it('calls callback on every subscription update', async () => {
       const callback = sinon.spy()
       botuser.reactToMessages(callback)

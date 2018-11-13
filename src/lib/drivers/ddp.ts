@@ -60,21 +60,22 @@ export class Socket extends EventEmitter {
     public resume: ILoginResult | null = null
   ) {
     super()
+    this.logger = options.logger || Logger
     this.config = {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
-      reopen: options.reopen || console.log,
+      reopen: options.reopen || this.logger.debug,
       ping: options.timeout || 30000
     }
 
-    this.logger = options.logger || Logger
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
 
-    // Echo call results, emitting ID of DDP call for more specific listeners
-    this.on('message.result', (data: any) => {
-      const { id, result, error } = data
-      this.emit(id, { id, result, error })
+    this.on('ping', () => {
+      this.send({ msg: 'pong' }).then(this.logger.debug, this.logger.error)
     })
+
+    this.on('result', (data: any) => this.emit(data.id, { id: data.id, result: data.result, error: data.error }))
+    this.on('ready', (data: any) => this.emit(data.subs[0], data))
   }
 
   /**
@@ -95,7 +96,7 @@ export class Socket extends EventEmitter {
         connection = new WebSocket(this.host)
         connection.onerror = reject
       } catch (err) {
-        console.log(err)
+        this.logger.error(err)
         return reject(err)
       }
       this.connection = connection
@@ -111,7 +112,7 @@ export class Socket extends EventEmitter {
       msg: 'connect',
       version: '1',
       support: ['1', 'pre2', 'pre1']
-    }, 'connected')
+    })
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
@@ -131,7 +132,7 @@ export class Socket extends EventEmitter {
       this.logger.info(`[ddp] Close (${e.code}) ${e.reason}`)
 
     } catch (error) {
-      console.log(error)
+      this.logger.error(error)
     }
   }
 
@@ -142,31 +143,14 @@ export class Socket extends EventEmitter {
    * All collection events are emitted with their `msg` as the event name.
    */
   onMessage (e: any) {
+    this.lastPing = Date.now()
+    this.ping()
     const data = (e.data) ? JSON.parse(e.data) : undefined
-    // console.log(data) // 👈  very useful for debugging missing responses
+    this.logger.debug(data) // 👈  very useful for debugging missing responses
     if (!data) return this.logger.error(`[ddp] JSON parse error: ${e.message}`)
     this.logger.debug(`[ddp] messages received: ${e.data}`)
     if (data.collection) this.emit(data.collection, data)
-    const handlers = []
-    const matcher = (handler: ISocketMessageHandler) => {
-      return ((
-        (data.collection && handler.collection === data.collection)
-      ) || (
-        (data.msg && handler.msg === data.msg) &&
-        (!handler.id || !data.id || handler.id === data.id)
-      ))
-    }
-    // tslint:disable-next-line
-    for (let i = 0; i < this.handlers.length; i++) {
-      if (matcher(this.handlers[i])) {
-        handlers.push(this.handlers[i])
-        if (!this.handlers[i].persist) {
-          this.handlers.splice(i, 1)
-          i--
-        }
-      }
-    }
-    for (let handler of handlers) handler.callback(data)
+    if (data.msg) this.emit(data.msg, data)
   }
 
   /** Disconnect the DDP from server and clear all subscriptions. */
@@ -175,7 +159,6 @@ export class Socket extends EventEmitter {
       await this.unsubscribeAll()
       await new Promise((resolve) => {
         if (this.connection) {
-          this.once('close', resolve)
           this.once('close', resolve)
           this.connection.close(1000, 'disconnect')
           return
@@ -223,42 +206,40 @@ export class Socket extends EventEmitter {
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
   async send (
-      obj: any,
-      msg: boolean | string = 'result',
-      errorMsg?: string
+      obj: any
     ): Promise<any> {
     return new Promise((resolve, reject) => {
+      if (!this.connection) throw new Error('[ddp] sending without open connection')
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
-      const data = JSON.stringify({ ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) })
-      if (!this.connection) throw new Error('[ddp] sending without open connection')
-      this.logger.debug(`[ddp] sending message: ${data}`)
-      this.connection.send(data)
-      if (typeof msg === 'string') {
-        this.handlers.push({ id, msg, callback: (data) => (data.error)
-          ? reject(data.error)
-          : resolve(data)
-        })
+      const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
+      const stringdata = JSON.stringify(data)
+      this.logger.debug(`[ddp] sending message: ${stringdata}`)
+      this.connection.send(stringdata)
+
+      this.once('disconnected', reject)
+      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
+      if (!listener) {
+        return resolve()
       }
-      if (errorMsg) {
-        this.handlers.push({ id, msg: errorMsg, callback: reject })
-      }
-      this.once('close', reject)
+      this.once(listener, (result: any) => {
+        this.off('disconnect', reject)
+        return (result.error ? reject(result.error) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+      })
     })
   }
 
   /** Send ping, record time, re-open if nothing comes back, repeat */
   async ping () {
+    this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
-      this.send({ msg: 'ping' }, 'pong')
+      this.send({ msg: 'ping' })
         .then(() => {
-          this.lastPing = Date.now()
           return this.ping()
         })
         .catch(() => this.reopen())
     }, this.config.ping)
   }
-
   /** Check if ping-pong to server is within tolerance of 1 missed ping */
   alive () {
     if (!this.lastPing) return false
@@ -332,8 +313,8 @@ export class Socket extends EventEmitter {
   }
 
   /** Register a callback to trigger on message events in subscription */
-  onEvent (id: string, collection: string, callback: ISocketMessageCallback) {
-    this.handlers.push({ id, collection, persist: true, callback })
+  onEvent (id: string, callback: ISocketMessageCallback) {
+    this.on(id, callback)
   }
 
   /**
@@ -342,13 +323,13 @@ export class Socket extends EventEmitter {
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
-  subscribe (name: string, params: any[], callback?: ISocketMessageCallback) {
+  subscribe (name: string, params: any[], callback ?: ISocketMessageCallback) {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
-    return this.send({ msg: 'sub', name, params }, 'ready')
+    return this.send({ msg: 'sub', name, params })
       .then((result) => {
         const id = (result.subs) ? result.subs[0] : undefined
         const unsubscribe = this.unsubscribe.bind(this, id)
-        const onEvent = this.onEvent.bind(this, id, name)
+        const onEvent = this.onEvent.bind(this, name)
         const subscription = { id, name, params, unsubscribe, onEvent }
         if (callback) subscription.onEvent(callback)
         this.subscriptions[id] = subscription
@@ -373,7 +354,7 @@ export class Socket extends EventEmitter {
   unsubscribe (id: any) {
     if (!this.subscriptions[id]) return Promise.reject(id)
     delete this.subscriptions[id]
-    return this.send({ msg: 'unsub', id }, 'result', 'nosub')
+    return this.send({ msg: 'unsub', id })
       .then((data: any) => data.result || data.subs)
       .catch((err) => {
         if (!err.msg && err.msg !== 'nosub') {

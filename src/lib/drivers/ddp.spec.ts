@@ -39,8 +39,7 @@ describe('[ddp]', () => {
   describe('.send', () => {
     it('sends websocket message to host', async () => {
       await socket.open()
-      const sent = await socket.send({
-        msg: 'ping' }, 'pong')
+      const sent = await socket.send({ msg: 'ping' })
       expect(sent).to.have.keys(['msg'])
     })
     it('good async methods resolve with data', async () => {
@@ -122,9 +121,12 @@ describe('[ddp]', () => {
         await socket.login(botUser)
         const name = 'stream-room-messages'
         const room = '__my_messages__'
-        await socket.subscribe(name, [room, true])
+        await socket.subscribe(name, [room, true], (data: any) => {
+          expect(data.msg).to.equal('changed')
+          resolve()
+        })
 
-        socket.once('stream-room-messages', (data: any) => {
+        socket.once(name, (data: any) => {
           expect(data.msg).to.equal('changed')
           resolve()
         })
