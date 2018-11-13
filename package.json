@@ -1,9 +1,9 @@
 {
   "name": "@rocket.chat/sdk",
-  "version": "0.2.9",
+  "version": "1.0.0-alpha.3",
   "description": "Node.js SDK for Rocket.Chat. Application interface for server methods and message streams.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "index.js",
+  "types": "index.d.ts",
   "repository": "https://github.com/RocketChat/Rocket.Chat.js.SDK.git",
   "author": "Tim Kinnane <tim.kinnane@rocket.chat>",
   "contributors": [
@@ -15,7 +15,7 @@
     "Diego Mello (https://github.com/diegolmello)"
   ],
   "license": "MIT",
-  "private": false,
+  "private": true,
   "keywords": [
     "adapter",
     "rocketchat",
@@ -24,9 +24,6 @@
     "messaging",
     "CUI",
     "typescript"
-  ],
-  "files": [
-    "dist"
   ],
   "engines": {
     "node": "> 8.0.0",
@@ -42,7 +39,8 @@
     "start": "ts-node ./src/utils/start",
     "docs": "rimraf ./docs && typedoc --options ./typedoc.json ./src/lib",
     "prebuild": "npm run test",
-    "build": "rimraf ./dist/* && tsc && webpack && npm run test:package"
+    "build": "rimraf ./dist/* && tsc && webpack && npm run test:package",
+    "builddist": "rimraf ./dist/* && tsc"
   },
   "husky": {
     "hooks": {
