@@ -17,7 +17,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   userId: string = ''
   logger: ILogger = Logger
   socket: Promise<ISocket | IDriver> = Promise.resolve() as any
-  constructor ({ logger, allPublic, rooms, integrationId, protocol, ...config }: any) {
+  constructor ({ logger, allPublic, rooms, integrationId, protocol = Protocols.DDP, ...config }: any) {
     super({ logger, ...config })
     this.import(protocol, config)
   }
@@ -44,11 +44,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   async onTyping (cb: ICallback): Promise<any> { return (await this.socket as IDriver).onTyping(cb) }
   async onAgentChange (rid: string, cb: ICallback) {
     await this.subscribe(this.livechatStream, rid)
-    this.on(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
-      if (type === 'agentData') {
-        return cb(data)
-      }
-    })
+    this.on(this.livechatStream, cb)
   }
   async subscribe (topic: string, eventName: string) {
     const { token } = this.credentials
