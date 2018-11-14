@@ -2,6 +2,7 @@ import { ISocket, IDriver, Protocols } from '../drivers'
 import ClientRest from '../api/RocketChat'
 import { ILogger, ISocketOptions, ICallback, ISubscription } from '../../interfaces'
 import { logger as Logger } from '../log'
+import { EventEmitter } from 'tiny-events'
 
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
@@ -26,6 +27,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
 
   async connect (options: ISocketOptions): Promise<any> { return (await this.socket as ISocket).connect(options) }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
+  async onStreamData (event: string, cb: ICallback): Promise<any> { return (await this.socket as ISocket).onStreamData(event, cb) }
   async subscribe (topic: string, ...args: any[]): Promise<ISubscription> { return (await this.socket as ISocket).subscribe(topic, ...args) }
   async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
   async unsubscribeAll (): Promise<any> { return (await this.socket as ISocket).unsubscribeAll() }

@@ -20,6 +20,8 @@ export interface ISocket {
   unsubscribe (subscription: ISubscription): Promise<ISocket>
   unsubscribeAll (): Promise<ISocket>
 
+  onStreamData (event: string, cb: ICallback): Promise<any>
+
   on (event: string, listener: Function): EventEmitter
   once (event: string, listener: Function): EventEmitter
   off (event?: string, listener?: Function): EventEmitter

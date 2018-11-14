@@ -55,4 +55,8 @@ export default class LivechatClient extends LivechatRest implements ISocket {
     const { token } = this.credentials
     return (await this.socket as IDriver).subscribeRoom(rid, { token, visitorToken: token })
   }
+
+  async onStreamData (event: string, cb: ICallback): Promise<any> {
+    return (await this.socket as ISocket).onStreamData(event, cb)
+  }
 }
