@@ -557,7 +557,9 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   unsubscribeAll (): Promise<any> {
     return this.ddp.unsubscribeAll()
   }
-
+  on (name: string, cb: ICallback) {
+    return this.ddp.on(name, cb)
+  }
   onMessage (cb: ICallback): void {
     this.ddp.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(this.ejsonMessage(message)))
   }

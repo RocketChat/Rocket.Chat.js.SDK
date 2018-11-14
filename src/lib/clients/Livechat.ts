@@ -13,6 +13,7 @@ import {
 } from '../../interfaces'
 
 export default class LivechatClient extends LivechatRest implements ISocket {
+  livechatStream: string = 'stream-livechat-room'
   userId: string = ''
   logger: ILogger = Logger
   socket: Promise<ISocket | IDriver> = Promise.resolve() as any
@@ -34,13 +35,28 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   }
   async connect (options: ISocketOptions, callback?: ICallback): Promise <any> { return (await this.socket as ISocket).connect(options) }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
-  async subscribe (topic: string, ...args: any[]): Promise<ISubscription> { return (await this.socket as ISocket) .subscribe(topic, args) }
   async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
   async unsubscribeAll (): Promise<any> { return (await this.socket as ISocket).unsubscribeAll() }
-  async subscribeRoom (rid: string, ...args: any[]): Promise<ISubscription[]> { return (await this.socket as IDriver).subscribeRoom(rid, ...args) }
   async subscribeNotifyAll (): Promise<any> { return (await this.socket as IDriver) .subscribeNotifyAll() }
   async subscribeLoggedNotify (): Promise<any> { return (await this.socket as IDriver) .subscribeLoggedNotify() }
   async subscribeNotifyUser (): Promise<any> { return (await this.socket as IDriver) .subscribeNotifyUser() }
   async onMessage (cb: ICallback): Promise<any> { return (await this.socket as IDriver).onMessage(cb) }
   async onTyping (cb: ICallback): Promise<any> { return (await this.socket as IDriver).onTyping(cb) }
+  async onAgentChange (rid: string, cb: ICallback) {
+    await this.subscribe(this.livechatStream, rid)
+    this.on(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
+      if (type === 'agentData') {
+        return cb(data)
+      }
+    })
+  }
+  async subscribe (topic: string, eventName: string) {
+    const { token } = this.credentials
+    return (await this.socket as ISocket).subscribe(topic, eventName, { token, visitorToken: token })
+  }
+
+  async subscribeRoom (rid: string) {
+    const { token } = this.credentials
+    return (await this.socket as IDriver).subscribeRoom(rid, { token, visitorToken: token })
+  }
 }
