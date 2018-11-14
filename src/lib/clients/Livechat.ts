@@ -44,7 +44,11 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   async onTyping (cb: ICallback): Promise<any> { return (await this.socket as IDriver).onTyping(cb) }
   async onAgentChange (rid: string, cb: ICallback) {
     await this.subscribe(this.livechatStream, rid)
-    this.on(this.livechatStream, cb)
+    this.onStreamData(this.livechatStream, ({ type, data }: any) => {
+      if (type === 'agentData') {
+        cb(data)
+      }
+    })
   }
   async subscribe (topic: string, eventName: string) {
     const { token } = this.credentials
