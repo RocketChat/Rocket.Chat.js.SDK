@@ -197,11 +197,12 @@ export async function setup () {
   // End of API setup usage
   await logout()
 
-  // Assign bot user as livechat agent
+  // Enable Livechat and assign bot as agent
   try {
     const socket = new Socket()
     await socket.open()
     await socket.login({ username: apiUser.username, password: apiUser.password })
+    await socket.call('saveSetting', 'Livechat_enabled', true)
     await socket.call('livechat:addAgent', botUser.username)
     console.log('Bot user assigned as livechat agent')
     await socket.close()
