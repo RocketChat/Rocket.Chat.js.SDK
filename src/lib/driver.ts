@@ -351,7 +351,6 @@ export async function respondToMessages (
   // public rooms, in which case it doesn't matter
   if (
     !config.allPublic &&
-    joinedIds.length === 0 &&
     config.rooms &&
     config.rooms.length > 0
   ) {
@@ -383,7 +382,8 @@ export async function respondToMessages (
     const isLC = meta.roomType === 'l'
     if (isLC && !config.livechat) return
 
-    console.log({ message, meta })
+    console.log({ meta })
+
     // Ignore messages in un-joined public rooms unless configured not to
     if (!config.allPublic && !isDM && !meta.roomParticipant) return
 
@@ -429,30 +429,34 @@ export function getDirectMessageRoomId (username: string): Promise<string> {
 /** Join the bot into a room by its name or ID */
 export async function joinRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
-  let joinedIndex = joinedIds.indexOf(room)
+  let joinedIndex = joinedIds.indexOf(roomId)
+  console.log({ joinedIds, room })
   if (joinedIndex !== -1) {
     logger.error(`[driver] Join room failed, already joined`)
   } else {
     await asyncCall('joinRoom', roomId)
+      .catch((err) => logger.error(`[driver] Join room failed, ${err.reason}`))
     joinedIds.push(roomId)
   }
 }
 
 /** Exit a room the bot has joined */
-export async function leaveRoom (room: string): Promise<void> {
+export async function leaveRoom (room: string) {
   let roomId = await getRoomId(room)
-  let joinedIndex = joinedIds.indexOf(room)
-  if (joinedIndex === -1) {
-    logger.error(`[driver] Leave room failed, bot has not joined ${room}`)
-  } else {
-    await asyncCall('leaveRoom', roomId)
-    delete joinedIds[joinedIndex]
-  }
+  let joinedIndex = joinedIds.indexOf(roomId)
+  if (joinedIndex === -1) delete joinedIds[joinedIndex]
+  return asyncCall('leaveRoom', roomId)
+    .catch((err) => logger.error(`[driver] Leave room failed, ${err.reason}`))
 }
 
 /** Join a set of rooms by array of names or IDs */
-export function joinRooms (rooms: string[]): Promise<void[]> {
+export function joinRooms (rooms: string[]) {
   return Promise.all(rooms.map((room) => joinRoom(room)))
+}
+
+/** Leave a set of rooms by array of names or IDs */
+export function leaveRooms (rooms: string[] = joinedIds) {
+  return Promise.all(rooms.map((room) => leaveRoom(room)))
 }
 
 /**

@@ -282,6 +282,7 @@ describe('driver', () => {
   })
   describe('.respondToMessages', () => {
     before(() => driver.login())
+    beforeEach(() => driver.leaveRooms(['general', tName]))
     it('joins rooms if not already joined', async () => {
       expect(driver.joinedIds).to.have.lengthOf(0)
       await driver.respondToMessages(() => null, { rooms: ['general', tName] })
@@ -291,6 +292,12 @@ describe('driver', () => {
       const callback = sinon.spy()
       await driver.respondToMessages(callback)
       await driver.sendToRoomId('SDK test `respondToMessages`', tId)
+      sinon.assert.notCalled(callback)
+    })
+    it('ignores messages in un-joined rooms', async () => {
+      const callback = sinon.spy()
+      await driver.respondToMessages(callback, { rooms: ['general'] })
+      await utils.sendFromUser({ text: 'SDK test `respondToMessages` 1' })
       sinon.assert.notCalled(callback)
     })
     it('fires callback on messages in joined rooms', async () => {
