@@ -244,8 +244,7 @@ export function login (credentials: ICredentials = {
   }
   return login
     .then((loggedInUser) => {
-      userId = loggedInUser.id
-      return loggedInUser.id
+      return loggedInUser
     })
     .catch((err: Error) => {
       logger.info('[login] Error:', err)

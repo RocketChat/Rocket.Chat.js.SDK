@@ -41,7 +41,7 @@ function getUrl (host: string) {
  * Prepend protocol (or put back if removed from env settings for driver)
  * Hard code endpoint prefix, because all syntax depends on this version
  */
-export const url = getUrl(host)
+export let url = getUrl(host)
 
 /** Initialize client */
 const client = axios.create({
@@ -49,7 +49,8 @@ const client = axios.create({
 })
 
 export function setBaseUrl (host: string) {
-  client.defaults.baseURL = getUrl(host)
+  url = getUrl(host)
+  client.defaults.baseURL = url
 }
 
 /** Convert payload data to query string for GET requests */
@@ -127,7 +128,8 @@ export async function post (
     logger.debug('[API] POST result:', result)
     return result.data
   } catch (err) {
-    throw new Error(`[API] POST error (${endpoint}): ${ err }`)
+    logger.debug(`[API] POST error (${endpoint}): ${ JSON.stringify(err.response) }`)
+    return Promise.reject(err.response)
   }
 }
 
@@ -155,7 +157,9 @@ export async function get (
     logger.debug('[API] GET result:', result)
     return result.data
   } catch (err) {
-    throw new Error(`[API] GET error (${endpoint}): ${ err }`)
+    logger.debug(`[API] GET error (${endpoint}): ${ err.response }`)
+    return Promise.reject(err.response)
+    // throw new Error(`[API] GET error (${endpoint}): ${ err }`)
   }
 }
 
@@ -235,19 +239,23 @@ export async function login (user: ILoginCredentials = {
       await logout()
     }
   }
-  const result = await post('login', user, false)
-  if (result && result.data && result.data.authToken) {
-    currentLogin = {
-      result: result, // keep to return if login requested again for same user
-      username: user.username, // keep to compare with following login attempt
-      authToken: result.data.authToken,
-      userId: result.data.userId
+  try {
+    const result = await post('login', user, false)
+    if (result && result.data && result.data.authToken) {
+      currentLogin = {
+        result: result, // keep to return if login requested again for same user
+        username: user.username, // keep to compare with following login attempt
+        authToken: result.data.authToken,
+        userId: result.data.userId
+      }
+      setAuth(currentLogin)
+      logger.info(`[API] Logged in ID ${ currentLogin.userId }`)
+      return result
+    } else {
+      throw new Error(`[API] Login failed for ${user.username}`)
     }
-    setAuth(currentLogin)
-    logger.info(`[API] Logged in ID ${ currentLogin.userId }`)
-    return result
-  } else {
-    throw new Error(`[API] Login failed for ${user.username}`)
+  } catch (err) {
+    return Promise.reject(err.data)
   }
 }
 
