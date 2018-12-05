@@ -120,7 +120,7 @@ export async function post (
 ): Promise<any> {
   try {
     logger.debug(`[API] POST: ${endpoint}`, JSON.stringify(data))
-    if (auth && !loggedIn()) await login()
+    // if (auth && !loggedIn()) await login()
     let headers = getHeaders(auth)
     const result = await client.post(endpoint, data, { headers })
     if (Buffer.isBuffer(result.data)) throw new Error('Result was buffer (HTML, not JSON)')
@@ -148,7 +148,7 @@ export async function get (
 ): Promise<any> {
   try {
     logger.debug(`[API] GET: ${endpoint}`, data)
-    if (auth && !loggedIn()) await login()
+    // if (auth && !loggedIn()) await login()
     let headers = getHeaders(auth)
     const query = getQueryString(data)
     const result = await client.get(endpoint + query, { headers })
@@ -209,7 +209,7 @@ export async function del (
   ): Promise<any> {
   try {
 	  logger.debug(`[API] DELETE: ${endpoint}`, JSON.stringify(data))
-	  if (auth && !loggedIn()) await login()
+	  // if (auth && !loggedIn()) await login()
     let headers = getHeaders(auth)
     const result = await client.delete(endpoint, { headers, data })
     if (Buffer.isBuffer(result)) throw new Error('Result was buffer (HTML, not JSON)')
@@ -217,7 +217,8 @@ export async function del (
 	  logger.debug('[API] DELETE result:', result)
 	  return result
   } catch (err) {
-    throw new Error(`[API] DELETE error (${endpoint}): ${ err }`)
+    logger.debug(`[API] DEL error (${endpoint}): ${ err.response }`)
+    return Promise.reject(err.response)
   }
 }
 
