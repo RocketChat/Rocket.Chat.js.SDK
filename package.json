@@ -92,7 +92,7 @@
     "msgpack-lite": "^0.1.26",
     "node-fetch": "^2.2.1",
     "node-fetch-polyfill": "^2.0.6",
-    "paho-mqtt": "git+ssh:git@github.com:eclipse/paho.mqtt.javascript.git#master",
+    "paho-mqtt": "eclipse/paho.mqtt.javascript#master",
     "protobufjs": "^6.8.8",
     "sha256": "^0.2.0",
     "tiny-events": "^1.0.1",
