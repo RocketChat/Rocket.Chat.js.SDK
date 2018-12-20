@@ -48,7 +48,7 @@ export default class ApiRocketChat extends ApiBase {
 	 * Send a prepared message object (with pre-defined room ID).
 	 * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
 	 */
-  async sendMessage (message: IMessage | string, rid: string): Promise<IMessageReceipt> { return (await this.post('chat.sendMessage', { message: this.prepareMessage(message, rid) })).message }
+  async sendMessage (message: IMessage | string, rid: string): Promise<IMessageReceipt> { return (await this.post('chat.sendMessage', { message: this.prepareMessage(message, rid) }, true)).message }
   getRoomIdByNameOrId (name: string): Promise<RID> { return this.get('chat.getRoomIdByNameOrId', { name }, true) }
   getRoomNameById (rid: RID): Promise<string> { return this.getRoomName(rid) }
   async getRoomName (rid: string): Promise<string> {

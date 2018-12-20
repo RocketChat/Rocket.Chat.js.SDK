@@ -34,11 +34,6 @@ export default class BotClient extends Rocketchat {
       }
     })
   }
-
-  async login (credentials: ICredentials) {
-    await super.login(credentials)
-    return this.currentLogin && (await this.socket as IDriver).login({ token: this.currentLogin.authToken } as any, {})
-  }
 	/**
 	 * Initialise socket instance with given options or defaults.
 	 * Proxies the DDP module socket connection. Resolves with socket when open.

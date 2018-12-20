@@ -1,6 +1,6 @@
 import { ISocket, IDriver, Protocols } from '../drivers'
 import ClientRest from '../api/RocketChat'
-import { ILogger, ISocketOptions, ICallback, ISubscription } from '../../interfaces'
+import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
 import { EventEmitter } from 'tiny-events'
 
@@ -23,6 +23,15 @@ export default class RocketChatClient extends ClientRest implements ISocket {
       default:
         throw new Error(`Invalid Protocol: ${protocol}, valids: ${Object.keys(Protocols).join()}`)
     }
+  }
+
+  async resume ({ token }: { token: string }) {
+    return (await this.socket as IDriver).login({ token } as any, {})
+  }
+
+  async login (credentials: ICredentials) {
+    await super.login(credentials)
+    return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }
 
   async connect (options: ISocketOptions): Promise<any> { return (await this.socket as ISocket).connect(options) }
