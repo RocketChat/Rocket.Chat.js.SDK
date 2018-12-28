@@ -3428,9 +3428,9 @@ pad-right@^0.2.2:
   dependencies:
     repeat-string "^1.5.2"
 
-"paho-mqtt@git+ssh:git@github.com:eclipse/paho.mqtt.javascript.git#master":
+paho-mqtt@eclipse/paho.mqtt.javascript#master:
   version "1.1.0"
-  resolved "git+ssh:git@github.com:eclipse/paho.mqtt.javascript.git#413f72920575f699f895ad1016283c053da9d4f0"
+  resolved "https://codeload.github.com/eclipse/paho.mqtt.javascript/tar.gz/9b761defeeb4a627db31d92ae1b0ca91b44b226e"
 
 pako@~0.2.0:
   version "0.2.9"

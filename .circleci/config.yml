@@ -14,7 +14,7 @@ jobs:
       - restore_cache:
           keys:
           - v1-dependencies-
-	  # fallback to using the latest cache if no exact match is found
+          # fallback to using the latest cache if no exact match is found
           - v1-dependencies-
 
       - run: npm install
@@ -25,10 +25,10 @@ jobs:
       #     command: npm test
 
       - run:
-        name: Build
-        command: |
-          npm run builddist
-          npm run publish:prepare
+          name: Build
+          command: |
+            npm run builddist
+            npm run publish:prepare
 
       - save_cache:
           paths:
