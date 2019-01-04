@@ -22,7 +22,7 @@ import ApiBase from './api'
 export default class ApiLivechat extends ApiBase {
   credentials: ILivechatRoomCredentialAPI = {} as any
   login (guest: INewLivechatGuestAPI | any) { return this.grantVisitor(guest) }
-  async config () { return (await this.get('livechat/config', { token: this.credentials.token }, false)).config }
+  async config (params?: ILivechatTokenAPI) { return (await this.get('livechat/config', params, false)).config }
   async room () { return (await this.get('livechat/room', { token: this.credentials.token }, false)).room }
   closeChat ({ rid }: ILivechatRoom) { return this.post('livechat/room.close', { rid, token: this.credentials.token }, false) }
   transferChat ({ rid, department }: ILivechatRoom) { return (this.post('livechat/room.transfer', { rid, token: this.credentials.token, department }, false)) }
@@ -35,7 +35,6 @@ export default class ApiLivechat extends ApiBase {
     }
     return visitor
 	 }
-  agent ({ rid }: any) { return this.get(`livechat/agent.info/${rid}/${this.credentials.token}`) }
   async agent ({ rid }: any) { return (await this.get(`livechat/agent.info/${rid}/${this.credentials.token}`)).agent }
   async nextAgent ({ department }: any) { return (await this.get(`livechat/agent.next/${this.credentials.token}`, { department })).agent }
   sendMessage (message: INewLivechatMessageAPI) { return (this.post('livechat/message', { ...message, token: this.credentials.token }, false)) }

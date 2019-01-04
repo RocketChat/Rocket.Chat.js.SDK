@@ -14,7 +14,7 @@ async function config () {
 		${JSON.stringify(await livechat.config(), null, '\t')}
 
 		Get Livechat Config with Token \`livechat.config({ token })\`:
-		${JSON.stringify(await livechat.config(), null, '\t')}
+		${JSON.stringify(await livechat.config({ token }), null, '\t')}
 
 	`)
 }
