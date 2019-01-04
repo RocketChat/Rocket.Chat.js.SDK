@@ -42,6 +42,16 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   async unsubscribeAll (): Promise<any> { return (await this.socket as ISocket).unsubscribeAll() }
   async subscribeRoom (rid: string, ...args: any[]): Promise<ISubscription[]> { return (await this.socket as IDriver).subscribeRoom(rid, ...args) }
   async subscribeNotifyAll (): Promise<any> { return (await this.socket as IDriver).subscribeNotifyAll() }
+
+  subscribeUserData (): Promise<any> {
+    return Promise.all([
+      'roles',
+      'webdavAccounts',
+      'userData',
+      'activeUsers'
+    ].map(stream => this.subscribe(stream, '')))
+  }
+
   async subscribeLoggedNotify (): Promise<any> { return (await this.socket as IDriver).subscribeLoggedNotify() }
   async subscribeNotifyUser (): Promise<any> { return (await this.socket as IDriver).subscribeNotifyUser() }
   get url () {

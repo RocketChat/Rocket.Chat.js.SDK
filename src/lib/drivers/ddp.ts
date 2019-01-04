@@ -509,15 +509,6 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, event, false)))
   }
 
-  subscribeUserData (): Promise<any> {
-    return Promise.all([
-      'roles',
-      'webdavAccounts',
-      'userData',
-      'activeUsers'
-    ].map(stream => this.subscribe(stream, '')))
-  }
-
   subscribeNotifyUser (): Promise<any> {
     const topic = 'stream-notify-user'
     return Promise.all([
