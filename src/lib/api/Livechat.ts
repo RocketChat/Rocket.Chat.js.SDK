@@ -34,7 +34,8 @@ export default class ApiLivechat extends ApiBase {
       token: visitor.token
     }
     return visitor
-	 }
+  }
+  async deleteVisitor () { return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor}
   agent ({ rid }: any) { return this.get(`livechat/agent.info/${rid}/${this.credentials.token}`) }
   nextAgent ({ department }: any) { return this.get(`livechat/agent.next/${this.credentials.token}`, { department }) }
   sendMessage (message: INewLivechatMessageAPI) { return (this.post('livechat/message', { ...message, token: this.credentials.token }, false)) }
