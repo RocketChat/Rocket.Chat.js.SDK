@@ -22,12 +22,12 @@ import ApiBase from './api'
 export default class ApiLivechat extends ApiBase {
   credentials: ILivechatRoomCredentialAPI = {} as any
   login (guest: INewLivechatGuestAPI | any) { return this.grantVisitor(guest) }
-  async config (params?: ILivechatTokenAPI) { return (await this.get('livechat/config', params, false)).config }
+  async config () { return (await this.get('livechat/config', { token: this.credentials.token }, false)).config }
   async room () { return (await this.get('livechat/room', { token: this.credentials.token }, false)).room }
   closeChat ({ rid }: ILivechatRoom) { return this.post('livechat/room.close', { rid, token: this.credentials.token }, false) }
   transferChat ({ rid, department }: ILivechatRoom) { return (this.post('livechat/room.transfer', { rid, token: this.credentials.token, department }, false)) }
   chatSurvey (survey: ILivechatRoomSurveyAPI) { return (this.post('livechat/room.survey', { rid: survey.rid, token: this.credentials.token, data: survey.data }, false)) }
-  visitor (params: ILivechatTokenAPI) { return this.get(`livechat/visitor/${params.token}`) }
+  visitor () { return this.get(`livechat/visitor/${this.credentials.token}`) }
   async grantVisitor (guest: INewLivechatGuestAPI) {
     const { visitor } = await this.post('livechat/visitor', guest, false)
     this.credentials = {
