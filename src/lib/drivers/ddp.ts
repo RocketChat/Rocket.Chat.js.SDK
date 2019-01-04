@@ -490,12 +490,9 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   subscribeNotifyAll (): Promise< any> {
     const topic = 'stream-notify-all'
     return Promise.all([
-      'roles-change',
       'updateEmojiCustom',
       'deleteEmojiCustom',
-      'updateAvatar',
-      'public-settings-changed',
-      'permissions-changed'
+      'public-settings-changed'
     ].map(event => this.subscribe(topic, event, false)))
   }
 
@@ -507,8 +504,18 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
       'updateAvatar',
       'updateEmojiCustom',
       'deleteEmojiCustom',
-      'roles-change'
+      'roles-change',
+      'permissions-changed'
     ].map(event => this.subscribe(topic, event, false)))
+  }
+
+  subscribeUserData (): Promise<any> {
+    return Promise.all([
+      'roles',
+      'webdavAccounts',
+      'userData',
+      'activeUsers'
+    ].map(stream => this.subscribe(stream, '')))
   }
 
   subscribeNotifyUser (): Promise<any> {
@@ -518,6 +525,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
       'otr',
       'webrtc',
       'notification',
+      'audioNotification',
       'rooms-changed',
       'subscriptions-changed'
     ].map(event => this.subscribe(topic, `${this.userId}/${event}`, false)))
