@@ -21,7 +21,7 @@ Add new Livechat CustomFields \`livechat.sendCustomFields()\`:
 ${JSON.stringify(await livechat.sendCustomFields(mockCustomFields), null, '\t')}
 
 \`livechat.visitor()\`:
-${JSON.stringify(await livechat.visitor({ token }), null, '\t')}
+${JSON.stringify(await livechat.visitor(), null, '\t')}
 
 	`)
 }
