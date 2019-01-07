@@ -37,13 +37,13 @@ export default class ApiLivechat extends ApiBase {
     return visitor
   }
   async deleteVisitor () { return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor}
-  async nextAgent ({ department }: any) { return (await this.get(`livechat/agent.next/${this.credentials.token}`, { department })).agent }
+  async nextAgent (department?: any) { return (await this.get(`livechat/agent.next/${this.credentials.token}`, department)).agent }
   async agent ({ rid }: any) { return (await this.get(`livechat/agent.info/${rid}/${this.credentials.token}`)).agent }
   sendMessage (message: INewLivechatMessageAPI) { return (this.post('livechat/message', { ...message, token: this.credentials.token }, false)) }
   editMessage (id: string, message: INewLivechatMessageAPI) { return (this.put(`livechat/message/${id}`, message, false)) }
   deleteMessage (id: string, { rid }: ILivechatRoom) { return (this.del(`livechat/message/${id}`, { rid, token: this.credentials.token }, false)) }
   async loadMessages (rid: string, params?: ILivechatRoomMessagesAPI) { return (await this.get(`livechat/messages.history/${rid}`, { ...params, token: this.credentials.token }, false)).messages }
-  async sendOfflineMessage (message: INewLivechatOfflineMessageAPI) { return (await this.post('livechat/offline.message', { ...message, token: this.credentials.token }, false)).message }
+  async sendOfflineMessage (message: INewLivechatOfflineMessageAPI) { return (await this.post('livechat/offline.message', { ...message }, false)).message }
   sendVisitorNavigation ({ rid }: ILivechatRoom, page: INewLivechatNavigationAPI) { return (this.post('livechat/page.visited', { token: this.credentials.token, rid, ...page }, false)) }
   requestTranscript (email: string, { rid }: ILivechatRoom) { return (this.post('livechat/transcript', { token: this.credentials.token, rid, email }, false)) }
   videoCall ({ rid }: ILivechatRoom) { return this.get(`livechat/video.call/${this.credentials.token}`, { rid }, false) }
