@@ -50,6 +50,14 @@ export default class LivechatClient extends LivechatRest implements ISocket {
       }
     })
   }
+  async onAgentStatusChange(rid: string, cb:ICallback){
+    await this.subscribe(this.livechatStream, rid);
+    this.onStreamData(this.livechatStream, ({ type, status }: any) => {
+      if (type === 'agentStatus') {
+        cb(status)
+      }
+    })
+  }
   async subscribe (topic: string, eventName: string) {
     const { token } = this.credentials
     return (await this.socket as ISocket).subscribe(topic, eventName, { token, visitorToken: token })
