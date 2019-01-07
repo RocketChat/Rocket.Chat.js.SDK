@@ -15,7 +15,7 @@ import {
 	INewLivechatOfflineMessageAPI,
 	INewLivechatCustomFieldsAPI,
 	ILivechatRoom,
-  ILivechatUploadAPI
+	ILivechatUploadAPI
 } from '../../interfaces'
 
 import ApiBase from './api'
