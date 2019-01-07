@@ -14,7 +14,8 @@ import {
 	INewLivechatCustomFieldAPI,
 	INewLivechatOfflineMessageAPI,
 	INewLivechatCustomFieldsAPI,
-	ILivechatRoom
+	ILivechatRoom,
+	ILivechatUploadAPI
 } from '../../interfaces'
 
 import ApiBase from './api'
@@ -47,4 +48,12 @@ export default class ApiLivechat extends ApiBase {
   videoCall ({ rid }: ILivechatRoom) { return this.get(`livechat/video.call/${this.credentials.token}`, { rid }, false) }
   sendCustomField (field: INewLivechatCustomFieldAPI) { return this.post('livechat/custom.field', field, false) }
   sendCustomFields (fields: INewLivechatCustomFieldsAPI) { return this.post('livechat/custom.fields', fields, false) }
+  uploadFile (params: ILivechatUploadAPI) {
+    const formData = new FormData()
+    const headersNeededForUpload = {
+      'x-visitor-token': this.credentials.token
+    }
+    formData.append('file', params.file)
+    return this.post(`livechat/upload/${params.rid}`, formData, false, undefined, { customHeaders: headersNeededForUpload })
+  }
 }

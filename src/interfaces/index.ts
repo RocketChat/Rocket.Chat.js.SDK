@@ -126,7 +126,8 @@ export interface IAPIRequest {
     endpoint: string,
     data?: any,
     auth?: boolean,
-    ignore?: RegExp
+    ignore?: RegExp,
+    options?: any
   ): Promise<any>
 }
 
@@ -886,4 +887,10 @@ export interface INewLivechatCustomFieldsAPI {
 export interface ILivechatCustomFieldsResultAPI {
   fields: ILivechatCustomFieldAPI[]
   success: boolean
+}
+
+/** Structure for Livechat Upload api */
+export interface ILivechatUploadAPI {
+  rid: string
+  file: File
 }
