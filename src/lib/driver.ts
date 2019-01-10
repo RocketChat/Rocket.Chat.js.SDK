@@ -1,22 +1,12 @@
 import { EventEmitter } from 'events'
-import Asteroid from 'asteroid'
+
 import * as settings from './settings'
 import * as methodCache from './methodCache'
 import { Message } from './message'
-import {
-  IConnectOptions,
-  IRespondOptions,
-  ICallback,
-  ILogger
-} from '../config/driverInterfaces'
-import {
-  IAsteroid,
-  ICredentials,
-  ISubscription,
-  ICollection
-} from '../config/asteroidInterfaces'
+import { IConnectOptions, IRespondOptions, ICallback, ILogger, ICredentials } from '../config/driverInterfaces'
 import { IMessage } from '../config/messageInterfaces'
 import { logger, replaceLog } from './log'
+import Socket, { Subscription } from './ddp'
 import { IMessageReceiptAPI } from '../utils/interfaces'
 
 /** Collection names */
@@ -45,17 +35,13 @@ export const integrationId = settings.integrationId
  */
 export const events = new EventEmitter()
 
-/**
- * An Asteroid instance for interacting with Rocket.Chat.
- * Variable not initialised until `connect` called.
- */
-export let asteroid: IAsteroid
+export let ddp: Socket
 
 /**
  * Asteroid subscriptions, exported for direct polling by adapters
  * Variable not initialised until `prepMeteorSubscriptions` called.
  */
-export let subscriptions: ISubscription[] = []
+export let subscriptions: Subscription[] = []
 
 /**
  * Current user object populated from resolved login
@@ -68,11 +54,6 @@ export let userId: string
 export let joinedIds: string[] = []
 
 /**
- * Array of messages received from reactive collection
- */
-export let messages: ICollection
-
-/**
  * Allow override of default logging with adapter's log instance
  */
 export function useLog (externalLog: ILogger) {
@@ -80,8 +61,8 @@ export function useLog (externalLog: ILogger) {
 }
 
 /**
- * Initialise asteroid instance with given options or defaults.
- * Returns promise, resolved with Asteroid instance. Callback follows
+ * Initialise socket instance with given options or defaults.
+ * Returns promise, resolved with Socket instance. Callback follows
  * error-first-pattern. Error returned or promise rejected on timeout.
  * Removes http/s protocol to get connection hostname if taken from URL.
  * @example <caption>Use with callback</caption>
@@ -96,31 +77,31 @@ export function useLog (externalLog: ILogger) {
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export function connect (
-  options: IConnectOptions = {},
-  callback?: ICallback
-): Promise<IAsteroid> {
+export function connect (options: IConnectOptions = {}, callback?: ICallback): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const config = Object.assign({}, settings, options) // override defaults
     config.host = config.host.replace(/(^\w+:|^)\/\//, '')
     logger.info('[connect] Connecting', config)
-    asteroid = new Asteroid(config.host, config.useSsl)
+    try {
+      ddp = new Socket(config.host, config.useSsl)
+    } catch (error) {
+      return reject(error) && callback && callback(error)
+    }
 
-    setupMethodCache(asteroid) // init instance for later caching method calls
-    asteroid.on('connected', () => {
-      asteroid.resumeLoginPromise.catch(function () {
-        // pass
-      })
-      events.emit('connected')
-    })
-    asteroid.on('reconnected', () => events.emit('reconnected'))
+    setupMethodCache(ddp) // init instance for later caching method calls
+
+    // TODO: refact
+    ddp.on('connected', () => events.emit('connected'))
+    ddp.on('reconnected', () => events.emit('reconnected'))
+    // END
+
     let cancelled = false
     const rejectionTimeout = setTimeout(function () {
       logger.info(`[connect] Timeout (${config.timeout})`)
-      const err = new Error('Asteroid connection timeout')
+      const err = new Error('Socket connection timeout')
       cancelled = true
       events.removeAllListeners('connected')
-      callback ? callback(err, asteroid) : reject(err)
+      callback ? callback(err, ddp) : reject(err)
     }, config.timeout)
 
     // if to avoid condition where timeout happens before listener to 'connected' is added
@@ -130,8 +111,8 @@ export function connect (
         logger.info('[connect] Connected')
         // if (cancelled) return asteroid.ddp.disconnect() // cancel if already rejected
         clearTimeout(rejectionTimeout)
-        if (callback) callback(null, asteroid)
-        resolve(asteroid)
+        if (callback) callback(null, ddp)
+        resolve(ddp)
       })
     }
   })
@@ -141,8 +122,7 @@ export function connect (
 export function disconnect (): Promise<void> {
   logger.info('Unsubscribing, logging out, disconnecting')
   unsubscribeAll()
-  return logout()
-    .then(() => Promise.resolve())
+  return logout().then(() => Promise.resolve())
 }
 
 // ASYNC AND CACHE METHOD UTILS
@@ -150,10 +130,10 @@ export function disconnect (): Promise<void> {
 
 /**
  * Setup method cache configs from env or defaults, before they are called.
- * @param asteroid The asteroid instance to cache method calls
+ * @param ddp The Socket instance to cache method calls
  */
-function setupMethodCache (asteroid: IAsteroid): void {
-  methodCache.use(asteroid)
+function setupMethodCache (ddp: Socket): void {
+  methodCache.use(ddp)
   methodCache.create('getRoomIdByNameOrId', {
     max: settings.roomCacheMaxSize,
     maxAge: settings.roomCacheMaxAge
@@ -170,18 +150,17 @@ function setupMethodCache (asteroid: IAsteroid): void {
 
 /**
  * Wraps method calls to ensure they return a Promise with caught exceptions.
- * @param method The Rocket.Chat server method, to call through Asteroid
+ * @param method The Rocket.Chat server method, to call through Socket
  * @param params Single or array of parameters of the method to call
  */
-export function asyncCall (method: string, params: any | any[]): Promise<any> {
-  if (!Array.isArray(params)) params = [params] // cast to array for apply
+export function asyncCall (method: string, ...params: any[]): Promise <any> {
   logger.info(`[${method}] Calling (async): ${JSON.stringify(params)}`)
-  return Promise.resolve(asteroid.apply(method, params).result)
+  return ddp.call(method, ...params)
     .catch((err: Error) => {
-      logger.error(`[${method}] Error:`, err)
+      // logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
     })
-    .then((result: any) => {
+    .then(({ result }: any) => {
       (result)
         ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
         : logger.debug(`[${method}] Success`)
@@ -190,7 +169,7 @@ export function asyncCall (method: string, params: any | any[]): Promise<any> {
 }
 
 /**
- * Call a method as async via Asteroid, or through cache if one is created.
+ * Call a method as async via Socket, or through cache if one is created.
  * If the method doesn't have or need parameters, it can't use them for caching
  * so it will always call asynchronously.
  * @param name The Rocket.Chat server method to call
@@ -203,18 +182,18 @@ export function callMethod (name: string, params?: any | any[]): Promise<any> {
 }
 
 /**
- * Wraps Asteroid method calls, passed through method cache if cache is valid.
- * @param method The Rocket.Chat server method, to call through Asteroid
+ * Wraps Socket method calls, passed through method cache if cache is valid.
+ * @param method The Rocket.Chat server method, to call through Socket
  * @param key Single string parameters only, required to use as cache key
  */
 export function cacheCall (method: string, key: string): Promise<any> {
   return methodCache.call(method, key)
     .catch((err: Error) => {
-      logger.error(`[${method}] Error:`, err)
+      // logger.error(`[${method}] Error:`, err)
       throw err // throw after log to stop async chain
     })
     .then((result: any) => {
-      (result)
+      result
         ? logger.debug(`[${method}] Success: ${JSON.stringify(result)}`)
         : logger.debug(`[${method}] Success`)
       return result
@@ -224,31 +203,49 @@ export function cacheCall (method: string, key: string): Promise<any> {
 // LOGIN AND SUBSCRIBE TO ROOMS
 // -----------------------------------------------------------------------------
 
-/** Login to Rocket.Chat via Asteroid */
+/** Login to Rocket.Chat via Socket */
 export function login (credentials: ICredentials = {
   username: settings.username,
   password: settings.password,
   ldap: settings.ldap
 }): Promise<any> {
   let login: Promise<any>
-  // if (credentials.ldap) {
-  //   logger.info(`[login] Logging in ${credentials.username} with LDAP`)
-  //   login = asteroid.loginWithLDAP(
-  //     credentials.email || credentials.username,
-  //     credentials.password,
-  //     { ldap: true, ldapOptions: credentials.ldapOptions || {} }
-  //   )
-  // } else {
-  logger.info(`[login] Logging in ${credentials.username}`)
-  login = asteroid.loginWithPassword(
-    credentials.email || credentials.username!,
-    credentials.password
-  )
-  // }
+  if (credentials.ldap) {
+    logger.info(`[login] Logging in ${credentials.username} with LDAP`)
+    login = ddp.login(
+      { ldap: true, ldapOptions: credentials.ldapOptions || {}, ldapPass: credentials.password, username: credentials.username }
+    )
+  } else if (credentials.crowd) {
+    logger.info(`[login] Logging in ${credentials.username} with CROWD`)
+    login = ddp.login({ crowd: true, username: credentials.username, crowdPassword: credentials.password })
+  } else if (credentials.totp) {
+    logger.info(`[login] Logging in ${credentials.username} with TOTP`)
+    login = ddp.login({
+      totp: {
+        login: {
+          user: { username: credentials.username, email: credentials.email },
+          password: credentials.password
+        },
+        code: credentials.code
+      }
+    })
+  } else if (credentials.resume) {
+    logger.info(`[login] Logging in with resume token`)
+    login = ddp.login({ resume: credentials.resume })
+  } else if (credentials.oauth) {
+    logger.info(`[login] Logging in with OAuth`)
+    login = ddp.login({ oauth: credentials.oauth })
+  } else {
+    logger.info(`[login] Logging in ${credentials.username}`)
+    login = ddp.login({
+      user: { username: credentials.username, email: credentials.email },
+      password: credentials.password
+    })
+  }
   return login
-    .then((loggedInUserId) => {
-      userId = loggedInUserId
-      return loggedInUserId
+    .then((loggedInUser) => {
+      userId = loggedInUser.id
+      return loggedInUser.id
     })
     .catch((err: Error) => {
       logger.info('[login] Error:', err)
@@ -256,63 +253,62 @@ export function login (credentials: ICredentials = {
     })
 }
 
-/** Logout of Rocket.Chat via Asteroid */
+/** Logout of Rocket.Chat via Socket */
 export function logout (): Promise<void | null> {
-  return asteroid.logout()
-    .catch((err: Error) => {
-      logger.error('[Logout] Error:', err)
-      throw err // throw after log to stop async chain
-    })
+  return ddp.logout().catch((err: Error) => {
+    // logger.error('[Logout] Error:', err)
+    throw err // throw after log to stop async chain
+  })
 }
 
 /**
  * Subscribe to Meteor subscription
  * Resolves with subscription (added to array), with ID property
- * @todo - 3rd param of asteroid.subscribe is deprecated in Rocket.Chat?
+ * @todo - 3rd param of ddp.subscribe is deprecated in Rocket.Chat?
  */
-export function subscribe (
-  topic: string,
-  roomId: string
-): Promise<ISubscription> {
+export function subscribe (topic: string, roomId: string, ...params: any[]): Promise<any> {
   return new Promise((resolve, reject) => {
     logger.info(`[subscribe] Preparing subscription: ${topic}: ${roomId}`)
-    const subscription = asteroid.subscribe(topic, roomId, true)
-    subscriptions.push(subscription)
-    return subscription.ready
-      .then((id) => {
-        logger.info(`[subscribe] Stream ready: ${id}`)
-        resolve(subscription)
-      })
+    const promiseSubscription = ddp.subscribe(topic, roomId, ...params, true)
+    return promiseSubscription.then((subscription) => {
+      subscriptions.push(subscription)
+      logger.info(`[subscribe] Stream ready: ${subscription.id}`)
+      resolve(subscription)
+    })
   })
 }
 
 /** Unsubscribe from Meteor subscription */
-export function unsubscribe (subscription: ISubscription): void {
+export function unsubscribe (subscription: Subscription): void {
   const index = subscriptions.indexOf(subscription)
   if (index === -1) return
-  subscription.stop()
-  // asteroid.unsubscribe(subscription.id) // v2
-  subscriptions.splice(index, 1) // remove from collection
-  logger.info(`[${subscription.id}] Unsubscribed`)
+  subscription.unsubscribe().then(() => {
+    subscriptions.splice(index, 1) // remove from collection
+    logger.info(`[${subscription.id}] Unsubscribed`)
+  }).catch((err: Error) => {
+    // logger.error('[Unsubscribe] Error:', err)
+    throw err
+  })
 }
 
 /** Unsubscribe from all subscriptions in collection */
 export function unsubscribeAll (): void {
-  subscriptions.map((s: ISubscription) => unsubscribe(s))
+  subscriptions.map((s: Subscription) => unsubscribe(s))
 }
 
 /**
  * Begin subscription to room events for user.
  * Older adapters used an option for this method but it was always the default.
  */
-export function subscribeToMessages (): Promise<ISubscription> {
+export function subscribeToMessages (): Promise<Subscription> {
   return subscribe(_messageCollectionName, _messageStreamName)
-    .then((subscription) => {
-      messages = asteroid.getCollection(_messageCollectionName)
-      return subscription
-    })
 }
-
+export function on (collection: string, callback: ICallback): void {
+  logger.info(`[reactive] Listening for change events in collection ${collection}`)
+  ddp.on(collection, (result: object) => {
+    callback(null, result)
+  })
+}
 /**
  * Once a subscription is created, using `subscribeToMessages` this method
  * can be used to attach a callback to changes in the message stream.
@@ -337,22 +333,7 @@ export function subscribeToMessages (): Promise<ISubscription> {
  *  - Third argument is additional attributes, such as `roomType`
  */
 export function reactToMessages (callback: ICallback): void {
-  logger.info(`[reactive] Listening for change events in collection ${messages.name}`)
-
-  messages.reactiveQuery({}).on('change', (_id: string) => {
-    const changedMessageQuery = messages.reactiveQuery({ _id })
-    if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {
-      const changedMessage = changedMessageQuery.result[0]
-      if (Array.isArray(changedMessage.args)) {
-        logger.info(`[received] Message in room ${ changedMessage.args[0].rid }`)
-        callback(null, changedMessage.args[0], changedMessage.args[1])
-      } else {
-        logger.debug('[received] Update without message args')
-      }
-    } else {
-      logger.debug('[received] Reactive query at ID ${ _id } without results')
-    }
-  })
+  return on(_messageCollectionName, callback)
 }
 
 /**
@@ -382,14 +363,14 @@ export function respondToMessages (
   ) {
     promise = joinRooms(config.rooms)
       .catch((err) => {
-        logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
+        // logger.error(`[joinRooms] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
       })
   }
 
   lastReadTime = new Date() // init before any message read
   reactToMessages(async (err, message, meta) => {
     if (err) {
-      logger.error(`[received] Unable to receive: ${err.message}`)
+      // logger.error(`[received] Unable to receive: ${err.message}`)
       callback(err) // bubble errors back to adapter
     }
 
@@ -411,10 +392,7 @@ export function respondToMessages (
     let currentReadTime = new Date(message.ts.$date)
 
     // Ignore edited messages if configured to
-    if (!config.edited && message.editedAt) return
-
-    // Set read time as time of edit, if message is edited
-    if (message.editedAt) currentReadTime = new Date(message.editedAt.$date)
+    if (!config.edited && typeof message.editedAt !== 'undefined') return
 
     // Ignore messages in stream that aren't new
     if (currentReadTime <= lastReadTime) return
@@ -433,7 +411,7 @@ export function respondToMessages (
 // -----------------------------------------------------------------------------
 
 /** Get ID for a room by name (or ID). */
-export function getRoomId (name: string): Promise<string> {
+export function getRoomId (name: string): Promise<any> {
   return cacheCall('getRoomIdByNameOrId', name)
 }
 
@@ -457,7 +435,7 @@ export async function joinRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
   let joinedIndex = joinedIds.indexOf(room)
   if (joinedIndex !== -1) {
-    logger.error(`[joinRoom] room was already joined`)
+    // logger.error(`[joinRoom] room was already joined`)
   } else {
     await asyncCall('joinRoom', roomId)
     joinedIds.push(roomId)
@@ -469,7 +447,7 @@ export async function leaveRoom (room: string): Promise<void> {
   let roomId = await getRoomId(room)
   let joinedIndex = joinedIds.indexOf(room)
   if (joinedIndex === -1) {
-    logger.error(`[leaveRoom] failed because bot has not joined ${room}`)
+    // logger.error(`[leaveRoom] failed because bot has not joined ${room}`)
   } else {
     await asyncCall('leaveRoom', roomId)
     delete joinedIds[joinedIndex]
@@ -564,5 +542,5 @@ export function editMessage (message: IMessage): Promise<IMessage> {
  * @param messageId ID for a previously sent message
  */
 export function setReaction (emoji: string, messageId: string) {
-  return asyncCall('setReaction', [emoji, messageId])
+  return asyncCall('setReaction', emoji, messageId)
 }

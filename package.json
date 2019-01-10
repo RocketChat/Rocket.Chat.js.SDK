@@ -25,15 +25,16 @@
     "npm": "> 5.0.0"
   },
   "scripts": {
+    "webpack": "webpack",
     "pretest": "tslint -p . && ts-node src/utils/setup.ts",
-    "test": "nyc mocha './src/lib/**/*.spec.ts'",
+    "test": "nyc mocha './src/lib/**/*.spec.ts' './src/livechat/**/*.spec.ts'",
     "test:hook": "mocha './**/*.spec.ts'",
     "test:debug": "mocha  --inspect --debug-brk 'src/**/*.spec.ts'",
     "test:package": "preview && mocha 'src/index.spec.ts'",
     "start": "ts-node ./src/utils/start",
     "docs": "rimraf ./docs && typedoc --options ./typedoc.json ./src/lib",
     "prebuild": "npm run test",
-    "build": "rimraf ./dist/* && tsc && npm run test:package"
+    "build": "rimraf ./dist/* && tsc && webpack && npm run test:package"
   },
   "husky": {
     "hooks": {
@@ -44,6 +45,8 @@
     "@types/chai": "^4.1.2",
     "@types/mocha": "^2.2.48",
     "@types/sinon": "^4.3.0",
+    "@types/ws": "^5.1.2",
+    "awesome-typescript-loader": "^5.2.0",
     "chai": "^4.1.2",
     "commitizen": "^2.9.6",
     "cz-conventional-changelog": "^2.1.0",
@@ -60,14 +63,19 @@
     "tslint-config-standard": "^7.0.0",
     "typedoc": "0.8.0",
     "typedoc-plugin-external-module-name": "^1.1.1",
-    "typescript": "^2.7.2"
+    "typescript": "^2.7.2",
+    "webpack": "^4.16.5",
+    "webpack-cli": "^3.1.0"
   },
   "dependencies": {
     "@types/lru-cache": "^4.1.0",
     "@types/node": "^9.4.6",
-    "asteroid": "rocketchat/asteroid",
+    "axios": "^0.18.0",
+    "ejson": "^2.1.2",
+    "isomorphic-ws": "^4.0.1",
     "lru-cache": "^4.1.1",
-    "node-rest-client": "^3.1.0"
+    "universal-websocket-client": "^1.0.2",
+    "ws": "^5.2.0"
   },
   "config": {
     "commitizen": {

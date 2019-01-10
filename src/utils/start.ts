@@ -34,7 +34,7 @@ async function demo (message: IMessage) {
     const sayWhat = `@${message.u!.username} says "${match[1]}"`
     const usernames = await api.users.allNames()
     for (let username of usernames) {
-      if (username !== botUser.username) {
+      if (username && username !== botUser.username) {
         const toWhere = await driver.getDirectMessageRoomId(username)
         await driver.sendToRoomId(sayWhat, toWhere) // DM ID hax
         await delay(200) // delay to prevent rate-limit error

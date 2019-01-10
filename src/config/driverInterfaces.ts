@@ -43,3 +43,17 @@ export interface ILogger {
 export interface ICallback {
   (error: Error | null, ...args: any[]): void
 }
+
+/** Credentials for login method */
+export interface ICredentials {
+  password?: string,
+  username?: string,
+  email?: string,
+  ldap?: boolean,
+  ldapOptions?: object,
+  totp?: boolean,
+  code?: number,
+  resume?: string,
+  crowd?: boolean,
+  oauth?: any
+}

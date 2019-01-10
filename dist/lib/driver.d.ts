@@ -1,9 +1,9 @@
 /// <reference types="node" />
 import { EventEmitter } from 'events';
 import { Message } from './message';
-import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces';
-import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces';
+import { IConnectOptions, IRespondOptions, ICallback, ILogger, ICredentials } from '../config/driverInterfaces';
 import { IMessage } from '../config/messageInterfaces';
+import Socket, { Subscription } from './ddp';
 import { IMessageReceiptAPI } from '../utils/interfaces';
 /** Internal for comparing message update timestamps */
 export declare let lastReadTime: Date;
@@ -21,16 +21,12 @@ export declare const integrationId: string;
  *  driver.events.on('connected', () => console.log('driver connected'))
  */
 export declare const events: EventEmitter;
-/**
- * An Asteroid instance for interacting with Rocket.Chat.
- * Variable not initialised until `connect` called.
- */
-export declare let asteroid: IAsteroid;
+export declare let ddp: Socket;
 /**
  * Asteroid subscriptions, exported for direct polling by adapters
  * Variable not initialised until `prepMeteorSubscriptions` called.
  */
-export declare let subscriptions: ISubscription[];
+export declare let subscriptions: Subscription[];
 /**
  * Current user object populated from resolved login
  */
@@ -40,16 +36,12 @@ export declare let userId: string;
  */
 export declare let joinedIds: string[];
 /**
- * Array of messages received from reactive collection
- */
-export declare let messages: ICollection;
-/**
  * Allow override of default logging with adapter's log instance
  */
 export declare function useLog(externalLog: ILogger): void;
 /**
- * Initialise asteroid instance with given options or defaults.
- * Returns promise, resolved with Asteroid instance. Callback follows
+ * Initialise socket instance with given options or defaults.
+ * Returns promise, resolved with Socket instance. Callback follows
  * error-first-pattern. Error returned or promise rejected on timeout.
  * Removes http/s protocol to get connection hostname if taken from URL.
  * @example <caption>Use with callback</caption>
@@ -64,17 +56,17 @@ export declare function useLog(externalLog: ILogger): void;
  *    .then(() => console.log('connected'))
  *    .catch((err) => console.error(err))
  */
-export declare function connect(options?: IConnectOptions, callback?: ICallback): Promise<IAsteroid>;
+export declare function connect(options?: IConnectOptions, callback?: ICallback): Promise<Socket>;
 /** Remove all active subscriptions, logout and disconnect from Rocket.Chat */
 export declare function disconnect(): Promise<void>;
 /**
  * Wraps method calls to ensure they return a Promise with caught exceptions.
- * @param method The Rocket.Chat server method, to call through Asteroid
+ * @param method The Rocket.Chat server method, to call through Socket
  * @param params Single or array of parameters of the method to call
  */
-export declare function asyncCall(method: string, params: any | any[]): Promise<any>;
+export declare function asyncCall(method: string, ...params: any[]): Promise<any>;
 /**
- * Call a method as async via Asteroid, or through cache if one is created.
+ * Call a method as async via Socket, or through cache if one is created.
  * If the method doesn't have or need parameters, it can't use them for caching
  * so it will always call asynchronously.
  * @param name The Rocket.Chat server method to call
@@ -82,30 +74,31 @@ export declare function asyncCall(method: string, params: any | any[]): Promise<
  */
 export declare function callMethod(name: string, params?: any | any[]): Promise<any>;
 /**
- * Wraps Asteroid method calls, passed through method cache if cache is valid.
- * @param method The Rocket.Chat server method, to call through Asteroid
+ * Wraps Socket method calls, passed through method cache if cache is valid.
+ * @param method The Rocket.Chat server method, to call through Socket
  * @param key Single string parameters only, required to use as cache key
  */
 export declare function cacheCall(method: string, key: string): Promise<any>;
-/** Login to Rocket.Chat via Asteroid */
+/** Login to Rocket.Chat via Socket */
 export declare function login(credentials?: ICredentials): Promise<any>;
-/** Logout of Rocket.Chat via Asteroid */
+/** Logout of Rocket.Chat via Socket */
 export declare function logout(): Promise<void | null>;
 /**
  * Subscribe to Meteor subscription
  * Resolves with subscription (added to array), with ID property
- * @todo - 3rd param of asteroid.subscribe is deprecated in Rocket.Chat?
+ * @todo - 3rd param of ddp.subscribe is deprecated in Rocket.Chat?
  */
-export declare function subscribe(topic: string, roomId: string): Promise<ISubscription>;
+export declare function subscribe(topic: string, roomId: string, ...params: any[]): Promise<any>;
 /** Unsubscribe from Meteor subscription */
-export declare function unsubscribe(subscription: ISubscription): void;
+export declare function unsubscribe(subscription: Subscription): void;
 /** Unsubscribe from all subscriptions in collection */
 export declare function unsubscribeAll(): void;
 /**
  * Begin subscription to room events for user.
  * Older adapters used an option for this method but it was always the default.
  */
-export declare function subscribeToMessages(): Promise<ISubscription>;
+export declare function subscribeToMessages(): Promise<Subscription>;
+export declare function on(collection: string, callback: ICallback): void;
 /**
  * Once a subscription is created, using `subscribeToMessages` this method
  * can be used to attach a callback to changes in the message stream.
@@ -141,7 +134,7 @@ export declare function reactToMessages(callback: ICallback): void;
  */
 export declare function respondToMessages(callback: ICallback, options?: IRespondOptions): Promise<void | void[]>;
 /** Get ID for a room by name (or ID). */
-export declare function getRoomId(name: string): Promise<string>;
+export declare function getRoomId(name: string): Promise<any>;
 /** Get name for a room by ID. */
 export declare function getRoomName(id: string): Promise<string>;
 /**
