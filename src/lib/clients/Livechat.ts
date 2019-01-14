@@ -58,6 +58,11 @@ export default class LivechatClient extends LivechatRest implements ISocket {
       }
     })
   }
+
+  async notifyVisitorTyping(rid: string, username: string, typing: boolean){
+    return (await this.socket as IDriver).notifyVisitorTyping(rid, username, typing, this.credentials.token);
+  }
+
   async subscribe (topic: string, eventName: string) {
     const { token } = this.credentials
     return (await this.socket as ISocket).subscribe(topic, eventName, { token, visitorToken: token })

@@ -1,3 +1,4 @@
+import { Socket } from './ddp';
 /**
  * @module Socket
  * Provides high-level helpers for DDP connection, method calls, subscriptions.
@@ -48,6 +49,9 @@ export interface IDriver {
   subscribeNotifyUser (): Promise<IDriver>
 
   onTyping (cb: ICallback): Promise<any>
+
+  notifyVisitorTyping(rid: string, username: string, typing: boolean, token: string): Promise<any>
+
 }
 
 export enum Protocols {
