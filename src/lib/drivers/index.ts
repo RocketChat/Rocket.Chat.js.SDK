@@ -1,4 +1,3 @@
-import { Socket } from './ddp';
 /**
  * @module Socket
  * Provides high-level helpers for DDP connection, method calls, subscriptions.
