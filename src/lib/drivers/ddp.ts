@@ -572,6 +572,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     }) as any
   }
 
+  notifyVisitorTyping(rid: string, username: string, typing: boolean, token: string) {
+    return this.ddp.call('stream-notify-room', `${ rid }/typing`, username, typing, { token })
+  }
+
   ejsonMessage (message: any) {
     if (message.ts) {
       message.ts = new Date(message.ts.$date)
