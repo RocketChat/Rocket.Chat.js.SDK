@@ -557,7 +557,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   }
 
   onStreamData = (name: string, cb: ICallback): Promise<any> => {
-    return Promise.resolve(this.ddp.on(name, ({ fields: { args: [message] } }: any) => cb((message)))) as any
+    return Promise.resolve(this.ddp.on(name, (message: any) => cb((message)))) as any
   }
 
   onMessage = (cb: ICallback): void => {
