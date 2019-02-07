@@ -580,4 +580,8 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     }
     return message
   }
+
+  methodCall = (method: string, ...args: any[]): Promise<any> => {
+    return this.ddp.call(method, ...args)
+  }
 }
