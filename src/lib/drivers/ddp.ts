@@ -406,21 +406,19 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 	/** Array of joined room IDs (for reactive queries) */
   joinedIds: string[] = []
 
-  constructor ({ host = 'localhost:3000', useSsl, integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
+  constructor ({ host = 'localhost:3000', integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
     super()
 
     this.config = {
       ...config,
       ...moreConfigs,
       host: host.replace(/(^\w+:|^)\/\//, ''),
-      timeout: 20000,
-      useSsl
+      timeout: 20000
 			// reopen: number
 			// ping: number
 			// close: number
 			// integration: string
     }
-
     this.ddp = new Socket({ ...this.config, logger })
     this.logger = logger
   }
@@ -561,11 +559,11 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   onStreamData = (event: string, cb: ICallback): Promise<any> => {
     function listener(message: any) {
       cb((message))
-    }
+    };
     return Promise.resolve(this.ddp.on(event, listener))
       .then(() => ({
         stop: () => this.ddp.off(event, listener)
-      }))
+      }));
   }
 
   onMessage = (cb: ICallback): void => {
