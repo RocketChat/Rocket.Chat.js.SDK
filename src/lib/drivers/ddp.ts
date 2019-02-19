@@ -215,13 +215,15 @@ export class Socket extends EventEmitter {
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
       this.connection.send(stringdata)
 
-      this.once('disconnected', reject)
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       if (!listener) {
         return resolve()
       }
+      if (listener) {
+        this.once('close', reject)
+      }
       this.once(listener, (result: any) => {
-        this.off('disconnect', reject)
+        this.off('close', reject)
         return (result.error ? reject(result.error) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       })
     })
