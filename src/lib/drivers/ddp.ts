@@ -207,23 +207,30 @@ export class Socket extends EventEmitter {
    */
   send = async (obj: any): Promise<any> => {
     return new Promise((resolve, reject) => {
-      if (!this.connection) throw new Error('[ddp] sending without open connection')
+      this.logger.debug({connection: this.connection})
+      if (!this.connection || this.connection.readyState !== 1) {
+        this.logger.error(`[ddp] sending failed, no connection at the moment`);
+        return reject({ error: 'no-socket-connection' });
+      }
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const stringdata = JSON.stringify(data)
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
-      this.connection.send(stringdata)
+      this.connection!.send(stringdata)
 
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       if (!listener) {
         return resolve()
       }
+      const onClose = () => {
+        return reject({ error: 'no-socket-connection' });
+      }
       if (listener) {
-        this.once('close', reject)
+        this.once('close', onClose)
       }
       this.once(listener, (result: any) => {
-        this.off('close', reject)
+        this.off('close', onClose)
         return (result.error ? reject(result.error) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       })
     })
@@ -254,10 +261,6 @@ export class Socket extends EventEmitter {
    */
   call = async (method: string, ...params: any[]) => {
     const response = await this.send({ msg: 'method', method, params })
-      .catch((err) => {
-        this.logger.error(`[ddp] Call error: ${err.message}`)
-        throw err
-      })
     return (response.result) ? response.result : response
   }
 
