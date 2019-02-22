@@ -570,7 +570,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     this.ddp.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(this.ejsonMessage(message)))
   }
 
-  onTyping = (cb: ICallback): Promise<any > => {
+  onTyping = (cb: ICallback, username?: any, isTyping?: boolean): Promise<any> => {
+    if(status !== undefined && username) {
+      cb(username, isTyping)
+    }
     return this.ddp.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
       cb(username, isTyping)
     }) as any

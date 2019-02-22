@@ -33,6 +33,13 @@ export default class LivechatClient extends LivechatRest implements ISocket {
         throw new Error(`Invalid Protocol: ${protocol}, valids: ${Object.keys(Protocols).join()}`)
     }
   }
+  private _onAgentStatusChange(cb: ICallback){
+    this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, status, username }] } }: any) => {
+      if (type === 'agentStatus') {
+        cb(null, { status, username });
+      }
+    })
+  }
   async connect (options: ISocketOptions, callback?: ICallback): Promise <any> { return (await this.socket as ISocket).connect(options) }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
   async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
@@ -41,7 +48,15 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   async subscribeLoggedNotify (): Promise<any> { return (await this.socket as IDriver) .subscribeLoggedNotify() }
   async subscribeNotifyUser (): Promise<any> { return (await this.socket as IDriver) .subscribeNotifyUser() }
   async onMessage (cb: ICallback): Promise<any> { return (await this.socket as IDriver).onMessage(cb) }
-  async onTyping (cb: ICallback): Promise<any> { return (await this.socket as IDriver).onTyping(cb) }
+  async onTyping (rid: string, cb: ICallback): Promise<any> { 
+    await this.subscribe(this.livechatStream, rid)
+    this._onAgentStatusChange(async (error, { status, username }: any) => {
+      if(status === 'offline') {
+        return (await this.socket as IDriver).onTyping(cb, username, false);
+      }
+    })
+    return (await this.socket as IDriver).onTyping(cb)
+  }
   async onAgentChange (rid: string, cb: ICallback) {
     await this.subscribe(this.livechatStream, rid)
     this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
@@ -52,10 +67,8 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   }
   async onAgentStatusChange(rid: string, cb:ICallback){
     await this.subscribe(this.livechatStream, rid);
-    this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, status }] } }: any) => {
-      if (type === 'agentStatus') {
-        cb(status)
-      }
+    this._onAgentStatusChange((error, { status }: any) => {
+      cb(status)
     })
   }
 

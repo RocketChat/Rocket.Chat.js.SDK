@@ -47,7 +47,7 @@ export interface IDriver {
 
   subscribeNotifyUser (): Promise<IDriver>
 
-  onTyping (cb: ICallback): Promise<any>
+  onTyping (cb: ICallback, username?: any, isTyping?: boolean): Promise<any>
 
   notifyVisitorTyping(rid: string, username: string, typing: boolean, token: string): Promise<any>
 
