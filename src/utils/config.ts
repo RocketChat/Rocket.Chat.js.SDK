@@ -1,3 +1,4 @@
+require('dotenv').config()
 import { INewUserAPI } from './interfaces'
 
 // The API user, should be provisioned on build with local Rocket.Chat
