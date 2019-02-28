@@ -84,6 +84,7 @@ export class Socket extends EventEmitter {
    * Resumes login if given token.
    */
   open = (ms: number = this.config.reopen) => {
+    this.logger.debug('[DDP] Will open connecton')
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
       this.lastPing = Date.now()
@@ -93,6 +94,7 @@ export class Socket extends EventEmitter {
         return !this.alive() && this.reopen()
       }, ms)
       try {
+        this.logger.debug('[DDP] Will create new websocket')
         connection = new WebSocket(this.host)
         connection.onerror = reject
       } catch (err) {
@@ -122,6 +124,7 @@ export class Socket extends EventEmitter {
 
   /** Emit close event so it can be used for promise resolve in close() */
   onClose = (e: any) => {
+    this.logger.debug('[DDP] socket emitted close')
     try {
       this.emit('close', e)
       if (e.code !== 1000) {
@@ -207,24 +210,32 @@ export class Socket extends EventEmitter {
    */
   send = async (obj: any): Promise<any> => {
     return new Promise((resolve, reject) => {
-      this.logger.debug({connection: this.connection})
-      if (!this.connection || this.connection.readyState !== 1) {
-        this.logger.error(`[ddp] sending failed, no connection at the moment`);
-        return reject({ error: 'no-socket-connection' });
-      }
+
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
+      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
+
+      if (!this.connection || this.connection.readyState !== 1) {
+        this.logger.error(`[ddp] sending failed, no connection at the moment`)
+        // do not reject unlistened requests
+        if (!listener) {
+          return resolve()
+        }
+        return reject({ error: 'no-socket-connection', message: 'There is no open socket connection', requestObject: obj })
+      }
+
+      this.logger.debug({ message: 'before sending ddp message', id, obj })
+
       const stringdata = JSON.stringify(data)
-      this.logger.debug(`[ddp] sending message: ${stringdata}`)
+      this.logger.debug(`[ddp] sending message: ${stringdata}, listener: ${listener}`)
       this.connection!.send(stringdata)
 
-      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       if (!listener) {
         return resolve()
       }
       const onClose = () => {
-        return reject({ error: 'no-socket-connection' });
+        return reject({ error: 'no-socket-connection', message: 'Lost socket connection while performing request', requestObject: obj })
       }
       if (listener) {
         this.once('close', onClose)
@@ -309,10 +320,16 @@ export class Socket extends EventEmitter {
   }
 
   /** Logout the current User from the server via Socket. */
-  logout = () => {
+  logout = async () => {
+    this.logger.info(`[ddp] will logout user`)
     this.resume = null
-    return this.unsubscribeAll()
-			.then(() => this.call('logout'))
+    try {
+      await this.unsubscribeAll()
+    } catch (error) {
+      this.logger.debug(`[DDP driver] could not unsubscribe from all subscribtions`)
+    }
+    // logout anyway
+    return this.call('logout')
   }
 
   /** Register a callback to trigger on message events in subscription */
@@ -361,7 +378,7 @@ export class Socket extends EventEmitter {
       .then((data: any) => data.result || data.subs)
       .catch((err) => {
         if (!err.msg && err.msg !== 'nosub') {
-          this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
+          this.logger.error(`[ddp] Unsubscribe error: ${err.message || err.error}`)
           throw err
         }
       })
@@ -546,10 +563,9 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return login
   }
   logout = async () => {
-    if (this.ddp && this.ddp.connected) {
-      await this.ddp.logout()
-    }
-
+    this.logger.info(`[ddp] will try logout user`)
+     // logount should be called anyway if there is connection or not, because credentials must be removed
+    return this.ddp.logout()
   }
 	/** Unsubscribe from Meteor stream. Proxy for socket unsubscribe. */
   unsubscribe = (subscription: ISubscription) => {
@@ -562,13 +578,13 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   }
 
   onStreamData = (event: string, cb: ICallback): Promise<any> => {
-    function listener(message: any) {
+    function listener (message: any) {
       cb((message))
-    };
+    }
     return Promise.resolve(this.ddp.on(event, listener))
       .then(() => ({
         stop: () => this.ddp.off(event, listener)
-      }));
+      }))
   }
 
   onMessage = (cb: ICallback): void => {

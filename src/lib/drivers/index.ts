@@ -49,9 +49,11 @@ export interface IDriver {
 
   onTyping (cb: ICallback): Promise<any>
 
-  notifyVisitorTyping(rid: string, username: string, typing: boolean, token: string): Promise<any>
+  notifyVisitorTyping (rid: string, username: string, typing: boolean, token: string): Promise<any>
 
   methodCall (method: string, ...args: any[]): Promise<any>
+
+  logout (): Promise<any>
 }
 
 export enum Protocols {
