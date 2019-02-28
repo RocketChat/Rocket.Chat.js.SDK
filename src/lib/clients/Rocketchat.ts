@@ -2,7 +2,6 @@ import { ISocket, IDriver, Protocols } from '../drivers'
 import ClientRest from '../api/RocketChat'
 import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
-import { EventEmitter } from 'tiny-events'
 
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
@@ -32,6 +31,20 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   async login (credentials: ICredentials) {
     await super.login(credentials)
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
+  }
+
+  async logout () {
+    // logout call must be performed on both rest and driver, as user credentials must be removed
+    try {
+      await super.logout()
+    } catch (error) {
+      this.logger.error('Could not logout via REST', error)
+    }
+    try {
+      await (await this.socket as IDriver).logout()
+    } catch (error) {
+      this.logger.error('Could not logout via Socket', error)
+    }
   }
 
   async connect (options: ISocketOptions): Promise<any> { return (await this.socket as ISocket).connect(options) }

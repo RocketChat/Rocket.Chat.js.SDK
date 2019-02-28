@@ -220,7 +220,7 @@ export default class Api extends EventEmitter {
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
       this.logger && this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`)
-      const hasDataInsideResult = result && !result.data;
+      const hasDataInsideResult = result && !result.data
       return (method === 'DELETE') && hasDataInsideResult ? result : result.data
     } catch (err) {
       this.logger && this.logger.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
@@ -267,10 +267,17 @@ export default class Api extends EventEmitter {
     if (!this.currentLogin) {
       return null
     }
-    const result = await this.post('logout', {}, true)
-    this.userId = ''
-    this.currentLogin = null
-    return result
+    try {
+      const result = await this.post('logout', {}, true)
+      this.userId = ''
+      this.currentLogin = null
+      return result
+    } catch (error) {
+      // remove credentials even if frequest fails
+      this.userId = ''
+      this.currentLogin = null
+      throw(error)
+    }
   }
 /**
  * Structure message content, optionally addressing to room ID.

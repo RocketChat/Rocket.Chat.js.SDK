@@ -98,6 +98,11 @@ export class MQTTDriver extends EventEmitter implements ISocket, IDriver {
   login (credentials: ICredentials, args ?: any): Promise < any > {
     return Promise.resolve() as any
   }
+
+  logout (): Promise < any > {
+    // todo: implement logout request
+    return Promise.resolve() as any
+  }
 	// usertyping room-messages deleted messages
   subscribeRoom (rid: string, ...args: any[]): Promise < ISubscription[] > {
     return this.subscribe(`room-messages/${rid}`, { qos: 0 }) as any
@@ -119,8 +124,8 @@ export class MQTTDriver extends EventEmitter implements ISocket, IDriver {
     })
   }
 
-  notifyVisitorTyping(rid: string, username: string, typing: boolean, token: string): Promise<any> {
-    return Promise.resolve() as any;
+  notifyVisitorTyping (rid: string, username: string, typing: boolean, token: string): Promise<any> {
+    return Promise.resolve() as any
   }
 
   onStreamData (name: string, cb: ICallback): Promise<any> {
