@@ -103,7 +103,7 @@ export function connect (
   return new Promise((resolve, reject) => {
     const config = Object.assign({}, settings, options) // override defaults
     config.host = config.host.replace(/(^\w+:|^)\/\//, '')
-    logger.info('[connect] Connecting', config)
+    logger.info('[connect] Connecting', filterKey(config, 'password'))
     asteroid = new Asteroid(config.host, config.useSsl)
 
     setupMethodCache(asteroid) // init instance for later caching method calls
@@ -344,7 +344,7 @@ export function reactToMessages (callback: ICallback): void {
     if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {
       const changedMessage = changedMessageQuery.result[0]
       if (Array.isArray(changedMessage.args)) {
-        logger.info(`[received] Message in room ${ changedMessage.args[0].rid }`)
+        logger.info(`[received] Message in room ${changedMessage.args[0].rid}`)
         callback(null, changedMessage.args[0], changedMessage.args[1])
       } else {
         logger.debug('[received] Update without message args')
@@ -565,4 +565,16 @@ export function editMessage (message: IMessage): Promise<IMessage> {
  */
 export function setReaction (emoji: string, messageId: string) {
   return asyncCall('setReaction', [emoji, messageId])
+}
+
+/**
+ * Filter object keys when logging
+ * @param config that is used by user
+ * @param keys Accept any nummber of string to filter
+ */
+export function filterKey (config: any, ...keys: string[]) {
+  for (let val in keys) {
+    delete config[keys[val]]
+  }
+  return config
 }
