@@ -67,7 +67,6 @@ export class Socket extends EventEmitter {
       reopen: options.reopen || 10000,
       ping: options.timeout || 30000
     }
-
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
 
     this.on('ping', () => {
@@ -124,15 +123,16 @@ export class Socket extends EventEmitter {
 
   /** Emit close event so it can be used for promise resolve in close() */
   onClose = (e: any) => {
-    this.logger.debug('[DDP] socket emitted close')
     try {
       this.emit('close', e)
       if (e.code !== 1000) {
+        // on 1001 error socket stays in ready state === 1, which is not true,
+        // so the close request will never occur and dpp stays in that state for ever
+        e.code === 1001 && this.connection && delete this.connection
         return this.reopen()
       } else {
         delete this.connection
       }
-      this.logger.info(`[ddp] Close (${e.code}) ${e.reason}`)
 
     } catch (error) {
       this.logger.error(error)
@@ -159,15 +159,27 @@ export class Socket extends EventEmitter {
   /** Disconnect the DDP from server and clear all subscriptions. */
   close = async () => {
     if (this.connected) {
-      await this.unsubscribeAll()
+      try {
+        this.logger.debug(`[ddp] will try call unsubscribeAll`)
+        await this.unsubscribeAll()
+        this.logger.debug(`[ddp] unsubscribeAll succeeded`)
+      } catch (error) {
+        this.logger.error(`[DDP driver] could not unsubscribe from all subscribtions on close`)
+      }
       await new Promise((resolve) => {
         if (this.connection) {
+          this.logger.debug(`[ddp] will wait for disconnect`)
           this.once('close', resolve)
           this.connection.close(1000, 'disconnect')
           return
         }
+        this.logger.debug(`[ddp] Connection is already closed`)
+        resolve()
       })
-      .catch(this.logger.error)
+      .catch(err => {
+        this.logger.error(`[ddp] error on closing connection`)
+        this.logger.error(err)
+      })
     }
     return Promise.resolve()
   }
@@ -175,9 +187,14 @@ export class Socket extends EventEmitter {
   /** Clear connection and try to connect again. */
   reopen = async () => {
     if (this.openTimeout) return
-    await this.close()
+    try {
+      await this.close()
+    } catch (error) {
+      this.logger.error('[ddp] error on close connection on reopen')
+    }
+    this.logger.debug(`[ddp] set timeout until reopen ${this.config.reopen}`)
     this.openTimeout = setTimeout(async () => {
-      delete this.openTimeout
+      if (this.openTimeout) delete this.openTimeout
       await this.open()
         .catch((err) => this.logger.error(`[ddp] Reopen error: ${err.message}`))
     }, this.config.reopen)
@@ -215,8 +232,8 @@ export class Socket extends EventEmitter {
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
-
       if (!this.connection || this.connection.readyState !== 1) {
+        this.logger.debug(`[ddp] Noconnection for listener: ${listener} and msg: ${data.msg} and id: ${data.id}`)
         this.logger.error(`[ddp] sending failed, no connection at the moment`)
         // do not reject unlistened requests
         if (!listener) {
@@ -235,6 +252,7 @@ export class Socket extends EventEmitter {
         return resolve()
       }
       const onClose = () => {
+        this.logger.debug(`[ddp] Lost connection for listener: ${listener} and msg: ${data.msg} and id: ${data.id}`)
         return reject({ error: 'no-socket-connection', message: 'Lost socket connection while performing request', requestObject: obj })
       }
       if (listener) {
@@ -253,9 +271,13 @@ export class Socket extends EventEmitter {
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' })
         .then(() => {
+          this.logger.debug('[ddp] Ping successfull')
           return this.ping()
         })
-        .catch(() => this.reopen())
+        .catch((e) => {
+          this.logger.debug('[ddp] ping failed, will reopen connection' + e && (e.error || e.message))
+          return this.reopen()
+        })
     }, this.config.ping)
   }
   /** Check if ping-pong to server is within tolerance of 1 missed ping */
@@ -385,12 +407,18 @@ export class Socket extends EventEmitter {
   }
 
   /** Unsubscribe from all active subscriptions and reset collection */
-  unsubscribeAll = () => {
+  unsubscribeAll =  () => {
+    this.logger.debug(`[ddp] will unsubscribe all subscriptions`)
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
       return this.subscriptions[id].unsubscribe()
     })
     return Promise.all(unsubAll)
       .then(() => this.subscriptions = {})
+      .catch((error) => {
+        this.logger.error(`[ddp] error on unsubscribe all subscriptions`)
+        this.subscriptions = {}
+        throw(error)
+      })
   }
 }
 
@@ -486,7 +514,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
       if (!cancelled) {
         this.once('connected', () => {
           this.logger.info('[driver] Connected')
-          if (cancelled) return this.ddp.close() // cancel if already rejected
+          if (cancelled) {
+            this.logger.debug('[driver] close ddp as already rejected')
+            return this.ddp.close()
+          }
           clearTimeout(rejectionTimeout)
           resolve(this as IDriver)
         })

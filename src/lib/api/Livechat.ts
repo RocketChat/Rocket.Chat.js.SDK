@@ -36,8 +36,8 @@ export default class ApiLivechat extends ApiBase {
     }
     return visitor
   }
-  async deleteVisitor () { return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor}
-  async updateVisitorStatus(status: string) { return (await this.post(`livechat/visitor.status`, { token: this.credentials.token, status })).status }
+  async deleteVisitor () { return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor }
+  async updateVisitorStatus (status: string) { return (await this.post(`livechat/visitor.status`, { token: this.credentials.token, status })).status }
   async nextAgent (department?: any) { return (await this.get(`livechat/agent.next/${this.credentials.token}`, department)).agent }
   async agent ({ rid }: any) { return (await this.get(`livechat/agent.info/${rid}/${this.credentials.token}`)).agent }
   sendMessage (message: INewLivechatMessageAPI) { return (this.post('livechat/message', { ...message, token: this.credentials.token }, false)) }
