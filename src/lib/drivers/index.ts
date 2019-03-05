@@ -54,6 +54,8 @@ export interface IDriver {
   methodCall (method: string, ...args: any[]): Promise<any>
 
   logout (): Promise<any>
+
+  removeCredentials (): Promise<any>
 }
 
 export enum Protocols {

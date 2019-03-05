@@ -279,6 +279,11 @@ export default class Api extends EventEmitter {
       throw(error)
     }
   }
+
+  async removeCredentials () {
+    this.userId = ''
+    this.currentLogin = null
+  }
 /**
  * Structure message content, optionally addressing to room ID.
  * Accepts message text string or a structured message object.

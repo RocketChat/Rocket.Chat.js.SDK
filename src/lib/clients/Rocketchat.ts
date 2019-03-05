@@ -47,6 +47,16 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     }
   }
 
+  async removeCredentials () {
+    // remove credentials and close connection, if user wants to perform logout manually
+    super.removeCredentials()
+    try {
+      await (await this.socket as IDriver).removeCredentials()
+    } catch (error) {
+      this.logger.error('Could not remove credentials and close connection', error)
+    }
+  }
+
   async connect (options: ISocketOptions): Promise<any> { return (await this.socket as ISocket).connect(options) }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
   async onStreamData (event: string, cb: ICallback): Promise<any> { return (await this.socket as ISocket).onStreamData(event, cb) }

@@ -354,6 +354,16 @@ export class Socket extends EventEmitter {
     return this.call('logout')
   }
 
+  removeCredentials = async () => {
+    // remove saved credentials and close connection
+    this.resume = null
+    try {
+      await this.unsubscribeAll()
+    } catch (error) {
+      this.logger.debug(`[DDP driver] could not unsubscribe from all subscribtions`)
+    }
+    this.close()
+  }
   /** Register a callback to trigger on message events in subscription */
   onEvent = (id: string, callback: ISocketMessageCallback) => {
     this.on(id, callback)
@@ -597,6 +607,11 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     this.logger.info(`[ddp] will try logout user`)
      // logount should be called anyway if there is connection or not, because credentials must be removed
     return this.ddp.logout()
+  }
+  removeCredentials = async () => {
+    this.logger.info(`[ddp] will try remove credentilas and close connection`)
+     // logount should be called anyway if there is connection or not, because credentials must be removed
+    return this.ddp.removeCredentials()
   }
 	/** Unsubscribe from Meteor stream. Proxy for socket unsubscribe. */
   unsubscribe = (subscription: ISubscription) => {
