@@ -117,12 +117,18 @@ export class Socket extends EventEmitter {
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
-    if (this.resume) await this.login(this.resume)
+    try {
+      if (this.resume) await this.login(this.resume)
+    } catch (error) {
+      this.logger.error('[ddp] login failed on connection open')
+      this.emit('error', error)
+    }
     return callback(this.connection)
   }
 
   /** Emit close event so it can be used for promise resolve in close() */
   onClose = (e: any) => {
+    this.logger.info('[ddp] socket emitted close')
     try {
       this.emit('close', e)
       if (e.code !== 1000) {
@@ -156,7 +162,7 @@ export class Socket extends EventEmitter {
     if (data.msg) this.emit(data.msg, data)
   }
 
-  /** Disconnect the DDP from server and clear all subscriptions. */
+/** Disconnect the DDP from server and clear all subscriptions. */
   close = async () => {
     if (this.connected) {
       try {
@@ -417,9 +423,10 @@ export class Socket extends EventEmitter {
   }
 
   /** Unsubscribe from all active subscriptions and reset collection */
-  unsubscribeAll =  () => {
+  unsubscribeAll = () => {
     this.logger.debug(`[ddp] will unsubscribe all subscriptions`)
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
+      this.logger.debug(`[ddp] will unsubscribe from subscription with id ${id}`)
       return this.subscriptions[id].unsubscribe()
     })
     return Promise.all(unsubAll)
