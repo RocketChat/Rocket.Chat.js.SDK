@@ -60,5 +60,6 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   async onMessage (cb: ICallback): Promise<any> {
     return (await this.socket as IDriver).onMessage(cb)
   }
+  async methodCall (method: string, ...args: any[]): Promise<ISubscription> { return (await this.socket as IDriver).methodCall(method, ...args) }
 
 }

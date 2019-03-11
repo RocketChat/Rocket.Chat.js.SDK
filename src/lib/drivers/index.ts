@@ -48,6 +48,10 @@ export interface IDriver {
   subscribeNotifyUser (): Promise<IDriver>
 
   onTyping (cb: ICallback): Promise<any>
+
+  notifyVisitorTyping(rid: string, username: string, typing: boolean, token: string): Promise<any>
+
+  methodCall (method: string, ...args: any[]): Promise<any>
 }
 
 export enum Protocols {

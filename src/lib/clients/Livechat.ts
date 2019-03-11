@@ -44,12 +44,25 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   async onTyping (cb: ICallback): Promise<any> { return (await this.socket as IDriver).onTyping(cb) }
   async onAgentChange (rid: string, cb: ICallback) {
     await this.subscribe(this.livechatStream, rid)
-    this.onStreamData(this.livechatStream, ({ type, data }: any) => {
+    this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
       if (type === 'agentData') {
         cb(data)
       }
     })
   }
+  async onAgentStatusChange(rid: string, cb:ICallback){
+    await this.subscribe(this.livechatStream, rid);
+    this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, status }] } }: any) => {
+      if (type === 'agentStatus') {
+        cb(status)
+      }
+    })
+  }
+
+  async notifyVisitorTyping(rid: string, username: string, typing: boolean){
+    return (await this.socket as IDriver).notifyVisitorTyping(rid, username, typing, this.credentials.token);
+  }
+
   async subscribe (topic: string, eventName: string) {
     const { token } = this.credentials
     return (await this.socket as ISocket).subscribe(topic, eventName, { token, visitorToken: token })

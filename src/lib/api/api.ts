@@ -103,31 +103,43 @@ class Client implements IClient {
     }
   }
 
+  getHeaders (options?: any) {
+    return options && options.customHeaders ?
+      options.customHeaders :
+      this.headers
+  }
+
+  getBody (data: any) {
+    return data instanceof FormData ?
+      data :
+      JSON.stringify(data)
+  }
+
   get (url: string, data: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}?${this.getParams(data)}`, {
       method: 'GET',
-      headers: this.headers
+      headers: this.getHeaders(options)
     }).then(this.handle) as Promise<any>
   }
   post (url: string, data: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'POST',
-      body: JSON.stringify(data),
-      headers: this.headers
+      body: this.getBody(data),
+      headers: this.getHeaders(options)
     }).then(this.handle) as Promise<any>
   }
   put (url: string, data: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
-      headers: this.headers
+      body: this.getBody(data),
+      headers: this.getHeaders(options)
     }).then(this.handle) as Promise<any>
   }
 
   delete (url: string, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
-      method: 'DEL',
-      headers: this.headers
+      method: 'DELETE',
+      headers: this.getHeaders(options)
     }).then(this.handle) as Promise<any>
   }
   private async handle (r: any) {
@@ -189,7 +201,8 @@ export default class Api extends EventEmitter {
 		endpoint: string,
 		data: any = {},
 		auth: boolean = true,
-		ignore?: RegExp
+    ignore?: RegExp,
+    options?: any
 	) => {
     this.logger && this.logger.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
@@ -198,32 +211,33 @@ export default class Api extends EventEmitter {
       }
       let result
       switch (method) {
-        case 'GET': result = await this.client.get(endpoint, data, { }); break
-        case 'PUT': result = await this.client.put(endpoint, data); break
-        case 'DELETE': result = await this.client.delete(endpoint, data); break
+        case 'GET': result = await this.client.get(endpoint, data, options); break
+        case 'PUT': result = await this.client.put(endpoint, data, options); break
+        case 'DELETE': result = await this.client.delete(endpoint, data, options); break
         default:
-        case 'POST': result = await this.client.post(endpoint, data); break
+        case 'POST': result = await this.client.post(endpoint, data, options); break
       }
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
       this.logger && this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`)
-      return (method === 'DELETE') ? result : result.data
+      const hasDataInsideResult = result && !result.data;
+      return (method === 'DELETE') && hasDataInsideResult ? result : result.data
     } catch (err) {
       this.logger && this.logger.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
       throw err
     }
   }
 	/** Do a POST request to an API endpoint. */
-  post: IAPIRequest = (endpoint, data, auth, ignore) => this.request('POST', endpoint, data, auth, ignore)
+  post: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('POST', endpoint, data, auth, ignore, options)
 
 	/** Do a GET request to an API endpoint. */
-  get: IAPIRequest = (endpoint, data, auth, ignore) => this.request('GET', endpoint, data, auth, ignore)
+  get: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('GET', endpoint, data, auth, ignore, options)
 
 	/** Do a PUT request to an API endpoint. */
-  put: IAPIRequest = (endpoint, data, auth, ignore) => this.request('PUT', endpoint, data, auth, ignore)
+  put: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('PUT', endpoint, data, auth, ignore, options)
 
 	/** Do a DELETE request to an API endpoint. */
-  del: IAPIRequest = (endpoint, data, auth, ignore) => this.request('DELETE', endpoint, data, auth, ignore)
+  del: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('DELETE', endpoint, data, auth, ignore, options)
 
 	/** Check result data for success, allowing override to ignore some errors */
   success (result: any, ignore?: RegExp) {

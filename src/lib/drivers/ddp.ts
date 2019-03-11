@@ -64,7 +64,7 @@ export class Socket extends EventEmitter {
     this.config = {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
-      reopen: options.reopen || this.logger.debug,
+      reopen: options.reopen || 10000,
       ping: options.timeout || 30000
     }
 
@@ -83,7 +83,7 @@ export class Socket extends EventEmitter {
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
    */
-  open (ms: number = this.config.reopen) {
+  open = (ms: number = this.config.reopen) => {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
       this.lastPing = Date.now()
@@ -107,7 +107,7 @@ export class Socket extends EventEmitter {
   }
 
   /** Send handshake message to confirm connection, start pinging. */
-  async onOpen (callback: Function) {
+  onOpen = async (callback: Function) => {
     const connected = await this.send({
       msg: 'connect',
       version: '1',
@@ -121,7 +121,7 @@ export class Socket extends EventEmitter {
   }
 
   /** Emit close event so it can be used for promise resolve in close() */
-  onClose (e: any) {
+  onClose = (e: any) => {
     try {
       this.emit('close', e)
       if (e.code !== 1000) {
@@ -142,7 +142,7 @@ export class Socket extends EventEmitter {
    * Any matched handlers are removed once called.
    * All collection events are emitted with their `msg` as the event name.
    */
-  onMessage (e: any) {
+  onMessage = (e: any) => {
     this.lastPing = Date.now()
     this.ping()
     const data = (e.data) ? JSON.parse(e.data) : undefined
@@ -154,7 +154,7 @@ export class Socket extends EventEmitter {
   }
 
   /** Disconnect the DDP from server and clear all subscriptions. */
-  async close () {
+  close = async () => {
     if (this.connected) {
       await this.unsubscribeAll()
       await new Promise((resolve) => {
@@ -170,7 +170,7 @@ export class Socket extends EventEmitter {
   }
 
   /** Clear connection and try to connect again. */
-  async reopen () {
+  reopen = async () => {
     if (this.openTimeout) return
     await this.close()
     this.openTimeout = setTimeout(async () => {
@@ -205,9 +205,7 @@ export class Socket extends EventEmitter {
    * @param msg       The `data.msg` value to wait for in response
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
-  async send (
-      obj: any
-    ): Promise<any> {
+  send = async (obj: any): Promise<any> => {
     return new Promise((resolve, reject) => {
       if (!this.connection) throw new Error('[ddp] sending without open connection')
       const id = obj.id || `ddp-${ this.sent }`
@@ -230,7 +228,7 @@ export class Socket extends EventEmitter {
   }
 
   /** Send ping, record time, re-open if nothing comes back, repeat */
-  async ping () {
+  ping = async () => {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' })
@@ -241,7 +239,7 @@ export class Socket extends EventEmitter {
     }, this.config.ping)
   }
   /** Check if ping-pong to server is within tolerance of 1 missed ping */
-  alive () {
+  alive = () => {
     if (!this.lastPing) return false
     return (Date.now() - this.lastPing <= this.config.ping * 2)
   }
@@ -252,7 +250,7 @@ export class Socket extends EventEmitter {
    * @param method    The name of the method to be called
    * @param params    An array with the parameters to be sent
    */
-  async call (method: string, ...params: any[]) {
+  call = async (method: string, ...params: any[]) => {
     const response = await this.send({ msg: 'method', method, params })
       .catch((err) => {
         this.logger.error(`[ddp] Call error: ${err.message}`)
@@ -265,7 +263,7 @@ export class Socket extends EventEmitter {
    * Login to server and resubscribe to all subs, resolve with user information.
    * @param credentials User credentials (username/password, oauth or token)
    */
-  async login (credentials: any) {
+  login = async (credentials: any) => {
     const params = this.loginParams(credentials)
     this.resume = (await this.call('login', params) as ILoginResult)
     await this.subscribeAll()
@@ -274,14 +272,14 @@ export class Socket extends EventEmitter {
   }
 
   /** Take variety of login credentials object types for accepted params */
-  loginParams (
+  loginParams = (
     credentials:
       ICredentialsPass |
       ICredentialsOAuth |
       ICredentialsAuthenticated |
       ILoginResult |
       ICredentials
-  ) {
+  ) => {
     if (
       isLoginPass(credentials) ||
       isLoginOAuth(credentials) ||
@@ -306,14 +304,14 @@ export class Socket extends EventEmitter {
   }
 
   /** Logout the current User from the server via Socket. */
-  logout () {
+  logout = () => {
     this.resume = null
     return this.unsubscribeAll()
 			.then(() => this.call('logout'))
   }
 
   /** Register a callback to trigger on message events in subscription */
-  onEvent (id: string, callback: ISocketMessageCallback) {
+  onEvent = (id: string, callback: ISocketMessageCallback) => {
     this.on(id, callback)
   }
 
@@ -323,7 +321,7 @@ export class Socket extends EventEmitter {
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
-  subscribe (name: string, params: any[], callback ?: ISocketMessageCallback) {
+  subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback) => {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.send({ msg: 'sub', name, params })
       .then((result) => {
@@ -342,7 +340,7 @@ export class Socket extends EventEmitter {
   }
 
   /** Subscribe to all pre-configured streams (e.g. on login resume) */
-  subscribeAll () {
+  subscribeAll = () => {
     const subscriptions = Object.keys(this.subscriptions || {}).map((key) => {
       const { name, params } = this.subscriptions[key]
       return this.subscribe(name, params)
@@ -351,7 +349,7 @@ export class Socket extends EventEmitter {
   }
 
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
-  unsubscribe (id: any) {
+  unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(id)
     delete this.subscriptions[id]
     return this.send({ msg: 'unsub', id })
@@ -365,7 +363,7 @@ export class Socket extends EventEmitter {
   }
 
   /** Unsubscribe from all active subscriptions and reset collection */
-  unsubscribeAll () {
+  unsubscribeAll = () => {
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
       return this.subscriptions[id].unsubscribe()
     })
@@ -436,7 +434,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 	 *    .then(() => console.log('connected'))
 	 *    .catch((err) => console.error(err))
 	 */
-  connect (c: any = {}): Promise<any> {
+  connect = (c: any = {}): Promise<any> => {
     if (this.connected) {
       return Promise.resolve(this)
     }
@@ -478,16 +476,16 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return !!this.ddp.connected
   }
 
-  disconnect (): Promise<any> {
+  disconnect = (): Promise<any> => {
     return this.ddp.close()
   }
 
-  subscribe (topic: string, eventname: string, ...args: any[]): Promise<ISubscription> {
+  subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription> => {
     this.logger.info(`[DDP driver] Subscribing to ${topic} | ${JSON.stringify(args)}`)
     return this.ddp.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
   }
 
-  subscribeNotifyAll (): Promise< any> {
+  subscribeNotifyAll = (): Promise< any> => {
     const topic = 'stream-notify-all'
     return Promise.all([
       'updateEmojiCustom',
@@ -496,7 +494,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, event, false)))
   }
 
-  subscribeLoggedNotify (): Promise<any> {
+  subscribeLoggedNotify = (): Promise<any> => {
     const topic = 'stream-notify-logged'
     return Promise.all([
       'Users:NameChanged',
@@ -509,7 +507,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, event, false)))
   }
 
-  subscribeNotifyUser (): Promise<any> {
+  subscribeNotifyUser = (): Promise<any> => {
     const topic = 'stream-notify-user'
     return Promise.all([
       'message',
@@ -522,7 +520,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, `${this.userId}/${event}`, false)))
   }
 
-  subscribeRoom (rid: string, ...args: any[]): Promise<ISubscription[]> {
+  subscribeRoom = (rid: string, ...args: any[]): Promise<ISubscription[]> => {
     const topic = 'stream-notify-room'
     return Promise.all([
       this.subscribe('stream-room-messages', rid, ...args),
@@ -532,7 +530,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   }
 
 	/** Login to Rocket.Chat via DDP */
-  async login (credentials: ICredentials, args: any): Promise<any> {
+  login = async (credentials: ICredentials, args: any): Promise<any> => {
     if (!this.ddp || !this.ddp.connected) {
       await this.connect()
     }
@@ -541,40 +539,54 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     this.userId = login.id
     return login
   }
-  async logout () {
+  logout = async () => {
     if (this.ddp && this.ddp.connected) {
       await this.ddp.logout()
     }
 
   }
 	/** Unsubscribe from Meteor stream. Proxy for socket unsubscribe. */
-  unsubscribe (subscription: ISubscription) {
+  unsubscribe = (subscription: ISubscription) => {
     return this.ddp.unsubscribe(subscription.id)
   }
 
 	/** Unsubscribe from all subscriptions. Proxy for socket unsubscribeAll */
-  unsubscribeAll (): Promise<any> {
+  unsubscribeAll = (): Promise<any> => {
     return this.ddp.unsubscribeAll()
   }
 
-  onStreamData (name: string, cb: ICallback): Promise<any> {
-    return Promise.resolve(this.ddp.on(name, ({ fields: { args: [message] } }: any) => cb((message)))) as any
+  onStreamData = (event: string, cb: ICallback): Promise<any> => {
+    function listener(message: any) {
+      cb((message))
+    };
+    return Promise.resolve(this.ddp.on(event, listener))
+      .then(() => ({
+        stop: () => this.ddp.off(event, listener)
+      }));
   }
 
-  onMessage (cb: ICallback): void {
+  onMessage = (cb: ICallback): void => {
     this.ddp.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(this.ejsonMessage(message)))
   }
 
-  onTyping (cb: ICallback): Promise<any > {
+  onTyping = (cb: ICallback): Promise<any > => {
     return this.ddp.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
       cb(username, isTyping)
     }) as any
   }
 
-  ejsonMessage (message: any) {
+  notifyVisitorTyping = (rid: string, username: string, typing: boolean, token: string) => {
+    return this.ddp.call('stream-notify-room', `${ rid }/typing`, username, typing, { token })
+  }
+
+  ejsonMessage = (message: any) => {
     if (message.ts) {
       message.ts = new Date(message.ts.$date)
     }
     return message
+  }
+
+  methodCall = (method: string, ...args: any[]): Promise<any> => {
+    return this.ddp.call(method, ...args)
   }
 }

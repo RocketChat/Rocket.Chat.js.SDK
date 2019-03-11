@@ -55,7 +55,7 @@ Send Livechat Offline Message \`livechat.sendOfflineMessage()\`:
 ${JSON.stringify(await livechat.sendOfflineMessage(mockOfflineMessage), null, '\t')}
 
 Send Livechat Visitor Navigation \`livechat.sendVisitorNavigation()\`:
-${JSON.stringify(await livechat.sendVisitorNavigation(roomCredential, pageInfo), null, '\t')}
+${JSON.stringify(await livechat.sendVisitorNavigation(pageInfo), null, '\t')}
 
   `)
 }
