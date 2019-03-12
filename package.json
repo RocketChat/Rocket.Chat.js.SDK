@@ -42,8 +42,12 @@
     "prebuild": "npm run test",
     "build": "rimraf ./dist/* && tsc && webpack && npm run test:package",
     "builddist": "rimraf ./dist/* && tsc",
-    "publish:prepare": "node .scripts/release.js"
+    "publish:prepare": "node .scripts/release.js",
+    "tsc:watch": "./node_modules/typescript/bin/tsc --watch"
   },
+  "files": [
+    "/dist"
+  ],
   "husky": {
     "hooks": {
       "pre-push": "npm run test:hook"
