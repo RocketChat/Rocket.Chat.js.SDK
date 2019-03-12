@@ -90,20 +90,25 @@ export class Socket extends EventEmitter {
       await this.close()
       if (this.reopenInterval) clearInterval(this.reopenInterval)
       this.reopenInterval = setInterval(() => {
-        return !this.alive() && this.reopen()
+        if (!this.alive()) {
+          this.logger.debug('Will reopen connection on reopen interval')
+          return this.reopen()
+        }
       }, ms)
       try {
         this.logger.debug('[DDP] Will create new websocket')
-        connection = new WebSocket(this.host)
-        connection.onerror = reject
+        const connection = new WebSocket(this.host)
+        connection.onerror = (err: Error) => {
+          reject(err)
+        }
+        this.connection = connection
+        this.connection!.onmessage = this.onMessage.bind(this)
+        this.connection!.onclose = this.onClose.bind(this)
+        this.connection!.onopen = this.onOpen.bind(this, resolve)
       } catch (err) {
         this.logger.error(err)
         return reject(err)
       }
-      this.connection = connection
-      this.connection.onmessage = this.onMessage.bind(this)
-      this.connection.onclose = this.onClose.bind(this)
-      this.connection.onopen = this.onOpen.bind(this, resolve)
     })
   }
 
@@ -165,13 +170,6 @@ export class Socket extends EventEmitter {
 /** Disconnect the DDP from server and clear all subscriptions. */
   close = async () => {
     if (this.connected) {
-      try {
-        this.logger.debug(`[ddp] will try call unsubscribeAll`)
-        await this.unsubscribeAll()
-        this.logger.debug(`[ddp] unsubscribeAll succeeded`)
-      } catch (error) {
-        this.logger.error(`[DDP driver] could not unsubscribe from all subscribtions on close`)
-      }
       await new Promise((resolve) => {
         if (this.connection) {
           this.logger.debug(`[ddp] will wait for disconnect`)
@@ -192,7 +190,10 @@ export class Socket extends EventEmitter {
 
   /** Clear connection and try to connect again. */
   reopen = async () => {
-    if (this.openTimeout) return
+    if (this.openTimeout) {
+      this.logger.debug('[ddp] openTimeout still')
+      return
+    }
     try {
       await this.close()
     } catch (error) {
@@ -200,7 +201,9 @@ export class Socket extends EventEmitter {
     }
     this.logger.debug(`[ddp] set timeout until reopen ${this.config.reopen}`)
     this.openTimeout = setTimeout(async () => {
-      if (this.openTimeout) delete this.openTimeout
+      if (this.openTimeout) {
+        delete this.openTimeout
+      }
       await this.open()
         .catch((err) => this.logger.error(`[ddp] Reopen error: ${err.message}`))
     }, this.config.reopen)
@@ -510,35 +513,19 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return new Promise((resolve, reject) => {
       this.logger.info('[driver] Connecting', config)
       this.subscriptions = this.ddp.subscriptions
+
       this.ddp.open().catch((err: Error) => {
         this.logger.error(`[driver] Failed to connect: ${err.message}`)
-        reject(err)
       })
 
       this.ddp.on('open', () => this.emit('connected')) // echo ddp event
 
-      let cancelled = false
-      const rejectionTimeout = setTimeout(() => {
-        this.logger.info(`[driver] Timeout (${config.timeout})`)
-        const err = new Error('Socket connection timeout')
-        cancelled = true
-        this.ddp.removeAllListeners('connected')
-        reject(err)
-      }, config.timeout)
-
 			// if to avoid condition where timeout happens before listener to 'connected' is added
 			// and this listener is not removed (because it was added after the removal)
-      if (!cancelled) {
-        this.once('connected', () => {
-          this.logger.info('[driver] Connected')
-          if (cancelled) {
-            this.logger.debug('[driver] close ddp as already rejected')
-            return this.ddp.close()
-          }
-          clearTimeout(rejectionTimeout)
-          resolve(this as IDriver)
-        })
-      }
+      this.once('connected', () => {
+        this.logger.info('[driver] Connected')
+        resolve(this as IDriver)
+      })
     })
   }
 
@@ -547,7 +534,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   }
 
   disconnect = (): Promise<any> => {
-    return this.ddp.close()
+    return this.ddp.unsubscribeAll().then(() => this.ddp.close())
   }
 
   subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription> => {
