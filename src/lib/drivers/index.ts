@@ -15,6 +15,7 @@ import {
 export interface ISocket {
   logger: ILogger
   connect (options: ISocketOptions): Promise<ISocket | IDriver>
+  reconnect (): Promise<any>
   disconnect (): Promise<ISocket>
   subscribe (topic: string, ...args: any[]): Promise<ISubscription>
   unsubscribe (subscription: ISubscription): Promise<ISocket>
@@ -56,6 +57,8 @@ export interface IDriver {
   logout (): Promise<any>
 
   removeCredentials (): Promise<any>
+  reconnect (): Promise<any>
+
 }
 
 export enum Protocols {

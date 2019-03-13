@@ -189,7 +189,10 @@ export class Socket extends EventEmitter {
   }
 
   /** Clear connection and try to connect again. */
-  reopen = async () => {
+  reopen = async (forceClearTimeout?: boolean) => {
+    if (forceClearTimeout && this.openTimeout) {
+      delete this.openTimeout
+    }
     if (this.openTimeout) {
       this.logger.debug('[ddp] openTimeout still')
       return
@@ -527,6 +530,13 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
         resolve(this as IDriver)
       })
     })
+  }
+
+  reconnect = () => {
+    if (this.connected) {
+      return Promise.resolve(this)
+    }
+    return this.ddp.reopen(true)
   }
 
   get connected (): boolean {

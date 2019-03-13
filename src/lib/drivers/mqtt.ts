@@ -109,6 +109,11 @@ export class MQTTDriver extends EventEmitter implements ISocket, IDriver {
     return Promise.resolve() as any
   }
 
+  reconnect (): Promise < any > {
+    // todo: implement
+    return Promise.resolve() as any
+  }
+
 	// usertyping room-messages deleted messages
   subscribeRoom (rid: string, ...args: any[]): Promise < ISubscription[] > {
     return this.subscribe(`room-messages/${rid}`, { qos: 0 }) as any
