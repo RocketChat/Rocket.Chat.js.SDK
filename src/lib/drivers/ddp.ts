@@ -191,6 +191,7 @@ export class Socket extends EventEmitter {
   /** Clear connection and try to connect again. */
   reopen = async (forceClearTimeout?: boolean) => {
     const openConnection = async () => {
+      this.logger.debug(`[ddp] will try open connection from reopen function`)
       if (this.openTimeout) {
         delete this.openTimeout
       }
