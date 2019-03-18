@@ -191,18 +191,21 @@ export class Socket extends EventEmitter {
   /** Clear connection and try to connect again. */
   reopen = async (forceClearTimeout?: boolean) => {
     const openConnection = async () => {
-      this.logger.debug(`[ddp] will try open connection from reopen function`)
-      if (this.openTimeout) {
+      this.logger.debug(`[ddp] will try open connection after timeout, timeout: ${this.openTimeout}`)
+      if (this.openTimeout !== undefined && this.openTimeout !== null) {
+        clearTimeout(this.openTimeout as number)
         delete this.openTimeout
+        this.logger.debug(`[ddp] timeout on reopen reset`)
       }
-      await this.open()
+      this.open()
+        .then(() => this.logger.debug(`[ddp] Reopen connection succeeded`))
         .catch((err) => this.logger.error(`[ddp] Reopen error: ${err.message}`))
     }
     if (forceClearTimeout) {
       return openConnection()
     }
     if (this.openTimeout) {
-      this.logger.debug('[ddp] openTimeout still')
+      this.logger.debug(`[ddp] openTimeout timer is still running, timeout: ${this.openTimeout}`)
       return
     }
     try {
@@ -211,7 +214,7 @@ export class Socket extends EventEmitter {
       this.logger.error('[ddp] error on close connection on reopen')
     }
     this.logger.debug(`[ddp] set timeout until reopen ${this.config.reopen}`)
-    this.openTimeout = setTimeout(async () => openConnection, this.config.reopen)
+    this.openTimeout = setTimeout(async () => openConnection(), this.config.reopen)
   }
 
   /** Check if websocket connected and ready. */
