@@ -114,12 +114,17 @@ export class Socket extends EventEmitter {
 
   /** Send handshake message to confirm connection, start pinging. */
   onOpen = async (callback: Function) => {
-    const connected = await this.send({
-      msg: 'connect',
-      version: '1',
-      support: ['1', 'pre2', 'pre1']
-    })
-    this.session = connected.session
+    try {
+      const connected = await this.send({
+        msg: 'connect',
+        version: '1',
+        support: ['1', 'pre2', 'pre1']
+      })
+      this.session = connected.session
+    } catch (error) {
+      this.logger.error('[ddp] Could not connect, session could not be started')
+    }
+
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
     try {
