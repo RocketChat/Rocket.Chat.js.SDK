@@ -354,6 +354,11 @@ As above, with room name instead of ID
 As above, with username for DM instead of ID
 - Creates DM room if it doesn't exist
 
+### `driver.execSlashCommand(command)`
+
+Execute slash command on server
+- Accept command object
+
 ---
 
 ## METHOD CACHE
