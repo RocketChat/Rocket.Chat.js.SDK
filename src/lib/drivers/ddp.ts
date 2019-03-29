@@ -419,6 +419,8 @@ export class Socket extends EventEmitter {
   subscribeAll = () => {
     const subscriptions = Object.keys(this.subscriptions || {}).map((key) => {
       const { name, params } = this.subscriptions[key]
+      // remove subscription as this would create duplicates
+      delete this.subscriptions[key]
       return this.subscribe(name, params)
     })
     return Promise.all(subscriptions)
