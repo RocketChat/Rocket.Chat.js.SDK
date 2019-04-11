@@ -14,8 +14,8 @@ import {
 	INewLivechatCustomFieldAPI,
 	INewLivechatOfflineMessageAPI,
 	INewLivechatCustomFieldsAPI,
-  ILivechatRoom,
-  INewLivechatRoomCredentialAPI,
+	ILivechatRoom,
+	INewLivechatRoomCredentialAPI,
 	ILivechatUploadAPI
 } from '../../interfaces'
 
