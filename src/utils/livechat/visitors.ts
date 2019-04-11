@@ -4,7 +4,6 @@ import { mockVisitor, mockCustomField, mockCustomFields } from '../config'
 
 silence()
 const livechat = new Api({})
-const { token } = mockVisitor.visitor
 
 async function visitors () {
   console.log(`

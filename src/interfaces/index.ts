@@ -611,6 +611,7 @@ export interface ILivechatRoomCredentialAPI {
 export interface ILivechatRoom {
   rid: string
   department?: string
+  agentId?: string
 }
 
 /** Structure for livechat room messages api */
