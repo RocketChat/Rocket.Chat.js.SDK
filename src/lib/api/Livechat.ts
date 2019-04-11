@@ -14,7 +14,8 @@ import {
 	INewLivechatCustomFieldAPI,
 	INewLivechatOfflineMessageAPI,
 	INewLivechatCustomFieldsAPI,
-	ILivechatRoom,
+  ILivechatRoom,
+  INewLivechatRoomCredentialAPI,
 	ILivechatUploadAPI
 } from '../../interfaces'
 
@@ -24,7 +25,7 @@ export default class ApiLivechat extends ApiBase {
   credentials: ILivechatRoomCredentialAPI = {} as any
   login (guest: INewLivechatGuestAPI | any) { return this.grantVisitor(guest) }
   async config (params?: ILivechatTokenAPI) { return (await this.get('livechat/config', params, false)).config }
-  async room (params?: ILivechatRoom) { return (await this.get('livechat/room', { token: this.credentials.token, ...params }, false)).room }
+  async room (params?: INewLivechatRoomCredentialAPI) { return (await this.get('livechat/room', { token: this.credentials.token, ...params }, false)).room }
   closeChat ({ rid }: ILivechatRoom) { return this.post('livechat/room.close', { rid, token: this.credentials.token }, false) }
   transferChat ({ rid, department }: ILivechatRoom) { return (this.post('livechat/room.transfer', { rid, token: this.credentials.token, department }, false)) }
   chatSurvey (survey: ILivechatRoomSurveyAPI) { return (this.post('livechat/room.survey', { rid: survey.rid, token: this.credentials.token, data: survey.data }, false)) }
