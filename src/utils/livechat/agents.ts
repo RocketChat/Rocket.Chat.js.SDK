@@ -33,7 +33,7 @@ async function agent () {
 		${JSON.stringify(await livechat.agent({ rid, token }), null, '\t')}
 
 		Get Livechat Next Agent \`livechat.nextAgent()\`:
-		${JSON.stringify(await livechat.nextAgent({ token, department }), null, '\t')}
+		${JSON.stringify(await livechat.nextAgent(department), null, '\t')}
   `)
 }
 

@@ -32,7 +32,6 @@ async function messages () {
   const editMessage = { token, rid, msg: 'editing livechat message..' }
   const result = await livechat.sendMessage(newMessage)
   const _id = result && result.message && result.message._id
-  const roomCredential = { token, rid }
   const pageInfo = Object.assign({}, mockVisitorNavigation, { rid })
 
   console.log(`
