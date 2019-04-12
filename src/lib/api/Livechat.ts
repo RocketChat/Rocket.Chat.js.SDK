@@ -15,6 +15,7 @@ import {
 	INewLivechatOfflineMessageAPI,
 	INewLivechatCustomFieldsAPI,
 	ILivechatRoom,
+	INewLivechatRoomCredentialAPI,
 	ILivechatUploadAPI
 } from '../../interfaces'
 
@@ -24,7 +25,7 @@ export default class ApiLivechat extends ApiBase {
   credentials: ILivechatRoomCredentialAPI = {} as any
   login (guest: INewLivechatGuestAPI | any) { return this.grantVisitor(guest) }
   async config (params?: ILivechatTokenAPI) { return (await this.get('livechat/config', params, false)).config }
-  async room (rid: string = '') { return (await this.get('livechat/room', { token: this.credentials.token, rid }, false)).room }
+  async room (params?: INewLivechatRoomCredentialAPI) { return (await this.get('livechat/room', { token: this.credentials.token, ...params }, false)).room }
   closeChat ({ rid }: ILivechatRoom) { return this.post('livechat/room.close', { rid, token: this.credentials.token }, false) }
   transferChat ({ rid, department }: ILivechatRoom) { return (this.post('livechat/room.transfer', { rid, token: this.credentials.token, department }, false)) }
   chatSurvey (survey: ILivechatRoomSurveyAPI) { return (this.post('livechat/room.survey', { rid: survey.rid, token: this.credentials.token, data: survey.data }, false)) }
@@ -38,7 +39,7 @@ export default class ApiLivechat extends ApiBase {
   }
   async deleteVisitor () { return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor}
   async updateVisitorStatus(status: string) { return (await this.post(`livechat/visitor.status`, { token: this.credentials.token, status })).status }
-  async nextAgent (department?: any) { return (await this.get(`livechat/agent.next/${this.credentials.token}`, { department })).agent }
+  async nextAgent (department: string = '' ) { return (await this.get(`livechat/agent.next/${this.credentials.token}`, { department })).agent }
   async agent ({ rid }: any) { return (await this.get(`livechat/agent.info/${rid}/${this.credentials.token}`)).agent }
   sendMessage (message: INewLivechatMessageAPI) { return (this.post('livechat/message', { ...message, token: this.credentials.token }, false)) }
   editMessage (id: string, message: INewLivechatMessageAPI) { return (this.put(`livechat/message/${id}`, message, false)) }
