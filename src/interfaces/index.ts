@@ -613,6 +613,12 @@ export interface ILivechatRoom {
   department?: string
 }
 
+/** Structure to get(new) livechat room */
+export interface INewLivechatRoomCredentialAPI {
+  rid?: string
+  agentId?: string
+}
+
 /** Structure for livechat room messages api */
 export interface ILivechatRoomMessagesAPI {
   token: string   // Visitor token
