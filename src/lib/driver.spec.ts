@@ -362,7 +362,8 @@ describe('driver', () => {
         msgId: sentMessage.message._id,
         text: 'SDK test `respondToMessages` edited'
       })
-      sinon.assert.calledOnce(callback)
+      await delay(500);
+      sinon.assert.called(callback)
     })
     it('by default ignores DMs', async () => {
       const dmResult = await utils.setupDirectFromUser()
@@ -388,6 +389,7 @@ describe('driver', () => {
       const callback = sinon.spy()
       driver.respondToMessages(callback, { rooms: [tName] })
       await utils.leaveUser()
+      await delay(500)
       sinon.assert.calledWithMatch(callback, null, sinon.match({ t: 'ul' }))
       await utils.inviteUser()
     })
@@ -396,6 +398,7 @@ describe('driver', () => {
       const callback = sinon.spy()
       driver.respondToMessages(callback, { rooms: [tName] })
       await utils.inviteUser()
+      await delay(500)
       sinon.assert.calledWithMatch(callback, null, sinon.match({ t: 'au' }))
     })
     // it('appends room name to event meta in channels', async () => {

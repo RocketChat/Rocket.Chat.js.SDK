@@ -4,6 +4,7 @@ import { Message } from './message';
 import { IConnectOptions, IRespondOptions, ICallback, ILogger } from '../config/driverInterfaces';
 import { IAsteroid, ICredentials, ISubscription, ICollection } from '../config/asteroidInterfaces';
 import { IMessage } from '../config/messageInterfaces';
+import { ISlashCommand } from '../config/slashCommandInterfaces';
 import { IMessageReceiptAPI } from '../utils/interfaces';
 /** Internal for comparing message update timestamps */
 export declare let lastReadTime: Date;
@@ -199,3 +200,5 @@ export declare function editMessage(message: IMessage): Promise<IMessage>;
  * @param messageId ID for a previously sent message
  */
 export declare function setReaction(emoji: string, messageId: string): Promise<any>;
+/** Add slash command */
+export declare function execSlashCommand(command: ISlashCommand): Promise<void>;
