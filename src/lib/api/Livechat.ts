@@ -16,7 +16,8 @@ import {
 	INewLivechatCustomFieldsAPI,
 	ILivechatRoom,
 	INewLivechatRoomCredentialAPI,
-	ILivechatUploadAPI
+	ILivechatUploadAPI,
+	ILivechatMessageCredentialAPI
 } from '../../interfaces'
 
 import ApiBase from './api'
@@ -41,6 +42,7 @@ export default class ApiLivechat extends ApiBase {
   async updateVisitorStatus(status: string) { return (await this.post(`livechat/visitor.status`, { token: this.credentials.token, status })).status }
   async nextAgent (department: string = '' ) { return (await this.get(`livechat/agent.next/${this.credentials.token}`, { department })).agent }
   async agent ({ rid }: any) { return (await this.get(`livechat/agent.info/${rid}/${this.credentials.token}`)).agent }
+  async message (id: string, params: ILivechatMessageCredentialAPI) { return (await this.get(`livechat/message/${id}`, { token: this.credentials.token, ...params } )).message }
   sendMessage (message: INewLivechatMessageAPI) { return (this.post('livechat/message', { ...message, token: this.credentials.token }, false)) }
   editMessage (id: string, message: INewLivechatMessageAPI) { return (this.put(`livechat/message/${id}`, message, false)) }
   deleteMessage (id: string, { rid }: ILivechatRoom) { return (this.del(`livechat/message/${id}`, { rid, token: this.credentials.token }, false)) }

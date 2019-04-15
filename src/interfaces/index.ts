@@ -619,6 +619,12 @@ export interface INewLivechatRoomCredentialAPI {
   agentId?: string
 }
 
+/** Structure to get livechat message */
+export interface ILivechatMessageCredentialAPI {
+  rid: string
+  token: string
+}
+
 /** Structure for livechat room messages api */
 export interface ILivechatRoomMessagesAPI {
   token: string   // Visitor token
