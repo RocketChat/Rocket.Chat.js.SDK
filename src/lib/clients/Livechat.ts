@@ -76,4 +76,8 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   async onStreamData (event: string, cb: ICallback): Promise<any> {
     return (await this.socket as ISocket).onStreamData(event, cb)
   }
+
+  async setUpConnection(data: any) {
+    return (await this.socket as IDriver).methodCall('livechat:setUpConnection', data)
+  }
 }
