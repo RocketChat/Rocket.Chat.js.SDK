@@ -34,7 +34,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
     }
   }
   async connect (options: ISocketOptions, callback?: ICallback): Promise <any> {
-    return (await this.socket as ISocket).connect(options).then(() => (this.setUpConnection(options)))
+    return (await this.socket as ISocket).connect(options).then(() => (this.setUpConnection()))
   }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
   async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
@@ -79,10 +79,8 @@ export default class LivechatClient extends LivechatRest implements ISocket {
     return (await this.socket as ISocket).onStreamData(event, cb)
   }
 
-  async setUpConnection(options: any) {
-    if (!options || !options.token) return
-
-    const { token } = options;
+  async setUpConnection() {
+    const { token } = this.credentials
     return (await this.socket as IDriver).methodCall('livechat:setUpConnection', { token })
   }
 }
