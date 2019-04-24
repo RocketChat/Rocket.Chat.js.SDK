@@ -33,7 +33,9 @@ export default class LivechatClient extends LivechatRest implements ISocket {
         throw new Error(`Invalid Protocol: ${protocol}, valids: ${Object.keys(Protocols).join()}`)
     }
   }
-  async connect (options: ISocketOptions, callback?: ICallback): Promise <any> { return (await this.socket as ISocket).connect(options) }
+  async connect (options: ISocketOptions, callback?: ICallback): Promise <any> {
+    return (await this.socket as ISocket).connect(options).then(() => (this.setUpConnection()))
+  }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
   async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
   async unsubscribeAll (): Promise<any> { return (await this.socket as ISocket).unsubscribeAll() }
@@ -75,5 +77,10 @@ export default class LivechatClient extends LivechatRest implements ISocket {
 
   async onStreamData (event: string, cb: ICallback): Promise<any> {
     return (await this.socket as ISocket).onStreamData(event, cb)
+  }
+
+  async setUpConnection() {
+    const { token } = this.credentials
+    return (await this.socket as IDriver).methodCall('livechat:setUpConnection', { token })
   }
 }
