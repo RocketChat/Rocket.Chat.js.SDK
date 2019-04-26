@@ -123,6 +123,7 @@ export async function post (
   } catch (err) {
     console.error(err)
     logger.error(`[API] POST error (${endpoint}):`, err)
+    throw err
   }
 }
 
@@ -155,6 +156,7 @@ export async function get (
     return result
   } catch (err) {
     logger.error(`[API] GET error (${endpoint}):`, err)
+    throw err
   }
 }
 
