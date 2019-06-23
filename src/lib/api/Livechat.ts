@@ -56,6 +56,7 @@ export default class ApiLivechat extends ApiBase {
     return (this.post('livechat/addLocationData', { ...locationData }, false))
   }
   checkLocationUser (token: string) { return this.get(`livechat/userLocation/${token}`) }
+  updateVisitCount (token: string) { return this.post(`livechat/updateVisitCount/${token}`) }
   videoCall ({ rid }: ILivechatRoom) { return this.get(`livechat/video.call/${this.credentials.token}`, { rid }, false) }
   sendCustomField (field: INewLivechatCustomFieldAPI) { return this.post('livechat/custom.field', field, false) }
   sendCustomFields (fields: INewLivechatCustomFieldsAPI) { return this.post('livechat/custom.fields', fields, false) }
