@@ -38,6 +38,9 @@ export default class ApiLivechat extends ApiBase {
     }
     return visitor
   }
+  updateVisitorSession (guest: INewLivechatGuestAPI) {
+    return this.post('livechat/updateVisitorSessionOnRegister', guest, false)
+  }
   async deleteVisitor () {
     return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor
   }
@@ -54,6 +57,9 @@ export default class ApiLivechat extends ApiBase {
   requestTranscript (email: string, { rid }: ILivechatRoom) { return (this.post('livechat/transcript', { token: this.credentials.token, rid, email }, false)) }
   sendLocationData (locationData: ILivechatLocationAPI) {
     return (this.post('livechat/addLocationData', { ...locationData }, false))
+  }
+  changeUserState (token: string) {
+    return this.post(`livechat/changeUserState/${this.credentials.token}`)
   }
   checkLocationUser (token: string) { return this.get(`livechat/userLocation/${token}`) }
   updateVisitCount (token: string) { return this.post(`livechat/updateVisitCount/${token}`) }
