@@ -909,12 +909,9 @@ export interface ILivechatLocationAPI {
 
 /** Location data sent by the API */
 export interface Location {
-  IPv4: string
   city: string
-  country_code: string
-  country_name: string
+  countryCode: string
+  countryName: string
   latitude: number
   longitude: number
-  postal: string
-  state: string
 }

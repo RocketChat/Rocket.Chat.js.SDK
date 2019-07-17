@@ -58,8 +58,8 @@ export default class ApiLivechat extends ApiBase {
   sendLocationData (locationData: ILivechatLocationAPI) {
     return (this.post('livechat/addLocationData', { ...locationData }, false))
   }
-  changeUserState (token: string) {
-    return this.post(`livechat/changeUserState/${this.credentials.token}`)
+  changeUserState (state: string) {
+    return this.post(`livechat/changeUserState/${this.credentials.token}/${state}`)
   }
   checkLocationUser (token: string) { return this.get(`livechat/userLocation/${token}`) }
   updateVisitCount (token: string) { return this.post(`livechat/updateVisitCount/${token}`) }
