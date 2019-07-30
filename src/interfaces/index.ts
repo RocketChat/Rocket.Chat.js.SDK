@@ -905,6 +905,15 @@ export interface ILivechatUploadAPI {
 export interface ILivechatLocationAPI {
   location: Location
   token: string
+  deviceInfo: Device
+}
+
+/** Browser and device info */
+export interface Device {
+  os: string
+  osVersion: number
+  browserName: string
+  browserVersion: number
 }
 
 /** Location data sent by the API */
