@@ -52,8 +52,8 @@ export default class LivechatClient extends LivechatRest implements ISocket {
       }
     })
   }
-  async onAgentStatusChange(rid: string, cb:ICallback){
-    await this.subscribe(this.livechatStream, rid);
+  async onAgentStatusChange (rid: string, cb: ICallback) {
+    await this.subscribe(this.livechatStream, rid)
     this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, status }] } }: any) => {
       if (type === 'agentStatus') {
         cb(status)
@@ -61,8 +61,17 @@ export default class LivechatClient extends LivechatRest implements ISocket {
     })
   }
 
-  async notifyVisitorTyping(rid: string, username: string, typing: boolean){
-    return (await this.socket as IDriver).notifyVisitorTyping(rid, username, typing, this.credentials.token);
+  async onQueuePositionChange (rid: string, cb: ICallback) {
+    await this.subscribe(this.livechatStream, rid)
+    this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
+      if (type === 'queueData') {
+        cb(data)
+      }
+    })
+  }
+
+  async notifyVisitorTyping (rid: string, username: string, typing: boolean) {
+    return (await this.socket as IDriver).notifyVisitorTyping(rid, username, typing, this.credentials.token)
   }
 
   async subscribe (topic: string, eventName: string) {
@@ -79,7 +88,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
     return (await this.socket as ISocket).onStreamData(event, cb)
   }
 
-  async setUpConnection() {
+  async setUpConnection () {
     const { token } = this.credentials
     return (await this.socket as IDriver).methodCall('livechat:setUpConnection', { token })
   }
