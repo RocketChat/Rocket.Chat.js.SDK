@@ -127,6 +127,9 @@ export class Socket extends EventEmitter {
       if (e.code !== 1000) {
         return this.reopen()
       } else {
+        if (this.reopenInterval) clearInterval(this.reopenInterval)
+        this.openTimeout && clearTimeout(this.openTimeout as any)
+        this.pingTimeout && clearTimeout(this.pingTimeout as any)
         delete this.connection
       }
       this.logger.info(`[ddp] Close (${e.code}) ${e.reason}`)
@@ -156,7 +159,7 @@ export class Socket extends EventEmitter {
   /** Disconnect the DDP from server and clear all subscriptions. */
   close = async () => {
     if (this.connected) {
-      await this.unsubscribeAll()
+      this.unsubscribeAll().catch(e => this.logger.debug(e))
       await new Promise((resolve) => {
         if (this.connection) {
           this.once('close', resolve)
