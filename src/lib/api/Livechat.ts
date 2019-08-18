@@ -17,7 +17,8 @@ import {
 	ILivechatRoom,
 	INewLivechatRoomCredentialAPI,
   ILivechatUploadAPI,
-  ILivechatLocationAPI
+  ILivechatLocationAPI,
+  ILivechatUserAPI
 } from '../../interfaces'
 
 import ApiBase from './api'
@@ -38,7 +39,7 @@ export default class ApiLivechat extends ApiBase {
     }
     return visitor
   }
-  updateVisitorSession (guest: INewLivechatGuestAPI) {
+  updateVisitorSessionOnRegister (guest: INewLivechatGuestAPI) {
     return this.post('livechat/session.updateVisitorSessionOnRegister', guest, false)
   }
   async deleteVisitor () {
@@ -58,8 +59,11 @@ export default class ApiLivechat extends ApiBase {
   sendLocationData (locationData: ILivechatLocationAPI) {
     return (this.post('livechat/session.addLocationData', { ...locationData }, false))
   }
+  sendUserDataWithoutLocation (userData: ILivechatUserAPI) {
+    return (this.post('livechat/session.addLocationData', { ...userData }, false))
+  }
   async updateSessionStatus (status: string, token: string) { return (await this.post(`livechat/session.updateSessionStatus`, { token: token, status })).status }
-  checkLocationUser (token: string) { return this.get(`livechat/session.userLocation/${token}`) }
+  checkLocationUser (token: string) { return this.get(`livechat/session.visitorInfo/${token}`) }
   updateVisitCount (token: string) { return this.post(`livechat/session.updateVisitCount/${token}`) }
   videoCall ({ rid }: ILivechatRoom) { return this.get(`livechat/video.call/${this.credentials.token}`, { rid }, false) }
   sendCustomField (field: INewLivechatCustomFieldAPI) { return this.post('livechat/custom.field', field, false) }

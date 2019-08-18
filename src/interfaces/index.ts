@@ -908,6 +908,11 @@ export interface ILivechatLocationAPI {
   deviceInfo: Device
 }
 
+export interface ILivechatUserAPI {
+  token: string
+  deviceInfo: Device
+}
+
 /** Browser and device info */
 export interface Device {
   os: string
