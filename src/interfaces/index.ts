@@ -902,13 +902,8 @@ export interface ILivechatUploadAPI {
 }
 
 /** Structure for sending location data to the server */
-export interface ILivechatLocationAPI {
+export interface ILivechatSessionAPI {
   location: Location
-  token: string
-  deviceInfo: Device
-}
-
-export interface ILivechatUserAPI {
   token: string
   deviceInfo: Device
 }

@@ -17,8 +17,7 @@ import {
 	ILivechatRoom,
 	INewLivechatRoomCredentialAPI,
   ILivechatUploadAPI,
-  ILivechatLocationAPI,
-  ILivechatUserAPI
+  ILivechatSessionAPI
 } from '../../interfaces'
 
 import ApiBase from './api'
@@ -40,7 +39,7 @@ export default class ApiLivechat extends ApiBase {
     return visitor
   }
   updateVisitorSessionOnRegister (guest: INewLivechatGuestAPI) {
-    return this.post('livechat/session.updateVisitorSessionOnRegister', guest, false)
+    return this.put('livechat/session.register', guest, false)
   }
   async deleteVisitor () {
     return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor
@@ -56,14 +55,10 @@ export default class ApiLivechat extends ApiBase {
   async sendOfflineMessage (message: INewLivechatOfflineMessageAPI) { return (await this.post('livechat/offline.message', { ...message }, false)).message }
   sendVisitorNavigation (page: INewLivechatNavigationAPI) { return (this.post('livechat/page.visited', { ...page }, false)) }
   requestTranscript (email: string, { rid }: ILivechatRoom) { return (this.post('livechat/transcript', { token: this.credentials.token, rid, email }, false)) }
-  sendLocationData (locationData: ILivechatLocationAPI) {
-    return (this.post('livechat/session.register', { ...locationData }, false))
-  }
-  sendUserDataWithoutLocation (userData: ILivechatUserAPI) {
-    return (this.post('livechat/session.register', { ...userData }, false))
+  sendSessionData (sessionData: ILivechatSessionAPI) {
+    return (this.post('livechat/session.register', { ...sessionData }, false))
   }
   async updateSessionStatus (status: string, token: string) { return (await this.post(`livechat/session.updateSessionStatus`, { token: token, status })).status }
-  checkLocationUser (token: string) { return this.get(`livechat/session.visitorInfo/${token}`) }
   updateVisitCount (token: string) { return this.post(`livechat/session.incVisitCount/${token}`) }
   videoCall ({ rid }: ILivechatRoom) { return this.get(`livechat/video.call/${this.credentials.token}`, { rid }, false) }
   sendCustomField (field: INewLivechatCustomFieldAPI) { return this.post('livechat/custom.field', field, false) }
