@@ -136,9 +136,10 @@ class Client implements IClient {
     }).then(this.handle) as Promise<any>
   }
 
-  delete (url: string, options?: any): Promise<any> {
+  delete (url: string, data?: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'DELETE',
+      body: this.getBody(data),
       headers: this.getHeaders(options)
     }).then(this.handle) as Promise<any>
   }
