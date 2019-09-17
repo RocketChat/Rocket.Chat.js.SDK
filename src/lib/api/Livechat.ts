@@ -16,7 +16,8 @@ import {
 	INewLivechatCustomFieldsAPI,
 	ILivechatRoom,
 	INewLivechatRoomCredentialAPI,
-	ILivechatUploadAPI
+  ILivechatUploadAPI,
+  ILivechatSessionAPI
 } from '../../interfaces'
 
 import ApiBase from './api'
@@ -37,11 +38,16 @@ export default class ApiLivechat extends ApiBase {
     }
     return visitor
   }
-  async deleteVisitor () { return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor}
-  async updateVisitorStatus(status: string) { return (await this.post(`livechat/visitor.status`, { token: this.credentials.token, status })).status }
-  async nextAgent (department: string = '' ) { return (await this.get(`livechat/agent.next/${this.credentials.token}`, { department })).agent }
+  updateVisitorSessionOnRegister (guest: INewLivechatGuestAPI) {
+    return this.put('livechat/session.register', guest, false)
+  }
+  async deleteVisitor () {
+    return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor
+  }
+  async updateVisitorStatus (status: string) { return (await this.post(`livechat/visitor.status`, { token: this.credentials.token, status })).status }
+  async nextAgent (department: string = '') { return (await this.get(`livechat/agent.next/${this.credentials.token}`, { department })).agent }
   async agent ({ rid }: any) { return (await this.get(`livechat/agent.info/${rid}/${this.credentials.token}`)).agent }
-  async message (id: string, params: ILivechatRoom) { return (await this.get(`livechat/message/${id}`, { token: this.credentials.token, ...params } )).message }
+  async message (id: string, params: ILivechatRoom) { return (await this.get(`livechat/message/${id}`, { token: this.credentials.token, ...params })).message }
   sendMessage (message: INewLivechatMessageAPI) { return (this.post('livechat/message', { ...message, token: this.credentials.token }, false)) }
   editMessage (id: string, message: INewLivechatMessageAPI) { return (this.put(`livechat/message/${id}`, message, false)) }
   deleteMessage (id: string, { rid }: ILivechatRoom) { return (this.del(`livechat/message/${id}`, { rid, token: this.credentials.token }, false)) }
@@ -49,6 +55,11 @@ export default class ApiLivechat extends ApiBase {
   async sendOfflineMessage (message: INewLivechatOfflineMessageAPI) { return (await this.post('livechat/offline.message', { ...message }, false)).message }
   sendVisitorNavigation (page: INewLivechatNavigationAPI) { return (this.post('livechat/page.visited', { ...page }, false)) }
   requestTranscript (email: string, { rid }: ILivechatRoom) { return (this.post('livechat/transcript', { token: this.credentials.token, rid, email }, false)) }
+  sendSessionData (sessionData: ILivechatSessionAPI) {
+    return (this.post('livechat/session.register', { ...sessionData }, false))
+  }
+  async updateSessionStatus (status: string, token: string) { return (await this.post(`livechat/session.updateSessionStatus`, { token: token, status })).status }
+  updateVisitCount (token: string) { return this.post(`livechat/session.incVisitCount/${token}`) }
   videoCall ({ rid }: ILivechatRoom) { return this.get(`livechat/video.call/${this.credentials.token}`, { rid }, false) }
   sendCustomField (field: INewLivechatCustomFieldAPI) { return this.post('livechat/custom.field', field, false) }
   sendCustomFields (fields: INewLivechatCustomFieldsAPI) { return this.post('livechat/custom.fields', fields, false) }

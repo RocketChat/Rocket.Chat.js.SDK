@@ -900,3 +900,27 @@ export interface ILivechatUploadAPI {
   rid: string
   file: File
 }
+
+/** Structure for sending location data to the server */
+export interface ILivechatSessionAPI {
+  location: Location
+  token: string
+  deviceInfo: Device
+}
+
+/** Browser and device info */
+export interface Device {
+  os: string
+  osVersion: number
+  browserName: string
+  browserVersion: number
+}
+
+/** Location data sent by the API */
+export interface Location {
+  city: string
+  countryCode: string
+  countryName: string
+  latitude: number
+  longitude: number
+}

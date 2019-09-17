@@ -119,21 +119,21 @@ class Client implements IClient {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}?${this.getParams(data)}`, {
       method: 'GET',
       headers: this.getHeaders(options)
-    }).then(this.handle) as Promise<any>
+    }).then(this.handle)
   }
   post (url: string, data: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'POST',
       body: this.getBody(data),
       headers: this.getHeaders(options)
-    }).then(this.handle) as Promise<any>
+    }).then(this.handle)
   }
   put (url: string, data: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'PUT',
       body: this.getBody(data),
       headers: this.getHeaders(options)
-    }).then(this.handle) as Promise<any>
+    }).then(this.handle)
   }
 
   delete (url: string, data?: any, options?: any): Promise<any> {
@@ -141,7 +141,7 @@ class Client implements IClient {
       method: 'DELETE',
       body: this.getBody(data),
       headers: this.getHeaders(options)
-    }).then(this.handle) as Promise<any>
+    }).then(this.handle)
   }
   private async handle (r: any) {
     const { status } = r
@@ -221,7 +221,7 @@ export default class Api extends EventEmitter {
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
       this.logger && this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`)
-      const hasDataInsideResult = result && !result.data;
+      const hasDataInsideResult = result && !result.data
       return (method === 'DELETE') && hasDataInsideResult ? result : result.data
     } catch (err) {
       this.logger && this.logger.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
