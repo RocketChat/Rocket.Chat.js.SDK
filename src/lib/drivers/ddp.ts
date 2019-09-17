@@ -147,7 +147,7 @@ export class Socket extends EventEmitter {
    */
   onMessage = (e: any) => {
     this.lastPing = Date.now()
-    this.ping()
+    void this.ping()
     const data = (e.data) ? JSON.parse(e.data) : undefined
     this.logger.debug(data) // 👈  very useful for debugging missing responses
     if (!data) return this.logger.error(`[ddp] JSON parse error: ${e.message}`)
@@ -560,13 +560,13 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   }
 
   onStreamData = (event: string, cb: ICallback): Promise<any> => {
-    function listener(message: any) {
+    function listener (message: any) {
       cb((message))
-    };
+    }
     return Promise.resolve(this.ddp.on(event, listener))
       .then(() => ({
         stop: () => this.ddp.off(event, listener)
-      }));
+      }))
   }
 
   onMessage = (cb: ICallback): void => {

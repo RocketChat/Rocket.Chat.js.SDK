@@ -2,8 +2,6 @@ import { ISocket, IDriver, Protocols } from '../drivers'
 import ClientRest from '../api/RocketChat'
 import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
-import { EventEmitter } from 'tiny-events'
-
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
   logger: ILogger = Logger
@@ -14,9 +12,9 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     super({ ...config, logger })
     this.logger = logger
     switch (protocol) {
-      case Protocols.MQTT:
-        this.socket = import(/* webpackChunkName: 'mqtt' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver({ ...config, logger }))
-        break
+      // case Protocols.MQTT:
+      //   this.socket = import(/* webpackChunkName: 'mqtt' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver({ ...config, logger }))
+      //   break
       case Protocols.DDP:
         this.socket = import(/* webpackChunkName: 'ddp' */ '../drivers/ddp').then(({ DDPDriver }) => new DDPDriver({ ...config, logger }))
         break

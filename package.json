@@ -1,6 +1,6 @@
 {
   "name": "@rocket.chat/sdk",
-  "version": "1.0.0-alpha.29",
+  "version": "1.0.0-alpha.30",
   "description": "Node.js SDK for Rocket.Chat. Application interface for server methods and message streams.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,11 +47,13 @@
   },
   "husky": {
     "hooks": {
-      "pre-push": "npm run test:hook"
+			"pre-push": "npm run test:hook"
     }
   },
   "devDependencies": {
-    "@types/chai": "^4.1.2",
+		"@types/event-emitter": "^0.3.2",
+		"@types/eventemitter3": "^2.0.2",
+		"@types/chai": "^4.1.2",
     "@types/mocha": "^2.2.48",
     "@types/sinon": "^4.3.0",
     "@types/ws": "^5.1.2",
@@ -62,6 +64,8 @@
     "dotenv": "^5.0.1",
     "husky": "^0.14.3",
     "mocha": "^5.0.1",
+		"node-fetch": "^2.2.1",
+		"node-fetch-polyfill": "^2.0.6",
     "nyc": "^11.4.1",
     "package-preview": "^1.0.5",
     "rimraf": "^2.6.2",
@@ -77,29 +81,12 @@
     "webpack-cli": "^3.1.0"
   },
   "dependencies": {
-    "@types/event-emitter": "^0.3.2",
-    "@types/eventemitter3": "^2.0.2",
-    "@types/lru-cache": "^4.1.0",
-    "@types/node": "^9.4.6",
-    "axios": "^0.18.0",
-    "create-hash": "^1.2.0",
-    "crypto-browserify": "^3.12.0",
-    "eventemitter3": "^3.1.0",
+
     "js-sha256": "^0.9.0",
     "lru-cache": "^4.1.1",
     "mem": "^4.0.0",
-    "mqtt": "^2.18.8",
-    "msgpack": "^1.0.2",
-    "msgpack-lite": "^0.1.26",
-    "node-fetch": "^2.2.1",
-    "node-fetch-polyfill": "^2.0.6",
-    "paho-mqtt": "eclipse/paho.mqtt.javascript#master",
-    "protobufjs": "^6.8.8",
-    "sha256": "^0.2.0",
     "tiny-events": "^1.0.1",
-    "universal-websocket-client": "^1.0.2",
-    "web-mqtt-client": "^1.3.1",
-    "ws": "^5.2.0"
+    "universal-websocket-client": "^1.0.2"
   },
   "config": {
     "commitizen": {

@@ -23,9 +23,9 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   }
   import (protocol: Protocols, config: any) {
     switch (protocol) {
-      case Protocols.MQTT:
-        this.socket = import(/* webpackChunkName: 'mqtttest' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver({ logger: this.logger, ...config }))
-        break
+      // case Protocols.MQTT:
+      //   this.socket = import(/* webpackChunkName: 'mqtttest' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver({ logger: this.logger, ...config }))
+      //   break
       case Protocols.DDP:
         this.socket = import(/* webpackChunkName: 'ddptest' */ '../drivers/ddp').then(({ DDPDriver }) => new DDPDriver({ logger: this.logger, ...config }))
         break
@@ -46,7 +46,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   async onTyping (cb: ICallback): Promise<any> { return (await this.socket as IDriver).onTyping(cb) }
   async onAgentChange (rid: string, cb: ICallback) {
     await this.subscribe(this.livechatStream, rid)
-    this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
+    await this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
       if (type === 'agentData') {
         cb(data)
       }
@@ -54,7 +54,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   }
   async onAgentStatusChange (rid: string, cb: ICallback) {
     await this.subscribe(this.livechatStream, rid)
-    this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, status }] } }: any) => {
+    await this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, status }] } }: any) => {
       if (type === 'agentStatus') {
         cb(status)
       }
@@ -63,7 +63,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
 
   async onQueuePositionChange (rid: string, cb: ICallback) {
     await this.subscribe(this.livechatStream, rid)
-    this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
+    await this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, data }] } }: any) => {
       if (type === 'queueData') {
         cb(data)
       }

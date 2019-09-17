@@ -1,5 +1,4 @@
 import { logger } from '../log'
-import { IDriver } from '../drivers'
 import Rocketchat from './Rocketchat'
 import mem from 'mem'
 import {
@@ -10,7 +9,6 @@ import {
 	ISubscriptionEvent,
 	IMessage,
 	ISubscription,
-	ICredentials,
 	IMessageReceipt
 } from '../../interfaces'
 import { RID } from '../api/RocketChat'

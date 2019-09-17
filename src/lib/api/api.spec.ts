@@ -18,6 +18,7 @@ import LivechatApi from './Livechat'
 import * as settings from '../settings'
 import { IMessage } from '../../interfaces'
 global.fetch = require('node-fetch')
+global.FormData = require('form-data')
 // silence() // suppress log during tests (disable this while developing tests)
 
 const clientApi = new ClientApi({})
