@@ -16,10 +16,12 @@ Create your own working BOT for Rocket.Chat, in seconds, at [glitch.com](https:/
 Add your own Rocket.Chat BOT, running on your favorite Linux, MacOS or Windows system.
 
 First, make sure you have the latest version of [nodeJS](https://nodejs.org/) (nodeJS 8.x or higher).   
+
 ```
 node -v
 v8.9.3
 ```
+
 In a project directory, add Rocket.Chat.js.SDK as dependency:
 
 ```
@@ -27,7 +29,8 @@ npm install @rocket.chat/sdk --save
 ```
 
 Next, create _easybot.js_ with the following:
-```
+
+```js
 const { driver } = require('@rocket.chat/sdk');
 // customize the following with your server and BOT account information
 const HOST = 'myserver.com';
@@ -142,11 +145,15 @@ Access these modules by importing them from SDK, e.g:
 
 For Node 8 / ES5
 
-`const { driver, methodCache, api } = require('@rocket.chat/sdk')`
+```js
+const { driver, methodCache, api } = require('@rocket.chat/sdk')
+```
 
 For ES6 supporting platforms
 
-`import { driver, methodCache, api } from '@rocket.chat/sdk'`
+```js
+import { driver, methodCache, api } from '@rocket.chat/sdk'
+```
 
 Any Rocket.Chat server method can be called via `driver.callMethod`,
 `driver.cacheCall` or `driver.asyncCall`. Server methods are not fully
@@ -515,11 +522,18 @@ interactions (i.e. bots) locally while in development.
 
 ## Use as Dependency
 
-`yarn add @rocket.chat/sdk` or `npm install --save @rocket.chat/sdk`
+```
+yarn add @rocket.chat/sdk
+```
+or 
+
+```
+npm install --save @rocket.chat/sdk
+```
 
 ES6 module, using async
 
-```
+```js
 import * as rocketchat from '@rocket.chat/sdk'
 
 const asteroid = await rocketchat.driver.connect({ host: 'localhost:3000' })
@@ -528,7 +542,7 @@ console.log('connected', asteroid)
 
 ES5 module, using callback
 
-```
+```js
 const rocketchat = require('@rocket.chat/sdk')
 
 rocketchat.driver.connect({ host: 'localhost:3000' }, function (err, asteroid) {
@@ -577,18 +591,22 @@ Rocket.Chat development you might do locally.
 The following will provision a default admin user on build, so it can be used to
 access the API, allowing SDK utils to prepare for and clean up tests.
 
-- `git clone https://github.com/RocketChat/Rocket.Chat.git rc-sdk-test`
-- `cd rc-sdk-test`
-- `meteor npm install`
-- `export ADMIN_PASS=pass; export ADMIN_USERNAME=sdk; export MONGO_URL='mongodb://localhost:27017/rc-sdk-test'; meteor`
+```
+git clone https://github.com/RocketChat/Rocket.Chat.git rc-sdk-test
+cd rc-sdk-test
+meteor npm install
+export ADMIN_PASS=pass; export ADMIN_USERNAME=sdk; export MONGO_URL='mongodb://localhost:27017/rc-sdk-test'; meteor
+```
 
 Using `yarn` to run local tests and build scripts is recommended.
 
 Do `npm install -g yarn` if you don't have it. Then setup the project:
 
-- `git clone https://github.com/RocketChat/Rocket.Chat.js.SDK.git`
-- `cd Rocket.Chat.js.SDK`
-- `yarn`
+```
+git clone https://github.com/RocketChat/Rocket.Chat.js.SDK.git
+cd Rocket.Chat.js.SDK
+yarn
+```
 
 ### Test and Build Scripts
 
