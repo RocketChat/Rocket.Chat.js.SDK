@@ -167,7 +167,7 @@ parameters defining the endpoint, payload and if authorization is required
 (respectively). See the [REST API docs][rest] for details.
 
 Some common requests for user queries are made available as simple helpers under
-`api.users`, such as `api.users.onlineIDs()` which returns the user IDs of all
+`api.users`, such as `api.users.onlineIds()` which returns the user IDs of all
 online users. Run `ts-node src/utils/users.ts` for a demo of user query outputs.
 
 ## MESSAGE OBJECTS
@@ -507,7 +507,7 @@ Helper for querying online users
 Helper for querying online usernames
 - Returns promise, resolves with array of usernames
 
-### `api.users.onlineIDs()`
+### `api.users.onlineIds()`
 
 Helper for querying online user IDs
 - Returns promise, resolves with array of IDs
