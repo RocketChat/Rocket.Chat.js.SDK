@@ -115,6 +115,7 @@ function post(endpoint, data, auth = true, ignore) {
         catch (err) {
             console.error(err);
             log_1.logger.error(`[API] POST error (${endpoint}):`, err);
+            throw err;
         }
     });
 }
@@ -149,6 +150,7 @@ function get(endpoint, data, auth = true, ignore) {
         }
         catch (err) {
             log_1.logger.error(`[API] GET error (${endpoint}):`, err);
+            throw err;
         }
     });
 }
