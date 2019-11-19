@@ -29,6 +29,7 @@ describe('driver', () => {
     await driver.logout()
     await driver.disconnect()
   })
+
   describe('.connect', () => {
     context('with localhost connection', () => {
       it('without args, returns a promise', () => {
@@ -189,6 +190,7 @@ describe('driver', () => {
         attachments
       })
       const last = (await utils.lastMessages(tId))[0]
+      delete last.attachments[0].ts;
       expect(last.attachments).to.eql(attachments)
     })
   })
@@ -360,7 +362,8 @@ describe('driver', () => {
         msgId: sentMessage.message._id,
         text: 'SDK test `respondToMessages` edited'
       })
-      sinon.assert.calledOnce(callback)
+      await delay(500);
+      sinon.assert.called(callback)
     })
     it('by default ignores DMs', async () => {
       const dmResult = await utils.setupDirectFromUser()
@@ -386,6 +389,7 @@ describe('driver', () => {
       const callback = sinon.spy()
       driver.respondToMessages(callback, { rooms: [tName] })
       await utils.leaveUser()
+      await delay(500)
       sinon.assert.calledWithMatch(callback, null, sinon.match({ t: 'ul' }))
       await utils.inviteUser()
     })
@@ -394,6 +398,7 @@ describe('driver', () => {
       const callback = sinon.spy()
       driver.respondToMessages(callback, { rooms: [tName] })
       await utils.inviteUser()
+      await delay(500)
       sinon.assert.calledWithMatch(callback, null, sinon.match({ t: 'au' }))
     })
     // it('appends room name to event meta in channels', async () => {
@@ -453,6 +458,14 @@ describe('driver', () => {
       await driver.login()
       await driver.joinRooms(['general', tName])
       expect(driver.joinedIds).to.have.members(['GENERAL', tId])
+    })
+  })
+  describe('execSlashCommand', () => {
+    it('execute slash command', async () => {
+        await driver.connect()
+        await driver.login()
+        const result = await driver.execSlashCommand({ cmd: 'shrug', params: '', msg: { rid: tId, msg: '' } });
+        expect(result).to.equal(undefined)
     })
   })
 })

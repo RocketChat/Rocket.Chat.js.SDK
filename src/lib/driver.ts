@@ -16,6 +16,7 @@ import {
   ICollection
 } from '../config/asteroidInterfaces'
 import { IMessage } from '../config/messageInterfaces'
+import { ISlashCommand } from '../config/slashCommandInterfaces'
 import { logger, replaceLog } from './log'
 import { IMessageReceiptAPI } from '../utils/interfaces'
 
@@ -565,4 +566,9 @@ export function editMessage (message: IMessage): Promise<IMessage> {
  */
 export function setReaction (emoji: string, messageId: string) {
   return asyncCall('setReaction', [emoji, messageId])
+}
+
+/** Add slash command */
+export async function execSlashCommand (command: ISlashCommand): Promise<void> {
+  return asyncCall('slashCommand', command)
 }

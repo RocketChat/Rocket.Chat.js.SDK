@@ -1,0 +1,1 @@
+{"version":3,"file":"slashCommandInterfaces.js","sourceRoot":"","sources":["../../src/config/slashCommandInterfaces.ts"],"names":[],"mappings":"","sourcesContent":["import { IMessage } from './messageInterfaces'\n\nexport interface ISlashCommand {\n  cmd: string\n  params?: any\n  msg?: IMessage\n}\n"]}
