@@ -338,9 +338,11 @@ export function subscribeToMessages (): Promise<ISubscription> {
  */
 export function reactToMessages (callback: ICallback): void {
   logger.info(`[reactive] Listening for change events in collection ${messages.name}`)
+  
+  const changedMessageQuery = messages.reactiveQuery({});
 
   messages.reactiveQuery({}).on('change', (_id: string) => {
-    const changedMessageQuery = messages.reactiveQuery({ _id })
+    
     if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {
       const changedMessage = changedMessageQuery.result[0]
       if (Array.isArray(changedMessage.args)) {
