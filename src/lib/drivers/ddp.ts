@@ -520,7 +520,8 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
       'webrtc',
       'notification',
       'rooms-changed',
-      'subscriptions-changed'
+      'subscriptions-changed',
+      'uiInteraction'
     ].map(event => this.subscribe(topic, `${this.userId}/${event}`, false)))
   }
 
