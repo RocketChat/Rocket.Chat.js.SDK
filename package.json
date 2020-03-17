@@ -1,11 +1,20 @@
 {
   "name": "@rocket.chat/sdk",
-  "version": "0.2.9-1",
+  "version": "1.0.0-alpha.41",
   "description": "Node.js SDK for Rocket.Chat. Application interface for server methods and message streams.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "index.ts",
+  "types": "index.d.ts",
+  "sideEffects": false,
   "repository": "https://github.com/RocketChat/Rocket.Chat.js.SDK.git",
   "author": "Tim Kinnane <tim.kinnane@rocket.chat>",
+  "contributors": [
+    "Mikael Mello (https://github.com/mikaelmello)",
+    "José Renan (https://github.com/JoseRenan)",
+    "Renato Becker (https://github.com/renatobecker)",
+    "Guilherme Gazzo (https://github.com/ggazzo)",
+    "Sing Li (https://github.com/Sing-Li)",
+    "Diego Mello (https://github.com/diegolmello)"
+  ],
   "license": "MIT",
   "private": false,
   "keywords": [
@@ -17,24 +26,24 @@
     "CUI",
     "typescript"
   ],
-  "files": [
-    "dist"
-  ],
   "engines": {
     "node": "> 8.0.0",
     "npm": "> 5.0.0"
   },
   "scripts": {
-    "pretest": "tslint -p . && ts-node src/utils/setup.ts",
-    "test": "nyc mocha './src/lib/**/*.spec.ts'",
+    "webpack": "webpack",
+    "dev": "tsc -w",
+    "pretest": "tslint --fix -p . && ts-node src/utils/setup.ts",
+    "test": "nyc mocha ./src/lib/**/*.spec.ts",
     "test:hook": "mocha './**/*.spec.ts'",
     "test:debug": "mocha  --inspect --debug-brk 'src/**/*.spec.ts'",
     "test:package": "preview && mocha 'src/index.spec.ts'",
     "start": "ts-node ./src/utils/start",
     "docs": "rimraf ./docs && typedoc --options ./typedoc.json ./src/lib",
-    "js-docs": "./node_modules/.bin/docma -c docma.json",
     "prebuild": "npm run test",
-    "build": "rimraf ./dist/* && tsc && npm run test:package"
+    "build": "rimraf ./dist/* && tsc && webpack && npm run test:package",
+    "builddist": "rimraf ./dist/* && tsc",
+    "publish:prepare": "node .scripts/release.js"
   },
   "husky": {
     "hooks": {
@@ -42,16 +51,21 @@
     }
   },
   "devDependencies": {
+    "@types/event-emitter": "^0.3.2",
+    "@types/eventemitter3": "^2.0.2",
     "@types/chai": "^4.1.2",
     "@types/mocha": "^2.2.48",
     "@types/sinon": "^4.3.0",
+    "@types/ws": "^5.1.2",
+    "awesome-typescript-loader": "^5.2.0",
     "chai": "^4.1.2",
     "commitizen": "^2.9.6",
     "cz-conventional-changelog": "^2.1.0",
-    "docma": "^3.2.2",
     "dotenv": "^5.0.1",
     "husky": "^0.14.3",
     "mocha": "^5.0.1",
+    "node-fetch": "^2.2.1",
+    "node-fetch-polyfill": "^2.0.6",
     "nyc": "^11.4.1",
     "package-preview": "^1.0.5",
     "rimraf": "^2.6.2",
@@ -62,14 +76,16 @@
     "tslint-config-standard": "^7.0.0",
     "typedoc": "0.8.0",
     "typedoc-plugin-external-module-name": "^1.1.1",
-    "typescript": "^2.7.2"
+    "typescript": "^3.4.3",
+    "webpack": "^4.16.5",
+    "webpack-cli": "^3.1.0"
   },
   "dependencies": {
-    "@types/lru-cache": "^4.1.0",
-    "@types/node": "^9.4.6",
-    "asteroid": "rocketchat/asteroid",
+    "js-sha256": "^0.9.0",
     "lru-cache": "^4.1.1",
-    "node-rest-client": "^3.1.0"
+    "mem": "^4.0.0",
+    "tiny-events": "^1.0.1",
+    "universal-websocket-client": "^1.0.2"
   },
   "config": {
     "commitizen": {
