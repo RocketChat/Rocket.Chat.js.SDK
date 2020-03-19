@@ -3,7 +3,7 @@
  * Handles low-level websocket ddp connections and event subscriptions
  */
 
-import WebSocket from 'universal-websocket-client'
+// import WebSocket from 'universal-websocket-client'
 import { EventEmitter } from 'tiny-events'
 
 import { logger as Logger } from '../log'
@@ -86,12 +86,15 @@ export class Socket extends EventEmitter {
   open = (ms: number = this.config.reopen) => {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
-      this.lastPing = Date.now()
+
       await this.close()
+      this.lastPing = Date.now()
+
       if (this.reopenInterval) clearInterval(this.reopenInterval)
       this.reopenInterval = setInterval(() => {
         return !this.alive() && this.reopen()
       }, ms)
+
       try {
         connection = new WebSocket(this.host)
         connection.onerror = reject
@@ -127,7 +130,7 @@ export class Socket extends EventEmitter {
       if (e.code !== 1000) {
         return this.reopen()
       } else {
-        if (this.reopenInterval) clearInterval(this.reopenInterval)
+        this.reopenInterval && clearInterval(this.reopenInterval as any)
         this.openTimeout && clearTimeout(this.openTimeout as any)
         this.pingTimeout && clearTimeout(this.pingTimeout as any)
         delete this.connection
@@ -154,6 +157,7 @@ export class Socket extends EventEmitter {
     this.logger.debug(`[ddp] messages received: ${e.data}`)
     if (data.collection) this.emit(data.collection, data)
     if (data.msg) this.emit(data.msg, data)
+    if (data.id) this.emit(data.id, data)
   }
 
   /** Disconnect the DDP from server and clear all subscriptions. */
@@ -175,12 +179,14 @@ export class Socket extends EventEmitter {
   /** Clear connection and try to connect again. */
   reopen = async () => {
     if (this.openTimeout) return
-    await this.close()
-    this.openTimeout = setTimeout(async () => {
-      delete this.openTimeout
-      await this.open()
-        .catch((err) => this.logger.error(`[ddp] Reopen error: ${err.message}`))
-    }, this.config.reopen)
+      
+    this.openTimeout = setTimeout(() => { delete this.openTimeout }, this.config.reopen);
+
+    await this.open()
+      .catch((err) => {
+        this.logger.error(`[ddp] Reopen error: ${err.message}`);
+        this.reopen();
+      })
   }
 
   /** Check if websocket connected and ready. */
@@ -209,14 +215,22 @@ export class Socket extends EventEmitter {
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
   send = async (obj: any): Promise<any> => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       if (!this.connection) throw new Error('[ddp] sending without open connection')
+      if (!this.connected) await new Promise(resolve => this.on('open', resolve))
+
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const stringdata = JSON.stringify(data)
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
-      this.connection.send(stringdata)
+
+      try {
+        this.connection.send(stringdata)
+      } catch (err) {
+        this.logger.error(`[ddp] Send without connection: ${err.message}`)
+        return reject(err);
+      }
 
       this.once('disconnected', reject)
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
@@ -235,12 +249,11 @@ export class Socket extends EventEmitter {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' })
-        .then(() => {
-          return this.ping()
-        })
+        .then(() => this.ping())
         .catch(() => this.reopen())
     }, this.config.ping)
   }
+
   /** Check if ping-pong to server is within tolerance of 1 missed ping */
   alive = () => {
     if (!this.lastPing) return false
