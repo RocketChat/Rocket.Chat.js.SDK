@@ -225,6 +225,11 @@ export class Socket extends EventEmitter {
       const stringdata = JSON.stringify(data)
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
+      if (obj.msg && obj.msg === 'sub') {
+        const { name, params } = obj;
+        this.subscriptions[id] = { id, name, params, unsubscribe: this.unsubscribe.bind(this, id) };
+      }
+
       try {
         this.connection.send(stringdata)
       } catch (err) {
