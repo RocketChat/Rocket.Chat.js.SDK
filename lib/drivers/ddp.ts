@@ -88,7 +88,6 @@ export class Socket extends EventEmitter {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
 
-      await this.close()
       this.lastPing = Date.now()
 
       this.reopenInterval && clearInterval(this.reopenInterval as any)
