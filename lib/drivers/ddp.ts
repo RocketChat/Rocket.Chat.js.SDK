@@ -8,7 +8,6 @@ import { EventEmitter } from 'tiny-events'
 
 import { logger as Logger } from '../log'
 import { ISocket, IDriver } from './index'
-
 import * as settings from '../settings';
 
 EventEmitter.prototype.removeAllListeners = function (event?: string | any): any {
@@ -50,7 +49,7 @@ export class Socket extends EventEmitter {
   handlers: ISocketMessageHandler[] = []
   config: ISocketOptions | any
   openTimeout?: NodeJS.Timer | number
-  reopenInterval?: NodeJS.Timer
+  reopenInterval?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
   connection?: WebSocket
   session?: string
@@ -92,7 +91,7 @@ export class Socket extends EventEmitter {
       await this.close()
       this.lastPing = Date.now()
 
-      if (this.reopenInterval) clearInterval(this.reopenInterval)
+      this.reopenInterval && clearInterval(this.reopenInterval as any)
       this.reopenInterval = setInterval(() => {
         return !this.alive() && this.reopen()
       }, ms)
@@ -113,19 +112,16 @@ export class Socket extends EventEmitter {
 
   /** Send handshake message to confirm connection, start pinging. */
   onOpen = async (callback: Function) => {
-    try {
-      const connected = await this.send({
-        msg: 'connect',
-        version: '1',
-        support: ['1', 'pre2', 'pre1']
-      })
-      this.session = connected.session
-      this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
-      this.emit('open')
-      if (this.resume) await this.login(this.resume)
-      return callback(this.connection)
-    } catch {
-    }
+    const connected = await this.send({
+      msg: 'connect',
+      version: '1',
+      support: ['1', 'pre2', 'pre1']
+    })
+    this.session = connected.session
+    this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
+    this.emit('open')
+    if (this.resume) await this.login(this.resume)
+    return callback(this.connection)
   }
 
   /** Emit close event so it can be used for promise resolve in close() */
@@ -135,7 +131,7 @@ export class Socket extends EventEmitter {
       if (e.code !== 1000) {
         return this.reopen()
       } else {
-        if (this.reopenInterval) clearInterval(this.reopenInterval)
+        this.reopenInterval && clearInterval(this.reopenInterval as any)
         this.openTimeout && clearTimeout(this.openTimeout as any)
         this.pingTimeout && clearTimeout(this.pingTimeout as any)
         delete this.connection
@@ -185,21 +181,13 @@ export class Socket extends EventEmitter {
   /** Clear connection and try to connect again. */
   reopen = async () => {
     if (this.openTimeout) return
+    this.openTimeout = setTimeout(() => { delete this.openTimeout }, this.config.reopen);
 
-    this.openTimeout = setTimeout(async () => {
-      delete this.openTimeout
-      await this.open()
-        .catch((err) => {
-          this.logger.error(`[ddp] Reopen error: ${err.message}`)
-          this.reopen();
-        })
-    }, this.config.reopen)
-  }
-
-  tryReopen = () => {
-    if (!this.connected) {
-      this.reopen()
-    }
+    await this.open()
+      .catch((err) => {
+        this.logger.error(`[ddp] Reopen error: ${err.message}`);
+        this.reopen();
+      })
   }
 
   /** Check if websocket connected and ready. */
@@ -235,6 +223,12 @@ export class Socket extends EventEmitter {
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const stringdata = JSON.stringify(data)
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
+
+      if (/sub/.test(obj.msg)) {
+        const { name, params } = obj;
+        this.subscriptions[id] = { id, name, params, unsubscribe: this.unsubscribe.bind(this, id) };
+      }
+
       this.connection.send(stringdata)
 
       this.once('disconnected', reject)
@@ -254,12 +248,11 @@ export class Socket extends EventEmitter {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' })
-        .then(() => {
-          return this.ping()
-        })
+        .then(() => this.ping())
         .catch(() => this.reopen())
     }, this.config.ping)
   }
+
   /** Check if ping-pong to server is within tolerance of 1 missed ping */
   alive = () => {
     if (!this.lastPing) return false
@@ -289,7 +282,7 @@ export class Socket extends EventEmitter {
     const params = this.loginParams(credentials)
     this.resume = (await this.call('login', params) as ILoginResult)
     await this.subscribeAll()
-    this.emit('login', this.resume.toString())
+    this.emit('login', this.resume)
     return this.resume
   }
 
@@ -343,9 +336,9 @@ export class Socket extends EventEmitter {
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
-  subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback) => {
+  subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback, id?: string) => {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
-    return this.send({ msg: 'sub', name, params })
+    return this.send({ msg: 'sub', id, name, params })
       .then((result) => {
         const id = (result.subs) ? result.subs[0] : undefined
         const unsubscribe = this.unsubscribe.bind(this, id)
@@ -357,15 +350,15 @@ export class Socket extends EventEmitter {
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        throw err
+        // throw err
       })
   }
 
   /** Subscribe to all pre-configured streams (e.g. on login resume) */
   subscribeAll = () => {
     const subscriptions = Object.keys(this.subscriptions || {}).map((key) => {
-      const { name, params } = this.subscriptions[key]
-      return this.subscribe(name, params)
+      const { name, params, id } = this.subscriptions[key]
+      return this.subscribe(name, params, undefined, id)
     })
     return Promise.all(subscriptions)
   }
@@ -477,7 +470,6 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
         this.logger.info(`[driver] Timeout (${config.timeout})`)
         const err = new Error('Socket connection timeout')
         cancelled = true
-        this.ddp.removeAllListeners('connected')
         reject(err)
       }, config.timeout)
 
@@ -500,10 +492,6 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 
   disconnect = (): Promise<any> => {
     return this.ddp.close()
-  }
-
-  tryReopen = () => {
-    return this.ddp.tryReopen()
   }
 
   subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription> => {
