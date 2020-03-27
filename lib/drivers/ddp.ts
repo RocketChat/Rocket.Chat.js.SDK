@@ -127,13 +127,9 @@ export class Socket extends EventEmitter {
   /** Emit close event so it can be used for promise resolve in close() */
   onClose = (e: any) => {
     try {
-      this.emit('close', e)
       if (e.code !== 1000) {
-        return this.reopen()
+        this.reopen()
       } else {
-        this.reopenInterval && clearInterval(this.reopenInterval as any)
-        this.openTimeout && clearTimeout(this.openTimeout as any)
-        this.pingTimeout && clearTimeout(this.pingTimeout as any)
         delete this.connection
       }
       this.logger.info(`[ddp] Close (${e.code}) ${e.reason}`)
@@ -141,6 +137,7 @@ export class Socket extends EventEmitter {
     } catch (error) {
       this.logger.error(error)
     }
+    this.emit('close', e)
   }
 
   /**
@@ -165,16 +162,19 @@ export class Socket extends EventEmitter {
   /** Disconnect the DDP from server and clear all subscriptions. */
   close = async () => {
     if (this.connected) {
-      this.unsubscribeAll().catch(e => this.logger.debug(e))
       await new Promise((resolve) => {
         if (this.connection) {
           this.once('close', resolve)
           this.connection.close(1000, 'disconnect')
-          return
         }
       })
       .catch(this.logger.error)
     }
+
+    this.reopenInterval && clearInterval(this.reopenInterval as any)
+    this.openTimeout && clearTimeout(this.openTimeout as any)
+    this.pingTimeout && clearTimeout(this.pingTimeout as any)
+
     return Promise.resolve()
   }
 
@@ -347,12 +347,14 @@ export class Socket extends EventEmitter {
     return this.send({ msg: 'sub', id, name, params })
       .then((result) => {
         const id = (result.subs) ? result.subs[0] : undefined
-        const unsubscribe = this.unsubscribe.bind(this, id)
-        const onEvent = this.onEvent.bind(this, name)
-        const subscription = { id, name, params, unsubscribe, onEvent }
-        if (callback) subscription.onEvent(callback)
-        this.subscriptions[id] = subscription
-        return subscription
+        if (id) {
+          const unsubscribe = this.unsubscribe.bind(this, id)
+          const onEvent = this.onEvent.bind(this, name)
+          const subscription = { id, name, params, unsubscribe, onEvent }
+          if (callback) subscription.onEvent(callback)
+          this.subscriptions[id] = subscription
+          return subscription
+        }
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
