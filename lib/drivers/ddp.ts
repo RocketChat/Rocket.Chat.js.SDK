@@ -216,20 +216,26 @@ export class Socket extends EventEmitter {
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
   send = async (obj: any): Promise<any> => {
-    return new Promise((resolve, reject) => {
+    return new Promise(async(resolve, reject) => {
       if (!this.connection) throw new Error('[ddp] sending without open connection')
+      if (!this.connected) await new Promise(resolve => this.on('open', resolve))
+
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const stringdata = JSON.stringify(data)
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
-      if (/sub/.test(obj.msg)) {
+      if (/^sub$/.test(obj.msg)) {
         const { name, params } = obj;
         this.subscriptions[id] = { id, name, params, unsubscribe: this.unsubscribe.bind(this, id) };
       }
 
-      this.connection.send(stringdata)
+      try {
+        this.connection.send(stringdata)
+      } catch {
+        this.logger.error('[ddp] send without open connection');
+      }
 
       this.once('disconnected', reject)
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
