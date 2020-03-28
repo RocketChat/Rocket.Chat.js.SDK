@@ -88,8 +88,6 @@ export class Socket extends EventEmitter {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
 
-      this.lastPing = Date.now()
-
       this.reopenInterval && clearInterval(this.reopenInterval as any)
       this.reopenInterval = setInterval(() => {
         return !this.alive() && this.reopen()
@@ -111,6 +109,8 @@ export class Socket extends EventEmitter {
 
   /** Send handshake message to confirm connection, start pinging. */
   onOpen = async (callback: Function) => {
+    this.lastPing = Date.now()
+
     const connected = await this.send({
       msg: 'connect',
       version: '1',
