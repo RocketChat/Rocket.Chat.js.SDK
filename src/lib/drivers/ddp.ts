@@ -126,13 +126,10 @@ export class Socket extends EventEmitter {
   /** Emit close event so it can be used for promise resolve in close() */
   onClose = (e: any) => {
     try {
-      if (e.code !== 1000) {
+      if (e?.reason !== 'disconnect') {
         this.reopen()
-      } else {
-        delete this.connection
       }
-      this.logger.info(`[ddp] Close (${e.code}) ${e.reason}`)
-
+      this.logger.info(`[ddp] Close (${e?.code}) ${e?.reason}`)
     } catch (error) {
       this.logger.error(error)
     }
