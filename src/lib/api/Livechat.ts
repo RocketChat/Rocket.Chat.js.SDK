@@ -27,6 +27,7 @@ export default class ApiLivechat extends ApiBase {
   async config (params?: ILivechatTokenAPI) { return (await this.get('livechat/config', params, false)).config }
   async room (params?: INewLivechatRoomCredentialAPI) { return (await this.get('livechat/room', { token: this.credentials.token, ...params }, false)).room }
   closeChat ({ rid }: ILivechatRoom) { return this.post('livechat/room.close', { rid, token: this.credentials.token }, false) }
+  requestFileSharing ({ rid, messageType }: any) { return this.post('livechat/room.requestFileSharing', { rid, token: this.credentials.token, messageType }, false) }
   transferChat ({ rid, department }: ILivechatRoom) { return (this.post('livechat/room.transfer', { rid, token: this.credentials.token, department }, false)) }
   chatSurvey (survey: ILivechatRoomSurveyAPI) { return (this.post('livechat/room.survey', { rid: survey.rid, token: this.credentials.token, data: survey.data }, false)) }
   visitor () { return this.get(`livechat/visitor/${this.credentials.token}`) }
