@@ -73,7 +73,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
   async onVisitorChange (rid: string, cb: ICallback) {
     await this.subscribe(this.livechatStream, rid)
     await this.onStreamData(this.livechatStream, ({ fields: { args: [{ type, visitor }] } }: any) => {
-      if (type === 'visitorChange') {
+      if (type === 'visitorData') {
         cb(visitor)
       }
     })
