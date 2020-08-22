@@ -33,3 +33,6 @@ export let dmCacheMaxAge = 1000 * parseInt(process.env.DM_ROOM_CACHE_MAX_AGE || 
 export let token = process.env.LIVECHAT_TOKEN || ''
 export let rid = process.env.LIVECHAT_ROOM || ''
 export let department = process.env.LIVECHAT_DEPARTMENT || ''
+
+// Headers settings
+export let customHeaders = {};
