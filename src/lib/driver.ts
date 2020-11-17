@@ -393,6 +393,9 @@ export function respondToMessages (
       callback(err) // bubble errors back to adapter
     }
 
+    // Grab the first message in the list
+    message = message.shift()
+
     // Ignore bot's own messages
     if (message.u._id === userId) return
 

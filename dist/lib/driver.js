@@ -129,7 +129,7 @@ function connect(options = {}, callback) {
 exports.connect = connect;
 /**
  * @memberof module:driver
- * @instance 
+ * @instance
  * @description Remove all active subscriptions, logout and disconnect from Rocket.Chat
  * @returns {Promise}
  */
@@ -192,7 +192,7 @@ exports.asyncCall = asyncCall;
  * @instance
  * @description Call a method as async ({@link module:driver#asyncCall|asyncCall}) via Asteroid,
  * or through cache ({@link module:driver#cacheCall|cacheCall}) if one is created.
- * 
+ *
  * If the method was called without parameters, they cannot be cached.
  * As the result, the method will always be called asynchronously.
  * @param {any} name - the Rocket.Chat server method to call through Asteroid
@@ -335,7 +335,7 @@ exports.unsubscribeAll = unsubscribeAll;
  * @memberof module:driver
  * @instance
  * @description Begin subscription to room events for user
- * 
+ *
  * > NOTE: Older adapters used an option for this method but it was always the default.
  * @param {string} [topic=stream-room-messages] - subscription topic
  * @param {number} [roomId=__my_messages__] - unique ID of the room to subscribe to
@@ -353,13 +353,13 @@ exports.subscribeToMessages = subscribeToMessages;
  * @memberof module:driver
  * @instance
  * @description Attach a callback to changes in the message stream.
- * 
+ *
  * This method should be used only after a subscription was created using
  * {@link module:driver#subscribeToMessages|subscribeToMessages}.
  * Fires callback with every change in subscriptions.
- * 
+ *
  * > NOTE: This method can be called directly for custom extensions, but for most usage
- * (e.g. for bots) the 
+ * (e.g. for bots) the
  * {@link module:driver#respondToMessages|respondToMessages} is more useful to only receive messages
  * matching configuration.
  *
@@ -439,6 +439,10 @@ function respondToMessages(callback, options = {}) {
             log_1.logger.error(`[received] Unable to receive: ${err.message}`);
             callback(err); // bubble errors back to adapter
         }
+
+        // Grab the first message in the list
+        message = message.shift()
+
         // Ignore bot's own messages
         if (message.u._id === exports.userId)
             return;
@@ -501,7 +505,7 @@ exports.getRoomName = getRoomName;
  * @memberof module:driver
  * @instance
  * @description Get ID for a DM room by its recipient's name.
- * 
+ *
  * The call will create a DM (with the bot) if it doesn't exist yet.
  * @param {string} username - recipient's username
  * @returns {Promise<roomId>}
