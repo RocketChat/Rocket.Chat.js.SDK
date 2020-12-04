@@ -7,6 +7,7 @@ import WebSocket from 'universal-websocket-client'
 import { EventEmitter } from 'tiny-events'
 
 import { logger as Logger } from '../log'
+import { timer as Timer } from '../timer'
 import { ISocket, IDriver } from './index'
 import * as settings from '../settings';
 
@@ -34,7 +35,8 @@ import {
   isLoginResult,
   ISocketMessageCallback,
 	ICallback,
-	ILogger
+  ILogger,
+  ITimer
 } from '../../interfaces'
 
 import { hostToWS } from '../util'
@@ -54,6 +56,7 @@ export class Socket extends EventEmitter {
   connection?: WebSocket
   session?: string
   logger: ILogger
+  timer: ITimer
 
   /** Create a websocket handler */
   constructor (
@@ -62,6 +65,7 @@ export class Socket extends EventEmitter {
   ) {
     super()
     this.logger = options.logger || Logger
+    this.timer = options.timer || Timer
     this.config = {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
@@ -88,8 +92,8 @@ export class Socket extends EventEmitter {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
 
-      this.reopenInterval && clearInterval(this.reopenInterval as any)
-      this.reopenInterval = setInterval(() => {
+      this.reopenInterval && this.timer.clearInterval(this.reopenInterval as any)
+      this.reopenInterval = this.timer.setInterval(() => {
         return !this.alive() && this.reopen()
       }, ms)
 
@@ -159,9 +163,9 @@ export class Socket extends EventEmitter {
   close = async () => {
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
-    this.reopenInterval && clearInterval(this.reopenInterval as any)
-    this.openTimeout && clearTimeout(this.openTimeout as any)
-    this.pingTimeout && clearTimeout(this.pingTimeout as any)
+    this.reopenInterval && this.timer.clearInterval(this.reopenInterval as any)
+    this.openTimeout && this.timer.clearTimeout(this.openTimeout as any)
+    this.pingTimeout && this.timer.clearTimeout(this.pingTimeout as any)
 
     if (this.connected) {
       await new Promise((resolve) => {
@@ -179,7 +183,7 @@ export class Socket extends EventEmitter {
   /** Clear connection and try to connect again. */
   reopen = async () => {
     if (this.openTimeout) return
-    this.openTimeout = setTimeout(() => { delete this.openTimeout }, this.config.reopen);
+    this.openTimeout = this.timer.setTimeout(() => { delete this.openTimeout }, this.config.reopen);
 
     await this.open()
       .catch((err) => {
@@ -249,8 +253,8 @@ export class Socket extends EventEmitter {
 
   /** Send ping, record time, re-open if nothing comes back, repeat */
   ping = async () => {
-    this.pingTimeout && clearTimeout(this.pingTimeout as any)
-    this.pingTimeout = setTimeout(() => {
+    this.pingTimeout && this.timer.clearTimeout(this.pingTimeout as any)
+    this.pingTimeout = this.timer.setTimeout(() => {
       this.send({ msg: 'ping' })
         .then(() => this.ping())
         .catch(() => this.reopen())
@@ -395,6 +399,7 @@ export class Socket extends EventEmitter {
 
 export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   logger: ILogger
+  timer: ITimer
   config: ISocketOptions
 	/**
 	 * Event Emitter for listening to connection (echoes selection of DDP events)
@@ -427,7 +432,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 	/** Array of joined room IDs (for reactive queries) */
   joinedIds: string[] = []
 
-  constructor ({ host = 'localhost:3000', integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
+  constructor ({ host = 'localhost:3000', integrationId, config, logger = Logger, timer = Timer, ...moreConfigs }: any = {}) {
     super()
 
     this.config = {
@@ -440,8 +445,9 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 			// close: number
 			// integration: string
     }
-    this.ddp = new Socket({ ...this.config, logger })
+    this.ddp = new Socket({ ...this.config, logger, timer })
     this.logger = logger
+    this.timer = timer
   }
 
 	/**
@@ -472,7 +478,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
       this.ddp.on('open', () => this.emit('connected')) // echo ddp event
 
       let cancelled = false
-      const rejectionTimeout = setTimeout(() => {
+      const rejectionTimeout = this.timer.setTimeout(() => {
         this.logger.info(`[driver] Timeout (${config.timeout})`)
         const err = new Error('Socket connection timeout')
         cancelled = true
@@ -485,7 +491,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
         this.once('connected', () => {
           this.logger.info('[driver] Connected')
           if (cancelled) return this.ddp.close() // cancel if already rejected
-          clearTimeout(rejectionTimeout)
+          this.timer.clearTimeout(rejectionTimeout)
           resolve(this as IDriver)
         })
       }

@@ -1,14 +1,15 @@
 import { ISocket, IDriver, Protocols } from '../drivers'
 import ClientRest from '../api/RocketChat'
-import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
+import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials, ITimer } from '../../interfaces'
 import { logger as Logger } from '../log'
+import { timer as Timer } from '../timer'
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
   logger: ILogger = Logger
   socket: Promise<ISocket | IDriver>
   config: any
 
-  constructor ({ logger, allPublic, rooms, integrationId, protocol = Protocols.DDP, ...config }: any) {
+  constructor ({ logger, timer = Timer, allPublic, rooms, integrationId, protocol = Protocols.DDP, ...config }: any) {
     super({ ...config, logger })
     this.logger = logger
     switch (protocol) {
@@ -16,7 +17,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
       //   this.socket = import(/* webpackChunkName: 'mqtt' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver({ ...config, logger }))
       //   break
       case Protocols.DDP:
-        this.socket = import(/* webpackChunkName: 'ddp' */ '../drivers/ddp').then(({ DDPDriver }) => new DDPDriver({ ...config, logger }))
+        this.socket = import(/* webpackChunkName: 'ddp' */ '../drivers/ddp').then(({ DDPDriver }) => new DDPDriver({ ...config, logger, timer }))
         break
       default:
         throw new Error(`Invalid Protocol: ${protocol}, valids: ${Object.keys(Protocols).join()}`)

@@ -7,6 +7,14 @@ export interface ILogger {
   error: (...args: any[]) => void
 }
 
+/** Timer need to provide the same set of methods */
+export interface ITimer {
+  setTimeout(callback: (...args: any[]) => void, ms: number, ...args: any[]): NodeJS.Timeout | number;
+  clearTimeout(timeoutId: NodeJS.Timeout | number): void;
+  setInterval(callback: (...args: any[]) => void, ms: number, ...args: any[]): NodeJS.Timeout | number;
+  clearInterval(intervalId: NodeJS.Timeout | number): void;
+}
+
 /**
  * Connection options type
  * @param host        Host URL:PORT, converted to websocket protocol
