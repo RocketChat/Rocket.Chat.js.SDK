@@ -344,7 +344,9 @@ export function reactToMessages (callback: ICallback): void {
     if (changedMessageQuery.result && changedMessageQuery.result.length > 0) {
       const changedMessage = changedMessageQuery.result[0]
       if (Array.isArray(changedMessage.args)) {
-        logger.info(`[received] Message in room ${ changedMessage.args[0].rid }`)
+        const [firstArg] = changedMessage.args
+        const rid = Array.isArray(firstArg) ? firstArg[0].rid : firstArg.rid
+        logger.info(`[received] Message in room ${ rid }`)
         callback(null, changedMessage.args[0], changedMessage.args[1])
       } else {
         logger.debug('[received] Update without message args')
@@ -353,6 +355,46 @@ export function reactToMessages (callback: ICallback): void {
       logger.debug('[received] Reactive query at ID ${ _id } without results')
     }
   })
+}
+
+function respondToOneMessage (
+  message: IMessage,
+  callback: ICallback,
+  config: IRespondOptions,
+  meta: { roomType: string; roomParticipant: boolean }
+): void {
+  // Ignore bot's own messages
+  if (message.u._id === userId) return
+
+  // Ignore DMs unless configured not to
+  const isDM = meta.roomType === 'd'
+  if (isDM && !config.dm) return
+
+  // Ignore Livechat unless configured not to
+  const isLC = meta.roomType === 'l'
+  if (isLC && !config.livechat) return
+
+  // Ignore messages in un-joined public rooms unless configured not to
+  if (!config.allPublic && !isDM && !meta.roomParticipant) return
+
+  // Set current time for comparison to incoming
+  let currentReadTime = new Date(message.ts.$date)
+
+  // Ignore edited messages if configured to
+  if (!config.edited && message.editedAt) return
+
+  // Set read time as time of edit, if message is edited
+  if (message.editedAt) currentReadTime = new Date(message.editedAt.$date)
+
+  // Ignore messages in stream that aren't new
+  if (currentReadTime <= lastReadTime) return
+
+  // At this point, message has passed checks and can be responded to
+  logger.info(`[received] Message ${message._id} from ${message.u.username}`)
+  lastReadTime = currentReadTime
+
+  // Processing completed, call callback to respond to message
+  callback(null, message, meta)
 }
 
 /**
@@ -387,44 +429,17 @@ export function respondToMessages (
   }
 
   lastReadTime = new Date() // init before any message read
-  reactToMessages(async (err, message, meta) => {
+  reactToMessages(async (err, messages, meta) => {
     if (err) {
       logger.error(`[received] Unable to receive: ${err.message}`)
       callback(err) // bubble errors back to adapter
     }
 
-    // Ignore bot's own messages
-    if (message.u._id === userId) return
-
-    // Ignore DMs unless configured not to
-    const isDM = meta.roomType === 'd'
-    if (isDM && !config.dm) return
-
-    // Ignore Livechat unless configured not to
-    const isLC = meta.roomType === 'l'
-    if (isLC && !config.livechat) return
-
-    // Ignore messages in un-joined public rooms unless configured not to
-    if (!config.allPublic && !isDM && !meta.roomParticipant) return
-
-    // Set current time for comparison to incoming
-    let currentReadTime = new Date(message.ts.$date)
-
-    // Ignore edited messages if configured to
-    if (!config.edited && message.editedAt) return
-
-    // Set read time as time of edit, if message is edited
-    if (message.editedAt) currentReadTime = new Date(message.editedAt.$date)
-
-    // Ignore messages in stream that aren't new
-    if (currentReadTime <= lastReadTime) return
-
-    // At this point, message has passed checks and can be responded to
-    logger.info(`[received] Message ${message._id} from ${message.u.username}`)
-    lastReadTime = currentReadTime
-
-    // Processing completed, call callback to respond to message
-    callback(null, message, meta)
+    if (Array.isArray(messages)) {
+      messages.forEach(message => respondToOneMessage(message, callback, config, meta))
+    } else {
+      respondToOneMessage(messages, callback, config, meta)
+    }
   })
   return promise
 }
