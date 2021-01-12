@@ -347,7 +347,11 @@ export function reactToMessages (callback: ICallback): void {
         const [firstArg] = changedMessage.args
         const rid = Array.isArray(firstArg) ? firstArg[0].rid : firstArg.rid
         logger.info(`[received] Message in room ${ rid }`)
-        callback(null, changedMessage.args[0], changedMessage.args[1])
+        if (Array.isArray(changedMessage.args[0])) {
+          changedMessage.args[0].forEach(message => callback(null, message, changedMessage.args[1]))
+        } else {
+          callback(null, changedMessage.args[0], changedMessage.args[1])
+        }
       } else {
         logger.debug('[received] Update without message args')
       }
