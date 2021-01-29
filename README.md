@@ -67,17 +67,20 @@ const runbot = async () => {
 }
 
 // callback for incoming messages filter and processing
-const processMessages = async(err, message, messageOptions) => {
+const processMessages = async(err, messages, messageOptions) => {
   if (!err) {
     // filter our own message
-    if (message.u._id === myuserid) return;
-    // can filter further based on message.rid
-    const roomname = await driver.getRoomName(message.rid);
-    if (message.msg.toLowerCase().startsWith(BOTNAME)) {
-      const response = message.u.username + 
-            ', how can ' + BOTNAME + ' help you with ' +
-            message.msg.substr(BOTNAME.length + 1);
-      const sentmsg = await driver.sendToRoom(response, roomname);
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      if (message.u._id === myuserid) continue;
+      // can filter further based on message.rid
+      const roomname = await driver.getRoomName(message.rid);
+      if (message.msg.toLowerCase().startsWith(BOTNAME)) {
+        const response = message.u.username +
+                ', how can ' + BOTNAME + ' help you with ' +
+                message.msg.substr(BOTNAME.length + 1);
+        const sentmsg = await driver.sendToRoom(response, roomname);
+      }
     }
   }
 }
