@@ -393,6 +393,8 @@ export function respondToMessages (
       callback(err) // bubble errors back to adapter
     }
 
+    if (Array.isArray(message)) message = message.shift()
+
     // Ignore bot's own messages
     if (message.u._id === userId) return
 

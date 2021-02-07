@@ -34,8 +34,8 @@ export declare const basicHeaders: {
     'Content-Type': string;
 };
 export declare const authHeaders: {
-    'X-Auth-Token': string;
-    'X-User-Id': string;
+    'X-Auth-Token'?: string;
+    'X-User-Id'?: string;
 };
 /** Populate auth headers (from response data on login) */
 export declare function setAuth(authData: {
