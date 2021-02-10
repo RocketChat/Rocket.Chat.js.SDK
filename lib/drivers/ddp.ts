@@ -40,6 +40,8 @@ import {
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
+const userDisconnectCloseCode = 4000;
+
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends EventEmitter {
   sent = 0
@@ -126,10 +128,10 @@ export class Socket extends EventEmitter {
   /** Emit close event so it can be used for promise resolve in close() */
   onClose = (e: any) => {
     try {
-      if (e?.reason !== 'disconnect') {
+      if (e?.code !== userDisconnectCloseCode) {
         this.reopen()
       }
-      this.logger.info(`[ddp] Close (${e?.code}) ${e?.reason}`)
+      this.logger.info(`[ddp] Close (${e?.code})`)
     } catch (error) {
       this.logger.error(error)
     }
@@ -167,7 +169,7 @@ export class Socket extends EventEmitter {
       await new Promise((resolve) => {
         if (this.connection) {
           this.once('close', resolve)
-          this.connection.close(1000, 'disconnect')
+          this.connection.close(userDisconnectCloseCode)
         }
       })
       .catch(this.logger.error)
