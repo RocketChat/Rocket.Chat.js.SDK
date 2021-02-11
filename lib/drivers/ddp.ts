@@ -41,6 +41,7 @@ import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
+const reopenCloseCode = 4001;
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends EventEmitter {
@@ -89,6 +90,10 @@ export class Socket extends EventEmitter {
   open = (ms: number = this.config.reopen) => {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
+
+      if (this.connection) {
+        this.connection.close(reopenCloseCode)
+      }
 
       this.reopenInterval && clearInterval(this.reopenInterval as any)
       this.reopenInterval = setInterval(() => {
@@ -177,6 +182,8 @@ export class Socket extends EventEmitter {
 
     return Promise.resolve()
   }
+
+  checkAndReopen = () => !this.alive() && this.reopen()
 
   /** Clear connection and try to connect again. */
   reopen = async () => {
@@ -500,6 +507,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 
   disconnect = (): Promise<any> => {
     return this.ddp.close()
+  }
+
+  checkAndReopen = (): Promise<any> => {
+    return this.ddp.checkAndReopen()
   }
 
   subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription> => {

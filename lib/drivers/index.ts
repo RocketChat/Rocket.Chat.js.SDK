@@ -16,7 +16,7 @@ export interface ISocket {
   logger: ILogger
   connect (options: ISocketOptions): Promise<ISocket | IDriver>
   disconnect (): Promise<ISocket>
-  tryReopen (): Promise<ISocket>
+  checkAndReopen (): Promise<ISocket>
   subscribe (topic: string, ...args: any[]): Promise<ISubscription>
   unsubscribe (subscription: ISubscription): Promise<ISocket>
   unsubscribeAll (): Promise<ISocket>
