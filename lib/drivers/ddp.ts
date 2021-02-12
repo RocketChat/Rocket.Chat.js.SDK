@@ -75,6 +75,7 @@ export class Socket extends EventEmitter {
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
 
     this.on('ping', () => {
+      this.lastPing = Date.now()
       this.send({ msg: 'pong' }).then(this.logger.debug, this.logger.error)
     })
 
@@ -111,6 +112,7 @@ export class Socket extends EventEmitter {
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = this.onClose.bind(this)
       this.connection.onopen = this.onOpen.bind(this, resolve)
+      this.emit('connecting')
     })
   }
 
@@ -132,6 +134,7 @@ export class Socket extends EventEmitter {
 
   /** Emit close event so it can be used for promise resolve in close() */
   onClose = (e: any) => {
+    this.emit('close', e)
     try {
       if (e?.code !== userDisconnectCloseCode) {
         this.reopen()
@@ -140,7 +143,6 @@ export class Socket extends EventEmitter {
     } catch (error) {
       this.logger.error(error)
     }
-    this.emit('close', e)
   }
 
   /**
@@ -151,7 +153,6 @@ export class Socket extends EventEmitter {
    */
   onMessage = (e: any) => {
     this.lastPing = Date.now()
-    void this.ping()
     const data = (e.data) ? JSON.parse(e.data) : undefined
   
     this.logger.debug(data) // 👈  very useful for debugging missing responses
