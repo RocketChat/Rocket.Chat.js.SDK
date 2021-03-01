@@ -184,7 +184,7 @@ export class Socket extends EventEmitter {
     return Promise.resolve()
   }
 
-  checkAndReopen = () => !this.alive() && this.reopen()
+  checkAndReopen = () => !this.connected && this.reopen()
 
   /** Clear connection and try to connect again. */
   reopen = async () => {
