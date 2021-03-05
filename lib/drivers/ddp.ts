@@ -40,6 +40,9 @@ import {
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
+const userDisconnectCloseCode = 4000;
+const reopenCloseCode = 4001;
+
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends EventEmitter {
   sent = 0
@@ -72,6 +75,7 @@ export class Socket extends EventEmitter {
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
 
     this.on('ping', () => {
+      this.lastPing = Date.now()
       this.send({ msg: 'pong' }).then(this.logger.debug, this.logger.error)
     })
 
@@ -87,6 +91,10 @@ export class Socket extends EventEmitter {
   open = (ms: number = this.config.reopen) => {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
+
+      if (this.connection) {
+        this.connection.close(reopenCloseCode)
+      }
 
       this.reopenInterval && clearInterval(this.reopenInterval as any)
       this.reopenInterval = setInterval(() => {
@@ -104,6 +112,7 @@ export class Socket extends EventEmitter {
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = this.onClose.bind(this)
       this.connection.onopen = this.onOpen.bind(this, resolve)
+      this.emit('connecting')
     })
   }
 
@@ -125,15 +134,15 @@ export class Socket extends EventEmitter {
 
   /** Emit close event so it can be used for promise resolve in close() */
   onClose = (e: any) => {
+    this.emit('close', e)
     try {
-      if (e?.reason !== 'disconnect') {
+      if (e?.code !== userDisconnectCloseCode) {
         this.reopen()
       }
-      this.logger.info(`[ddp] Close (${e?.code}) ${e?.reason}`)
+      this.logger.info(`[ddp] Close (${e?.code})`)
     } catch (error) {
       this.logger.error(error)
     }
-    this.emit('close', e)
   }
 
   /**
@@ -144,7 +153,6 @@ export class Socket extends EventEmitter {
    */
   onMessage = (e: any) => {
     this.lastPing = Date.now()
-    void this.ping()
     const data = (e.data) ? JSON.parse(e.data) : undefined
   
     this.logger.debug(data) // 👈  very useful for debugging missing responses
@@ -167,7 +175,7 @@ export class Socket extends EventEmitter {
       await new Promise((resolve) => {
         if (this.connection) {
           this.once('close', resolve)
-          this.connection.close(1000, 'disconnect')
+          this.connection.close(userDisconnectCloseCode)
         }
       })
       .catch(this.logger.error)
@@ -175,6 +183,8 @@ export class Socket extends EventEmitter {
 
     return Promise.resolve()
   }
+
+  checkAndReopen = () => !this.connected && this.reopen()
 
   /** Clear connection and try to connect again. */
   reopen = async () => {
@@ -498,6 +508,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 
   disconnect = (): Promise<any> => {
     return this.ddp.close()
+  }
+
+  checkAndReopen = (): Promise<any> => {
+    return this.ddp.checkAndReopen()
   }
 
   subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription> => {

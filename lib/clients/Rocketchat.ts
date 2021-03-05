@@ -34,7 +34,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
 
   async connect (options: ISocketOptions): Promise<any> { return (await this.socket as ISocket).connect(options) }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
-  async tryReopen (): Promise<any> { return (await this.socket as ISocket).tryReopen() }
+  async checkAndReopen (): Promise<any> { return (await this.socket as ISocket).checkAndReopen() }
   async onStreamData (event: string, cb: ICallback): Promise<any> { return (await this.socket as ISocket).onStreamData(event, cb) }
   async subscribe (topic: string, ...args: any[]): Promise<ISubscription> { return (await this.socket as ISocket).subscribe(topic, ...args) }
   async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
