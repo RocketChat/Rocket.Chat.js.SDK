@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.silence = exports.replaceLog = exports.logger = void 0;
 /** Temp logging, should override form adapter's log */
 class InternalLog {
     debug(...args) {

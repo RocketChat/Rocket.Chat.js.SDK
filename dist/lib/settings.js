@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.dmCacheMaxAge = exports.dmCacheMaxSize = exports.roomCacheMaxAge = exports.roomCacheMaxSize = exports.integrationId = exports.edited = exports.livechat = exports.dm = exports.allPublic = exports.rooms = exports.timeout = exports.useSsl = exports.host = exports.ldap = exports.password = exports.username = void 0;
 // Login settings - LDAP needs to be explicitly enabled
 exports.username = process.env.ROCKETCHAT_USER || 'bot';
 exports.password = process.env.ROCKETCHAT_PASSWORD || 'pass';

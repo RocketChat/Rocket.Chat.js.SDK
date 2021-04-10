@@ -51,7 +51,7 @@ export function getQueryString (data: any) {
 
 /** Setup default headers with empty auth for now */
 export const basicHeaders = { 'Content-Type': 'application/json' }
-export const authHeaders = { 'X-Auth-Token': '', 'X-User-Id': '' }
+export const authHeaders: { 'X-Auth-Token'?: string, 'X-User-Id'?: string } = { 'X-Auth-Token': '', 'X-User-Id': '' }
 
 /** Populate auth headers (from response data on login) */
 export function setAuth (authData: {authToken: string, userId: string}) {

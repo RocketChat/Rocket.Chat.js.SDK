@@ -90,7 +90,7 @@ export async function sendFromUser (payload: any): Promise<IMessageResultAPI> {
       })
       if (found || looked > 10) {
         clearInterval(look)
-        if (found) resolve()
+        if (found) resolve(true)
         else reject('API send from user, proof of receipt timeout')
       }
       looked++

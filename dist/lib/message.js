@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.Message = void 0;
 /**
  * Rocket.Chat message class.
  * Sets integration param to allow tracing source of automated sends.

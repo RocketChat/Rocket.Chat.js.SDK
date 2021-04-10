@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.mockUser = exports.botUser = exports.apiUser = void 0;
 // The API user, should be provisioned on build with local Rocket.Chat
 exports.apiUser = {
     username: process.env.ADMIN_USERNAME || 'admin',
