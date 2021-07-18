@@ -47,13 +47,13 @@
   },
   "husky": {
     "hooks": {
-			"pre-push": "npm run test:hook"
+      "pre-push": "npm run test:hook"
     }
   },
   "devDependencies": {
-		"@types/event-emitter": "^0.3.2",
-		"@types/eventemitter3": "^2.0.2",
-		"@types/chai": "^4.1.2",
+    "@types/event-emitter": "^0.3.2",
+    "@types/eventemitter3": "^2.0.2",
+    "@types/chai": "^4.1.2",
     "@types/mocha": "^2.2.48",
     "@types/sinon": "^4.3.0",
     "@types/ws": "^5.1.2",
@@ -64,8 +64,8 @@
     "dotenv": "^5.0.1",
     "husky": "^0.14.3",
     "mocha": "^5.0.1",
-		"node-fetch": "^2.2.1",
-		"node-fetch-polyfill": "^2.0.6",
+    "node-fetch": "^2.2.1",
+    "node-fetch-polyfill": "^2.0.6",
     "nyc": "^11.4.1",
     "package-preview": "^1.0.5",
     "rimraf": "^2.6.2",
@@ -81,7 +81,6 @@
     "webpack-cli": "^3.1.0"
   },
   "dependencies": {
-
     "js-sha256": "^0.9.0",
     "lru-cache": "^4.1.1",
     "mem": "^4.0.0",
