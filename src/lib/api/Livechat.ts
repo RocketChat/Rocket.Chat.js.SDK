@@ -13,6 +13,7 @@ import {
 	INewLivechatNavigationAPI,
 	INewLivechatCustomFieldAPI,
 	INewLivechatOfflineMessageAPI,
+  webrtcMessage,
 	INewLivechatCustomFieldsAPI,
 	ILivechatRoom,
 	INewLivechatRoomCredentialAPI,
@@ -40,6 +41,7 @@ export default class ApiLivechat extends ApiBase {
   }
   async deleteVisitor () { return (await this.del(`livechat/visitor/${this.credentials.token}`)).visitor }
   async updateVisitorStatus (status: string) { return (await this.post(`livechat/visitor.status`, { token: this.credentials.token, status })).status }
+  async updateCallStatus (callStatus: string, rid: string) { return (await this.post(`livechat/visitor.callStatus`, { token: this.credentials.token, callStatus, rid })).callStatus}
   async nextAgent (department: string = '') { return (await this.get(`livechat/agent.next/${this.credentials.token}`, { department })).agent }
   async agent ({ rid }: any) { return (await this.get(`livechat/agent.info/${rid}/${this.credentials.token}`)).agent }
   async message (id: string, params: ILivechatRoom) { return (await this.get(`livechat/message/${id}`, { token: this.credentials.token, ...params })).message }
