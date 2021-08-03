@@ -563,6 +563,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return Promise.all([
       this.subscribe('stream-room-messages', rid, ...args),
       this.subscribe(topic, `${rid}/user-activity`, ...args),
+      this.subscribe(topic, `${rid}/typing`, ...args),
       this.subscribe(topic, `${rid}/deleteMessage`, ...args)
     ])
   }
