@@ -811,6 +811,13 @@ export interface INewLivechatOfflineMessageAPI {
   message: string       // Message text
 }
 
+export interface webrtcMessage {
+  callId: string
+  rid:string
+  status:string
+  user:string
+}
+
 /** Result structure for Livechat Offline Message */
 export interface ILivechatOfflineMessageResultAPI {
   message: string
