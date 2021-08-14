@@ -50,6 +50,8 @@ export interface IDriver {
   onTyping (cb: ICallback): Promise<any>
 
   notifyVisitorTyping (rid: string, username: string, typing: boolean, token: string): Promise<any>
+  
+  notifyCallDeclined (rid: string): Promise<any>
 
   methodCall (method: string, ...args: any[]): Promise<any>
 }
