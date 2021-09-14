@@ -123,6 +123,10 @@ export class MQTTDriver extends EventEmitter implements ISocket, IDriver {
     return Promise.resolve() as any
   }
 
+  notifyCallDeclined (rid: string): Promise<any> {
+    return Promise.resolve() as any
+  }
+
   onStreamData (name: string, cb: ICallback): Promise<any> {
     return Promise.resolve(this.on(name, ({ fields: { args: [message] } }: any) => cb((message)))) as any
   }

@@ -584,6 +584,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.call('stream-notify-room', `${ rid }/typing`, username, typing, { token })
   }
 
+  notifyCallDeclined = (rid: string) => {
+    return this.ddp.call('stream-notify-room', `${ rid }/webrtc`, 'callStatus', { callStatus: 'declined' })
+  }
+
   ejsonMessage = (message: any) => {
     if (message.ts) {
       message.ts = new Date(message.ts.$date)
