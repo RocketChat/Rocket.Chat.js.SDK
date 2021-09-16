@@ -187,7 +187,7 @@ export interface ISubscription {
   id?: string
   name?: any
   unsubscribe: () => Promise<any>
-  onEvent: (callback: ISocketMessageCallback) => void
+  onEvent?: (callback: ISocketMessageCallback) => void
   [key: string]: any
 }
 

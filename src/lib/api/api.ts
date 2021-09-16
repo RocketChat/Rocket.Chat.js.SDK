@@ -11,6 +11,7 @@ import {
 import { Message } from '../message'
 
 import { EventEmitter } from 'tiny-events'
+import * as settings from '../settings';
 
 /** Check for existing login */
 // export function loggedIn () {
@@ -99,6 +100,7 @@ class Client implements IClient {
   get headers (): any {
     return {
       'Content-Type': 'application/json',
+      ...settings.customHeaders,
       ...this._headers
     }
   }
