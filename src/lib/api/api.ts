@@ -115,24 +115,31 @@ class Client implements IClient {
       JSON.stringify(data)
   }
 
+  getSignal (options?: any): AbortSignal {
+    return options && options.signal;
+  }
+
   get (url: string, data: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}?${this.getParams(data)}`, {
       method: 'GET',
-      headers: this.getHeaders(options)
+      headers: this.getHeaders(options),
+      signal: this.getSignal(options)
     }).then(this.handle)
   }
   post (url: string, data: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'POST',
       body: this.getBody(data),
-      headers: this.getHeaders(options)
+      headers: this.getHeaders(options),
+      signal: this.getSignal(options)
     }).then(this.handle)
   }
   put (url: string, data: any, options?: any): Promise<any> {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'PUT',
       body: this.getBody(data),
-      headers: this.getHeaders(options)
+      headers: this.getHeaders(options),
+      signal: this.getSignal(options)
     }).then(this.handle)
   }
 
@@ -140,7 +147,8 @@ class Client implements IClient {
     return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
       method: 'DELETE',
       body: this.getBody(data),
-      headers: this.getHeaders(options)
+      headers: this.getHeaders(options),
+      signal: this.getSignal(options)
     }).then(this.handle)
   }
   private async handle (r: any) {
@@ -174,11 +182,13 @@ export default class Api extends EventEmitter {
     authToken: string,
     result: ILoginResultAPI
   } | null = null
+  controller: AbortController
 
   constructor ({ client, host, logger = Logger }: any) {
     super()
     this.client = client || new Client({ host } as any)
     this.logger = Logger
+    this.controller = new AbortController();
   }
 
   get username () {
@@ -210,6 +220,10 @@ export default class Api extends EventEmitter {
       if (auth && !this.loggedIn()) {
         throw new Error('')
       }
+
+      const { signal } = this.controller;
+      options = { ...options, signal };
+
       let result
       switch (method) {
         case 'GET': result = await this.client.get(endpoint, data, options); break
@@ -239,6 +253,8 @@ export default class Api extends EventEmitter {
 
 	/** Do a DELETE request to an API endpoint. */
   del: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('DELETE', endpoint, data, auth, ignore, options)
+
+  abort = (): void => this.controller.abort()
 
 	/** Check result data for success, allowing override to ignore some errors */
   success (result: any, ignore?: RegExp) {
