@@ -69,7 +69,7 @@ export class Socket extends EventEmitter {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
       reopen: options.reopen || 10000,
-      ping: options.timeout || 30000
+      ping: options.timeout || 10000
     }
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
@@ -128,7 +128,7 @@ export class Socket extends EventEmitter {
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
-    if (this.resume) await this.login(this.resume)
+    // if (this.resume) await this.login(this.resume)
     return callback(this.connection)
   }
 
@@ -481,24 +481,24 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 
       this.ddp.on('open', () => this.emit('connected')) // echo ddp event
 
-      let cancelled = false
-      const rejectionTimeout = setTimeout(() => {
-        this.logger.info(`[driver] Timeout (${config.timeout})`)
-        const err = new Error('Socket connection timeout')
-        cancelled = true
-        reject(err)
-      }, config.timeout)
+      // let cancelled = false
+      // const rejectionTimeout = setTimeout(() => {
+      //   this.logger.info(`[driver] Timeout (${config.timeout})`)
+      //   const err = new Error('Socket connection timeout')
+      //   cancelled = true
+      //   reject(err)
+      // }, config.timeout)
 
 			// if to avoid condition where timeout happens before listener to 'connected' is added
 			// and this listener is not removed (because it was added after the removal)
-      if (!cancelled) {
-        this.once('connected', () => {
-          this.logger.info('[driver] Connected')
-          if (cancelled) return this.ddp.close() // cancel if already rejected
-          clearTimeout(rejectionTimeout)
-          resolve(this as IDriver)
-        })
-      }
+      // if (!cancelled) {
+      this.once('connected', () => {
+        this.logger.info('[driver] Connected')
+        // if (cancelled) return this.ddp.close() // cancel if already rejected
+        // clearTimeout(rejectionTimeout)
+        resolve(this as IDriver)
+      })
+      // }
     })
   }
 
