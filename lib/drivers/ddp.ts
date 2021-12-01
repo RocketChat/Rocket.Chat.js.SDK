@@ -189,13 +189,16 @@ export class Socket extends EventEmitter {
   /** Clear connection and try to connect again. */
   reopen = async () => {
     if (this.openTimeout) return
-    this.openTimeout = setTimeout(() => { delete this.openTimeout }, this.config.reopen);
+    this.openTimeout = setTimeout(async() => {
+      delete this.openTimeout
 
-    await this.open()
-      .catch((err) => {
+      try {
+        await this.open()  
+      } catch (err) {
         this.logger.error(`[ddp] Reopen error: ${err.message}`);
         this.reopen();
-      })
+      }
+    }, this.config.reopen);
   }
 
   /** Check if websocket connected and ready. */
