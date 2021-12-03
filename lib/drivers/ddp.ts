@@ -41,7 +41,6 @@ import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
-const reopenCloseCode = 4001;
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends EventEmitter {
@@ -52,7 +51,6 @@ export class Socket extends EventEmitter {
   handlers: ISocketMessageHandler[] = []
   config: ISocketOptions | any
   openTimeout?: NodeJS.Timer | number
-  reopenInterval?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
   connection?: WebSocket
   session?: string
@@ -92,14 +90,9 @@ export class Socket extends EventEmitter {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
 
-      if (this.connection) {
-        this.connection.close(reopenCloseCode)
+      if (this.connected) {
+        return resolve()
       }
-
-      this.reopenInterval && clearInterval(this.reopenInterval as any)
-      this.reopenInterval = setInterval(() => {
-        return !this.alive() && this.reopen()
-      }, ms)
 
       try {
         connection = new WebSocket(this.host, null, { headers: settings.customHeaders })
@@ -166,7 +159,6 @@ export class Socket extends EventEmitter {
   close = async () => {
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
-    this.reopenInterval && clearInterval(this.reopenInterval as any)
     this.openTimeout && clearTimeout(this.openTimeout as any)
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
 
@@ -183,21 +175,25 @@ export class Socket extends EventEmitter {
     return Promise.resolve()
   }
 
+  // Call open directly, so it skips openTimeout
   checkAndReopen = () => {
     if (!this.connected) {
-      delete this.openTimeout
-      this.reopen()
+      if (this.openTimeout) {
+        clearTimeout(this.openTimeout as any)
+        delete this.openTimeout
+      }
+      this.open()
     }
   }
 
   /** Clear connection and try to connect again. */
-  reopen = async () => {
+  reopen = () => {
     if (this.openTimeout) return
     this.openTimeout = setTimeout(async() => {
       delete this.openTimeout
 
       try {
-        await this.open()  
+        await this.open()
       } catch (err) {
         this.logger.error(`[ddp] Reopen error: ${err.message}`);
         this.reopen();
