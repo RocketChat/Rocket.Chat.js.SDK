@@ -41,7 +41,6 @@ import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
-const reopenCloseCode = 4001;
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends EventEmitter {
@@ -52,7 +51,6 @@ export class Socket extends EventEmitter {
   handlers: ISocketMessageHandler[] = []
   config: ISocketOptions | any
   openTimeout?: NodeJS.Timer | number
-  reopenInterval?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
   connection?: WebSocket
   session?: string
@@ -69,7 +67,7 @@ export class Socket extends EventEmitter {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
       reopen: options.reopen || 10000,
-      ping: options.timeout || 30000
+      ping: options.timeout || 10000
     }
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
@@ -92,14 +90,9 @@ export class Socket extends EventEmitter {
     return new Promise(async (resolve, reject) => {
       let connection: WebSocket
 
-      if (this.connection) {
-        this.connection.close(reopenCloseCode)
+      if (this.connected) {
+        return resolve()
       }
-
-      this.reopenInterval && clearInterval(this.reopenInterval as any)
-      this.reopenInterval = setInterval(() => {
-        return !this.alive() && this.reopen()
-      }, ms)
 
       try {
         connection = new WebSocket(this.host, null, { headers: settings.customHeaders })
@@ -128,7 +121,6 @@ export class Socket extends EventEmitter {
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
-    if (this.resume) await this.login(this.resume)
     return callback(this.connection)
   }
 
@@ -167,7 +159,6 @@ export class Socket extends EventEmitter {
   close = async () => {
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
-    this.reopenInterval && clearInterval(this.reopenInterval as any)
     this.openTimeout && clearTimeout(this.openTimeout as any)
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
 
@@ -184,18 +175,30 @@ export class Socket extends EventEmitter {
     return Promise.resolve()
   }
 
-  checkAndReopen = () => !this.connected && this.reopen()
+  // Call open directly, so it skips openTimeout
+  checkAndReopen = () => {
+    if (!this.connected) {
+      if (this.openTimeout) {
+        clearTimeout(this.openTimeout as any)
+        delete this.openTimeout
+      }
+      this.open()
+    }
+  }
 
   /** Clear connection and try to connect again. */
-  reopen = async () => {
+  reopen = () => {
     if (this.openTimeout) return
-    this.openTimeout = setTimeout(() => { delete this.openTimeout }, this.config.reopen);
+    this.openTimeout = setTimeout(async() => {
+      delete this.openTimeout
 
-    await this.open()
-      .catch((err) => {
+      try {
+        await this.open()
+      } catch (err) {
         this.logger.error(`[ddp] Reopen error: ${err.message}`);
         this.reopen();
-      })
+      }
+    }, this.config.reopen);
   }
 
   /** Check if websocket connected and ready. */
@@ -481,24 +484,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 
       this.ddp.on('open', () => this.emit('connected')) // echo ddp event
 
-      let cancelled = false
-      const rejectionTimeout = setTimeout(() => {
-        this.logger.info(`[driver] Timeout (${config.timeout})`)
-        const err = new Error('Socket connection timeout')
-        cancelled = true
-        reject(err)
-      }, config.timeout)
-
-			// if to avoid condition where timeout happens before listener to 'connected' is added
-			// and this listener is not removed (because it was added after the removal)
-      if (!cancelled) {
-        this.once('connected', () => {
-          this.logger.info('[driver] Connected')
-          if (cancelled) return this.ddp.close() // cancel if already rejected
-          clearTimeout(rejectionTimeout)
-          resolve(this as IDriver)
-        })
-      }
+      this.once('connected', () => {
+        this.logger.info('[driver] Connected')
+        resolve(this as IDriver)
+      })
     })
   }
 
