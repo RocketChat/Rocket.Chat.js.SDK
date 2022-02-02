@@ -508,6 +508,11 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
   }
 
+  subscribeRaw = (...args: any[]): Promise<ISubscription> => {
+    this.logger.info(`[DDP driver] Raw Subscribing to ${JSON.stringify(args)}`)
+    return this.ddp.subscribe(...args)
+  }   
+
   subscribeNotifyAll = (): Promise< any> => {
     const topic = 'stream-notify-all'
     return Promise.all([

@@ -18,6 +18,7 @@ export interface ISocket {
   disconnect (): Promise<ISocket>
   checkAndReopen (): Promise<ISocket>
   subscribe (topic: string, ...args: any[]): Promise<ISubscription>
+  subscribeRaw (...args: any[]): Promise<ISubscription>
   unsubscribe (subscription: ISubscription): Promise<ISocket>
   unsubscribeAll (): Promise<ISocket>
 
