@@ -298,7 +298,7 @@ export class Socket extends EventEmitter {
   login = async (credentials: any) => {
     const params = this.loginParams(credentials)
     this.resume = (await this.call('login', params) as ILoginResult)
-    await this.subscribeAll()
+    this.subscribeAll().catch(console.log)
     this.emit('login', this.resume)
     return this.resume
   }
