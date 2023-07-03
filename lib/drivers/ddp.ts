@@ -548,7 +548,8 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
       'subscriptions-changed',
       'uiInteraction',
       'e2ekeyRequest',
-      'userData'
+      'userData',
+      'video-conference'
     ].map(event => this.subscribe(topic, `${this.userId}/${event}`, false)))
   }
 
