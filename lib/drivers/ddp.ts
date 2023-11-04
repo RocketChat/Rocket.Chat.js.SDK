@@ -38,7 +38,7 @@ import {
 } from '../../interfaces'
 
 import { hostToWS } from '../util'
-import { sha256 } from 'js-sha256'
+import crypto from 'crypto'
 
 const userDisconnectCloseCode = 4000;
 
@@ -328,7 +328,7 @@ export class Socket extends EventEmitter {
     const params: ICredentialsPass = {
       user: { username: credentials.username },
       password: {
-        digest: sha256(credentials.password),
+        digest: crypto.createHash('sha256').update(credentials.password).digest('hex'),
         algorithm: 'sha-256'
       }
     }
