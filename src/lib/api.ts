@@ -38,6 +38,10 @@ export const url = ((host.indexOf('http') === -1)
   ? host.replace(/^(\/\/)?/, 'http://')
   : host) + '/api/v1/'
 
+export const getUrl = (apiVersion: string) => ((host.indexOf('http') === -1)
+? host.replace(/^(\/\/)?/, 'http://')
+: host) + `/api/${apiVersion}/`
+
 /** Convert payload data to query string for GET requests */
 export function getQueryString (data: any) {
   if (!data || typeof data !== 'object' || !Object.keys(data).length) return ''
@@ -100,17 +104,20 @@ export function success (result: any, ignore?: RegExp) {
  * @param data     Payload for POST request to endpoint
  * @param auth     Require auth headers for endpoint, default true
  * @param ignore   Allows certain matching error messages to not count as errors
+ * @param apiVersion Allows to set a spcific API version, default v1
  */
 export async function post (
   endpoint: string,
   data: any,
   auth: boolean = true,
-  ignore?: RegExp
+  ignore?: RegExp,
+  apiVersion: string = 'v1'
 ): Promise<any> {
   try {
     logger.debug(`[API] POST: ${endpoint}`, JSON.stringify(data))
     if (auth && !loggedIn()) await login()
     let headers = getHeaders(auth)
+    let url = getUrl(apiVersion)
     const result = await new Promise((resolve, reject) => {
       client.post(url + endpoint, { headers, data }, (result: any) => {
         if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
@@ -132,18 +139,21 @@ export async function post (
  * @param data       Object to serialise for GET request query string
  * @param auth       Require auth headers for endpoint, default true
  * @param ignore     Allows certain matching error messages to not count as errors
+ * @param apiVersion Allows to set a spcific API version, default v1
  */
 export async function get (
   endpoint: string,
   data?: any,
   auth: boolean = true,
-  ignore?: RegExp
+  ignore?: RegExp,
+  apiVersion: string = 'v1'
 ): Promise<any> {
   try {
     logger.debug(`[API] GET: ${endpoint}`, data)
     if (auth && !loggedIn()) await login()
     let headers = getHeaders(auth)
     const query = getQueryString(data)
+    let url = getUrl(apiVersion)
     const result = await new Promise((resolve, reject) => {
       client.get(url + endpoint + query, { headers }, (result: any) => {
         if (Buffer.isBuffer(result)) reject('Result was buffer (HTML, not JSON)')
