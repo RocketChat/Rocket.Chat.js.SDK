@@ -79,10 +79,10 @@ import * as settings from '../settings';
 
 export interface IClient {
   headers: any
-  get (url: string, data: any, options?: any): Promise<any>
-  post (url: string, data: any, options?: any): Promise<any>
-  put (url: string, data: any, options?: any): Promise<any>
-  delete (url: string, data: any, options?: any): Promise<any>
+  get (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  post (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  put (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  delete (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
 }
 
 class Client implements IClient {
@@ -121,23 +121,23 @@ class Client implements IClient {
     return options && options.signal;
   }
 
-  get (url: string, data: any, options?: any): Promise<any> {
-    return fetch(`${this.host}/api/v1/${encodeURI(url)}?${this.getParams(data)}`, {
+  get (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}?${this.getParams(data)}`, {
       method: 'GET',
       headers: this.getHeaders(options),
       signal: this.getSignal(options)
     }).then(this.handle)
   }
-  post (url: string, data: any, options?: any): Promise<any> {
-    return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
+  post (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
       method: 'POST',
       body: this.getBody(data),
       headers: this.getHeaders(options),
       signal: this.getSignal(options)
     }).then(this.handle)
   }
-  put (url: string, data: any, options?: any): Promise<any> {
-    return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
+  put (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
       method: 'PUT',
       body: this.getBody(data),
       headers: this.getHeaders(options),
@@ -145,8 +145,8 @@ class Client implements IClient {
     }).then(this.handle)
   }
 
-  delete (url: string, data?: any, options?: any): Promise<any> {
-    return fetch(`${this.host}/api/v1/${encodeURI(url)}`, {
+  delete (url: string, data?: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
       method: 'DELETE',
       body: this.getBody(data),
       headers: this.getHeaders(options),
@@ -215,7 +215,8 @@ export default class Api extends EventEmitter {
 		data: any = {},
 		auth: boolean = true,
     ignore?: RegExp,
-    options?: any
+    options?: any,
+    apiVersion: string = 'v1'
 	) => {
     this.logger && this.logger.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
@@ -228,11 +229,11 @@ export default class Api extends EventEmitter {
 
       let result
       switch (method) {
-        case 'GET': result = await this.client.get(endpoint, data, options); break
-        case 'PUT': result = await this.client.put(endpoint, data, options); break
-        case 'DELETE': result = await this.client.delete(endpoint, data, options); break
+        case 'GET': result = await this.client.get(endpoint, data, options, apiVersion); break
+        case 'PUT': result = await this.client.put(endpoint, data, options, apiVersion); break
+        case 'DELETE': result = await this.client.delete(endpoint, data, options, apiVersion); break
         default:
-        case 'POST': result = await this.client.post(endpoint, data, options); break
+        case 'POST': result = await this.client.post(endpoint, data, options, apiVersion); break
       }
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
@@ -245,16 +246,16 @@ export default class Api extends EventEmitter {
     }
   }
 	/** Do a POST request to an API endpoint. */
-  post: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('POST', endpoint, data, auth, ignore, options)
+  post: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('POST', endpoint, data, auth, ignore, options, apiVersion)
 
 	/** Do a GET request to an API endpoint. */
-  get: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('GET', endpoint, data, auth, ignore, options)
+  get: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('GET', endpoint, data, auth, ignore, options, apiVersion)
 
 	/** Do a PUT request to an API endpoint. */
-  put: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('PUT', endpoint, data, auth, ignore, options)
+  put: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('PUT', endpoint, data, auth, ignore, options, apiVersion)
 
 	/** Do a DELETE request to an API endpoint. */
-  del: IAPIRequest = (endpoint, data, auth, ignore, options = {}) => this.request('DELETE', endpoint, data, auth, ignore, options)
+  del: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('DELETE', endpoint, data, auth, ignore, options, apiVersion)
 
   /** Abort all current API requests. */
   abort = (): void => this.controller.abort()

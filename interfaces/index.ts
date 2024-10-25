@@ -127,7 +127,8 @@ export interface IAPIRequest {
     data?: any,
     auth?: boolean,
     ignore?: RegExp,
-    options?: any
+    options?: any,
+    apiVersion?: string
   ): Promise<any>
 }
 
