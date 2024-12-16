@@ -166,7 +166,7 @@ class Client implements IClient {
       const value = data[key];
       if (Array.isArray(value)) {
         value.forEach(val => {
-          params.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
+          params.push(`${encodeURIComponent(key)}[]=${encodeURIComponent(val)}`);
         });
       } else {
         params.push(`${encodeURIComponent(key)}=${(typeof data[key] === 'object' ? encodeURIComponent(JSON.stringify(data[key])) : encodeURIComponent(data[key]))}`);
