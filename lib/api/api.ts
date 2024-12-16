@@ -161,9 +161,18 @@ class Client implements IClient {
 
   }
   private getParams (data: any) {
-    return Object.keys(data).map(function (k) {
-      return encodeURIComponent(k) + '=' + (typeof data[k] === 'object' ? encodeURIComponent(JSON.stringify(data[k])) : encodeURIComponent(data[k]))
-    }).join('&')
+    const params: any = [];
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+      if (Array.isArray(value)) {
+        value.forEach(val => {
+          params.push(`${encodeURIComponent(key)}[]=${encodeURIComponent(val)}`);
+        });
+      } else {
+        params.push(`${encodeURIComponent(key)}=${(typeof data[key] === 'object' ? encodeURIComponent(JSON.stringify(data[key])) : encodeURIComponent(data[key]))}`);
+      }
+    });
+    return params.join('&');
   }
 }
 
