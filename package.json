@@ -81,7 +81,6 @@
     "webpack-cli": "^3.1.0"
   },
   "dependencies": {
-    "js-sha256": "^0.9.0",
     "lru-cache": "^4.1.1",
     "mem": "^4.0.0",
     "tiny-events": "^1.0.1",
