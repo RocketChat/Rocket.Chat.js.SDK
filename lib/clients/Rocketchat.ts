@@ -13,9 +13,6 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     super({ ...config, logger })
     this.logger = logger
     switch (protocol) {
-      // case Protocols.MQTT:
-      //   this.socket = import(/* webpackChunkName: 'mqtt' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver({ ...config, logger }))
-      //   break
       case Protocols.DDP:
         this.socket = import(/* webpackChunkName: 'ddp' */ '../drivers/ddp').then(({ DDPDriver }) => {
           this.ddp = new DDPDriver({ ...config, logger })

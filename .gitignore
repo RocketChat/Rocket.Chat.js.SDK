@@ -5,4 +5,5 @@
 /shrinkwrap.yaml
 /package-lock.json
 /docs/
+/.scratch/
 .DS_Store

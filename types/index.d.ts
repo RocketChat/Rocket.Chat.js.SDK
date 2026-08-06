@@ -1,6 +1,4 @@
 declare module 'universal-websocket-client'
-declare module 'paho-mqtt'
-declare module 'paho-mqtt/src/paho-mqtt'
 declare module 'msgpack-lite'
 declare module 'mem'
 declare module 'js-sha256' {
