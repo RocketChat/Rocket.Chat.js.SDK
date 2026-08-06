@@ -5,6 +5,14 @@ on:
   push:
     branches: [mobile]
 
+# The two triggers do not overlap: every branch is covered by its pull request,
+# and `mobile` by the push. A new commit supersedes the run it replaces, so a
+# stale run does not sit in the queue. On `mobile`, every commit keeps its own
+# result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.ref_name != 'mobile' }}
+
 jobs:
   checks:
     runs-on: ubuntu-latest
