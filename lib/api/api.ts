@@ -10,7 +10,7 @@ import {
 
 import { Message } from '../message'
 
-import { EventEmitter } from 'tiny-events'
+import { EventEmitter } from '../EventEmitter'
 import * as settings from '../settings';
 
 /** Check for existing login */
