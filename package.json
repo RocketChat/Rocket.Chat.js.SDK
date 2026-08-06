@@ -26,8 +26,8 @@
     "typescript"
   ],
   "scripts": {
-    "lint": "oxlint && tsc",
-    "tsc": "tsc"
+    "lint": "oxlint",
+    "typecheck": "tsc"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

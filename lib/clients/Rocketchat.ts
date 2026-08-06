@@ -9,7 +9,9 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   ddp?: any
   config: any
 
-  constructor ({ logger, allPublic, rooms, integrationId, protocol = Protocols.DDP, ...config }: any) {
+  // `allPublic`, `rooms` and `integrationId` are destructured only to keep them
+  // out of `...config`, which is forwarded to `super` and to `DDPDriver`.
+  constructor ({ logger, allPublic: _allPublic, rooms: _rooms, integrationId: _integrationId, protocol = Protocols.DDP, ...config }: any) {
     super({ ...config, logger })
     this.logger = logger
     switch (protocol) {

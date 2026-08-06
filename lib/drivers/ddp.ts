@@ -553,7 +553,9 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 	/** Array of joined room IDs (for reactive queries) */
   joinedIds: string[] = []
 
-  constructor ({ host = 'localhost:3000', integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
+  // `integrationId` is destructured only to keep it out of `...moreConfigs`,
+  // which is spread into `this.config`.
+  constructor ({ host = 'localhost:3000', integrationId: _integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
     super()
 
     this.config = {

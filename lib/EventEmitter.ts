@@ -2,8 +2,10 @@
  * @module EventEmitter
  * Typed port of the `tiny-events` package, vendored so the SDK owns its own
  * event base class instead of shadowing an untyped JS dependency with a shim.
- * Behaviour is faithful to `tiny-events@1.0.1`, plus `removeAllListeners`,
- * which used to be monkey-patched onto the prototype by `lib/drivers/ddp.ts`.
+ * `on`, `once`, `off` and `emit` are faithful to `tiny-events@1.0.1`.
+ * `removeAllListeners` has no upstream counterpart: it replaces the method that
+ * `lib/drivers/ddp.ts` used to monkey-patch onto the prototype, and it returns
+ * the same empty array that patch returned so callers see no change.
  */
 
 export type Listener = Function & { listener?: Function }
@@ -73,11 +75,12 @@ export class EventEmitter {
     return this
   }
 
-  removeAllListeners (event?: string): void {
+  removeAllListeners (event?: string): any[] {
     if (event) {
       this._listeners[event] = []
     } else {
       this._listeners = {}
     }
+    return []
   }
 }

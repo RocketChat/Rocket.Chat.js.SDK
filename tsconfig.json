@@ -10,7 +10,7 @@
 		"noUnusedParameters": true,
 		"allowSyntheticDefaultImports": true,
 		"esModuleInterop": true,
-		"skipLibCheck": true,
+		"skipLibCheck": false,
 		"forceConsistentCasingInFileNames": true
 	},
 	"exclude": ["node_modules"]
