@@ -195,7 +195,7 @@ export default class Api extends EventEmitter {
   } | null = null
   controller: AbortController
 
-  constructor ({ client, host, logger = Logger }: any) {
+  constructor ({ client, host }: any) {
     super()
     this.client = client || new Client({ host } as any)
     this.logger = Logger

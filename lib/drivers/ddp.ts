@@ -117,7 +117,7 @@ export class Socket extends EventEmitter {
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
    */
-  open = (ms: number = this.config.reopen) => {
+  open = (_ms: number = this.config.reopen) => {
     return new Promise<any>(async (resolve, reject) => {
       if (this.connected) {
         return resolve(undefined)
@@ -758,7 +758,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   }
 
 	/** Login to Rocket.Chat via DDP */
-  login = async (credentials: ICredentials, args: any): Promise<any> => {
+  login = async (credentials: ICredentials, _args: any): Promise<any> => {
     if (!this.ddp || !this.ddp.connected) {
       await this.connect()
     }
