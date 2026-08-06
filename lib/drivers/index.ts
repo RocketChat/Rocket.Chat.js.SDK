@@ -27,10 +27,10 @@ export interface ISocket {
   on (event: string, listener: Function): EventEmitter
   once (event: string, listener: Function): EventEmitter
   off (event?: string, listener?: Function): EventEmitter
-  emit (event: string, ...args: any[]): boolean
-  listeners (event: string): Function[]
-  removeAllListeners (event?: string): Function[]
-  hasListeners (event: string): boolean
+  // TODO: the vendored `EventEmitter` returns `this` from `emit` and nothing from
+  // `removeAllListeners`. Widened to match reality rather than changing the emitter.
+  emit (event: string, ...args: any[]): any
+  removeAllListeners (event?: string): any
 }
 
 export interface IDriver {

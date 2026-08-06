@@ -118,9 +118,9 @@ export class Socket extends EventEmitter {
    * Resumes login if given token.
    */
   open = (ms: number = this.config.reopen) => {
-    return new Promise(async (resolve, reject) => {
+    return new Promise<any>(async (resolve, reject) => {
       if (this.connected) {
-        return resolve()
+        return resolve(undefined)
       }
 
       if (this.reopenPromise) {
@@ -229,7 +229,7 @@ export class Socket extends EventEmitter {
       try {
         await this.open()
       } catch (err) {
-        this.logger.error(`[ddp] Reopen error: ${err.message}`);
+        this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
         this.reopen();
       }
     }, this.config.reopen);
@@ -340,7 +340,7 @@ export class Socket extends EventEmitter {
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
   send = async (obj: any): Promise<any> => {
-    return new Promise(async(resolve, reject) => {
+    return new Promise<any>(async(resolve, reject) => {
       if (!this.connection) throw new Error('[ddp] sending without open connection')
       if (!this.connected) await new Promise(resolve => this.on('open', resolve))
 
@@ -364,7 +364,7 @@ export class Socket extends EventEmitter {
       this.once('disconnected', reject)
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       if (!listener) {
-        return resolve()
+        return resolve(undefined)
       }
       this.once(listener, (result: any) => {
         this.off('disconnected', reject)
@@ -612,7 +612,10 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.close()
   }
 
-  checkAndReopen = (): Promise<any> => {
+  // TODO: `DDPDriver.checkAndReopen` is sync fire-and-forget — `ddp.checkAndReopen`
+  // returns void, not a promise. Widened rather than corrected; the rewrite decides
+  // whether callers should be able to await a reopen.
+  checkAndReopen = (): any => {
     return this.ddp.checkAndReopen()
   }
 
@@ -632,15 +635,18 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.config.ping
   }
 
-  subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription> => {
+  // TODO: `ddp.subscribe` resolves with `void | subscription | undefined`, not an
+  // `ISubscription` — the subscription object is only built on the happy path. Widened
+  // to match reality rather than narrowed to a guess; the rewrite owns the real shape.
+  subscribe = (topic: string, eventname: string, ...args: any[]): Promise<any> => {
     this.logger.info(`[DDP driver] Subscribing to ${topic} | ${JSON.stringify(args)}`)
     return this.ddp.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
   }
 
-  subscribeRaw = (...args: any[]): Promise<ISubscription> => {
+  subscribeRaw = (...args: any[]): Promise<any> => {
     this.logger.info(`[DDP driver] Raw Subscribing to ${JSON.stringify(args)}`)
-    return this.ddp.subscribe(...args)
-  }   
+    return this.ddp.subscribe(...args as [string, any[]])
+  }
 
   subscribeNotifyAll = (): Promise< any> => {
     const topic = 'stream-notify-all'
