@@ -483,6 +483,7 @@ export class Socket extends EventEmitter {
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
         // throw err
+        return undefined
       })
   }
 
@@ -614,10 +615,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.close()
   }
 
-  // TODO: `DDPDriver.checkAndReopen` is sync fire-and-forget — `ddp.checkAndReopen`
-  // returns void, not a promise. Widened rather than corrected; the rewrite decides
-  // whether callers should be able to await a reopen.
-  checkAndReopen = (): any => {
+  checkAndReopen = (): void => {
     return this.ddp.checkAndReopen()
   }
 
@@ -637,15 +635,12 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.config.ping
   }
 
-  // TODO: `ddp.subscribe` resolves with `void | subscription | undefined`, not an
-  // `ISubscription` — the subscription object is only built on the happy path. Widened
-  // to match reality rather than narrowed to a guess; the rewrite owns the real shape.
-  subscribe = (topic: string, eventname: string, ...args: any[]): Promise<any> => {
+  subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription | undefined> => {
     this.logger.info(`[DDP driver] Subscribing to ${topic} | ${JSON.stringify(args)}`)
     return this.ddp.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
   }
 
-  subscribeRaw = (...args: any[]): Promise<any> => {
+  subscribeRaw = (...args: any[]): Promise<ISubscription | undefined> => {
     this.logger.info(`[DDP driver] Raw Subscribing to ${JSON.stringify(args)}`)
     return this.ddp.subscribe(...args as [string, any[]])
   }
@@ -750,7 +745,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     })
   }
 
-  subscribeRoom = (rid: string, ...args: any[]): Promise<ISubscription[]> => {
+  subscribeRoom = (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> => {
     const topic = 'stream-notify-room'
     return Promise.all([
       this.subscribe('stream-room-messages', rid, ...args),

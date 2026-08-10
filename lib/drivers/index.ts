@@ -16,13 +16,9 @@ export interface ISocket {
   logger: ILogger
   connect (options: ISocketOptions): Promise<ISocket | IDriver>
   disconnect (): Promise<ISocket>
-  // TODO: `DDPDriver` returns neither of these shapes. `Socket.checkAndReopen`
-  // is sync fire-and-forget and returns `void`, and `Socket.subscribe` only
-  // builds a subscription on the happy path. Widened to match the
-  // implementation; narrowing it back is a breaking change, so it is deferred.
-  checkAndReopen (): any
-  subscribe (topic: string, ...args: any[]): Promise<any>
-  subscribeRaw (...args: any[]): Promise<ISubscription>
+  checkAndReopen (): void
+  subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined>
+  subscribeRaw (...args: any[]): Promise<ISubscription | undefined>
   unsubscribe (subscription: ISubscription): Promise<ISocket>
   unsubscribeAll (): Promise<ISocket>
 
@@ -31,18 +27,15 @@ export interface ISocket {
   on (event: string, listener: Function): EventEmitter
   once (event: string, listener: Function): EventEmitter
   off (event?: string, listener?: Function): EventEmitter
-  // TODO: the vendored `EventEmitter` returns `this` from `emit` and an empty
-  // array from `removeAllListeners`. Widened to match reality rather than
-  // changing the emitter.
-  emit (event: string, ...args: any[]): any
-  removeAllListeners (event?: string): any[]
+  emit (event: string, ...args: any[]): EventEmitter
+  removeAllListeners (event?: string): Function[]
 }
 
 export interface IDriver {
   config: any
   login (credentials: ICredentials, args: any): Promise<any>
 
-  subscribeRoom (rid: string, ...args: any[]): Promise<ISubscription[]>
+  subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]>
 
   onMessage (cb: ICallback): void
 

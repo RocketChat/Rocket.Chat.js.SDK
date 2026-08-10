@@ -5,7 +5,7 @@
  * `on`, `once`, `off` and `emit` are faithful to `tiny-events@1.0.1`.
  * `removeAllListeners` has no upstream counterpart: it replaces the method that
  * `lib/drivers/ddp.ts` used to monkey-patch onto the prototype, and it returns
- * the same empty array that patch returned so callers see no change.
+ * the same empty listener array that patch returned so callers see no change.
  */
 
 export type Listener = Function & { listener?: Function }
@@ -75,7 +75,7 @@ export class EventEmitter {
     return this
   }
 
-  removeAllListeners (event?: string): any[] {
+  removeAllListeners (event?: string): Function[] {
     if (event) {
       this._listeners[event] = []
     } else {
