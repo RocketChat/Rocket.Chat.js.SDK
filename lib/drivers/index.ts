@@ -55,5 +55,6 @@ export interface IDriver {
 }
 
 export enum Protocols {
+	MQTT = 'mqtt',
 	DDP = 'ddp'
 }
