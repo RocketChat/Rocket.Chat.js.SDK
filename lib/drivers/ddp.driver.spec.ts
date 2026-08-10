@@ -46,7 +46,7 @@ describe('new DDPDriver', () => {
     expect(createDriver().config.host).toBe('localhost:3000')
   })
 
-  it('BUG (pinned bug 8): discards the caller\'s timeout and hard-codes 10000', () => {
+  it('BUG (pinned bug 11): discards the caller\'s timeout and hard-codes 10000', () => {
     const driver = createDriver({ timeout: 250 })
 
     expect(driver.config.timeout).toBe(10000)

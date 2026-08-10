@@ -92,7 +92,7 @@ describe('Socket liveness', () => {
     it('skips closing a stale-ping socket, leaking it open', async () => {
       // Pinned bug: `close` gates the actual close on `connected`, which a stale
       // ping already made false — so the open transport is abandoned rather than
-      // closed. See test/PINNED-BUGS.md, row 8.
+      // closed. See test/PINNED-BUGS.md, row 12.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
 
       await socket.close()
@@ -113,7 +113,7 @@ describe('Socket liveness', () => {
       // Pinned bug: the probe snapshots `lastPing` and requires it to *advance*
       // strictly, so a pong answered within the same millisecond is discarded and
       // the probe times out on a demonstrably live socket. See PINNED-BUGS.md,
-      // row 9. Under the frozen clock this is deterministic, not flaky.
+      // row 13. Under the frozen clock this is deterministic, not flaky.
       const stampBeforeProbe = socket.lastPing
       const pongSeen = jest.fn()
       socket.on('pong', pongSeen)
