@@ -1,0 +1,14 @@
+{
+	// The test program: same strictness as the shipped code, plus jest's globals.
+	// It pulls the sources in as imports, so they are still checked here — what
+	// changes is only which globals exist.
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"types": ["node", "jest"]
+	},
+	// `types` carries the ambient module declarations the sources depend on
+	// (`tiny-events`, the websocket client); the base program picks them up by
+	// globbing everything, this one has to name them.
+	"include": ["test", "types", "**/*.spec.ts"],
+	"exclude": ["node_modules"]
+}

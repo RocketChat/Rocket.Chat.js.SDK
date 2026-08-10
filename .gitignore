@@ -3,5 +3,6 @@
 /.env
 /shrinkwrap.yaml
 /docs/
+/coverage/
 /.scratch/
 .DS_Store
