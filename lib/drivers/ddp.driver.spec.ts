@@ -1,7 +1,10 @@
 import { DDPDriver } from './ddp'
+import { ISocketOptions } from '../../interfaces'
 import { silentLogger } from '../../test/silentLogger'
 import {
   FakeWebSocket,
+  fakeSockets,
+  OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../test/fakeTransport'
@@ -12,7 +15,9 @@ jest.mock('universal-websocket-client', () => require('../../test/fakeTransport'
 
 useFakeClockAndSocketRegistry()
 
-const createDriver = (options: object = {}) =>
+// Typed rather than `object`: the option names have to typecheck, or the pin on
+// the discarded timeout would go green against a typo.
+const createDriver = (options: ISocketOptions = {}) =>
   new DDPDriver({ host: 'localhost:3000', logger: silentLogger, ...options })
 
 /**
@@ -101,13 +106,73 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     await subscribing
   }
 
-  it('resolves false without a logged-in user, before doing any work', async () => {
+  it('resolves false without a logged-in user, before scheduling anything', async () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver.ddp)
     const sentBefore = transport.sent.length
+    // The socket's own ping timer is pending here and stays that way; what the
+    // guard has to avoid is adding the poll and the deadline on top of it.
+    const timersBefore = jest.getTimerCount()
 
     await expect(driver.waitForNotifyUserMediaSubs()).resolves.toBe(false)
+
     expect(transport.sent).toHaveLength(sentBefore)
+    expect(jest.getTimerCount()).toBe(timersBefore)
+  })
+
+  it('resolves ready after an immediate reopen, on the socket the reopen built', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+
+    // A real reopen: a second transport is constructed and handshaken, and the
+    // subscription map survives it — which is what makes the resubscribe below
+    // reuse the ids rather than mint new ones.
+    const reopening = driver.reopenNow()
+    const reopened = fakeSockets[fakeSockets.length - 1]
+    expect(reopened).not.toBe(transport)
+    reopened.readyState = OPEN
+    reopened.onopen?.({})
+    await jest.advanceTimersByTimeAsync(0)
+    reopened.receive({ msg: 'connected', session: 'reopened-session' })
+    await reopening
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    // The resubscribes go out on the new socket, not the dead one.
+    expect(reopened.sent.map((frame) => JSON.parse(frame).id))
+      .toEqual(expect.arrayContaining(['sub-media-signal', 'sub-media-calls']))
+    reopened.receive({ msg: 'ready', subs: ['sub-media-signal'] })
+    reopened.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+
+    await expect(waiting).resolves.toBe(true)
+  })
+
+  it('does not resubscribe again while a resubscribe is still in flight', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+
+    const sentBefore = transport.sent.length
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    let resolved: boolean | undefined
+    waiting.then((value) => { resolved = value }, () => { resolved = false })
+
+    // The server never acks, so the first attempt stays in flight across many
+    // poll ticks. Without the latch each tick would fire another pair of
+    // resubscribes — a storm the server would see as repeated sub requests.
+    await jest.advanceTimersByTimeAsync(1000)
+
+    expect(transport.sent).toHaveLength(sentBefore + 2)
+    expect(resolved).toBeUndefined()
+
+    // Left settled so the pending timers do not outlive the test.
+    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
+    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    await expect(waiting).resolves.toBe(true)
   })
 
   it('polls until both media subscriptions appear, then resubscribes on their own ids', async () => {
@@ -119,7 +184,7 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     let resolved: boolean | undefined
-    waiting.then((value) => { resolved = value })
+    waiting.then((value) => { resolved = value }, () => { resolved = false })
 
     // Nothing to find yet, and one poll interval passing changes nothing.
     await jest.advanceTimersByTimeAsync(100)
@@ -157,7 +222,7 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
 
     const waiting = driver.waitForNotifyUserMediaSubs(500)
     let resolved: boolean | undefined
-    waiting.then((value) => { resolved = value })
+    waiting.then((value) => { resolved = value }, () => { resolved = false })
 
     await jest.advanceTimersByTimeAsync(499)
     expect(resolved).toBeUndefined()
