@@ -4,13 +4,13 @@
 	// sites below are cleared.
 	//
 	//   no-unused-expressions          7  lib/api/api.ts, lib/drivers/ddp.ts
-	//   no-this-alias                  4  lib/EventEmitter.ts, lib/api/RocketChat.ts, lib/util.ts
+	//   no-this-alias                  3  lib/api/RocketChat.ts, lib/util.ts
 	//   no-async-promise-executor      2  lib/drivers/ddp.ts
 	//   triple-slash-reference         1  lib/drivers/ddp.ts
 	//   no-unsafe-declaration-merging  1  lib/message.ts
 	//   no-unused-vars                 0  clear; kept on to stop regressions
 	//
-	// Total: 15 warnings.
+	// Total: 14 warnings.
 	"rules": {
 		"no-unused-expressions": "warn",
 		"no-this-alias": "warn",

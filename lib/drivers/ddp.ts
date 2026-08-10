@@ -5,11 +5,20 @@
  */
 
 import WebSocket from 'universal-websocket-client'
-import { EventEmitter } from '../EventEmitter'
+import { EventEmitter } from 'tiny-events'
 
 import { logger as Logger } from '../log'
 import { ISocket, IDriver } from './index'
 import * as settings from '../settings';
+
+EventEmitter.prototype.removeAllListeners = function (event?: string | any): any {
+  if (event) {
+    this._listeners[event] = []
+  } else {
+    this._listeners = {}
+  }
+  return [] as any
+}
 
 import {
   ISocketOptions,

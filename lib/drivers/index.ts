@@ -3,7 +3,7 @@
  * Provides high-level helpers for DDP connection, method calls, subscriptions.
  */
 
-import { EventEmitter } from '../EventEmitter'
+import { EventEmitter } from 'tiny-events'
 import {
   ILogger,
   ISocketOptions,
