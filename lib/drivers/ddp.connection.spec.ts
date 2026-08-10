@@ -2,10 +2,10 @@ import { Socket } from './ddp'
 import { silentLogger } from '../../test/silentLogger'
 import {
   CLOSED,
+  driveToHandshake,
   FakeWebSocket,
   fakeSockets,
   fakeTransportModule,
-  OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../test/fakeTransport'
@@ -17,8 +17,13 @@ useFakeClockAndSocketRegistry()
 /** The code the driver closes with when *it* asked for the close. */
 const INTENTIONAL_CLOSE = 4000
 
-/** The delay `reopen` schedules its retry on, read from the `reopen` option. */
-const REOPEN_DELAY = 10000
+/**
+ * The delay `reopen` schedules its retry on, read from the `reopen` option.
+ * Deliberately *not* the 10000 default, and deliberately not the fallback below:
+ * with either, a boundary assertion would pass whether or not the driver read
+ * the option, and the two timers would be indistinguishable on the clock.
+ */
+const REOPEN_DELAY = 3000
 
 /**
  * The hard fallback inside `reopenNow`, hardcoded in the driver rather than
@@ -38,20 +43,6 @@ const createSocket = () => new Socket({
   reopen: REOPEN_DELAY,
   timeout: 10 * 60 * 1000
 })
-
-/**
- * Drive an already-constructed fake to open and handshaken, the same way
- * `openFakeConnection` does for the first socket. Needed because the sockets
- * a *reopen* builds are constructed by the driver behind a promise the test
- * holds, so they cannot be opened through the `socket.open()` entry point.
- */
-const handshake = async (transport: FakeWebSocket, session = 'reopened-session'): Promise<void> => {
-  transport.readyState = OPEN
-  transport.onopen?.({})
-  await jest.advanceTimersByTimeAsync(0)
-  transport.receive({ msg: 'connected', session })
-  await jest.advanceTimersByTimeAsync(0)
-}
 
 /**
  * Connecting and reconnecting. Every test starts from a real open connection
@@ -92,17 +83,21 @@ describe('Socket connection lifecycle', () => {
 
       closeTheReplacedSocket({ code: 1006 })
 
+      // No 'close' emitted, no reopen scheduled, and — the harm the guard exists
+      // to prevent — the live connection is still the replacement.
       expect(closeSeen).not.toHaveBeenCalled()
       expect(socket.openTimeout).toBeUndefined()
-      expect(fakeSockets).toHaveLength(2)
+      expect(socket.connection).toBe(replacement)
 
-      await handshake(replacement)
+      await driveToHandshake(replacement)
       await reopening
     })
   })
 
   describe('a close from the live socket', () => {
-    it.each([1000, 1001, 1006, 1011, 4001])('schedules a reopen for code %i', (code) => {
+    // A normal close and an abnormal one — the two shapes either side of the
+    // single `code !== 4000` branch. More codes would add inputs, not coverage.
+    it.each([1000, 1006])('schedules a reopen for code %i', (code) => {
       transport.close(code)
 
       expect(socket.openTimeout).toBeDefined()
@@ -136,22 +131,28 @@ describe('Socket connection lifecycle', () => {
       expect(transport.onclose).toBeNull()
       expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
 
-      await handshake(fakeSockets[1])
+      await driveToHandshake(fakeSockets[1])
       await reopening
     })
 
     it('replaces the predecessor even when tearing it down throws', async () => {
       transport.close = () => { throw new Error('teardown boom') }
 
+      // `silentLogger` is a shared module singleton and `restoreMocks` does not
+      // reset plain `jest.fn()`s, so the log assertion below would otherwise read
+      // calls this test never made.
+      const debug = silentLogger.debug as jest.Mock
+      debug.mockClear()
+
       const reopening = socket.reopenNow()
 
-      expect(silentLogger.debug).toHaveBeenCalledWith(
+      expect(debug).toHaveBeenCalledWith(
         '[ddp] open: previous connection teardown failed: teardown boom'
       )
       expect(fakeSockets).toHaveLength(2)
       expect(socket.connection).toBe(fakeSockets[1])
 
-      await handshake(fakeSockets[1])
+      await driveToHandshake(fakeSockets[1])
       await reopening
     })
   })
@@ -169,7 +170,7 @@ describe('Socket connection lifecycle', () => {
       expect(socket.lastPing).toBe(0)
       expect(disconnectSeen).toHaveBeenCalledTimes(1)
 
-      await handshake(fakeSockets[1])
+      await driveToHandshake(fakeSockets[1])
 
       await expect(first).resolves.toBeUndefined()
       await expect(second).resolves.toBeUndefined()
@@ -197,28 +198,39 @@ describe('Socket connection lifecycle', () => {
       const failure = new Error('transport unavailable')
       jest.spyOn(fakeTransportModule, 'default').mockImplementation(() => { throw failure })
 
+      // Shared logger singleton, as above.
+      const error = silentLogger.error as jest.Mock
+      error.mockClear()
+
       // The existing socket has to stop being connected first, or `open` short
       // circuits before it ever constructs anything.
       transport.readyState = CLOSED
 
       await expect(socket.open()).rejects.toBe(failure)
 
-      expect(silentLogger.error).toHaveBeenCalledWith(failure)
+      expect(error).toHaveBeenCalledWith(failure)
       expect(fakeSockets).toHaveLength(1)
     })
   })
 
   describe('the interval argument to open', () => {
     it('BUG (pinned bug 14): is ignored entirely', async () => {
-      // `open` declares an interval parameter and then never reads it, so the
-      // reopen after a dropped connection still waits `config.reopen`. See
-      // test/PINNED-BUGS.md, row 14.
+      // `open` declares an interval parameter and never reads it: the value
+      // reaches nothing, stores nowhere, and every subsequent retry still waits
+      // `config.reopen` — 3000 here, so the delay below is demonstrably the
+      // configured one and not the 1 that was passed. See PINNED-BUGS.md, row 14.
+      //
+      // A pin on a parameter that does nothing can only assert the absences: an
+      // implementation that honoured the argument would have to change one of
+      // them, and this test is where it becomes visible.
       transport.readyState = CLOSED
       const opening = socket.open(1)
 
       const reopened = fakeSockets[1]
-      await handshake(reopened)
+      await driveToHandshake(reopened)
       await opening
+
+      expect(socket.config.reopen).toBe(REOPEN_DELAY)
 
       reopened.close(1006)
 

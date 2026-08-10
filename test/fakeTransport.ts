@@ -136,6 +136,21 @@ export const openFakeConnection = async (socket: Socket, session = 'fake-session
   expect(fakeSockets).toHaveLength(constructedBefore + 1)
   const transport = fakeSockets[constructedBefore]
 
+  await driveToHandshake(transport, session)
+
+  await opening
+  return transport
+}
+
+/**
+ * Take an already-constructed fake through open and handshake, exactly as the
+ * transport and server would.
+ *
+ * Separate from `openFakeConnection` because a *reopen* constructs its socket
+ * behind a promise the spec never gets to hold — so there is no `socket.open()`
+ * call to wrap, only a fake out of the registry to drive.
+ */
+export const driveToHandshake = async (transport: FakeWebSocket, session = 'fake-session'): Promise<void> => {
   // `connected` reads the ready state, and the handshake send waits on it.
   transport.readyState = OPEN
   transport.onopen?.({})
@@ -144,6 +159,6 @@ export const openFakeConnection = async (socket: Socket, session = 'fake-session
   await jest.advanceTimersByTimeAsync(0)
   transport.receive({ msg: 'connected', session })
 
-  await opening
-  return transport
+  // And let everything the handshake reply resolves actually run.
+  await jest.advanceTimersByTimeAsync(0)
 }
