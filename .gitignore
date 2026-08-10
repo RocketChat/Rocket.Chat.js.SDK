@@ -2,7 +2,8 @@
 /yarn-error.log
 /.env
 /shrinkwrap.yaml
-/docs/
-/coverage/
+/package-lock.json
+/docs/*
+!/docs/agents/
 /.scratch/
 .DS_Store
