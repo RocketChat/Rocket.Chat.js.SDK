@@ -4,5 +4,6 @@
 /.env
 /shrinkwrap.yaml
 /package-lock.json
-/docs/
+/docs/*
+!/docs/agents/
 .DS_Store
