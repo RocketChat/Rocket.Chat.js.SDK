@@ -12,9 +12,13 @@ jest.mock('universal-websocket-client', () => require('../../test/fakeTransport'
 
 useFakeClockAndSocketRegistry()
 
-/** The interval the whole file is arithmetic about. `timeout` is the option the
- * constructor actually reads for it — see PINNED-BUGS.md, the `ping` option row. */
-const PING_INTERVAL = 10000
+/**
+ * The interval the whole file is arithmetic about. Deliberately *not* the 10000
+ * default: with the default, every boundary assertion below would pass whether
+ * or not the socket read the option at all. `timeout` is the option that carries
+ * it — the one named `ping` is ignored, see PINNED-BUGS.md, row 3.
+ */
+const PING_INTERVAL = 3000
 
 const createSocket = () => new Socket({
   host: 'localhost:3000',
@@ -43,8 +47,9 @@ describe('Socket liveness', () => {
 
   describe('alive', () => {
     it('is alive exactly up to twice the ping interval since the last ping', async () => {
-      // The handshake stamped `lastPing`; nothing refreshes it from here, so the
-      // clock alone walks the socket to the boundary.
+      // The handshake stamped `lastPing`. The chain's ping does go out during
+      // this advance, but nothing answers it — and only a pong moves the stamp —
+      // so the clock alone walks the socket to the boundary.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
 
       expect(socket.alive()).toBe(true)
@@ -56,13 +61,10 @@ describe('Socket liveness', () => {
       expect(socket.alive()).toBe(false)
     })
 
-    it('is not alive at all with no ping stamp', async () => {
-      // `reopenNow` zeroes the stamp on its way out — the driver's own path to a
-      // falsy `lastPing`, which short-circuits the arithmetic entirely.
-      socket.reopenNow()
-
-      expect(socket.lastPing).toBe(0)
-      expect(socket.alive()).toBe(false)
+    it('reports the interval it was configured with', () => {
+      // The boundary tests are only meaningful if the socket read the option
+      // rather than falling back to the 10000 default.
+      expect(socket.config.ping).toBe(PING_INTERVAL)
     })
   })
 
@@ -112,10 +114,20 @@ describe('Socket liveness', () => {
       // strictly, so a pong answered within the same millisecond is discarded and
       // the probe times out on a demonstrably live socket. See PINNED-BUGS.md,
       // row 9. Under the frozen clock this is deterministic, not flaky.
+      const stampBeforeProbe = socket.lastPing
+      const pongSeen = jest.fn()
+      socket.on('pong', pongSeen)
+
       const probing = socket.probe(2000)
 
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
       transport.receive({ msg: 'pong' })
+
+      // The pong genuinely arrived and genuinely refreshed the stamp — to the
+      // same value, because no time passed. Without these two the false below
+      // would be indistinguishable from a pong that never showed up at all.
+      expect(pongSeen).toHaveBeenCalled()
+      expect(socket.lastPing).toBe(stampBeforeProbe)
 
       await jest.advanceTimersByTimeAsync(2000)
       await expect(probing).resolves.toBe(false)
@@ -144,17 +156,20 @@ describe('Socket liveness', () => {
      * the pong resolves. Running all timers is worse still — a self-rescheduling
      * chain hits the runner's timer-count abort.
      */
-    const tick = async (pong = true) => {
+    const tick = async (deliverPong: boolean) => {
       await jest.advanceTimersToNextTimerAsync()
-      if (pong) transport.receive({ msg: 'pong' })
+      if (deliverPong) transport.receive({ msg: 'pong' })
       await jest.advanceTimersByTimeAsync(0)
     }
+
+    const tickWithPong = () => tick(true)
+    const tickWithoutPong = () => tick(false)
 
     it('reschedules itself, leaving exactly one pending timer per tick', async () => {
       expect(jest.getTimerCount()).toBe(1)
 
       for (let turn = 1; turn <= 5; turn += 1) {
-        await tick()
+        await tickWithPong()
 
         // The invariant that stops a silently dead chain from passing green.
         expect(jest.getTimerCount()).toBe(1)
@@ -164,10 +179,10 @@ describe('Socket liveness', () => {
     })
 
     it('dies for good when one pong is withheld, and a send then never returns', async () => {
-      await tick()
-      await tick()
+      await tickWithPong()
+      await tickWithPong()
 
-      await tick(false)
+      await tickWithoutPong()
 
       // Nothing rescheduled: the ping send is still waiting on a pong that will
       // never arrive, so there is no timer left to fire.
@@ -192,6 +207,10 @@ describe('Socket liveness', () => {
       // socket's timers are pending at once.
       transport.close(1006)
 
+      // Named rather than merely counted, so the assertion still means "the ping
+      // and the reopen" if some other timer ever joins the count.
+      expect(socket.pingTimeout).toBeDefined()
+      expect(socket.openTimeout).toBeDefined()
       expect(jest.getTimerCount()).toBe(2)
 
       await socket.close()
