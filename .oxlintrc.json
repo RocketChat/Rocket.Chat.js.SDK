@@ -8,9 +8,13 @@
 	//   no-async-promise-executor      2  lib/drivers/ddp.ts
 	//   triple-slash-reference         1  lib/drivers/ddp.ts
 	//   no-unsafe-declaration-merging  1  lib/message.ts
-	//   no-unused-vars                 0  clear; kept on to stop regressions
+	//   no-unused-vars                 3  lib/clients/Livechat.ts
 	//
-	// Total: 14 warnings.
+	// The three no-unused-vars sites are destructured constructor parameters that
+	// exist to strip keys out of `...config`. The `_` convention does not apply:
+	// renaming one changes which property is stripped.
+	//
+	// Total: 17 warnings.
 	"rules": {
 		"no-unused-expressions": "warn",
 		"no-this-alias": "warn",
