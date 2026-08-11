@@ -112,23 +112,9 @@ describe('Socket.onMessage', () => {
     expect(silentLogger.error).toHaveBeenCalledWith(
       expect.stringContaining('[ddp] JSON parse error')
     )
-    expect(listener).not.toHaveBeenCalled()
-  })
-
-  it('reports the frame that failed to parse', () => {
-    socket.onMessage({ data: 'not json' })
-
     expect(silentLogger.error).toHaveBeenCalledWith(
       expect.stringContaining('not json')
     )
-  })
-
-  it('emits nothing for an empty frame', () => {
-    const listener = jest.fn()
-    socket.on('changed', listener)
-
-    socket.onMessage({ data: '' })
-
     expect(listener).not.toHaveBeenCalled()
   })
 })

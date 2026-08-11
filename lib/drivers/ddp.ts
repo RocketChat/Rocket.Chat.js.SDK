@@ -187,11 +187,15 @@ export class Socket extends SDKEventEmitter {
     try {
       data = JSON.parse(e.data)
     } catch (err) {
-      return this.logger.error(`[ddp] JSON parse error on frame: ${e.data}`)
+      return this.logger.error(
+        `[ddp] JSON parse error on frame: ${e.data} — ${(err as Error).message}`
+      )
     }
 
+    // A frame that parses to a falsy value — `null`, `0`, `""` — carries
+    // nothing to dispatch on.
+    if (!data) return this.logger.debug(`[ddp] empty frame dropped: ${e.data}`)
     this.logger.debug(data) // 👈  very useful for debugging missing responses
-    if (!data) return
     this.logger.debug(`[ddp] messages received: ${e.data}`)
     if (data.collection) this.emit(data.collection, data)
     if (data.msg) this.emit(data.msg, data)
