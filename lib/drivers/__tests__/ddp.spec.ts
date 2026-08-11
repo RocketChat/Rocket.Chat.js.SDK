@@ -1,7 +1,7 @@
 import { sha256 } from 'js-sha256'
 
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 
 // `loginParams` reads only its argument, so one Socket serves every case here.
 // Constructing a Socket opens no connection and starts no timer. Bound rather
@@ -38,7 +38,7 @@ describe('new Socket', () => {
     expect(new Socket({ logger: silentLogger }).config.ping).toBe(10000)
   })
 
-  it('BUG (pinned bug 4): throws when constructed with no arguments', () => {
+  it('BUG: throws when constructed with no arguments', () => {
     // No cast: the call has to typecheck for the pin to mean anything. Making
     // `options` required is the fix, and it must break this test.
     expect(() => new Socket()).toThrow(TypeError)
