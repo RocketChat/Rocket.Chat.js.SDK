@@ -46,6 +46,11 @@
 	//
 	// Total: 17 warnings, 0 errors.
 	//
+	// Every warning above is shipped-source debt. Specs and test helpers lint under
+	// these same rules — there are no test-file overrides and no rule changes for
+	// them — and test code stays at zero warnings. So the count above is also the
+	// budget: if it grows, the growth came from test code and is a real regression.
+	//
 	// Every rule below carries violations, so none can be promoted to error yet.
 	// A rule reaches "error" once its entry above is cleared.
 	"rules": {

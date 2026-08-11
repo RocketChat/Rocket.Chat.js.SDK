@@ -25,3 +25,6 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      # After typecheck: a type error is the cheaper failure to read. Coverage is
+      # deliberately not collected here — it is a local tool, not a gate.
+      - run: npm test

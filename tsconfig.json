@@ -13,5 +13,9 @@
 		"skipLibCheck": false,
 		"forceConsistentCasingInFileNames": true
 	},
-	"exclude": ["node_modules"]
+	// Specs and test helpers are checked by tsconfig.test.json instead. Keeping
+	// them out of this program keeps jest's globals out of it too, so a stray
+	// `describe` in shipped source fails `npm run typecheck` here rather than in
+	// the consuming app.
+	"exclude": ["node_modules", "test", "**/*.spec.ts"]
 }
