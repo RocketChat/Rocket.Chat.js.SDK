@@ -161,16 +161,26 @@ describe('Socket.send', () => {
   })
 
   describe('failed replies', () => {
-    it('rejects with the raw error payload rather than an Error', async () => {
-      // Pinned bug: callers up the stack read `err.message`, which is undefined
-      // here. See test/PINNED-BUGS.md, row 6.
+    it('rejects with an Error carrying the reason, and keeps the payload fields', async () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       const error = { error: 403, reason: 'User not found', errorType: 'Meteor.Error' }
       transport.receive({ msg: 'result', id: 'ddp-1', error })
 
-      await expect(sending).rejects.toEqual(error)
-      await expect(sending).rejects.not.toBeInstanceOf(Error)
+      // Callers up the stack log `err.message`; the reason has to survive there.
+      await expect(sending).rejects.toBeInstanceOf(Error)
+      await expect(sending).rejects.toThrow('User not found')
+      // The payload's own fields stay readable, so a caller branching on
+      // `err.error` or `err.errorType` still works.
+      await expect(sending).rejects.toMatchObject(error)
+    })
+
+    it('falls back to the payload itself when it carries no reason', async () => {
+      const sending = socket.send({ msg: 'method', method: 'login', params: [] })
+
+      transport.receive({ msg: 'result', id: 'ddp-1', error: 'you must be logged in' })
+
+      await expect(sending).rejects.toThrow('you must be logged in')
     })
   })
 

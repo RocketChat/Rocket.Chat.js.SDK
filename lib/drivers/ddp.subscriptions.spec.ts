@@ -105,7 +105,7 @@ describe('Socket subscription bookkeeping', () => {
 
       const unsubscribing = socket.unsubscribe('ddp-1')
       transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
-      await expect(unsubscribing).rejects.toEqual({ reason: 'no such subscription' })
+      await expect(unsubscribing).rejects.toThrow('no such subscription')
 
       const framesBefore = transport.sent.length
       await socket.subscribeAll()

@@ -34,6 +34,17 @@ import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
 
+/**
+ * Wrap a server error payload in an Error, so callers reading `err.message`
+ * see the reason. The payload's own fields are copied onto the Error, so
+ * anything branching on `err.error` or `err.errorType` keeps working.
+ */
+const replyError = (error: any): Error => {
+  if (error instanceof Error) return error
+  if (error === null || typeof error !== 'object') return new Error(String(error))
+  return Object.assign(new Error(error.reason || error.message || JSON.stringify(error)), error)
+}
+
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -368,7 +379,7 @@ export class Socket extends SDKEventEmitter {
       }
       this.once(listener, (result: any) => {
         this.off('disconnected', reject)
-        return (result.error ? reject(result.error) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+        return (result.error ? reject(replyError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       })
     })
   }
