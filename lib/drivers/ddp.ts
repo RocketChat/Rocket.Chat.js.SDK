@@ -41,7 +41,6 @@ const userDisconnectCloseCode = 4000;
  * anything branching on `err.error` or `err.errorType` keeps working — except
  * `message`, `name` and `stack`, which stay the Error's own, so a payload
  * carrying both `reason` and `message` cannot overwrite the reason.
- * See docs/adr/0001-failed-replies-reject-with-an-error.md
  */
 const replyError = (error: IDDPErrorPayload | string | null): Error => {
   if (error === null || typeof error !== 'object') return new Error(String(error))

@@ -200,7 +200,7 @@ describe('Socket.send', () => {
   describe('sending while the connection is not open', () => {
     it('waits forever for the connection to open, with no timeout', async () => {
       // Pinned bug: the wait on the `open` event is unbounded, so a send issued
-      // while the socket is down never settles. See PINNED-BUGS.md, row 7.
+      // while the socket is down never settles.
       transport.readyState = CLOSED
 
       let settled = false

@@ -100,8 +100,7 @@ describe('Socket.onMessage', () => {
 
   it('throws out of the callback on malformed JSON', () => {
     // `JSON.parse` is unguarded, so a bad frame propagates to the caller —
-    // which in production is the websocket's `onmessage`. See
-    // test/PINNED-BUGS.md, row 5.
+    // which in production is the websocket's `onmessage`.
     expect(() => socket.onMessage({ data: 'not json' })).toThrow(SyntaxError)
   })
 })
