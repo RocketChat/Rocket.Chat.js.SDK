@@ -78,3 +78,108 @@ describe('SDKEventEmitter.removeAllListeners', () => {
     expect(emitter.removeAllListeners('never-registered')).toEqual([])
   })
 })
+
+/**
+ * `off` and `emit` are overridden for the same reason: `tiny-events` mutates the
+ * listener array by index, and both of its index bugs are silent — a listener
+ * that was never asked to go stops receiving events.
+ */
+describe('SDKEventEmitter.off', () => {
+  let emitter: SDKEventEmitter
+
+  beforeEach(() => {
+    emitter = new SDKEventEmitter()
+  })
+
+  it('is a no-op when the listener is no longer registered', () => {
+    // Upstream splices at `indexOf`'s -1, and `splice(-1, 1)` removes the *last*
+    // listener of the event. Removing an already-fired `once` — which the driver
+    // does on every settled send — unsubscribed whoever registered last.
+    const listenOnce = jest.fn()
+    const stayListening = jest.fn()
+    emitter.once('reply', listenOnce)
+    emitter.on('reply', stayListening)
+
+    emitter.emit('reply')
+    expect(listenOnce).toHaveBeenCalledTimes(1)
+
+    emitter.off('reply', listenOnce)
+
+    emitter.emit('reply')
+    expect(listenOnce).toHaveBeenCalledTimes(1)
+    expect(stayListening).toHaveBeenCalledTimes(2)
+  })
+
+  it('is a no-op for a listener that was never registered', () => {
+    const stayListening = jest.fn()
+    emitter.on('reply', stayListening)
+
+    emitter.off('reply', jest.fn())
+
+    emitter.emit('reply')
+    expect(stayListening).toHaveBeenCalledTimes(1)
+  })
+
+  it('removes a `once` listener by the function that was registered', () => {
+    // The `.listener` back-reference scan, kept from upstream: the caller never
+    // saw the wrapper, so it can only pass its own function.
+    const listenOnce = jest.fn()
+    emitter.once('reply', listenOnce)
+
+    emitter.off('reply', listenOnce)
+
+    emitter.emit('reply')
+    expect(listenOnce).not.toHaveBeenCalled()
+  })
+
+  it('clears every listener for the event when given no listener', () => {
+    const first = jest.fn()
+    const second = jest.fn()
+    emitter.on('reply', first)
+    emitter.on('reply', second)
+
+    expect(emitter.off('reply')).toBe(emitter)
+
+    emitter.emit('reply')
+    expect(first).not.toHaveBeenCalled()
+    expect(second).not.toHaveBeenCalled()
+  })
+})
+
+describe('SDKEventEmitter.emit', () => {
+  let emitter: SDKEventEmitter
+
+  beforeEach(() => {
+    emitter = new SDKEventEmitter()
+  })
+
+  it('does not skip a listener sitting behind a firing `once`', () => {
+    // A `once` wrapper removes itself as it fires, shifting every later listener
+    // down one index. Upstream iterates the live array, so the next listener was
+    // stepped over entirely.
+    const listenOnce = jest.fn()
+    const nextListener = jest.fn()
+    emitter.once('reply', listenOnce)
+    emitter.on('reply', nextListener)
+
+    emitter.emit('reply', 'payload')
+
+    expect(listenOnce).toHaveBeenCalledWith('payload')
+    expect(nextListener).toHaveBeenCalledWith('payload')
+  })
+
+  it('calls every listener when they are all `once`', () => {
+    const first = jest.fn()
+    const second = jest.fn()
+    const third = jest.fn()
+    emitter.once('reply', first)
+    emitter.once('reply', second)
+    emitter.once('reply', third)
+
+    expect(emitter.emit('reply')).toBe(emitter)
+
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(third).toHaveBeenCalledTimes(1)
+  })
+})

@@ -118,23 +118,18 @@ export class Socket extends SDKEventEmitter {
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
    */
-  open = (_ms: number = this.config.reopen) => {
-    return new Promise<any>(async (resolve, reject) => {
-      if (this.connected) {
-        return resolve(undefined)
-      }
+  open = async (_ms: number = this.config.reopen): Promise<any> => {
+    if (this.connected) {
+      return undefined
+    }
 
-      if (this.reopenPromise) {
-        return this.reopenPromise.then(() => resolve(this.connection)).catch(reject)
-      }
+    if (this.reopenPromise) {
+      await this.reopenPromise
+      return this.connection
+    }
 
-      try {
-        await this.createConnection()
-        resolve(this.connection)
-      } catch (err) {
-        reject(err)
-      }
-    })
+    await this.createConnection()
+    return this.connection
   }
 
   /** Send handshake message to confirm connection, start pinging. */
@@ -343,6 +338,36 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
+   * Wait for the socket to open, bounded by the reopen interval. Rejects on the
+   * deadline so a send issued while the socket is down fails the caller rather
+   * than hanging for the life of the process.
+   *
+   * The default is twice `config.reopen`, not `config.reopen`: `reopen()` only
+   * *schedules* the retry at that interval, so a deadline of exactly `reopen`
+   * expires as the reconnect begins and every send issued at a drop fails.
+   */
+  private waitForOpen = (timeoutMs = this.config.reopen * 2): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        this.off('open', onOpen)
+        clearTimeout(timeout as any)
+      }
+
+      const onOpen = () => {
+        cleanup()
+        resolve()
+      }
+
+      this.once('open', onOpen)
+
+      const timeout = setTimeout(() => {
+        cleanup()
+        reject(new Error('[ddp] timed out waiting for the connection to open'))
+      }, timeoutMs)
+    })
+  }
+
+  /**
    * Send an object to the server via Socket. Adds handler to collection to
    * allow awaiting response matching an expected object. Most responses are
    * identified by their message event name and the ID they were sent with, but
@@ -354,14 +379,17 @@ export class Socket extends SDKEventEmitter {
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
   send = async (obj: any): Promise<any> => {
-    return new Promise<any>(async(resolve, reject) => {
-      if (!this.connection) throw new Error('[ddp] sending without open connection')
-      if (!this.connected) await new Promise(resolve => this.on('open', resolve))
+    // Outside the promise executor: a `throw` from an async executor is dropped
+    // on the floor as an unhandled rejection instead of rejecting the send.
+    if (!this.connection) throw new Error('[ddp] sending without open connection')
+    if (!this.connected) await this.waitForOpen()
 
+    return new Promise<any>((resolve, reject) => {
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const stringdata = JSON.stringify(data)
+      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
       if (/^sub$/.test(obj.msg)) {
@@ -370,18 +398,32 @@ export class Socket extends SDKEventEmitter {
       }
 
       try {
-        this.connection.send(stringdata)
-      } catch {
-        this.logger.error('[ddp] send without open connection');
+        // Read fresh rather than captured above the wait: a reopen while the send
+        // waited on `open` will have replaced the connection.
+        this.connection!.send(stringdata)
+      } catch (err) {
+        this.logger.error(`[ddp] the transport failed to write the message: ${stringdata}`);
+        return reject(err)
       }
 
-      this.once('disconnected', reject)
-      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
+      // Before any listener is attached: a frame with no reply to wait for —
+      // `pong` — would otherwise strand a `disconnected` listener forever.
       if (!listener) {
         return resolve(undefined)
       }
+
+      // Named, and the *same* reference `off` is given below: `disconnected` is
+      // emitted with no arguments, so handing `reject` straight to it rejected
+      // every in-flight send with `undefined` — and callers read `err.message`
+      // inside their `catch`, which then threw a TypeError from the rejection
+      // handler. The pairing matters as much as the Error: `off` only removes a
+      // listener it can match, and a miss is silently a no-op.
+      const rejectOnDisconnect = () =>
+        reject(new Error('[ddp] connection reopened before the response arrived'))
+
+      this.once('disconnected', rejectOnDisconnect)
       this.once(listener, (result: any) => {
-        this.off('disconnected', reject)
+        this.off('disconnected', rejectOnDisconnect)
         return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       })
     })
@@ -391,9 +433,23 @@ export class Socket extends SDKEventEmitter {
   ping = async () => {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
-      this.send({ msg: 'ping' })
+      // The ping goes out while `connected` is still true, so its send never
+      // waits on `open` — it waits on a pong reply that a dead socket never
+      // sends, and without a deadline of its own the chain stops here and
+      // `reopen` is never reached. The deadline lives in `ping` rather than in
+      // `send`, so no other caller inherits a reply timeout.
+      let deadline: NodeJS.Timer | number | undefined
+      const answered = new Promise<void>((_, expire) => {
+        deadline = setTimeout(
+          () => expire(new Error('[ddp] ping went unanswered')),
+          this.config.ping
+        )
+      })
+
+      Promise.race([this.send({ msg: 'ping' }), answered])
         .then(() => this.ping())
         .catch(() => this.reopen())
+        .finally(() => clearTimeout(deadline as any))
     }, this.config.ping)
   }
 

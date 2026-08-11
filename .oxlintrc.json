@@ -17,14 +17,6 @@
 	//     No issue owns these nine. Nothing on the
 	//     tracker will clear them as a side effect — they need their own change.
 	//
-	// Live defect — not merely cosmetic, and owned:
-	//
-	//   no-async-promise-executor      1  lib/drivers/ddp.ts, the send path.
-	//     A bare `throw` sits inside an async executor, so it rejects the
-	//     executor's own promise instead of settling the outer one. Callers
-	//     awaiting a send on a closed connection hang forever.
-	//     Fixed by issue #203, which pins the hang.
-	//
 	// Not debt — correct as written, do not "fix":
 	//
 	//   no-this-alias                  1  lib/util.ts, the debounce helper.
@@ -41,27 +33,29 @@
 	//   no-unsafe-declaration-merging  1  lib/message.ts
 	//     A documented workaround for a long-standing TypeScript issue.
 	//
-	//   no-async-promise-executor      1  lib/drivers/ddp.ts, the open path.
-	//     Benign: the body is fully wrapped and both paths settle.
-	//
 	//   no-unused-vars                 3  lib/clients/Livechat.ts
 	//     Destructured constructor parameters that exist to strip keys out of
 	//     `...config`. The `_` convention cannot apply: renaming one changes which
 	//     property is stripped.
 	//
-	// Total: 17 warnings, 0 errors.
+	// Total: 15 warnings, 0 errors.
 	//
 	// Every warning above is shipped-source debt. Specs and test helpers lint under
 	// these same rules — there are no test-file overrides and no rule changes for
 	// them — and test code stays at zero warnings. So the count above is also the
 	// budget: if it grows, the growth came from test code and is a real regression.
 	//
-	// Every rule below carries violations, so none can be promoted to error yet.
-	// A rule reaches "error" once its entry above is cleared.
+	// A rule reaches "error" once its entry above is cleared, and every rule still
+	// at "warn" carries violations.
+	//
+	// `no-async-promise-executor` is the first one cleared, so it gates: both
+	// executors are gone — `send`'s dropped its guard's `throw` on the floor, and
+	// `open`'s was a wrapper a plain async method does the same job as. The rule is
+	// now the thing that stops that shape coming back, rather than a note about it.
 	"rules": {
 		"no-unused-expressions": "warn",
 		"no-this-alias": "warn",
-		"no-async-promise-executor": "warn",
+		"no-async-promise-executor": "error",
 		"triple-slash-reference": "warn",
 		"no-unsafe-declaration-merging": "warn",
 		"no-unused-vars": "warn"

@@ -55,7 +55,7 @@ The DDP message that answers a Method call or a DDP subscription — `result`, `
 _Avoid_: Reply, ack, result (that is one response type of three)
 
 **DDP error**:
-The error field of a failed DDP response, as the server sent it. What the SDK raises to its callers from one is an ordinary Error, not this.
+The error field of a failed DDP response, as the server sent it. What the SDK raises to its callers from one is an ordinary Error, not this. A rejection the SDK originates itself — a write that failed, a Deadline that expired, a Reopen that abandoned the wait — carries no DDP error and no server reason; only the server-sent kind is a DDP error.
 _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 
 **DDP subscription**:
@@ -72,3 +72,19 @@ Exchanging credentials — password, OAuth, or a token — for an authenticated 
 **Resume**:
 Logging in again with the token from a previous login rather than with credentials.
 _Avoid_: Reauth, refresh
+
+**Reopen**:
+A retry scheduled after a connection drops, waited out before a new Socket is built. Distinct from the immediate reconnect a caller forces, which skips the wait — the two are separate paths in the code and the difference decides whether an in-flight send is abandoned now or later.
+_Avoid_: Reconnect (unqualified — say which of the two), retry
+
+**Liveness chain**:
+The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. A Socket the server has stopped answering still reads as open to the transport.
+_Avoid_: Heartbeat, keepalive
+
+**Probe**:
+A single bounded liveness check on a Socket that looks open, asked for on demand rather than on the chain's schedule.
+_Avoid_: Health check, ping (that is one message of the chain)
+
+**Deadline**:
+A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Every wait the SDK can be left holding has one.
+_Avoid_: Timeout — that is a config option, and it means only the connection one
