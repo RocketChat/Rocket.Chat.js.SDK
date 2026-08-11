@@ -7,3 +7,5 @@
 !/docs/agents/
 /.scratch/
 .DS_Store
+
+.superset/
