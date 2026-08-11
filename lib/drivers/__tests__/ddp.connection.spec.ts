@@ -1,5 +1,5 @@
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 import {
   CLOSED,
   driveToHandshake,
@@ -8,9 +8,9 @@ import {
   fakeTransportModule,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
@@ -214,7 +214,7 @@ describe('Socket connection lifecycle', () => {
   })
 
   describe('the interval argument to open', () => {
-    it('BUG (pinned bug 14): is ignored entirely', async () => {
+    it('BUG: is ignored entirely', async () => {
       // `open` declares an interval parameter and never reads it: the value
       // reaches nothing, stores nowhere, and every subsequent retry still waits
       // `config.reopen` — 3000 here, so the delay below is demonstrably the

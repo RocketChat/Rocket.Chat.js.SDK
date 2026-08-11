@@ -1,18 +1,18 @@
-import { Socket } from './ddp'
-import * as settings from '../settings'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import * as settings from '../../settings'
+import { silentLogger } from '../../../test/silentLogger'
 import {
   CLOSED,
   FakeWebSocket,
   fakeSockets,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
 // Hoisted above the imports by jest, so the driver's own `import WebSocket from
 // 'universal-websocket-client'` resolves to the fake. This is the whole seam:
 // the driver constructs the fake through its normal code path.
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
@@ -199,7 +199,7 @@ describe('Socket.send', () => {
 
   describe('sending while the connection is not open', () => {
     it('waits forever for the connection to open, with no timeout', async () => {
-      // Pinned bug: the wait on the `open` event is unbounded, so a send issued
+      // The wait on the `open` event is unbounded, so a send issued
       // while the socket is down never settles.
       transport.readyState = CLOSED
 

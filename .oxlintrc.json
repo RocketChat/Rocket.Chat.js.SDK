@@ -7,18 +7,23 @@
 	// No source file is edited to satisfy the linter, and there are no inline
 	// suppressions. The reasoning lives here instead, one entry per group.
 	//
-	// Debt — cleared in the behaviour PR, since each fix rewrites a runtime
-	// expression:
+	// Debt — clears as behaviour fixes land, since each fix rewrites a runtime
+	// expression. There is no single "behaviour PR": each known defect is one issue
+	// and one PR, so this debt clears a piece at a time and most PRs clear none.
 	//
 	//   no-unused-expressions          7  lib/api/api.ts, lib/drivers/ddp.ts
 	//   no-this-alias                  2  lib/api/RocketChat.ts
 	//
-	// Live defect — also the behaviour PR, and not merely cosmetic:
+	//     No issue owns these nine. Nothing on the
+	//     tracker will clear them as a side effect — they need their own change.
+	//
+	// Live defect — not merely cosmetic, and owned:
 	//
 	//   no-async-promise-executor      1  lib/drivers/ddp.ts, the send path.
 	//     A bare `throw` sits inside an async executor, so it rejects the
 	//     executor's own promise instead of settling the outer one. Callers
 	//     awaiting a send on a closed connection hang forever.
+	//     Fixed by issue #203, which pins the hang.
 	//
 	// Not debt — correct as written, do not "fix":
 	//
