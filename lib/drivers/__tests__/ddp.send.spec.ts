@@ -218,3 +218,122 @@ describe('Socket.send', () => {
     })
   })
 })
+
+/**
+ * Every test below has more than one listener registered for the same event at
+ * the same time — the shape `tiny-events` mishandled by mutating the listener
+ * array by index. They are driver-level rather than emitter-level on purpose:
+ * the emitter specs pin the mechanism, these pin that a send actually survives
+ * it.
+ *
+ * The ping interval is pushed far beyond every advance here, so no ping frame
+ * joins the ones being counted. The reopen delay is the arithmetic.
+ */
+describe('Socket.send with several listeners on one event', () => {
+  const REOPEN_DELAY = 3000
+
+  let socket: Socket
+  let transport: FakeWebSocket
+
+  beforeEach(async () => {
+    socket = new Socket({
+      host: 'localhost:3000',
+      logger: silentLogger,
+      reopen: REOPEN_DELAY,
+      ping: 10 * 60 * 1000
+    })
+    transport = await openFakeConnection(socket)
+  })
+
+  it('writes every send that was waiting on open, not just one', async () => {
+    transport.readyState = CLOSED
+
+    const sends = [1, 2, 3].map(() =>
+      socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+    )
+
+    await driveToHandshake(transport)
+    await jest.advanceTimersByTimeAsync(0)
+
+    const written = transport.sent.map(frame => JSON.parse(frame))
+    for (const id of ['ddp-2', 'ddp-3', 'ddp-4']) {
+      expect(written).toContainEqual({ msg: 'method', method: 'getUsersOfRoom', params: [], id })
+      transport.receive({ msg: 'result', id, result: 'ok' })
+    }
+
+    await expect(Promise.all(sends)).resolves.toHaveLength(3)
+  })
+
+  it('carries a send issued at a drop across the whole reopen cycle', async () => {
+    // The deadline is twice the reopen delay, so the reconnect the close
+    // scheduled has time to finish before the waiting send gives up.
+    transport.close(1006)
+
+    const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+
+    await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+    expect(fakeSockets).toHaveLength(2)
+
+    const reopened = fakeSockets[1]
+    await driveToHandshake(reopened)
+    await jest.advanceTimersByTimeAsync(0)
+
+    const written = reopened.sent.map(frame => JSON.parse(frame))
+    expect(written).toContainEqual({
+      msg: 'method', method: 'getUsersOfRoom', params: [], id: 'ddp-2'
+    })
+
+    reopened.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+    await expect(sending).resolves.toMatchObject({ result: 'ok' })
+  })
+
+  it('rejects every in-flight send on one reopenNow', async () => {
+    const sends = [1, 2, 3, 4].map(() =>
+      socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+    )
+
+    // Both halves, as ADR-0001 established: an `Error`, and the message the
+    // caller will actually read. `disconnected` is emitted with no arguments, so
+    // handing `reject` to it directly rejected with `undefined` and every
+    // caller's `err.message` threw from inside its own `catch`.
+    const rejections = sends.flatMap(sending => [
+      expect(sending).rejects.toBeInstanceOf(Error),
+      expect(sending).rejects.toThrow('[ddp] connection reopened before the response arrived')
+    ])
+
+    socket.reopenNow()
+
+    await Promise.all(rejections)
+  })
+
+  it('rejects the send when the transport throws on the write', async () => {
+    // A real websocket throws from `send` when the socket closed under it. The
+    // failure used to be logged and swallowed, leaving the caller's promise
+    // pending forever.
+    const failure = new Error('transport write failed')
+    transport.sendError = failure
+
+    await expect(socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] }))
+      .rejects.toBe(failure)
+  })
+
+  it('waits for open up to twice the reopen delay, and no longer', async () => {
+    // The deadline has to outlast the retry `reopen()` merely *schedules* at
+    // `config.reopen`: at exactly `reopen` it expires as the reconnect begins,
+    // so every send issued at a drop fails. Both boundaries are asserted, so
+    // reverting the default to `config.reopen` fails here.
+    transport.readyState = CLOSED
+
+    const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+    const settled = jest.fn()
+    sending.then(settled, settled)
+
+    await jest.advanceTimersByTimeAsync(REOPEN_DELAY * 2 - 1)
+    expect(settled).not.toHaveBeenCalled()
+
+    const rejected = expect(sending).rejects.toThrow('[ddp] timed out waiting for the connection to open')
+    await jest.advanceTimersByTimeAsync(1)
+
+    await rejected
+  })
+})

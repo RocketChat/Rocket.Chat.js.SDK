@@ -12,8 +12,13 @@ export interface ILogger {
  * @param host        Host URL:PORT, converted to websocket protocol
  * @param useSsl      Use SSL (https/wss) to connect
  * @param timeout     How long to wait (ms) before abandoning connection
- * @param reopen      ms interval before attempting reopens on disconnect
- * @param ping        ms interval between each ping
+ * @param reopen      ms interval before attempting reopens on disconnect. Twice
+ *                    this is also how long a send waits for the connection to
+ *                    open before it is rejected, so the deadline outlasts the
+ *                    reopen it is waiting on
+ * @param ping        ms interval between each ping, and also how long a ping
+ *                    waits for its pong before the connection is reopened —
+ *                    tightening it for liveness tightens that deadline too
  * @param close       ms interval to wait for socket close to succeed
  * @param integration Name added to message `bot` attribute to identify SDK use
  */

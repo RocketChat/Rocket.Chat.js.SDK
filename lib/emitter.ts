@@ -28,6 +28,49 @@ const registeredListener = (listener: Function): Function =>
  * Narrowing the signature is a breaking change.
  */
 export class SDKEventEmitter extends EventEmitter {
+  /**
+   * `tiny-events` splices at the index it found without checking it found one,
+   * and `splice(-1, 1)` drops the *last* listener of the event — so removing a
+   * listener that is no longer registered, an already-fired `once` above all,
+   * silently unsubscribes an unrelated one. Guard the miss.
+   *
+   * Everything else is upstream's behaviour, deliberately: the clear-all branch
+   * when no listener is given, the `.listener` back-reference scan that
+   * identifies a `once` wrapper by the function it wraps, and returning `this`.
+   */
+  off (event?: string, listener?: Function): this {
+    const listeners = event ? this._listeners[event] : undefined
+    if (!Array.isArray(listeners)) return this
+
+    if (typeof listener === 'undefined') {
+      this._listeners[event as string] = []
+      return this
+    }
+
+    let index = listeners.indexOf(listener)
+    if (index === -1) {
+      index = listeners.findIndex((registered: any) => registered.listener === listener)
+    }
+    if (index === -1) return this
+
+    listeners.splice(index, 1)
+    return this
+  }
+
+  /**
+   * `tiny-events` iterates the live listener array, so a `once` wrapper that
+   * removes itself as it fires shifts every later listener down one index and
+   * `forEach` skips the next one. Iterate a snapshot instead; the return value
+   * is upstream's `this`.
+   */
+  emit (event: string, ...args: any[]): this {
+    const listeners = this._listeners[event]
+    if (!Array.isArray(listeners)) return this
+
+    listeners.slice().forEach((listener) => listener.apply(this, args))
+    return this
+  }
+
   /** Drop the listeners for one event, or for every event, and return them. */
   removeAllListeners (event?: string): Function[] {
     if (event) {

@@ -2,7 +2,9 @@ import { Socket } from '../ddp'
 import { silentLogger } from '../../../test/silentLogger'
 import {
   CLOSED,
+  driveToHandshake,
   FakeWebSocket,
+  fakeSockets,
   OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
@@ -177,31 +179,37 @@ describe('Socket liveness', () => {
       }
     })
 
-    it('dies for good when one pong is withheld, and a later send fails on the deadline', async () => {
+    it('reconnects when one pong is withheld', async () => {
+      // This test used to pin the opposite: the chain died for good, because the
+      // ping's send went out while `connected` was still true, waited forever on
+      // a pong reply, and the `.catch(() => this.reopen())` behind it never ran.
+      // `ping` now races its send against a deadline of its own, so the withheld
+      // pong is what triggers the reconnect rather than what prevents it.
       await tickWithPong()
       await tickWithPong()
 
       await tickWithoutPong()
 
-      // Nothing rescheduled: the ping send is still waiting on a pong that will
-      // never arrive, so there is no timer left to fire.
-      expect(jest.getTimerCount()).toBe(0)
+      // The ping's own deadline, the one timer the unanswered send leaves behind.
+      expect(jest.getTimerCount()).toBe(1)
 
-      // The stamp goes stale, and aliveness takes `connected` down with it.
-      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
+      // One millisecond past the deadline, which is also one past the aliveness
+      // boundary — the stamp last moved on the pong two ticks ago.
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
+
+      // The stamp is stale by now, so the socket reads as disconnected, and the
+      // expired ping has scheduled the reopen.
       expect(socket.alive()).toBe(false)
       expect(socket.connected).toBe(false)
+      expect(socket.openTimeout).toBeDefined()
 
-      // The socket is not open, so the send waits on `open` — bounded by the
-      // reopen interval, then rejected rather than left hanging.
-      // Asserted before the clock moves: the rejection lands inside the advance,
-      // and an unattached handler at that point is an unhandled rejection.
-      const rejected = expect(socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] }))
-        .rejects.toThrow('[ddp] timed out waiting for the connection to open')
+      // And the reopen actually builds a replacement transport once its delay
+      // elapses — the socket is no longer abandoned open forever.
+      await jest.advanceTimersByTimeAsync(socket.config.reopen)
 
-      await jest.advanceTimersByTimeAsync(10 * 60 * 1000)
-
-      await rejected
+      expect(fakeSockets).toHaveLength(2)
+      await driveToHandshake(fakeSockets[1])
+      expect(socket.connected).toBe(true)
     })
 
     it('clears both the ping and the reopen timer on close', async () => {
