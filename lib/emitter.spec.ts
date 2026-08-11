@@ -50,6 +50,19 @@ describe('SDKEventEmitter.removeAllListeners', () => {
     expect(second).not.toHaveBeenCalled()
   })
 
+  it('returns one entry per registration, not per distinct function', () => {
+    // A function registered for two events was removed twice, so it appears
+    // twice. The return value counts registrations removed rather than distinct
+    // functions — de-duplicating would lose the fact that two events were
+    // cleared. Pinned because either reading is arguable and callers should be
+    // able to rely on one.
+    const listener = jest.fn()
+    emitter.on('one', listener)
+    emitter.on('two', listener)
+
+    expect(emitter.removeAllListeners()).toEqual([listener, listener])
+  })
+
   it('reports a `once` listener as the function that was registered', () => {
     // `tiny-events` stores a wrapper for `once` and hangs the caller's function
     // off it as `.listener`, which is the same back-reference its own `off`
