@@ -60,7 +60,7 @@ export class Socket extends SDKEventEmitter {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
       reopen: options.reopen || 10000,
-      ping: options.timeout || 10000
+      ping: options.ping || options.timeout || 10000
     }
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`

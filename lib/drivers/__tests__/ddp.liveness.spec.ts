@@ -15,8 +15,7 @@ useFakeClockAndSocketRegistry()
 /**
  * The interval the whole file is arithmetic about. Deliberately *not* the 10000
  * default: with the default, every boundary assertion below would pass whether
- * or not the socket read the option at all. `timeout` is the option that carries
- * it — the one named `ping` is ignored.
+ * or not the socket read the option at all.
  */
 const PING_INTERVAL = 3000
 
@@ -90,7 +89,7 @@ describe('Socket liveness', () => {
     })
 
     it('skips closing a stale-ping socket, leaking it open', async () => {
-      // Pinned bug: `close` gates the actual close on `connected`, which a stale
+      // `close` gates the actual close on `connected`, which a stale
       // ping already made false — so the open transport is abandoned rather than
       // closed.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
@@ -110,7 +109,7 @@ describe('Socket liveness', () => {
     })
 
     it('ignores a pong that lands in the same millisecond as the probe', async () => {
-      // Pinned bug: the probe snapshots `lastPing` and requires it to *advance*
+      // The probe snapshots `lastPing` and requires it to *advance*
       // strictly, so a pong answered within the same millisecond is discarded and
       // the probe times out on a demonstrably live socket. Under the frozen
       // clock this is deterministic, not flaky.

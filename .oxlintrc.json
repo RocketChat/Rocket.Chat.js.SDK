@@ -8,13 +8,13 @@
 	// suppressions. The reasoning lives here instead, one entry per group.
 	//
 	// Debt — clears as behaviour fixes land, since each fix rewrites a runtime
-	// expression. There is no single "behaviour PR": each pinned bug is one issue
+	// expression. There is no single "behaviour PR": each known defect is one issue
 	// and one PR, so this debt clears a piece at a time and most PRs clear none.
 	//
 	//   no-unused-expressions          7  lib/api/api.ts, lib/drivers/ddp.ts
 	//   no-this-alias                  2  lib/api/RocketChat.ts
 	//
-	//     No issue owns these nine. They are not pinned bugs, so nothing on the
+	//     No issue owns these nine. Nothing on the
 	//     tracker will clear them as a side effect — they need their own change.
 	//
 	// Live defect — not merely cosmetic, and owned:

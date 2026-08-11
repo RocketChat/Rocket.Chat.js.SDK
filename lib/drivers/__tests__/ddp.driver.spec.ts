@@ -50,8 +50,8 @@ describe('new DDPDriver', () => {
     const driver = createDriver({ timeout: 250 })
 
     expect(driver.config.timeout).toBe(10000)
-    // And the knock-on, because the socket reads its ping interval from
-    // `timeout`: the caller's number reaches nothing at all.
+    // And the knock-on: with no `ping` given, the socket falls back to
+    // `timeout`, so the caller's number reaches nothing at all.
     expect(driver.ddp.config.ping).toBe(10000)
   })
 })
