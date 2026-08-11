@@ -90,17 +90,17 @@ export function isLoginPass (params: any): params is ICredentialsPass {
   )
 }
 
-/** User credentials for oath login method  */
+/** User credentials for oauth login method  */
 export interface ICredentialsOAuth {
   oauth: { credentialToken: string, credentialSecret: string }
 }
 
-/** Password login credential type guard */
+/** OAuth login credential type guard */
 export function isLoginOAuth (params: any): params is ICredentialsOAuth {
   return (
-    params.oath &&
-    params.credentialToken !== undefined &&
-    params.credentialSecret !== undefined
+    params.oauth &&
+    params.oauth.credentialToken !== undefined &&
+    params.oauth.credentialSecret !== undefined
   )
 }
 
