@@ -1,7 +1,7 @@
 import { sha256 } from 'js-sha256'
 
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 
 // `loginParams` reads only its argument, so one Socket serves every case here.
 // Constructing a Socket opens no connection and starts no timer. Bound rather
@@ -24,13 +24,13 @@ describe('new Socket', () => {
     expect(new Socket({ reopen: 500, logger: silentLogger }).config.reopen).toBe(500)
   })
 
-  it('BUG (pinned bug 3): ignores a `ping` option and reads the ping interval from `timeout`', () => {
+  it('BUG: ignores a `ping` option and reads the ping interval from `timeout`', () => {
     const pingSocket = new Socket({ ping: 500, timeout: 250, logger: silentLogger })
 
     expect(pingSocket.config.ping).toBe(250)
   })
 
-  it('BUG (pinned bug 4): throws when constructed with no arguments', () => {
+  it('BUG: throws when constructed with no arguments', () => {
     // No cast: the call has to typecheck for the pin to mean anything. Making
     // `options` required is the fix, and it must break this test.
     expect(() => new Socket()).toThrow(TypeError)
@@ -54,12 +54,17 @@ describe('Socket.loginParams', () => {
     })
   })
 
-  it('passes an oauth credential through untouched', () => {
+  it('BUG: passes an oauth credential through untouched only when it is misspelled', () => {
+    // The misspelled `oath` key and the root-level token/secret are what the
+    // guard actually tests. A well-formed ICredentialsOAuth does not reach this
+    // branch.
     const credentials = {
-      oauth: { credentialToken: 'token', credentialSecret: 'secret' }
+      oath: true,
+      credentialToken: 'token',
+      credentialSecret: 'secret'
     }
 
-    expect(loginParams(credentials)).toBe(credentials)
+    expect(loginParams(credentials as any)).toBe(credentials)
   })
 
   it('passes an already-authenticated credential through untouched', () => {
