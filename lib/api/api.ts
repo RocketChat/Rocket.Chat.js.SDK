@@ -10,7 +10,7 @@ import {
 
 import { Message } from '../message'
 
-import { EventEmitter } from 'tiny-events'
+import { SDKEventEmitter } from '../emitter'
 import * as settings from '../settings';
 
 /** Check for existing login */
@@ -183,7 +183,7 @@ export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
 	* Provides a base client for handling requests with generic Rocket.Chat's REST API
 	*/
 
-export default class Api extends EventEmitter {
+export default class Api extends SDKEventEmitter {
   userId: string = ''
   logger: ILogger
   client: IClient

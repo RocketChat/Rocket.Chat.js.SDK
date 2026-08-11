@@ -5,20 +5,11 @@
  */
 
 import WebSocket from 'universal-websocket-client'
-import { EventEmitter } from 'tiny-events'
 
+import { SDKEventEmitter } from '../emitter'
 import { logger as Logger } from '../log'
 import { ISocket, IDriver } from './index'
 import * as settings from '../settings';
-
-EventEmitter.prototype.removeAllListeners = function (event?: string | any): any {
-  if (event) {
-    this._listeners[event] = []
-  } else {
-    this._listeners = {}
-  }
-  return [] as any
-}
 
 import {
   ISocketOptions,
@@ -44,7 +35,7 @@ import { sha256 } from 'js-sha256'
 const userDisconnectCloseCode = 4000;
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
-export class Socket extends EventEmitter {
+export class Socket extends SDKEventEmitter {
   sent = 0
   host: string
   lastPing = Date.now()
@@ -529,7 +520,7 @@ export class Socket extends EventEmitter {
   }
 }
 
-export class DDPDriver extends EventEmitter implements ISocket, IDriver {
+export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   logger: ILogger
   config: ISocketOptions
 	/**
