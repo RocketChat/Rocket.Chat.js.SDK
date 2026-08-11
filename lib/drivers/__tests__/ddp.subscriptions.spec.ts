@@ -15,6 +15,15 @@ useFakeClockAndSocketRegistry()
 const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
 
 /**
+ * Timers are faked, so there is no macrotask to await: settling a chain that
+ * hops several promises before its next frame goes out means turning the
+ * microtask queue over by hand.
+ */
+const flushMicrotasks = async () => {
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
+}
+
+/**
  * What the subscription map holds, and when. The send plumbing underneath —
  * request ids, reply matching, failed replies — belongs to ddp.send.spec.ts;
  * this file is only about the bookkeeping either side of it.
@@ -107,6 +116,7 @@ describe('Socket subscription bookkeeping', () => {
       const unsubscribing = socket.unsubscribe('ddp-1')
       transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
       await expect(unsubscribing).rejects.toThrow('no such subscription')
+      await expect(unsubscribing).rejects.toMatchObject({ reason: 'no such subscription' })
 
       const resubscribing = socket.subscribeAll()
 
@@ -125,9 +135,10 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('unsubscribing from all', () => {
-    it('leaves an unacknowledged subscription behind', async () => {
+    it('leaves a refused subscription behind and resolves anyway', async () => {
       // `unsubscribeAll` does not wipe the collection: each unsubscribe removes
-      // its own entry on acknowledgement, so a refused one survives.
+      // its own entry on acknowledgement, so a refused one survives. It is a
+      // best-effort cleanup, so one refusal does not fail the whole call.
       await subscribe('stream-room-messages', ['GENERAL'])
       await subscribe('stream-notify-user', ['alice/message'])
 
@@ -135,9 +146,29 @@ describe('Socket subscription bookkeeping', () => {
 
       transport.receive({ msg: 'result', id: 'ddp-1', result: true })
       transport.receive({ msg: 'nosub', id: 'ddp-2', error: { reason: 'no such subscription' } })
-      await expect(unsubscribingAll).rejects.toThrow('no such subscription')
+      await unsubscribingAll
 
       expect(Object.keys(socket.subscriptions)).toEqual(['ddp-2'])
+    })
+
+    it('still logs out when the server refuses an unsubscribe', async () => {
+      // `logout` unsubscribes first and then calls the method. A refusal that
+      // failed the whole cleanup would strand the user logged in on the server.
+      await subscribe('stream-room-messages', ['GENERAL'])
+
+      // The handler goes on immediately: a driver that fails the cleanup rejects
+      // here, and an unobserved rejection takes the run down rather than failing
+      // this test.
+      const loggingOut = socket.logout().catch((err) => err)
+
+      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
+      await flushMicrotasks()
+
+      const loggingOutFrame = transport.lastSent()
+      expect(loggingOutFrame).toMatchObject({ msg: 'method', method: 'logout' })
+
+      transport.receive({ msg: 'result', id: loggingOutFrame.id, result: true })
+      await expect(loggingOut).resolves.toBe(true)
     })
   })
 })

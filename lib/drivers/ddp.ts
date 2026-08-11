@@ -577,24 +577,22 @@ export class Socket extends SDKEventEmitter {
         return data.result || data.subs
       })
       .catch((err) => {
-        if (!err.msg && err.msg !== 'nosub') {
-          this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
-          throw err
-        }
+        this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
+        throw err
       })
   }
 
   /**
-   * Unsubscribe from all active subscriptions, resolve with whatever is left in
-   * the collection. Each `unsubscribe` removes its own entry on the server's
-   * acknowledgement, so a refused one stays behind rather than being erased here.
+   * Unsubscribe from all active subscriptions. A best-effort cleanup: each
+   * `unsubscribe` removes its own entry on the server's acknowledgement, and a
+   * refused one stays behind without failing the rest — callers such as `logout`
+   * and `close` have to get on with their own work either way.
    */
   unsubscribeAll = () => {
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
-      return this.subscriptions[id].unsubscribe()
+      return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })
-    return Promise.all(unsubAll)
-      .then(() => this.subscriptions)
+    return Promise.all(unsubAll).then(() => undefined)
   }
 }
 
