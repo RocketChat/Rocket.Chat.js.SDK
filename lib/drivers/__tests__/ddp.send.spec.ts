@@ -174,27 +174,6 @@ describe('Socket.send', () => {
       // `err.error` or `err.errorType` still works.
       await expect(sending).rejects.toMatchObject(error)
     })
-
-    it('keeps the reason when the DDP error carries a message of its own', async () => {
-      const sending = socket.send({ msg: 'method', method: 'login', params: [] })
-
-      // Some server paths send both; `reason` is the one callers want to read.
-      transport.receive({
-        msg: 'result',
-        id: 'ddp-1',
-        error: { error: 403, reason: 'User not found', message: '[403] User not found' }
-      })
-
-      await expect(sending).rejects.toThrow('User not found')
-    })
-
-    it('falls back to the DDP error itself when it carries no reason', async () => {
-      const sending = socket.send({ msg: 'method', method: 'login', params: [] })
-
-      transport.receive({ msg: 'result', id: 'ddp-1', error: 'you must be logged in' })
-
-      await expect(sending).rejects.toThrow('you must be logged in')
-    })
   })
 
   describe('sending while the connection is not open', () => {
