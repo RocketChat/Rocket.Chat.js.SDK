@@ -1,14 +1,14 @@
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 import {
   FakeWebSocket,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
 // Hoisted above the imports by jest, so the driver's own `import WebSocket from
 // 'universal-websocket-client'` resolves to the fake. See test/fakeTransport.ts.
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
@@ -72,13 +72,13 @@ describe('Socket subscription bookkeeping', () => {
     expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
   })
 
-  it('rejects with the bare id when unsubscribing from something not in the map', async () => {
-    // Pinned bug: callers up the stack log `err.message`, which is undefined
-    // on a string. See test/PINNED-BUGS.md, row 8.
+  it('rejects with an Error naming the id when unsubscribing from something not in the map', async () => {
+    // Callers up the stack log `err.message`, so the rejection has to be an
+    // Error that says which subscription was missing.
     const unsubscribing = socket.unsubscribe('never-subscribed')
 
-    await expect(unsubscribing).rejects.toEqual('never-subscribed')
-    await expect(unsubscribing).rejects.not.toBeInstanceOf(Error)
+    await expect(unsubscribing).rejects.toBeInstanceOf(Error)
+    await expect(unsubscribing).rejects.toThrow('never-subscribed')
   })
 
   describe('unsubscribing from a live subscription', () => {
@@ -106,7 +106,7 @@ describe('Socket subscription bookkeeping', () => {
 
       const unsubscribing = socket.unsubscribe('ddp-1')
       transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
-      await expect(unsubscribing).rejects.toEqual({ reason: 'no such subscription' })
+      await expect(unsubscribing).rejects.toThrow('no such subscription')
 
       const resubscribing = socket.subscribeAll()
 
@@ -124,18 +124,20 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
-  it('leaves an unacknowledged subscription behind when unsubscribing from all', async () => {
-    // `unsubscribeAll` does not wipe the collection: each unsubscribe removes
-    // its own entry on acknowledgement, so a refused one survives.
-    await subscribe('stream-room-messages', ['GENERAL'])
-    await subscribe('stream-notify-user', ['alice/message'])
+  describe('unsubscribing from all', () => {
+    it('leaves an unacknowledged subscription behind', async () => {
+      // `unsubscribeAll` does not wipe the collection: each unsubscribe removes
+      // its own entry on acknowledgement, so a refused one survives.
+      await subscribe('stream-room-messages', ['GENERAL'])
+      await subscribe('stream-notify-user', ['alice/message'])
 
-    const unsubscribingAll = socket.unsubscribeAll()
+      const unsubscribingAll = socket.unsubscribeAll()
 
-    transport.receive({ msg: 'result', id: 'ddp-1', result: true })
-    transport.receive({ msg: 'nosub', id: 'ddp-2', error: { reason: 'no such subscription' } })
-    await expect(unsubscribingAll).rejects.toEqual({ reason: 'no such subscription' })
+      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+      transport.receive({ msg: 'nosub', id: 'ddp-2', error: { reason: 'no such subscription' } })
+      await expect(unsubscribingAll).rejects.toThrow('no such subscription')
 
-    expect(Object.keys(socket.subscriptions)).toEqual(['ddp-2'])
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-2'])
+    })
   })
 })
