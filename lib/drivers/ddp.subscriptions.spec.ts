@@ -72,6 +72,32 @@ describe('Socket subscription bookkeeping', () => {
     expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
   })
 
+  it('holds nothing for a subscription the server refused', async () => {
+    // `send` used to file every `sub` frame under its send-time id, so a refused
+    // subscription left an entry nobody owned: never acknowledged, never
+    // unsubscribed, and resubscribed by `subscribeAll` forever.
+    const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+    transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
+
+    await expect(subscribing).resolves.toBeUndefined()
+    expect(socket.subscriptions).toEqual({})
+
+    const framesBefore = transport.sent.length
+    await socket.subscribeAll()
+    expect(transport.sent).toHaveLength(framesBefore)
+  })
+
+  it('holds nothing while a subscription is still in flight', async () => {
+    // The other half of the same change: the map is written on the server's
+    // acknowledgement, so an unanswered `sub` is not in it yet.
+    socket.subscribe('stream-room-messages', ['GENERAL'])
+
+    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+    expect(socket.subscriptions).toEqual({})
+
+    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+  })
+
   it('rejects with the bare id when unsubscribing from something not in the map', async () => {
     // Pinned bug: callers up the stack log `err.message`, which is undefined
     // on a string. See test/PINNED-BUGS.md, row 8.

@@ -350,11 +350,6 @@ export class Socket extends SDKEventEmitter {
       const stringdata = JSON.stringify(data)
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
-      if (/^sub$/.test(obj.msg)) {
-        const { name, params } = obj;
-        this.subscriptions[id] = { id, name, params, unsubscribe: this.unsubscribe.bind(this, id) };
-      }
-
       try {
         this.connection.send(stringdata)
       } catch {
@@ -463,6 +458,9 @@ export class Socket extends SDKEventEmitter {
   /**
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
+   *
+   * Sole owner of `subscriptions`: the entry is written on the server's
+   * acknowledgement, so a refused or unanswered `sub` leaves nothing behind.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
