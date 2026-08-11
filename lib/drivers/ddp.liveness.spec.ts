@@ -88,16 +88,15 @@ describe('Socket liveness', () => {
       expect(socket.connected).toBe(false)
     })
 
-    it('skips closing a stale-ping socket, leaking it open', async () => {
-      // Pinned bug: `close` gates the actual close on `connected`, which a stale
-      // ping already made false — so the open transport is abandoned rather than
-      // closed. See test/PINNED-BUGS.md, row 12.
+    it('closes a stale-ping socket rather than leaking it open', async () => {
+      // `close` works off the transport's own ready state, not `connected`: a
+      // stale ping makes the socket unusable but it is still very much open.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
 
       await socket.close()
 
-      expect(transport.closedWith).toEqual([])
-      expect(transport.readyState).toBe(OPEN)
+      expect(transport.closedWith).toEqual([4000]) // the user-disconnect code
+      expect(transport.readyState).toBe(CLOSED)
     })
   })
 

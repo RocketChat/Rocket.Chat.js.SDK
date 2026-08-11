@@ -196,12 +196,13 @@ export class Socket extends SDKEventEmitter {
     this.openTimeout && clearTimeout(this.openTimeout as any)
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
 
-    if (this.connected) {
+    // Gate on the transport's own state, not on `connected`: a socket whose ping
+    // has gone stale is not usable, but it is still open and still has to be closed.
+    if (this.connection && this.connection.readyState !== 3) {
+      const connection = this.connection
       await new Promise((resolve) => {
-        if (this.connection) {
-          this.once('close', resolve)
-          this.connection.close(userDisconnectCloseCode)
-        }
+        this.once('close', resolve)
+        connection.close(userDisconnectCloseCode)
       })
       .catch(this.logger.error)
     }
