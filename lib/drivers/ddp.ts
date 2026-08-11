@@ -15,7 +15,7 @@ import {
   ISocketOptions,
   ISocketMessageHandler,
   ISubscription,
-  IDDPErrorPayload,
+  IDDPError,
   ICredentials,
   ILoginResult,
   ICredentialsPass,
@@ -36,18 +36,18 @@ import { sha256 } from 'js-sha256'
 const userDisconnectCloseCode = 4000;
 
 /**
- * Wrap a server error payload in an Error, so callers reading `err.message`
- * see the reason. The payload's own fields are copied onto the Error, so
- * anything branching on `err.error` or `err.errorType` keeps working — except
- * `message`, `name` and `stack`, which stay the Error's own, so a payload
- * carrying both `reason` and `message` cannot overwrite the reason.
+ * Turn a DDP error into an Error, so callers reading `err.message` see the
+ * reason. Its own fields are copied across, so anything branching on
+ * `err.error` or `err.errorType` keeps working — except `message`, `name` and
+ * `stack`, which stay the Error's own, so a DDP error carrying both `reason`
+ * and `message` cannot overwrite the reason.
  */
-const errorFromPayload = (payload: IDDPErrorPayload | string | null): Error => {
-  if (payload === null || typeof payload !== 'object') return new Error(String(payload))
-  const error = new Error(payload.reason || payload.message || JSON.stringify(payload))
-  for (const key of Object.keys(payload)) {
+const toError = (ddpError: IDDPError | string | null): Error => {
+  if (ddpError === null || typeof ddpError !== 'object') return new Error(String(ddpError))
+  const error = new Error(ddpError.reason || ddpError.message || JSON.stringify(ddpError))
+  for (const key of Object.keys(ddpError)) {
     if (key === 'message' || key === 'name' || key === 'stack') continue
-    (error as any)[key] = payload[key]
+    (error as any)[key] = ddpError[key]
   }
   return error
 }
@@ -399,7 +399,7 @@ export class Socket extends SDKEventEmitter {
       }
       this.once(listener, (result: any) => {
         this.off('disconnected', reject)
-        return (result.error ? reject(errorFromPayload(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+        return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       })
     })
   }

@@ -193,13 +193,13 @@ export interface ISubscription {
 }
 
 /**
- * Error payload on a failed DDP reply
+ * The error field of a failed DDP response, as the server sent it
  * @param reason     Human readable reason, what callers want to read
  * @param message    Some server paths send this alongside `reason`
  * @param error      Error code, e.g. 403
  * @param errorType  e.g. 'Meteor.Error'
  */
-export interface IDDPErrorPayload {
+export interface IDDPError {
   reason?: string
   message?: string
   error?: any

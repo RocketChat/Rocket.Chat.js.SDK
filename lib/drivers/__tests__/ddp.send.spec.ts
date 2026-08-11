@@ -161,7 +161,7 @@ describe('Socket.send', () => {
   })
 
   describe('failed replies', () => {
-    it('rejects with an Error carrying the reason, and keeps the payload fields', async () => {
+    it('rejects with an Error carrying the reason, and keeps its fields', async () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       const error = { error: 403, reason: 'User not found', errorType: 'Meteor.Error' }
@@ -170,12 +170,12 @@ describe('Socket.send', () => {
       // Callers up the stack log `err.message`; the reason has to survive there.
       await expect(sending).rejects.toBeInstanceOf(Error)
       await expect(sending).rejects.toThrow('User not found')
-      // The payload's own fields stay readable, so a caller branching on
+      // The DDP error's own fields stay readable, so a caller branching on
       // `err.error` or `err.errorType` still works.
       await expect(sending).rejects.toMatchObject(error)
     })
 
-    it('keeps the reason when the payload carries a message of its own', async () => {
+    it('keeps the reason when the DDP error carries a message of its own', async () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       // Some server paths send both; `reason` is the one callers want to read.
@@ -188,7 +188,7 @@ describe('Socket.send', () => {
       await expect(sending).rejects.toThrow('User not found')
     })
 
-    it('falls back to the payload itself when it carries no reason', async () => {
+    it('falls back to the DDP error itself when it carries no reason', async () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       transport.receive({ msg: 'result', id: 'ddp-1', error: 'you must be logged in' })
