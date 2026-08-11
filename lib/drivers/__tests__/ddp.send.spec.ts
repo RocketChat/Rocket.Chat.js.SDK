@@ -162,7 +162,7 @@ describe('Socket.send', () => {
 
   describe('failed replies', () => {
     it('rejects with the raw error payload rather than an Error', async () => {
-      // Pinned bug: callers up the stack read `err.message`, which is undefined
+      // Callers up the stack read `err.message`, which is undefined
       // here.
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
@@ -176,7 +176,7 @@ describe('Socket.send', () => {
 
   describe('sending while the connection is not open', () => {
     it('waits forever for the connection to open, with no timeout', async () => {
-      // Pinned bug: the wait on the `open` event is unbounded, so a send issued
+      // The wait on the `open` event is unbounded, so a send issued
       // while the socket is down never settles.
       transport.readyState = CLOSED
 
