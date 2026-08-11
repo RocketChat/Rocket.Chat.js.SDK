@@ -108,11 +108,9 @@ describe('Socket liveness', () => {
       await expect(socket.probe()).resolves.toBe(false)
     })
 
-    it('ignores a pong that lands in the same millisecond as the probe', async () => {
-      // Pinned bug: the probe snapshots `lastPing` and requires it to *advance*
-      // strictly, so a pong answered within the same millisecond is discarded and
-      // the probe times out on a demonstrably live socket. See PINNED-BUGS.md,
-      // row 13. Under the frozen clock this is deterministic, not flaky.
+    it('succeeds on a pong that lands in the same millisecond as the probe', async () => {
+      // The stamp cannot advance here, because no time passes on the frozen
+      // clock. The probe must answer on the pong itself, not on the timestamp.
       const stampBeforeProbe = socket.lastPing
       const pongSeen = jest.fn()
       socket.on('pong', pongSeen)
@@ -122,14 +120,12 @@ describe('Socket liveness', () => {
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
       transport.receive({ msg: 'pong' })
 
-      // The pong genuinely arrived and genuinely refreshed the stamp — to the
-      // same value, because no time passed. Without these two the false below
-      // would be indistinguishable from a pong that never showed up at all.
+      // Without these two the true below could not be told apart from a probe
+      // that resolved for some other reason.
       expect(pongSeen).toHaveBeenCalled()
       expect(socket.lastPing).toBe(stampBeforeProbe)
 
-      await jest.advanceTimersByTimeAsync(2000)
-      await expect(probing).resolves.toBe(false)
+      await expect(probing).resolves.toBe(true)
     })
 
     it('succeeds when the pong lands after the clock has moved', async () => {
