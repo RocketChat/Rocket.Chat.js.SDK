@@ -1,17 +1,17 @@
-import { DDPDriver } from './ddp'
-import { ISocketOptions } from '../../interfaces'
-import { silentLogger } from '../../test/silentLogger'
+import { DDPDriver } from '../ddp'
+import { ISocketOptions } from '../../../interfaces'
+import { silentLogger } from '../../../test/silentLogger'
 import {
   FakeWebSocket,
   fakeSockets,
   OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
 // Same seam as the socket specs: the driver builds its Socket, the Socket builds
 // the fake through its normal code path. See test/fakeTransport.ts.
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 

@@ -1,5 +1,5 @@
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 
 // `onMessage` is handed frames directly — no socket is constructed and no timer
 // is started, so this file runs on Jest's default real timers.
