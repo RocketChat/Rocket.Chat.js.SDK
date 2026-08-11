@@ -82,35 +82,45 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('unsubscribing from a live subscription', () => {
-    it('deletes its bookkeeping before the server has acknowledged', async () => {
-      // Pinned bug: the delete happens up front, not on the reply. See
-      // test/PINNED-BUGS.md, row 9.
+    it('keeps its bookkeeping until the server acknowledges', async () => {
       await subscribe('stream-room-messages', ['GENERAL'])
 
       const unsubscribing = socket.unsubscribe('ddp-1')
 
-      // The `unsub` frame is on the wire and unanswered, yet the map is empty.
+      // The `unsub` frame is on the wire and unanswered, so the subscription is
+      // still the driver's to name.
       expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
-      expect(socket.subscriptions).toEqual({})
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
 
       transport.receive({ msg: 'result', id: 'ddp-1', result: true })
       await expect(unsubscribing).resolves.toBe(true)
+
+      // Acknowledged — now it is gone.
+      expect(socket.subscriptions).toEqual({})
     })
 
-    it('cannot resubscribe the subscription after the server refuses', async () => {
-      // The consequence of the delete above, and what makes it a bug rather
-      // than an ordering detail: the unsubscribe failed, so the server is still
-      // streaming, but the driver no longer holds the id to resubscribe with.
+    it('can resubscribe the subscription after the server refuses', async () => {
+      // The unsubscribe failed, so the server is still streaming: the driver
+      // must still hold the id to resubscribe with.
       await subscribe('stream-room-messages', ['GENERAL'])
 
       const unsubscribing = socket.unsubscribe('ddp-1')
       transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
       await expect(unsubscribing).rejects.toEqual({ reason: 'no such subscription' })
 
-      const framesBefore = transport.sent.length
-      await socket.subscribeAll()
+      const resubscribing = socket.subscribeAll()
 
-      expect(transport.sent).toHaveLength(framesBefore)
+      expect(transport.lastSent()).toEqual({
+        msg: 'sub',
+        id: 'ddp-1',
+        name: 'stream-room-messages',
+        params: ['GENERAL']
+      })
+
+      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+      await resubscribing
+
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
     })
   })
 })

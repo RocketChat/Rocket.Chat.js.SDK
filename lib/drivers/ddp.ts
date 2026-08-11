@@ -499,9 +499,13 @@ export class Socket extends SDKEventEmitter {
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(id)
-    delete this.subscriptions[id]
     return this.send({ msg: 'unsub', id })
-      .then((data: any) => data.result || data.subs)
+      .then((data: any) => {
+        // Only once the server has acknowledged: a refused or dropped unsub
+        // leaves the subscription in the map, so it can still be named.
+        delete this.subscriptions[id]
+        return data.result || data.subs
+      })
       .catch((err) => {
         if (!err.msg && err.msg !== 'nosub') {
           this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
