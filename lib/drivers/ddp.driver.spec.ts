@@ -46,13 +46,17 @@ describe('new DDPDriver', () => {
     expect(createDriver().config.host).toBe('localhost:3000')
   })
 
-  it('BUG (pinned bug 11): discards the caller\'s timeout and hard-codes 10000', () => {
+  it('keeps the caller\'s timeout, and the socket pings on it', () => {
     const driver = createDriver({ timeout: 250 })
 
-    expect(driver.config.timeout).toBe(10000)
-    // And the knock-on: with no `ping` given, the socket falls back to
-    // `timeout`, so the caller's number reaches nothing at all.
-    expect(driver.ddp.config.ping).toBe(10000)
+    expect(driver.config.timeout).toBe(250)
+    // The knock-on, now in the caller's favour: with no `ping` given, the socket
+    // falls back to `timeout`, so the number reaches the ping interval.
+    expect(driver.ddp.config.ping).toBe(250)
+  })
+
+  it('defaults the timeout to 10000 when the caller gives none', () => {
+    expect(createDriver().config.timeout).toBe(10000)
   })
 })
 
