@@ -24,10 +24,18 @@ describe('new Socket', () => {
     expect(new Socket({ reopen: 500, logger: silentLogger }).config.reopen).toBe(500)
   })
 
-  it('BUG (pinned bug 3): ignores a `ping` option and reads the ping interval from `timeout`', () => {
+  it('honours a ping interval, in preference to `timeout`', () => {
     const pingSocket = new Socket({ ping: 500, timeout: 250, logger: silentLogger })
 
-    expect(pingSocket.config.ping).toBe(250)
+    expect(pingSocket.config.ping).toBe(500)
+  })
+
+  it('falls back to `timeout` for the ping interval when no `ping` is given', () => {
+    expect(new Socket({ timeout: 250, logger: silentLogger }).config.ping).toBe(250)
+  })
+
+  it('defaults the ping interval when neither option is given', () => {
+    expect(new Socket({ logger: silentLogger }).config.ping).toBe(10000)
   })
 
   it('BUG (pinned bug 4): throws when constructed with no arguments', () => {

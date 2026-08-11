@@ -15,8 +15,7 @@ useFakeClockAndSocketRegistry()
 /**
  * The interval the whole file is arithmetic about. Deliberately *not* the 10000
  * default: with the default, every boundary assertion below would pass whether
- * or not the socket read the option at all. `timeout` is the option that carries
- * it — the one named `ping` is ignored, see PINNED-BUGS.md, row 3.
+ * or not the socket read the option at all.
  */
 const PING_INTERVAL = 3000
 
