@@ -46,6 +46,18 @@ _Avoid_: Socket (that is the raw websocket inside a driver), adapter
 A named server-side feed a client asks to receive events from, such as room messages or user notifications.
 _Avoid_: Channel (that is a Room type), feed, topic
 
+**DDP message**:
+One message on the wire, in either direction, named by its `msg` field. Qualified because an unqualified "message" in this SDK is chat content.
+_Avoid_: Message (unqualified), frame, packet, event
+
+**DDP response**:
+The DDP message that answers a Method call or a DDP subscription — `result`, `ready` or `nosub`. A response carrying an error rather than a result is a failed response.
+_Avoid_: Reply, ack, result (that is one response type of three)
+
+**DDP error**:
+The error field of a failed DDP response, as the server sent it. What the SDK raises to its callers from one is an ordinary Error, not this.
+_Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
+
 **DDP subscription**:
 A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry.
 _Avoid_: Sub, subscription (unqualified)

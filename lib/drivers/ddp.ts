@@ -29,6 +29,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
+import { toError } from './ddpError'
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
@@ -381,7 +382,7 @@ export class Socket extends SDKEventEmitter {
       }
       this.once(listener, (result: any) => {
         this.off('disconnected', reject)
-        return (result.error ? reject(result.error) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+        return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       })
     })
   }

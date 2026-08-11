@@ -5,6 +5,7 @@
 /package-lock.json
 /docs/*
 !/docs/agents/
+!/docs/adr/
 /.scratch/
 .DS_Store
 
