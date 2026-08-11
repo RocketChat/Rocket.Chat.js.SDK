@@ -1,14 +1,14 @@
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 import {
   FakeWebSocket,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
 // Hoisted above the imports by jest, so the driver's own `import WebSocket from
 // 'universal-websocket-client'` resolves to the fake. See test/fakeTransport.ts.
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
@@ -73,7 +73,7 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   it('rejects with the bare id when unsubscribing from something not in the map', async () => {
-    // Known bug: callers up the stack log `err.message`, which is undefined
+    // Callers up the stack log `err.message`, which is undefined
     // on a string.
     const unsubscribing = socket.unsubscribe('never-subscribed')
 
@@ -83,7 +83,7 @@ describe('Socket subscription bookkeeping', () => {
 
   describe('unsubscribing from a live subscription', () => {
     it('deletes its bookkeeping before the server has acknowledged', async () => {
-      // Known bug: the delete happens up front, not on the reply.
+      // The delete happens up front, not on the reply.
       await subscribe('stream-room-messages', ['GENERAL'])
 
       const unsubscribing = socket.unsubscribe('ddp-1')
@@ -104,7 +104,8 @@ describe('Socket subscription bookkeeping', () => {
 
       const unsubscribing = socket.unsubscribe('ddp-1')
       transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
-      await expect(unsubscribing).rejects.toEqual({ reason: 'no such subscription' })
+      await expect(unsubscribing).rejects.toThrow('no such subscription')
+      await expect(unsubscribing).rejects.toMatchObject({ reason: 'no such subscription' })
 
       const framesBefore = transport.sent.length
       await socket.subscribeAll()

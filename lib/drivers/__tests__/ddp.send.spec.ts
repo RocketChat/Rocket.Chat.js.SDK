@@ -1,6 +1,6 @@
-import { Socket } from './ddp'
-import * as settings from '../settings'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import * as settings from '../../settings'
+import { silentLogger } from '../../../test/silentLogger'
 import {
   CLOSED,
   FakeWebSocket,
@@ -8,12 +8,12 @@ import {
   fakeSockets,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
 // Hoisted above the imports by jest, so the driver's own `import WebSocket from
 // 'universal-websocket-client'` resolves to the fake. This is the whole seam:
 // the driver constructs the fake through its normal code path.
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
@@ -162,16 +162,18 @@ describe('Socket.send', () => {
   })
 
   describe('failed replies', () => {
-    it('rejects with the raw error payload rather than an Error', async () => {
-      // Known bug: callers up the stack read `err.message`, which is undefined
-      // here.
+    it('rejects with an Error carrying the reason, and keeps its fields', async () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       const error = { error: 403, reason: 'User not found', errorType: 'Meteor.Error' }
       transport.receive({ msg: 'result', id: 'ddp-1', error })
 
-      await expect(sending).rejects.toEqual(error)
-      await expect(sending).rejects.not.toBeInstanceOf(Error)
+      // Callers up the stack log `err.message`; the reason has to survive there.
+      await expect(sending).rejects.toBeInstanceOf(Error)
+      await expect(sending).rejects.toThrow('User not found')
+      // The DDP error's own fields stay readable, so a caller branching on
+      // `err.error` or `err.errorType` still works.
+      await expect(sending).rejects.toMatchObject(error)
     })
   })
 

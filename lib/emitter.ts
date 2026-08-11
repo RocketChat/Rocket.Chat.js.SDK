@@ -20,8 +20,12 @@ const registeredListener = (listener: Function): Function =>
  * of being installed onto the shared `tiny-events` prototype — which reached
  * every emitter in the host process, including ones the SDK never created.
  *
- * Internal: not exported from the package entry point, so its shape can change
- * without a breaking release.
+ * The class is not exported from `index.ts`, but do not read that as freedom to
+ * reshape it. `removeAllListeners` is public API twice over: `Socket`,
+ * `DDPDriver` and `Api` inherit it, so it reaches consumers through
+ * `Rocketchat`/`Bot`/`Livechat`, and `package.json` sets `"main": "index.ts"` —
+ * the package ships TypeScript source, so `lib/emitter` is importable directly.
+ * Narrowing the signature is a breaking change.
  */
 export class SDKEventEmitter extends EventEmitter {
   /** Drop the listeners for one event, or for every event, and return them. */
