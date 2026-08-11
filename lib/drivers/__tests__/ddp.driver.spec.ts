@@ -1,17 +1,17 @@
-import { DDPDriver } from './ddp'
-import { ISocketOptions } from '../../interfaces'
-import { silentLogger } from '../../test/silentLogger'
+import { DDPDriver } from '../ddp'
+import { ISocketOptions } from '../../../interfaces'
+import { silentLogger } from '../../../test/silentLogger'
 import {
   FakeWebSocket,
   fakeSockets,
   OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
 // Same seam as the socket specs: the driver builds its Socket, the Socket builds
 // the fake through its normal code path. See test/fakeTransport.ts.
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
@@ -46,12 +46,12 @@ describe('new DDPDriver', () => {
     expect(createDriver().config.host).toBe('localhost:3000')
   })
 
-  it('BUG (pinned bug 11): discards the caller\'s timeout and hard-codes 10000', () => {
+  it('BUG: discards the caller\'s timeout and hard-codes 10000', () => {
     const driver = createDriver({ timeout: 250 })
 
     expect(driver.config.timeout).toBe(10000)
     // And the knock-on, because the socket reads its ping interval from
-    // `timeout` (pinned bug 3): the caller's number reaches nothing at all.
+    // `timeout`: the caller's number reaches nothing at all.
     expect(driver.ddp.config.ping).toBe(10000)
   })
 })

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'tiny-events'
 
-import { SDKEventEmitter } from './emitter'
+import { SDKEventEmitter } from '../emitter'
 
 /**
  * `removeAllListeners` is not upstream API — `tiny-events` ships only
