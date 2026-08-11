@@ -51,7 +51,7 @@ export class Socket extends SDKEventEmitter {
 
   /** Create a websocket handler */
   constructor (
-    options?: ISocketOptions | any,
+    options: ISocketOptions | any = {},
     public resume: ILoginResult | null = null
   ) {
     super()
