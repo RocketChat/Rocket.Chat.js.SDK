@@ -177,7 +177,7 @@ describe('Socket liveness', () => {
       }
     })
 
-    it('dies for good when one pong is withheld, and a send then never returns', async () => {
+    it('dies for good when one pong is withheld, and a later send fails on the deadline', async () => {
       await tickWithPong()
       await tickWithPong()
 
@@ -192,13 +192,16 @@ describe('Socket liveness', () => {
       expect(socket.alive()).toBe(false)
       expect(socket.connected).toBe(false)
 
-      let settled = false
-      socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
-        .then(() => { settled = true }, () => { settled = true })
+      // The socket is not open, so the send waits on `open` — bounded by the
+      // reopen interval, then rejected rather than left hanging.
+      // Asserted before the clock moves: the rejection lands inside the advance,
+      // and an unattached handler at that point is an unhandled rejection.
+      const rejected = expect(socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] }))
+        .rejects.toThrow('[ddp] timed out waiting for the connection to open')
 
       await jest.advanceTimersByTimeAsync(10 * 60 * 1000)
 
-      expect(settled).toBe(false)
+      await rejected
     })
 
     it('clears both the ping and the reopen timer on close', async () => {

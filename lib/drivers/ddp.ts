@@ -339,11 +339,43 @@ export class Socket extends SDKEventEmitter {
    * @param msg       The `data.msg` value to wait for in response
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
-  send = async (obj: any): Promise<any> => {
-    return new Promise<any>(async(resolve, reject) => {
-      if (!this.connection) throw new Error('[ddp] sending without open connection')
-      if (!this.connected) await new Promise(resolve => this.on('open', resolve))
+  /**
+   * Wait for the socket to open, bounded by the reopen interval. Rejects on the
+   * deadline so a send issued while the socket is down fails the caller rather
+   * than hanging for the life of the process.
+   */
+  private waitForOpen = (timeoutMs = this.config.reopen): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      let settled = false
+      const cleanup = () => {
+        settled = true
+        this.off('open', onOpen)
+        clearTimeout(timeout as any)
+      }
 
+      const onOpen = () => {
+        if (settled) return
+        cleanup()
+        resolve()
+      }
+
+      this.once('open', onOpen)
+
+      const timeout = setTimeout(() => {
+        if (settled) return
+        cleanup()
+        reject(new Error('[ddp] timed out waiting for the connection to open'))
+      }, timeoutMs)
+    })
+  }
+
+  send = async (obj: any): Promise<any> => {
+    // Outside the promise executor: a `throw` from an async executor is dropped
+    // on the floor as an unhandled rejection instead of rejecting the send.
+    if (!this.connection) throw new Error('[ddp] sending without open connection')
+    if (!this.connected) await this.waitForOpen()
+
+    return new Promise<any>((resolve, reject) => {
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
@@ -356,6 +388,9 @@ export class Socket extends SDKEventEmitter {
       }
 
       try {
+        // Read fresh rather than captured above the wait: a reopen while the send
+        // waited on `open` will have replaced the connection.
+        if (!this.connection) throw new Error('[ddp] no connection to send on')
         this.connection.send(stringdata)
       } catch {
         this.logger.error('[ddp] send without open connection');

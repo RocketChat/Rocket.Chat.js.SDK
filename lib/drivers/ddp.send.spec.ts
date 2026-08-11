@@ -4,6 +4,7 @@ import { silentLogger } from '../../test/silentLogger'
 import {
   CLOSED,
   FakeWebSocket,
+  driveToHandshake,
   fakeSockets,
   openFakeConnection,
   useFakeClockAndSocketRegistry
@@ -175,18 +176,43 @@ describe('Socket.send', () => {
   })
 
   describe('sending while the connection is not open', () => {
-    it('waits forever for the connection to open, with no timeout', async () => {
-      // Pinned bug: the wait on the `open` event is unbounded, so a send issued
-      // while the socket is down never settles. See PINNED-BUGS.md, row 7.
+    it('rejects on the deadline rather than waiting on open forever', async () => {
       transport.readyState = CLOSED
 
-      let settled = false
-      socket.send({ msg: 'method', method: 'login', params: [] })
-        .then(() => { settled = true }, () => { settled = true })
+      // Asserted before the clock moves: the rejection lands inside the advance,
+      // and an unattached handler at that point is an unhandled rejection.
+      const rejected = expect(socket.send({ msg: 'method', method: 'login', params: [] }))
+        .rejects.toThrow('[ddp] timed out waiting for the connection to open')
 
       await jest.advanceTimersByTimeAsync(10 * 60 * 1000)
 
-      expect(settled).toBe(false)
+      await rejected
+      expect(transport.sent).toHaveLength(1) // the handshake only
+    })
+
+    it('sends once the connection opens inside the deadline', async () => {
+      transport.readyState = CLOSED
+
+      const sending = socket.send({ msg: 'method', method: 'login', params: [] })
+
+      // `open` is emitted at the end of the handshake, so the whole reopen has to
+      // run before the waiting send can go out.
+      await driveToHandshake(transport)
+      await jest.advanceTimersByTimeAsync(0)
+
+      // `onOpen` sends its own handshake on the same tick, so the waiting send is
+      // not necessarily the last frame — only that it was written at all.
+      expect(transport.sent.map(frame => JSON.parse(frame)))
+        .toContainEqual({ msg: 'method', method: 'login', params: [], id: 'ddp-2' })
+      transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+      await expect(sending).resolves.toMatchObject({ result: 'ok' })
+    })
+
+    it('rejects the send when there is no connection at all', async () => {
+      // The guard used to sit inside an async promise executor, which dropped
+      // the throw as an unhandled rejection instead of failing the caller.
+      await expect(createSocket().send({ msg: 'method', method: 'login', params: [] }))
+        .rejects.toThrow('[ddp] sending without open connection')
     })
   })
 })
