@@ -117,7 +117,9 @@ export class Socket extends SDKEventEmitter {
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
    */
-  open = (_ms: number = this.config.reopen) => {
+  open = (ms: number = this.config.reopen) => {
+    this.config.reopen = ms
+
     return new Promise<any>(async (resolve, reject) => {
       if (this.connected) {
         return resolve(undefined)

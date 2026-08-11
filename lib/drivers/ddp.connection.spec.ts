@@ -214,17 +214,33 @@ describe('Socket connection lifecycle', () => {
   })
 
   describe('the interval argument to open', () => {
-    it('BUG (pinned bug 14): is ignored entirely', async () => {
-      // `open` declares an interval parameter and never reads it: the value
-      // reaches nothing, stores nowhere, and every subsequent retry still waits
-      // `config.reopen` — 3000 here, so the delay below is demonstrably the
-      // configured one and not the 1 that was passed. See PINNED-BUGS.md, row 14.
-      //
-      // A pin on a parameter that does nothing can only assert the absences: an
-      // implementation that honoured the argument would have to change one of
-      // them, and this test is where it becomes visible.
+    it('becomes the retry interval for later reopens', async () => {
+      // The interval passed here is deliberately far shorter than the configured
+      // `REOPEN_DELAY`, so the boundary below can only pass if the retry ran on
+      // the argument rather than on the option.
+      const PASSED_DELAY = 25
+
       transport.readyState = CLOSED
-      const opening = socket.open(1)
+      const opening = socket.open(PASSED_DELAY)
+
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+      await opening
+
+      expect(socket.config.reopen).toBe(PASSED_DELAY)
+
+      reopened.close(1006)
+
+      await jest.advanceTimersByTimeAsync(PASSED_DELAY - 1)
+      expect(fakeSockets).toHaveLength(2)
+
+      await jest.advanceTimersByTimeAsync(1)
+      expect(fakeSockets).toHaveLength(3)
+    })
+
+    it('leaves the configured interval alone when omitted', async () => {
+      transport.readyState = CLOSED
+      const opening = socket.open()
 
       const reopened = fakeSockets[1]
       await driveToHandshake(reopened)
