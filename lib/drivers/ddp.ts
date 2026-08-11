@@ -15,6 +15,7 @@ import {
   ISocketOptions,
   ISocketMessageHandler,
   ISubscription,
+  IDDPErrorPayload,
   ICredentials,
   ILoginResult,
   ICredentialsPass,
@@ -37,12 +38,19 @@ const userDisconnectCloseCode = 4000;
 /**
  * Wrap a server error payload in an Error, so callers reading `err.message`
  * see the reason. The payload's own fields are copied onto the Error, so
- * anything branching on `err.error` or `err.errorType` keeps working.
+ * anything branching on `err.error` or `err.errorType` keeps working — except
+ * `message`, `name` and `stack`, which stay the Error's own, so a payload
+ * carrying both `reason` and `message` cannot overwrite the reason.
+ * See docs/adr/0001-failed-replies-reject-with-an-error.md
  */
-const replyError = (error: any): Error => {
-  if (error instanceof Error) return error
+const replyError = (error: IDDPErrorPayload | string | null): Error => {
   if (error === null || typeof error !== 'object') return new Error(String(error))
-  return Object.assign(new Error(error.reason || error.message || JSON.stringify(error)), error)
+  const wrapped = new Error(error.reason || error.message || JSON.stringify(error))
+  for (const key of Object.keys(error)) {
+    if (key === 'message' || key === 'name' || key === 'stack') continue
+    (wrapped as any)[key] = error[key]
+  }
+  return wrapped
 }
 
 /** Websocket handler class, manages connections and subscriptions by DDP */

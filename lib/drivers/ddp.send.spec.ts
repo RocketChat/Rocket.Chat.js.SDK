@@ -175,6 +175,19 @@ describe('Socket.send', () => {
       await expect(sending).rejects.toMatchObject(error)
     })
 
+    it('keeps the reason when the payload carries a message of its own', async () => {
+      const sending = socket.send({ msg: 'method', method: 'login', params: [] })
+
+      // Some server paths send both; `reason` is the one callers want to read.
+      transport.receive({
+        msg: 'result',
+        id: 'ddp-1',
+        error: { error: 403, reason: 'User not found', message: '[403] User not found' }
+      })
+
+      await expect(sending).rejects.toThrow('User not found')
+    })
+
     it('falls back to the payload itself when it carries no reason', async () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
