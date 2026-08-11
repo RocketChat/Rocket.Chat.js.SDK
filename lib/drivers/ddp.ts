@@ -117,23 +117,18 @@ export class Socket extends SDKEventEmitter {
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
    */
-  open = (_ms: number = this.config.reopen) => {
-    return new Promise<any>(async (resolve, reject) => {
-      if (this.connected) {
-        return resolve(undefined)
-      }
+  open = async (_ms: number = this.config.reopen): Promise<any> => {
+    if (this.connected) {
+      return undefined
+    }
 
-      if (this.reopenPromise) {
-        return this.reopenPromise.then(() => resolve(this.connection)).catch(reject)
-      }
+    if (this.reopenPromise) {
+      await this.reopenPromise
+      return this.connection
+    }
 
-      try {
-        await this.createConnection()
-        resolve(this.connection)
-      } catch (err) {
-        reject(err)
-      }
-    })
+    await this.createConnection()
+    return this.connection
   }
 
   /** Send handshake message to confirm connection, start pinging. */
