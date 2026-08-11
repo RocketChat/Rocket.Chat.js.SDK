@@ -163,8 +163,8 @@ describe('Socket.send', () => {
 
   describe('failed replies', () => {
     it('rejects with the raw error payload rather than an Error', async () => {
-      // Pinned bug: callers up the stack read `err.message`, which is undefined
-      // here. See test/PINNED-BUGS.md, row 6.
+      // Known bug: callers up the stack read `err.message`, which is undefined
+      // here.
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       const error = { error: 403, reason: 'User not found', errorType: 'Meteor.Error' }
