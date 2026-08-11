@@ -24,13 +24,13 @@ describe('new Socket', () => {
     expect(new Socket({ reopen: 500, logger: silentLogger }).config.reopen).toBe(500)
   })
 
-  it('BUG (pinned bug 3): ignores a `ping` option and reads the ping interval from `timeout`', () => {
+  it('BUG: ignores a `ping` option and reads the ping interval from `timeout`', () => {
     const pingSocket = new Socket({ ping: 500, timeout: 250, logger: silentLogger })
 
     expect(pingSocket.config.ping).toBe(250)
   })
 
-  it('BUG (pinned bug 4): throws when constructed with no arguments', () => {
+  it('BUG: throws when constructed with no arguments', () => {
     // No cast: the call has to typecheck for the pin to mean anything. Making
     // `options` required is the fix, and it must break this test.
     expect(() => new Socket()).toThrow(TypeError)
