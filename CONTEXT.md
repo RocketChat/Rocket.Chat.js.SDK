@@ -50,14 +50,6 @@ _Avoid_: Channel (that is a Room type), feed, topic
 A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry.
 _Avoid_: Sub, subscription (unqualified)
 
-**Frame**:
-One message on the wire, in either direction. Named apart from Message, which in this SDK is always chat content.
-_Avoid_: Message (that is chat content), packet, event
-
-**Reply**:
-The server's answer to a Method call or a DDP subscription. A reply that carries an error rather than a result is a failed reply.
-_Avoid_: Response, answer, ack
-
 **Method call**:
 A named server procedure invoked over the realtime connection, as opposed to a REST request.
 _Avoid_: RPC, command
