@@ -42,14 +42,14 @@ const userDisconnectCloseCode = 4000;
  * `message`, `name` and `stack`, which stay the Error's own, so a payload
  * carrying both `reason` and `message` cannot overwrite the reason.
  */
-const replyError = (error: IDDPErrorPayload | string | null): Error => {
-  if (error === null || typeof error !== 'object') return new Error(String(error))
-  const wrapped = new Error(error.reason || error.message || JSON.stringify(error))
-  for (const key of Object.keys(error)) {
+const errorFromPayload = (payload: IDDPErrorPayload | string | null): Error => {
+  if (payload === null || typeof payload !== 'object') return new Error(String(payload))
+  const error = new Error(payload.reason || payload.message || JSON.stringify(payload))
+  for (const key of Object.keys(payload)) {
     if (key === 'message' || key === 'name' || key === 'stack') continue
-    (wrapped as any)[key] = error[key]
+    (error as any)[key] = payload[key]
   }
-  return wrapped
+  return error
 }
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
@@ -399,7 +399,7 @@ export class Socket extends SDKEventEmitter {
       }
       this.once(listener, (result: any) => {
         this.off('disconnected', reject)
-        return (result.error ? reject(replyError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+        return (result.error ? reject(errorFromPayload(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       })
     })
   }
