@@ -54,10 +54,10 @@ describe('Socket.loginParams', () => {
     })
   })
 
-  it('BUG (pinned bug 2): passes an oauth credential through untouched only when it is misspelled', () => {
+  it('BUG: passes an oauth credential through untouched only when it is misspelled', () => {
     // The misspelled `oath` key and the root-level token/secret are what the
-    // guard actually tests — see test/PINNED-BUGS.md, row 2. A well-formed
-    // ICredentialsOAuth does not reach this branch.
+    // guard actually tests. A well-formed ICredentialsOAuth does not reach this
+    // branch.
     const credentials = {
       oath: true,
       credentialToken: 'token',

@@ -3,7 +3,7 @@ import { EventEmitter } from 'tiny-events'
 import * as settings from '../lib/settings'
 
 // Importing the DDP driver overwrites `EventEmitter.prototype.removeAllListeners`
-// on the library itself, for every consumer in the process. See PINNED-BUGS.md.
+// on the library itself, for every consumer in the process.
 //
 // This file runs before the spec's own imports, so the reference captured here is
 // the pristine one. Restoring happens in teardown only: during a test file the
