@@ -568,7 +568,7 @@ export class Socket extends SDKEventEmitter {
 
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
   unsubscribe = (id: any) => {
-    if (!this.subscriptions[id]) return Promise.reject(id)
+    if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
     delete this.subscriptions[id]
     return this.send({ msg: 'unsub', id })
       .then((data: any) => data.result || data.subs)

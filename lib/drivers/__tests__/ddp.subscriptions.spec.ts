@@ -72,13 +72,13 @@ describe('Socket subscription bookkeeping', () => {
     expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
   })
 
-  it('rejects with the bare id when unsubscribing from something not in the map', async () => {
-    // Callers up the stack log `err.message`, which is undefined
-    // on a string.
+  it('rejects with an Error naming the id when unsubscribing from something not in the map', async () => {
+    // Callers up the stack log `err.message`, so the rejection has to be an
+    // Error that says which subscription was missing.
     const unsubscribing = socket.unsubscribe('never-subscribed')
 
-    await expect(unsubscribing).rejects.toEqual('never-subscribed')
-    await expect(unsubscribing).rejects.not.toBeInstanceOf(Error)
+    await expect(unsubscribing).rejects.toBeInstanceOf(Error)
+    await expect(unsubscribing).rejects.toThrow('never-subscribed')
   })
 
   describe('unsubscribing from a live subscription', () => {
