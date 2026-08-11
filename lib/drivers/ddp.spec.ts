@@ -38,10 +38,16 @@ describe('new Socket', () => {
     expect(new Socket({ logger: silentLogger }).config.ping).toBe(10000)
   })
 
-  it('BUG (pinned bug 4): throws when constructed with no arguments', () => {
-    // No cast: the call has to typecheck for the pin to mean anything. Making
-    // `options` required is the fix, and it must break this test.
-    expect(() => new Socket()).toThrow(TypeError)
+  it('constructs with no arguments, on the defaults alone', () => {
+    const defaultSocket = new Socket()
+
+    expect(defaultSocket.host).toBe('ws://localhost:3000/websocket')
+    expect(defaultSocket.config).toEqual({
+      host: 'http://localhost:3000',
+      useSsl: false,
+      reopen: 10000,
+      ping: 10000
+    })
   })
 })
 
