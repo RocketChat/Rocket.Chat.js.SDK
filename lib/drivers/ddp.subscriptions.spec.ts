@@ -123,4 +123,19 @@ describe('Socket subscription bookkeeping', () => {
       expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
     })
   })
+
+  it('leaves an unacknowledged subscription behind when unsubscribing from all', async () => {
+    // `unsubscribeAll` does not wipe the collection: each unsubscribe removes
+    // its own entry on acknowledgement, so a refused one survives.
+    await subscribe('stream-room-messages', ['GENERAL'])
+    await subscribe('stream-notify-user', ['alice/message'])
+
+    const unsubscribingAll = socket.unsubscribeAll()
+
+    transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+    transport.receive({ msg: 'nosub', id: 'ddp-2', error: { reason: 'no such subscription' } })
+    await expect(unsubscribingAll).rejects.toEqual({ reason: 'no such subscription' })
+
+    expect(Object.keys(socket.subscriptions)).toEqual(['ddp-2'])
+  })
 })

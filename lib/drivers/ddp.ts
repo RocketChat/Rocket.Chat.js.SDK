@@ -501,8 +501,8 @@ export class Socket extends SDKEventEmitter {
     if (!this.subscriptions[id]) return Promise.reject(id)
     return this.send({ msg: 'unsub', id })
       .then((data: any) => {
-        // Only once the server has acknowledged: a refused or dropped unsub
-        // leaves the subscription in the map, so it can still be named.
+        // Only once the server has acknowledged: a refused unsub leaves the
+        // subscription in the map, so it can still be named.
         delete this.subscriptions[id]
         return data.result || data.subs
       })
@@ -514,13 +514,17 @@ export class Socket extends SDKEventEmitter {
       })
   }
 
-  /** Unsubscribe from all active subscriptions and reset collection */
+  /**
+   * Unsubscribe from all active subscriptions, resolve with whatever is left in
+   * the collection. Each `unsubscribe` removes its own entry on the server's
+   * acknowledgement, so a refused one stays behind rather than being erased here.
+   */
   unsubscribeAll = () => {
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
       return this.subscriptions[id].unsubscribe()
     })
     return Promise.all(unsubAll)
-      .then(() => this.subscriptions = {})
+      .then(() => this.subscriptions)
   }
 }
 
