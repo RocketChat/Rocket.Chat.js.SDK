@@ -9,13 +9,12 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   ddp?: any
   config: any
 
-  constructor ({ logger, allPublic, rooms, integrationId, protocol = Protocols.DDP, ...config }: any) {
+  // `allPublic`, `rooms` and `integrationId` are destructured only to keep them
+  // out of `...config`, which is forwarded to `super` and to `DDPDriver`.
+  constructor ({ logger, allPublic: _allPublic, rooms: _rooms, integrationId: _integrationId, protocol = Protocols.DDP, ...config }: any) {
     super({ ...config, logger })
     this.logger = logger
     switch (protocol) {
-      // case Protocols.MQTT:
-      //   this.socket = import(/* webpackChunkName: 'mqtt' */ '../drivers/mqtt').then(({ MQTTDriver }) => new MQTTDriver({ ...config, logger }))
-      //   break
       case Protocols.DDP:
         this.socket = import(/* webpackChunkName: 'ddp' */ '../drivers/ddp').then(({ DDPDriver }) => {
           this.ddp = new DDPDriver({ ...config, logger })
@@ -38,13 +37,13 @@ export default class RocketChatClient extends ClientRest implements ISocket {
 
   async connect (options: ISocketOptions): Promise<any> { return (await this.socket as ISocket).connect(options) }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
-  async checkAndReopen (): Promise<any> { return (await this.socket as ISocket).checkAndReopen() }
+  async checkAndReopen (): Promise<void> { return (await this.socket as ISocket).checkAndReopen() }
   async onStreamData (event: string, cb: ICallback): Promise<any> { return (await this.socket as ISocket).onStreamData(event, cb) }
-  async subscribe (topic: string, ...args: any[]): Promise<ISubscription> { return (await this.socket as ISocket).subscribe(topic, ...args) }
-  async subscribeRaw (...args: any[]): Promise<ISubscription> { return (await this.socket as ISocket).subscribeRaw(...args) }
+  async subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined> { return (await this.socket as ISocket).subscribe(topic, ...args) }
+  async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return (await this.socket as ISocket).subscribeRaw(...args) }
   async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
   async unsubscribeAll (): Promise<any> { return (await this.socket as ISocket).unsubscribeAll() }
-  async subscribeRoom (rid: string, ...args: any[]): Promise<ISubscription[]> { return (await this.socket as IDriver).subscribeRoom(rid, ...args) }
+  async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return (await this.socket as IDriver).subscribeRoom(rid, ...args) }
   async subscribeNotifyAll (): Promise<any> { return (await this.socket as IDriver).subscribeNotifyAll() }
   async subscribeLoggedNotify (): Promise<any> { return (await this.socket as IDriver).subscribeLoggedNotify() }
   async subscribeNotifyUser (): Promise<any> { return (await this.socket as IDriver).subscribeNotifyUser() }

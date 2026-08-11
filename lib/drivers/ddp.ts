@@ -1,3 +1,4 @@
+/// <reference path="../../types/websocket.d.ts" />
 /**
  * @module DDPDriver
  * Handles low-level websocket ddp connections and event subscriptions
@@ -125,10 +126,10 @@ export class Socket extends EventEmitter {
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
    */
-  open = (ms: number = this.config.reopen) => {
-    return new Promise(async (resolve, reject) => {
+  open = (_ms: number = this.config.reopen) => {
+    return new Promise<any>(async (resolve, reject) => {
       if (this.connected) {
-        return resolve()
+        return resolve(undefined)
       }
 
       if (this.reopenPromise) {
@@ -237,7 +238,7 @@ export class Socket extends EventEmitter {
       try {
         await this.open()
       } catch (err) {
-        this.logger.error(`[ddp] Reopen error: ${err.message}`);
+        this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
         this.reopen();
       }
     }, this.config.reopen);
@@ -348,7 +349,7 @@ export class Socket extends EventEmitter {
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
   send = async (obj: any): Promise<any> => {
-    return new Promise(async(resolve, reject) => {
+    return new Promise<any>(async(resolve, reject) => {
       if (!this.connection) throw new Error('[ddp] sending without open connection')
       if (!this.connected) await new Promise(resolve => this.on('open', resolve))
 
@@ -372,7 +373,7 @@ export class Socket extends EventEmitter {
       this.once('disconnected', reject)
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       if (!listener) {
-        return resolve()
+        return resolve(undefined)
       }
       this.once(listener, (result: any) => {
         this.off('disconnected', reject)
@@ -491,6 +492,7 @@ export class Socket extends EventEmitter {
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
         // throw err
+        return undefined
       })
   }
 
@@ -561,7 +563,9 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
 	/** Array of joined room IDs (for reactive queries) */
   joinedIds: string[] = []
 
-  constructor ({ host = 'localhost:3000', integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
+  // `integrationId` is destructured only to keep it out of `...moreConfigs`,
+  // which is spread into `this.config`.
+  constructor ({ host = 'localhost:3000', integrationId: _integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
     super()
 
     this.config = {
@@ -620,7 +624,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.close()
   }
 
-  checkAndReopen = (): Promise<any> => {
+  checkAndReopen = (): void => {
     return this.ddp.checkAndReopen()
   }
 
@@ -640,15 +644,15 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     return this.ddp.config.ping
   }
 
-  subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription> => {
+  subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription | undefined> => {
     this.logger.info(`[DDP driver] Subscribing to ${topic} | ${JSON.stringify(args)}`)
     return this.ddp.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
   }
 
-  subscribeRaw = (...args: any[]): Promise<ISubscription> => {
+  subscribeRaw = (...args: any[]): Promise<ISubscription | undefined> => {
     this.logger.info(`[DDP driver] Raw Subscribing to ${JSON.stringify(args)}`)
-    return this.ddp.subscribe(...args)
-  }   
+    return this.ddp.subscribe(...args as [string, any[]])
+  }
 
   subscribeNotifyAll = (): Promise< any> => {
     const topic = 'stream-notify-all'
@@ -750,7 +754,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
     })
   }
 
-  subscribeRoom = (rid: string, ...args: any[]): Promise<ISubscription[]> => {
+  subscribeRoom = (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> => {
     const topic = 'stream-notify-room'
     return Promise.all([
       this.subscribe('stream-room-messages', rid, ...args),
@@ -760,7 +764,7 @@ export class DDPDriver extends EventEmitter implements ISocket, IDriver {
   }
 
 	/** Login to Rocket.Chat via DDP */
-  login = async (credentials: ICredentials, args: any): Promise<any> => {
+  login = async (credentials: ICredentials, _args: any): Promise<any> => {
     if (!this.ddp || !this.ddp.connected) {
       await this.connect()
     }

@@ -7,7 +7,7 @@ export function debounce<F extends Procedure> (
   waitMilliseconds = 100,
   immediate = false
 ): F {
-  let timeout: NodeJS.Timer | undefined
+  let timeout: ReturnType<typeof setTimeout> | undefined
   return function (this: any, ...args: any[]) {
     const self = this
     const doLater = function () {

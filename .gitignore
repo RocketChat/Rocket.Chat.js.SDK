@@ -1,9 +1,9 @@
 /node_modules
 /yarn-error.log
-/.nyc_output
 /.env
 /shrinkwrap.yaml
 /package-lock.json
 /docs/*
 !/docs/agents/
+/.scratch/
 .DS_Store

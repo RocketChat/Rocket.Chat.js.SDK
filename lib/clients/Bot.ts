@@ -20,7 +20,7 @@ export default class BotClient extends Rocketchat {
   integrationId: string
   lastReadTime: Date = new Date(-8640000000000000)
   joinedIds: string[] = []
-  messages: ISubscription | null = null
+  messages?: ISubscription | null = null
 
   constructor ({ allPublic = false, integrationId, cachedMethods = ['channelInfo','privateInfo','getRoomIdByNameOrId', 'getRoomId', 'getRoomName','getRoomNameById','getDirectMessageRoomId' ], ...config }: any) {
     super({ ...config, allPublic })
@@ -59,7 +59,7 @@ export default class BotClient extends Rocketchat {
 
     } catch (error) {
       if (callback) {
-        callback(error, this)
+        callback(error as Error, this)
       }
       return Promise.reject(error)
     }
@@ -86,7 +86,7 @@ export default class BotClient extends Rocketchat {
  *  - Second argument is the changed message
  *  - Third argument is additional attributes, such as `roomType`
  */
-  async reactToMessages (callback: IMessageCallback, debug?: string) {
+  async reactToMessages (callback: IMessageCallback, _debug?: string) {
     const handler = (e: ISubscriptionEvent) => {
 
       try {
@@ -99,12 +99,12 @@ export default class BotClient extends Rocketchat {
           callback(null, message, {} as any)
         }
       } catch (err) {
-        this.logger.error(`[driver] Message handler err: ${err.message}`)
-        callback(err)
+        this.logger.error(`[driver] Message handler err: ${(err as Error).message}`)
+        callback(err as Error)
       }
     }
     this.messages = await this.subscribeToMessages()
-    this.messages.onEvent(handler)
+    this.messages!.onEvent!(handler)
     // this.logger.info(`[driver] Added event handler for ${this.messages.name} subscription`)
   }
 /**
@@ -129,7 +129,7 @@ export default class BotClient extends Rocketchat {
       try {
         await this.joinRooms(config.rooms)
       } catch (err) {
-        this.logger.error(`[driver] Failed to join configured rooms (${config.rooms.join(', ')}): ${err.message}`)
+        this.logger.error(`[driver] Failed to join configured rooms (${config.rooms.join(', ')}): ${(err as Error).message}`)
       }
     }
     return this.reactToMessages(async (err, message, meta) => {

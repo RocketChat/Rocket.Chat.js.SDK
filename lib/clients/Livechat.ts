@@ -12,7 +12,7 @@ import {
 	ISubscription
 } from '../../interfaces'
 
-export default class LivechatClient extends LivechatRest implements ISocket {
+export default class LivechatClient extends LivechatRest implements Omit<ISocket, 'checkAndReopen' | 'subscribeRaw'> {
   livechatStream: string = 'stream-livechat-room'
   userId: string = ''
   logger: ILogger = Logger
@@ -33,7 +33,7 @@ export default class LivechatClient extends LivechatRest implements ISocket {
         throw new Error(`Invalid Protocol: ${protocol}, valids: ${Object.keys(Protocols).join()}`)
     }
   }
-  async connect (options: ISocketOptions, callback?: ICallback): Promise <any> {
+  async connect (options: ISocketOptions, _callback?: ICallback): Promise <any> {
     return (await this.socket as ISocket).connect(options).then(() => (this.setUpConnection()))
   }
   async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }

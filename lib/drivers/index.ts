@@ -16,9 +16,9 @@ export interface ISocket {
   logger: ILogger
   connect (options: ISocketOptions): Promise<ISocket | IDriver>
   disconnect (): Promise<ISocket>
-  checkAndReopen (): Promise<ISocket>
-  subscribe (topic: string, ...args: any[]): Promise<ISubscription>
-  subscribeRaw (...args: any[]): Promise<ISubscription>
+  checkAndReopen (): void
+  subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined>
+  subscribeRaw (...args: any[]): Promise<ISubscription | undefined>
   unsubscribe (subscription: ISubscription): Promise<ISocket>
   unsubscribeAll (): Promise<ISocket>
 
@@ -27,17 +27,15 @@ export interface ISocket {
   on (event: string, listener: Function): EventEmitter
   once (event: string, listener: Function): EventEmitter
   off (event?: string, listener?: Function): EventEmitter
-  emit (event: string, ...args: any[]): boolean
-  listeners (event: string): Function[]
+  emit (event: string, ...args: any[]): EventEmitter
   removeAllListeners (event?: string): Function[]
-  hasListeners (event: string): boolean
 }
 
 export interface IDriver {
   config: any
   login (credentials: ICredentials, args: any): Promise<any>
 
-  subscribeRoom (rid: string, ...args: any[]): Promise<ISubscription[]>
+  subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]>
 
   onMessage (cb: ICallback): void
 
