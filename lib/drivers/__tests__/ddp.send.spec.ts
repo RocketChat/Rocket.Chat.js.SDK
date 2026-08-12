@@ -339,13 +339,15 @@ describe('Socket.send with several listeners on one event', () => {
 
   it('leaves no response listener behind when the send is abandoned by a reopen', async () => {
     const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
-    const rejected = expect(sending).rejects.toThrow('[ddp] connection reopened before the response arrived')
+    const rejected = Promise.all([
+      expect(sending).rejects.toBeInstanceOf(Error),
+      expect(sending).rejects.toThrow('[ddp] connection reopened before the response arrived')
+    ])
 
     socket.reopenNow()
     await rejected
 
-    // Read, not cleanup: `removeAllListeners` returns what it took off, and it
-    // is the only public way to see what is still registered under an id.
-    expect(socket.removeAllListeners('ddp-1')).toHaveLength(0)
+    const listenersLeftUnderTheResponseId = socket.removeAllListeners('ddp-1')
+    expect(listenersLeftUnderTheResponseId).toHaveLength(0)
   })
 })
