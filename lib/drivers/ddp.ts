@@ -261,15 +261,12 @@ export class Socket extends SDKEventEmitter {
 
   /**
    * The one bounded wait every other wait in the connection lifecycle is built
-   * from: listen for `event`, give up on the Deadline, and detach the listener
-   * and clear the timer whichever arrives first. Resolves true when the event
-   * arrived and false when the Deadline expired.
+   * from. Resolves true when the event arrived, false when the Deadline expired.
    *
    * `start` runs with the listener already attached, so an event answered in the
    * same tick as the write cannot be missed; returning false from it abandons
-   * the wait without leaving the timer or the listener behind. Pairing `once`
-   * with the matching `off` is what ADR-0002 hardened the emitter for, and this
-   * is the only place the SDK now writes that pairing.
+   * the wait. Pairing `once` with the matching `off` is what ADR-0002 hardened
+   * the emitter for, and this is the only place the SDK now writes that pairing.
    */
   private awaitEvent = (
     event: string,
@@ -319,7 +316,6 @@ export class Socket extends SDKEventEmitter {
     return this.reopenPromise
   }
 
-  /** Write a bare ping frame, reporting whether the transport took it. */
   private writePing = (): boolean => {
     if (!this.connection || this.connection.readyState !== 1) return false
     try {
@@ -427,12 +423,9 @@ export class Socket extends SDKEventEmitter {
 
   /**
    * The Liveness chain: one Probe per interval, repeated for as long as the
-   * server keeps answering, and a Reopen the moment it stops.
-   *
-   * The Probe carries the Deadline the chain depends on. Without one the chain
-   * waits on a pong a dead socket never sends, stops there, and never reaches
-   * `reopen`. The Deadline belongs to the Probe rather than to `send`, so no
-   * other caller inherits a reply timeout.
+   * server keeps answering, and a Reopen the moment it stops. The Deadline the
+   * chain depends on belongs to the Probe rather than to `send`, so no other
+   * caller inherits a reply timeout — see ADR-0003 and ADR-0005.
    */
   ping = async () => {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)

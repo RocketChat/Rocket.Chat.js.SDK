@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Amends:** ADR-0003
+
 ## Context
 
 The Socket in `lib/drivers/ddp.ts` holds four waits it must be able to give up
@@ -42,6 +44,12 @@ false when the Deadline expired.
   Deadline stays on the Probe rather than moving into `send`, so no other caller
   inherits a reply timeout.
 
+This amends ADR-0003, whose Decision reads "`ping` races its send against a
+Deadline of `config.ping`". The chain no longer races a send. It awaits a Probe,
+and the Probe carries that same Deadline. Everything ADR-0003 decided about where
+the Deadline lives, and about `config.ping` being the one bound the SDK does not
+choose for the consuming app, still holds. Only the mechanism moved.
+
 ## Consequences
 
 - The `once`/`off` pairing ADR-0002 protects now exists in one place. A fifth
@@ -53,8 +61,18 @@ false when the Deadline expired.
   but the chain no longer consumes an id from the `sent` counter and no longer
   registers the `disconnected` listener `send` attaches. Nothing reads the
   counter for anything but uniqueness.
-- A chain turn on a transport that refuses the write now reopens at once instead
-  of waiting for a reply that cannot come.
-- The `settled` booleans are gone. Settling is idempotent because the primitive
-  removes the listener and clears the timer together, so neither racer can reach
-  the promise twice.
+- A chain turn reopens at once, rather than waiting for a reply that cannot come,
+  whenever the transport will not take the ping — because it threw, or because it
+  is no longer open. The second case used to reach `waitForOpen` through `send`
+  and wait up to twice the Reopen interval before failing into `reopen`.
+- The `settled` booleans are gone. Settling removes the listener and clears the
+  timer together, so neither racer reaches the promise a second time. Where a
+  wait is abandoned in the same tick as its event arrives, the second `off` is a
+  miss — harmless only because ADR-0002 made a missed `off` a no-op. This
+  primitive depends on that guarantee; read ADR-0002 before replacing the
+  emitter.
+- The reopen promise is now cleared a microtask after the `open` arrives rather
+  than synchronously inside the emit. A caller that asks for an immediate
+  reconnect from inside an `open` listener therefore joins the reopen that is
+  settling instead of starting a new one. That was already true of any listener
+  registered ahead of the old cleanup; it is now true of all of them.

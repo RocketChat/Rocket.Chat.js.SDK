@@ -247,6 +247,17 @@ describe('Socket liveness', () => {
       expect(fakeSockets).toHaveLength(1)
     })
 
+    it('reopens without waiting out the deadline when the socket is no longer open', async () => {
+      // This turn used to go out through `send`, which waited on `open` for
+      // twice the reopen interval before failing into the reopen. A socket that
+      // cannot be written to is dead now, not two reopen intervals from now.
+      transport.readyState = CLOSED
+
+      await tickWithoutPong()
+
+      expect(socket.openTimeout).toBeDefined()
+    })
+
     it('reconnects when one pong is withheld', async () => {
       // This test used to pin the opposite: the chain died for good, because the
       // ping's send went out while `connected` was still true, waited forever on
