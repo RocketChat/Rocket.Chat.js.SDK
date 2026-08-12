@@ -211,21 +211,30 @@ describe('Socket.send', () => {
     })
 
     it('sends on the open socket it already has when the last ping has gone stale', async () => {
-      // `connected` is false here because `alive()` is, but the transport is
-      // open — so there is no `open` event coming and waiting for one strands
-      // the send until its deadline.
-      socket.lastPing = Date.now() - socket.config.ping * 3
+      // The reported shape, reached the way the driver reaches it rather than by
+      // assigning the stamp: the ping goes unanswered, so the chain schedules a
+      // reopen and `alive()` lapses — while the transport stays open. The
+      // pending `openTimeout` is the part that bites, because it suppresses any
+      // further reopen, so no `open` event is coming for a send to wait on.
+      await jest.advanceTimersByTimeAsync(socket.config.ping * 2 + 1)
+
+      expect(socket.openTimeout).toBeDefined()
       expect(socket.connected).toBe(false)
+      expect(socket.transportOpen).toBe(true)
+      expect(fakeSockets).toHaveLength(1)
 
       const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
 
       expect(transport.lastSent()).toEqual({
-        msg: 'method', method: 'getUsersOfRoom', params: [], id: 'ddp-1'
+        msg: 'method', method: 'getUsersOfRoom', params: [], id: 'ddp-2'
       })
 
-      transport.receive({ msg: 'result', id: 'ddp-1', result: 'ok' })
+      transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
+      // Still the socket it started with: the send used the transport it had.
       expect(fakeSockets).toHaveLength(1)
+
+      clearTimeout(socket.openTimeout as any)
     })
 
     it('rejects the send when there is no connection at all', async () => {

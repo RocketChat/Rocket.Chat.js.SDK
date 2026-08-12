@@ -300,7 +300,7 @@ export class Socket extends SDKEventEmitter {
    */
   probe = (timeoutMs = 2000): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
-      if (!this.connection || this.connection.readyState !== 1) {
+      if (!this.transportOpen) {
         return resolve(false)
       }
 
@@ -325,7 +325,7 @@ export class Socket extends SDKEventEmitter {
       }, timeoutMs)
 
       try {
-        this.connection.send(JSON.stringify({ msg: 'ping' }))
+        this.connection!.send(JSON.stringify({ msg: 'ping' }))
       } catch {
         cleanup()
         resolve(false)
@@ -333,13 +333,14 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
+  /** Check if there is a websocket and the transport reads it as open. */
+  get transportOpen () {
+    return !!(this.connection && this.connection.readyState === 1)
+  }
+
   /** Check if websocket connected and ready. */
   get connected () {
-    return !!(
-      this.connection &&
-      this.connection.readyState === 1 &&
-      this.alive()
-    )
+    return this.transportOpen && this.alive()
   }
 
   /** Check if connected and logged in */
@@ -392,10 +393,7 @@ export class Socket extends SDKEventEmitter {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
-    // The transport's own ready state, not `connected`: a socket whose last ping
-    // has gone stale is still open, and waiting for an `open` event it has no
-    // reason to emit strands the send until the deadline.
-    if (this.connection.readyState !== 1) await this.waitForOpen()
+    if (!this.transportOpen) await this.waitForOpen()
 
     return new Promise<any>((resolve, reject) => {
       const id = obj.id || `ddp-${ this.sent }`
