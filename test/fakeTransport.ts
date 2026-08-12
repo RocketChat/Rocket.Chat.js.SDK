@@ -88,7 +88,16 @@ export class FakeWebSocket {
 
   /** Deliver a server message to the driver, as the transport would. */
   receive (data: object): void {
-    this.onmessage?.({ data: JSON.stringify(data) })
+    this.receiveRaw(JSON.stringify(data))
+  }
+
+  /**
+   * Deliver a DDP message body verbatim — the only way to reach the driver's
+   * empty and malformed branches, which `receive` can never produce because it
+   * serialises whatever it is given.
+   */
+  receiveRaw (data: string): void {
+    this.onmessage?.({ data })
   }
 }
 
