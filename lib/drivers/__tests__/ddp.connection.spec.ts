@@ -213,18 +213,14 @@ describe('Socket connection lifecycle', () => {
     })
   })
 
-  describe('the interval argument to open', () => {
-    it('BUG: is ignored entirely', async () => {
-      // `open` declares an interval parameter and never reads it: the value
-      // reaches nothing, stores nowhere, and every subsequent retry still waits
-      // `config.reopen` — 3000 here, so the delay below is demonstrably the
-      // configured one and not the 1 that was passed.
-      //
-      // A pin on a parameter that does nothing can only assert the absences: an
-      // implementation that honoured the argument would have to change one of
-      // them, and this test is where it becomes visible.
+  describe('the retry interval', () => {
+    /**
+     * The `reopen` option is the only way to set the retry interval, so this
+     * asserts a socket reconnected through `open` still retries on it.
+     */
+    it('comes from the reopen option after a reconnect', async () => {
       transport.readyState = CLOSED
-      const opening = socket.open(1)
+      const opening = socket.open()
 
       const reopened = fakeSockets[1]
       await driveToHandshake(reopened)

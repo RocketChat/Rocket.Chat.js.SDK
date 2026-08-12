@@ -114,11 +114,11 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Open websocket connection, with optional retry interval.
+   * Open websocket connection.
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
    */
-  open = async (_ms: number = this.config.reopen): Promise<any> => {
+  open = async (): Promise<any> => {
     if (this.connected) {
       return undefined
     }
