@@ -13,76 +13,11 @@ import { Message } from '../message'
 import { SDKEventEmitter } from '../emitter'
 import * as settings from '../settings';
 
-/** Check for existing login */
-// export function loggedIn () {
-//   return (currentLogin !== null)
-// }
-
-/**
-	* Prepend protocol (or put back if removed from env settings for driver)
-	* Hard code endpoint prefix, because all syntax depends on this version
-	*/
-// export const url = `${(host.indexOf('http') === -1) ? host.replace(/^(\/\/)?/, 'http://') : host}/api/v1/`
-
-/** Populate auth headers (from response data on login) */
-// export function setAuth (authData: {authToken: string, userId: string}) {
-//   client.defaults.headers.common['X-Auth-Token'] = authData.authToken
-//   client.defaults.headers.common['X-User-Id'] = authData.userId
-// }
-
-// /** Clear headers so they can't be used without logging in again */
-// export function clearHeaders () {
-//   delete client.defaults.headers.common['X-Auth-Token']
-//   delete client.defaults.headers.common['X-User-Id']
-// }
-
-// /**
-// 	* Login a user for further API calls
-// 	* Result should come back with a token, to authorise following requests.
-// 	* Use env default credentials, unless overridden by login arguments.
-// 	*/
-// export async function login (user: ICredentialsAPI = { username, password }) {
-//   this.logger.info(`[API] Logging in ${user.username}`)
-//   if (currentLogin !== null) {
-//     this.logger.debug(`[API] Already logged in`)
-//     if (currentLogin.username === user.username) return currentLogin.result
-//     else await logout()
-//   }
-//   const result = (await this.post('login', user, false) as ILoginResultAPI)
-//   if (result && result.data && result.data.authToken) {
-//     currentLogin = {
-//       result: result, // keep to return if login requested again for same user
-//       username: user.username, // keep to compare with following login attempt
-//       authToken: result.data.authToken,
-//       userId: result.data.userId
-//     }
-//     setAuth(currentLogin)
-//     this.logger.info(`[API] Logged in ID ${currentLogin.userId}`)
-//     return result
-//   } else {
-//     throw new Error(`[API] Login failed for ${user.username}`)
-//   }
-// }
-
-// /** Logout a user at end of API calls */
-// export function logout () {
-//   if (currentLogin === null) {
-//     this.logger.debug(`[API] Already logged out`)
-//     return Promise.resolve()
-//   }
-//   this.logger.info(`[API] Logging out ${ currentLogin.username }`)
-//   return this.get('logout', null, true).then(() => {
-//     clearHeaders()
-//     currentLogin = null
-//   })
-// }
+export type RequestMethod = 'POST' | 'GET' | 'PUT' | 'DELETE'
 
 export interface IClient {
   headers: any
-  get (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  post (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  put (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  delete (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  request (method: RequestMethod, url: string, data: any, options?: any, apiVersion?: string): Promise<any>
 }
 
 class Client implements IClient {
@@ -121,34 +56,12 @@ class Client implements IClient {
     return options && options.signal;
   }
 
-  get (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}?${this.getParams(data)}`, {
-      method: 'GET',
-      headers: this.getHeaders(options),
-      signal: this.getSignal(options)
-    }).then(this.handle)
-  }
-  post (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
-      method: 'POST',
-      body: this.getBody(data),
-      headers: this.getHeaders(options),
-      signal: this.getSignal(options)
-    }).then(this.handle)
-  }
-  put (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
-      method: 'PUT',
-      body: this.getBody(data),
-      headers: this.getHeaders(options),
-      signal: this.getSignal(options)
-    }).then(this.handle)
-  }
-
-  delete (url: string, data?: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
-      method: 'DELETE',
-      body: this.getBody(data),
+  request (method: RequestMethod, url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    const carriesDataInQuery = method === 'GET'
+    const query = carriesDataInQuery ? `?${this.getParams(data)}` : ''
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}${query}`, {
+      method,
+      body: carriesDataInQuery ? undefined : this.getBody(data),
       headers: this.getHeaders(options),
       signal: this.getSignal(options)
     }).then(this.handle)
@@ -219,7 +132,7 @@ export default class Api extends SDKEventEmitter {
 	* @param ignore   Allows certain matching error messages to not count as errors
 	*/
   request = async (
-		method: 'POST' | 'GET' | 'PUT' | 'DELETE',
+		method: RequestMethod,
 		endpoint: string,
 		data: any = {},
 		auth: boolean = true,
@@ -233,24 +146,20 @@ export default class Api extends SDKEventEmitter {
         throw new Error('')
       }
 
-      const { signal } = this.controller;
-      options = { ...options, signal };
-
-      let result
-      switch (method) {
-        case 'GET': result = await this.client.get(endpoint, data, options, apiVersion); break
-        case 'PUT': result = await this.client.put(endpoint, data, options, apiVersion); break
-        case 'DELETE': result = await this.client.delete(endpoint, data, options, apiVersion); break
-        default:
-        case 'POST': result = await this.client.post(endpoint, data, options, apiVersion); break
-      }
+      const result = await this.client.request(
+        method,
+        endpoint,
+        data,
+        { ...options, signal: this.controller.signal },
+        apiVersion
+      )
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
       this.logger && this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`)
-      const hasDataInsideResult = result && !result.data
-      return (method === 'DELETE') && hasDataInsideResult ? result : result.data
+      const carriesNoData = !result.data
+      return (method === 'DELETE') && carriesNoData ? result : result.data
     } catch (err) {
-      this.logger && this.logger.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
+      this.logger && this.logger.error(`[API] ${ method } error(${ endpoint }): ${ JSON.stringify(err) }`)
       throw err
     }
   }
@@ -266,8 +175,11 @@ export default class Api extends SDKEventEmitter {
 	/** Do a DELETE request to an API endpoint. */
   del: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('DELETE', endpoint, data, auth, ignore, options, apiVersion)
 
-  /** Abort all current API requests. */
-  abort = (): void => this.controller.abort()
+  /** Abort all in-flight API requests, leaving the client usable for new ones. */
+  abort = (): void => {
+    this.controller.abort()
+    this.controller = new AbortController()
+  }
 
 	/** Check result data for success, allowing override to ignore some errors */
   success (result: any, ignore?: RegExp) {

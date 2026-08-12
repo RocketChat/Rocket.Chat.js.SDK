@@ -88,3 +88,9 @@ _Avoid_: Health check, ping (that is one message of the chain)
 **Deadline**:
 A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Every wait the SDK can be left holding has one.
 _Avoid_: Timeout — that is a config option, and it means only the connection one
+
+### REST
+
+**REST request**:
+One HTTP call to a server endpoint, named by its method and endpoint — `POST chat.sendMessage`. The other way to reach a server, alongside a Method call over the realtime connection. Every REST request the SDK makes goes through a single seam on the Client, so the URL, headers, body and abort signal are decided in one place.
+_Avoid_: Call, API call, endpoint (that is the name, not the request)
