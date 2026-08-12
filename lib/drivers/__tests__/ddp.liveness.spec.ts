@@ -69,6 +69,38 @@ describe('Socket liveness', () => {
     })
   })
 
+  describe('a server sending only unreadable DDP messages', () => {
+    const deliverAtBoundaryThenStepPast = async (deliver: () => void) => {
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
+      deliver()
+      await jest.advanceTimersByTimeAsync(1)
+    }
+
+    it('is not kept alive by an empty DDP message', async () => {
+      await deliverAtBoundaryThenStepPast(() => transport.receiveRaw(''))
+
+      expect(socket.alive()).toBe(false)
+    })
+
+    it('is not kept alive by a malformed DDP message', async () => {
+      await deliverAtBoundaryThenStepPast(() => transport.receiveRaw('not json'))
+
+      expect(socket.alive()).toBe(false)
+    })
+
+    it('is not kept alive by a DDP message that parses to nothing', async () => {
+      await deliverAtBoundaryThenStepPast(() => transport.receiveRaw('null'))
+
+      expect(socket.alive()).toBe(false)
+    })
+
+    it('is still kept alive by a DDP message it can read, so a healthy socket is never reconnected', async () => {
+      await deliverAtBoundaryThenStepPast(() => transport.receive({ msg: 'updated' }))
+
+      expect(socket.alive()).toBe(true)
+    })
+  })
+
   describe('connected', () => {
     it('needs both a ready socket and a fresh ping', () => {
       expect(transport.readyState).toBe(OPEN)
@@ -123,6 +155,19 @@ describe('Socket liveness', () => {
       await expect(probing).resolves.toBe(true)
     })
 
+    it('still settles on a later pong after one lands in the probe millisecond', async () => {
+      const probing = socket.probe(2000)
+
+      transport.receive({ msg: 'pong' })
+      await jest.advanceTimersByTimeAsync(1)
+      transport.receive({ msg: 'pong' })
+
+      await expect(probing).resolves.toBe(true)
+
+      // Only the ping chain's timer: the probe's deadline was cleared.
+      expect(jest.getTimerCount()).toBe(1)
+    })
+
     it('succeeds when the pong lands after the clock has moved', async () => {
       // The millisecond advance is the whole test: without it this passes for the
       // wrong reason, resolving false on the timeout instead of true on the pong.
@@ -146,14 +191,15 @@ describe('Socket liveness', () => {
      * the pong resolves. Running all timers is worse still — a self-rescheduling
      * chain hits the runner's timer-count abort.
      */
-    const tick = async (deliverPong: boolean) => {
+    const tick = async (deliver?: () => void) => {
       await jest.advanceTimersToNextTimerAsync()
-      if (deliverPong) transport.receive({ msg: 'pong' })
+      deliver?.()
       await jest.advanceTimersByTimeAsync(0)
     }
 
-    const tickWithPong = () => tick(true)
-    const tickWithoutPong = () => tick(false)
+    const tickWithPong = () => tick(() => transport.receive({ msg: 'pong' }))
+    const tickWithoutPong = () => tick()
+    const tickWithUnreadableMessage = () => tick(() => transport.receiveRaw('not json'))
 
     it('reschedules itself, leaving exactly one pending timer per tick', async () => {
       expect(jest.getTimerCount()).toBe(1)
@@ -240,6 +286,22 @@ describe('Socket liveness', () => {
       expect(fakeSockets).toHaveLength(2)
       expect(socket.connected).toBe(true)
       expect(socket.openTimeout).toBeUndefined()
+    })
+
+    it('reconnects when a server answers pings with nothing readable', async () => {
+      await tickWithPong()
+
+      await tickWithUnreadableMessage()
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
+
+      expect(socket.alive()).toBe(false)
+      expect(socket.connected).toBe(false)
+      expect(socket.openTimeout).toBeDefined()
+
+      await jest.advanceTimersByTimeAsync(socket.config.reopen)
+
+      expect(fakeSockets).toHaveLength(2)
     })
 
     it('clears both the ping and the reopen timer on close', async () => {

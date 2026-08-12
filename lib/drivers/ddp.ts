@@ -190,7 +190,6 @@ export class Socket extends SDKEventEmitter {
    * All collection events are emitted with their `msg` as the event name.
    */
   onMessage = (e: any) => {
-    this.lastPing = Date.now()
     if (!e.data) return
 
     // The caller is the websocket's `onmessage`, which has nowhere to put a
@@ -207,6 +206,9 @@ export class Socket extends SDKEventEmitter {
     // A frame that parses to a falsy value — `null`, `0`, `""` — carries
     // nothing to dispatch on.
     if (!data) return this.logger.debug(`[ddp] empty frame dropped: ${e.data}`)
+
+    this.lastPing = Date.now()
+
     this.logger.debug(data) // 👈  very useful for debugging missing responses
     this.logger.debug(`[ddp] messages received: ${e.data}`)
     if (data.collection) this.emit(data.collection, data)
