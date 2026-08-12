@@ -78,11 +78,11 @@ A retry scheduled after a connection drops, waited out before a new Socket is bu
 _Avoid_: Reconnect (unqualified — say which of the two), retry
 
 **Liveness chain**:
-The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. A Socket the server has stopped answering still reads as open to the transport.
+The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. One Probe per interval, repeated for as long as the server answers, and a Reopen the moment it stops. A Socket the server has stopped answering still reads as open to the transport.
 _Avoid_: Heartbeat, keepalive
 
 **Probe**:
-A single bounded liveness check on a Socket that looks open, asked for on demand rather than on the chain's schedule.
+A single bounded liveness check on a Socket that looks open. The chain runs one per interval; a caller can also ask for one on demand, off that schedule.
 _Avoid_: Health check, ping (that is one message of the chain)
 
 **Deadline**:

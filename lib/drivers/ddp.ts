@@ -34,6 +34,8 @@ import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
+const reopenNowDeadline = 10000;
+const probeDeadline = 2000;
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
@@ -258,6 +260,40 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
+   * The one bounded wait every other wait in the connection lifecycle is built
+   * from: listen for `event`, give up on the Deadline, and detach the listener
+   * and clear the timer whichever arrives first. Resolves true when the event
+   * arrived and false when the Deadline expired.
+   *
+   * `start` runs with the listener already attached, so an event answered in the
+   * same tick as the write cannot be missed; returning false from it abandons
+   * the wait without leaving the timer or the listener behind. Pairing `once`
+   * with the matching `off` is what ADR-0002 hardened the emitter for, and this
+   * is the only place the SDK now writes that pairing.
+   */
+  private awaitEvent = (
+    event: string,
+    deadlineMs: number,
+    start: () => boolean = () => true
+  ): Promise<boolean> => {
+    return new Promise<boolean>(resolve => {
+      const settle = (arrived: boolean) => {
+        this.off(event, onArrival)
+        clearTimeout(deadline as any)
+        resolve(arrived)
+      }
+
+      const onArrival = () => settle(true)
+
+      const deadline = setTimeout(() => settle(false), deadlineMs)
+
+      this.once(event, onArrival)
+
+      if (!start()) settle(false)
+    })
+  }
+
+  /**
    * Force an immediate reconnect. Shared across concurrent callers so only one
    * new WebSocket is created. Emits 'disconnected' to unblock in-flight sends,
    * then creates the connection directly so a concurrent open() cannot tear it
@@ -269,68 +305,37 @@ export class Socket extends SDKEventEmitter {
       return this.reopenPromise
     }
 
-    this.reopenPromise = new Promise<void>(resolve => {
-      this.openTimeout && clearTimeout(this.openTimeout as any)
-      this.lastPing = 0
-      this.emit('disconnected')
+    this.openTimeout && clearTimeout(this.openTimeout as any)
+    this.lastPing = 0
+    this.emit('disconnected')
 
-      let settled = false
-      const cleanup = () => {
-        if (settled) return
-        settled = true
-        this.off('open', cleanup)
-        if (timeout) clearTimeout(timeout as any)
-        delete this.reopenPromise
-        resolve()
-      }
-
-      this.once('open', cleanup)
-
+    this.reopenPromise = this.awaitEvent('open', reopenNowDeadline, () => {
       this.createConnection().catch(() => {})
-
-      const timeout = setTimeout(() => cleanup(), 10000)
+      return true
+    }).then(() => {
+      delete this.reopenPromise
     })
 
     return this.reopenPromise
+  }
+
+  /** Write a bare ping frame, reporting whether the transport took it. */
+  private writePing = (): boolean => {
+    if (!this.connection || this.connection.readyState !== 1) return false
+    try {
+      this.connection.send(JSON.stringify({ msg: 'ping' }))
+      return true
+    } catch {
+      return false
+    }
   }
 
   /**
    * Bounded liveness check for a socket in the gray zone. Returns true only if
    * the socket is open and the server answers the ping within the deadline.
    */
-  probe = (timeoutMs = 2000): Promise<boolean> => {
-    return new Promise<boolean>(resolve => {
-      if (!this.connection || this.connection.readyState !== 1) {
-        return resolve(false)
-      }
-
-      let settled = false
-      const cleanup = () => {
-        if (settled) return
-        settled = true
-        this.off('pong', onPong)
-        if (timeout) clearTimeout(timeout as any)
-      }
-
-      const onPong = () => {
-        cleanup()
-        resolve(true)
-      }
-
-      this.once('pong', onPong)
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        resolve(false)
-      }, timeoutMs)
-
-      try {
-        this.connection.send(JSON.stringify({ msg: 'ping' }))
-      } catch {
-        cleanup()
-        resolve(false)
-      }
-    })
+  probe = (deadlineMs = probeDeadline): Promise<boolean> => {
+    return this.awaitEvent('pong', deadlineMs, this.writePing)
   }
 
   /** Check if websocket connected and ready. */
@@ -356,25 +361,11 @@ export class Socket extends SDKEventEmitter {
    * *schedules* the retry at that interval, so a deadline of exactly `reopen`
    * expires as the reconnect begins and every send issued at a drop fails.
    */
-  private waitForOpen = (timeoutMs = this.config.reopen * 2): Promise<void> => {
-    return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        this.off('open', onOpen)
-        clearTimeout(timeout as any)
-      }
-
-      const onOpen = () => {
-        cleanup()
-        resolve()
-      }
-
-      this.once('open', onOpen)
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        reject(new Error('[ddp] timed out waiting for the connection to open'))
-      }, timeoutMs)
-    })
+  private waitForOpen = async (deadlineMs = this.config.reopen * 2): Promise<void> => {
+    const opened = await this.awaitEvent('open', deadlineMs)
+    if (!opened) {
+      throw new Error('[ddp] timed out waiting for the connection to open')
+    }
   }
 
   /**
@@ -434,27 +425,20 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
-  /** Send ping, record time, re-open if nothing comes back, repeat */
+  /**
+   * The Liveness chain: one Probe per interval, repeated for as long as the
+   * server keeps answering, and a Reopen the moment it stops.
+   *
+   * The Probe carries the Deadline the chain depends on. Without one the chain
+   * waits on a pong a dead socket never sends, stops there, and never reaches
+   * `reopen`. The Deadline belongs to the Probe rather than to `send`, so no
+   * other caller inherits a reply timeout.
+   */
   ping = async () => {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
-    this.pingTimeout = setTimeout(() => {
-      // The ping goes out while `connected` is still true, so its send never
-      // waits on `open` — it waits on a pong reply that a dead socket never
-      // sends, and without a deadline of its own the chain stops here and
-      // `reopen` is never reached. The deadline lives in `ping` rather than in
-      // `send`, so no other caller inherits a reply timeout.
-      let deadline: NodeJS.Timer | number | undefined
-      const answered = new Promise<void>((_, expire) => {
-        deadline = setTimeout(
-          () => expire(new Error('[ddp] ping went unanswered')),
-          this.config.ping
-        )
-      })
-
-      Promise.race([this.send({ msg: 'ping' }), answered])
-        .then(() => this.ping())
-        .catch(() => this.reopen())
-        .finally(() => clearTimeout(deadline as any))
+    this.pingTimeout = setTimeout(async () => {
+      if (await this.probe(this.config.ping)) return this.ping()
+      this.reopen()
     }, this.config.ping)
   }
 

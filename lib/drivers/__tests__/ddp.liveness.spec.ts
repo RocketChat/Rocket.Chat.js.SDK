@@ -168,6 +168,17 @@ describe('Socket liveness', () => {
       expect(jest.getTimerCount()).toBe(1)
     })
 
+    it('abandons its deadline when the transport refuses the ping write', async () => {
+      transport.sendError = new Error('socket closed under the write')
+
+      await expect(socket.probe(2000)).resolves.toBe(false)
+
+      // Only the ping chain's timer: the probe left neither a deadline nor a
+      // listener behind on the way out.
+      expect(jest.getTimerCount()).toBe(1)
+      expect(socket.removeAllListeners('pong')).toHaveLength(0)
+    })
+
     it('succeeds when the pong lands after the clock has moved', async () => {
       // The millisecond advance is the whole test: without it this passes for the
       // wrong reason, resolving false on the timeout instead of true on the pong.
@@ -212,6 +223,28 @@ describe('Socket liveness', () => {
         expect(transport.lastSent()).toEqual({ msg: 'ping' })
         expect(socket.connected).toBe(true)
       }
+    })
+
+    it('leaves no pong listener behind, however many turns it runs', async () => {
+      // The chain is a probe per turn, and a probe listens for one pong. A turn
+      // that failed to detach would pile listeners up on a long-lived socket.
+      for (let turn = 1; turn <= 5; turn += 1) {
+        await tickWithPong()
+      }
+
+      expect(socket.removeAllListeners('pong')).toHaveLength(0)
+    })
+
+    it('reopens without waiting out the deadline when the transport refuses the ping write', async () => {
+      transport.sendError = new Error('socket closed under the write')
+
+      await tickWithoutPong()
+
+      // The reopen is already scheduled, with no time advanced past the ping
+      // interval — a socket that cannot even be written to is dead now, not at
+      // the deadline.
+      expect(socket.openTimeout).toBeDefined()
+      expect(fakeSockets).toHaveLength(1)
     })
 
     it('reconnects when one pong is withheld', async () => {
