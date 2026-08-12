@@ -2,6 +2,7 @@ import { Socket } from '../ddp'
 import { silentLogger } from '../../../test/silentLogger'
 import {
   FakeWebSocket,
+  flushMicrotasks,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -11,10 +12,6 @@ import {
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
-
-const flushMicrotasks = async () => {
-  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
-}
 
 /**
  * A `sub` and an `unsub` for one DDP subscription carry the same id, and `send`
@@ -108,6 +105,45 @@ describe('one sub or unsub in flight per DDP subscription', () => {
     const reopened = await openFakeConnection(socket)
 
     socket.subscribeAll().catch(() => undefined)
+    await flushMicrotasks()
+    expect(reopened.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+  })
+
+  it('releases a request queued behind one the dropped socket left unanswered', async () => {
+    // The queued request would otherwise never be written and its caller would
+    // never settle. `logout` waits on `unsubscribeAll`, so that is a Logout that
+    // can never complete.
+    socket.unsubscribe('ddp-1').catch(() => undefined)
+    await flushMicrotasks()
+
+    const resubscribing = socket.subscribeAll()
+    await flushMicrotasks()
+    expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+    transport.close(1006)
+    const reopened = await openFakeConnection(socket)
+    await flushMicrotasks()
+
+    expect(reopened.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+    reopened.receive({ msg: 'ready', subs: ['ddp-1'] })
+    await resubscribing
+  })
+
+  it('keeps holding the id after a released request goes out on the new socket', async () => {
+    socket.unsubscribe('ddp-1').catch(() => undefined)
+    await flushMicrotasks()
+
+    socket.subscribeAll().catch(() => undefined)
+    await flushMicrotasks()
+
+    transport.close(1006)
+    const reopened = await openFakeConnection(socket)
+    await flushMicrotasks()
+    expect(reopened.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+    // The released `sub` registered itself on the new socket as it went out, so
+    // this waits rather than joining it there.
+    socket.unsubscribe('ddp-1').catch(() => undefined)
     await flushMicrotasks()
     expect(reopened.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
   })

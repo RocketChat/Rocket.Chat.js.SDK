@@ -34,13 +34,18 @@ Both outcomes break the assumption ADR-0004 rests on, that a DDP response tells
 the truth about what the server holds. Neither depends on the server behaving
 badly.
 
-The server does not behave badly. Meteor's `Session` takes one message from a
-session at a time, through a single queue drained by one worker, and its own
-design comment gives the reason: `unsub` needs to be ordered against `sub`. The
-`unsub` handler is synchronous — it removes the id and sends `nosub` before it
-returns — so a following `sub` for that id finds nothing registered, does not
-take the idempotency early return that would silently drop it, and is answered
-with its own `ready`. Only `ping`, `pong` and `disconnect` bypass the queue.
+The server does not behave badly. In Meteor's
+`packages/ddp-server/livedata_server.js` — read at `devel`, and unchanged in
+substance at `METEOR@2.16` and `METEOR@1.8.1` — `Session` takes one message from
+a session at a time, through a single `inQueue` drained by one worker, and its
+own design comment gives the reason: *"unsub needs to be ordered against sub"*.
+The handlers are `Session.prototype.protocol_handlers.sub` and `.unsub`; the
+names ADR-0004 and the issue used, `_livedata_sub` and `_livedata_unsub`, are
+not in the source. `unsub` is synchronous — `_stopSubscription` deletes the id
+from `_namedSubs` and sends `nosub` before the handler returns — so a following
+`sub` for that id finds nothing registered, does not take the idempotency early
+return that would otherwise drop it in silence, and is answered with its own
+`ready`. Only `ping`, `pong` and `disconnect` bypass the queue.
 
 ## Decision
 
@@ -56,10 +61,20 @@ the first to have its DDP response before its own frame is written.
 - The wait ends on the response, whether it succeeded or carried a DDP error.
   Neither outcome is examined here — what a rejection does to the entry stays
   with ADR-0004.
-- The queue is bounded by the connection, not by a Deadline. `createConnection`
-  drops it. A request left pending by a dropped socket would otherwise hold its
-  id for the life of the Socket, because only `reopenNow` rejects in-flight
-  sends and the scheduled `reopen` leaves them waiting.
+- The wait is bounded by the Socket, not by a Deadline. A request records the
+  Socket it was written to, and `releaseQueuedRequests` — called from
+  `createConnection` and from `close` — lets go of everything still waiting on a
+  Socket that is going away. Only `reopenNow` rejects in-flight sends; the
+  scheduled `reopen` and `close` leave them pending, so without this a request
+  queued behind one of those would never be written and its caller would never
+  settle. `logout` waits on `unsubscribeAll`, which makes that a Logout that can
+  never complete.
+- A released request registers itself as it goes out, under the Socket it is
+  written to. Registering at the point of writing rather than at the point of
+  queueing is what keeps the id held across the release: a later request finds
+  the entry and waits, instead of joining it on one Socket and re-creating the
+  fault this ADR removes. An entry naming a Socket that is no longer current is
+  ignored rather than cleared.
 
 ## Consequences
 

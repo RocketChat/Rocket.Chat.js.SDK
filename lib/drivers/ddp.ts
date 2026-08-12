@@ -35,6 +35,17 @@ import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
 
+/**
+ * A `sub` or `unsub` on the wire, held against the Socket it was written to so
+ * a request queued behind it can tell whether that Socket is still the current
+ * one. `settled` resolves when the request has its DDP response, and never
+ * rejects — the outcome belongs to the caller, not to the queue.
+ */
+interface ISubscriptionRequest {
+  connection?: WebSocket
+  settled: Promise<void>
+}
+
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -49,7 +60,9 @@ export class Socket extends SDKEventEmitter {
   session?: string
   logger: ILogger
   reopenPromise?: Promise<void>
-  private subscriptionRequests: { [id: string]: Promise<any> } = {}
+  private subscriptionRequests: { [id: string]: ISubscriptionRequest } = {}
+  private connectionDropped!: Promise<void>
+  private dropConnection!: () => void
 
   /** Create a websocket handler */
   constructor (
@@ -71,6 +84,8 @@ export class Socket extends SDKEventEmitter {
       this.lastPing = Date.now()
       this.send({ msg: 'pong' }).then(this.logger.debug, this.logger.error)
     })
+
+    this.releaseQueuedRequests()
 
     this.on('result', (data: any) => this.emit(data.id, { id: data.id, result: data.result, error: data.error }))
     this.on('ready', (data: any) => this.emit(data.subs[0], data))
@@ -106,11 +121,7 @@ export class Socket extends SDKEventEmitter {
           this.logger.debug(`[ddp] open: previous connection teardown failed: ${(err as Error).message}`)
         }
       }
-      // A request still waiting on the socket being replaced will never be
-      // answered on the new one, and only `reopenNow` rejects in-flight sends —
-      // the scheduled `reopen` leaves them pending. Holding the queue across
-      // that would block every later `sub` and `unsub` for those ids.
-      this.subscriptionRequests = {}
+      this.releaseQueuedRequests()
       this.connection = connection
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
@@ -223,8 +234,24 @@ export class Socket extends SDKEventEmitter {
     }
 
     this.forgetAllSubscriptions()
+    this.releaseQueuedRequests()
 
     return Promise.resolve()
+  }
+
+  /**
+   * Stop everything waiting on the Socket that is going away, and arm the wait
+   * for the next one.
+   *
+   * A queued request waits on the DDP response to the request before it. Only
+   * `reopenNow` rejects in-flight sends, so a request the scheduled `reopen` or
+   * `close` left pending would hold everything behind it forever, and its
+   * caller would never settle — `logout` waits on `unsubscribeAll`, so that is
+   * a Login that can never complete.
+   */
+  private releaseQueuedRequests = () => {
+    if (this.dropConnection) this.dropConnection()
+    this.connectionDropped = new Promise<void>(resolve => { this.dropConnection = resolve })
   }
 
   /** Drop one DDP subscription. */
@@ -553,24 +580,35 @@ export class Socket extends SDKEventEmitter {
    * a session at a time and answers in that order, so waiting for the response
    * is enough to keep one request per id on the wire.
    *
-   * The wait is bounded by the connection, not by a deadline: a request whose
-   * DDP response never arrives would otherwise hold its id for the life of the
-   * Socket. `createConnection` drops the queue, so a new Socket starts clear.
+   * The wait is bounded by the Socket rather than by a Deadline, and a request
+   * records the Socket it was written to. A request waiting on one that a
+   * dropped Socket left unanswered is released by `releaseQueuedRequests`, and
+   * registers itself on the new Socket as it goes out — so the id is never held
+   * open, and never carries two requests on one Socket.
    */
   private queueSubscriptionRequest = <T>(id: string | undefined, request: () => Promise<T>): Promise<T> => {
     if (!id) return request()
 
-    // Called rather than chained when nothing is in flight: `send` writes its
-    // frame synchronously on an open connection, and a hop through `then` would
-    // delay every first request by a turn of the microtask queue.
-    const waiting = this.subscriptionRequests[id]
-    const sending = waiting ? waiting.then(request, request) : request()
-    const settled: Promise<any> = sending.then(() => undefined, () => undefined).then(() => {
-      if (this.subscriptionRequests[id] === settled) delete this.subscriptionRequests[id]
-    })
-    this.subscriptionRequests[id] = settled
+    const write = (): Promise<T> => {
+      const sending = request()
+      const pending: ISubscriptionRequest = {
+        connection: this.connection,
+        settled: sending.then(() => undefined, () => undefined).then(() => {
+          if (this.subscriptionRequests[id] === pending) delete this.subscriptionRequests[id]
+        })
+      }
+      this.subscriptionRequests[id] = pending
+      return sending
+    }
 
-    return sending
+    // Written rather than queued when this Socket has nothing in flight for the
+    // id: `send` writes its frame synchronously on an open connection, and a
+    // hop through `then` would delay the request by a turn of the microtask
+    // queue.
+    const waiting = this.subscriptionRequests[id]
+    if (!waiting || waiting.connection !== this.connection) return write()
+
+    return Promise.race([waiting.settled, this.connectionDropped]).then(write)
   }
 
   /**
