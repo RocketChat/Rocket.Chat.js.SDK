@@ -106,11 +106,18 @@ an Error that the SDK writes.
   Reopen, and a caller retrying on the wrong one retries into a closed Socket.
   This is not a Deadline, and the paragraph above still holds: nothing here bounds
   a Method call on a connection that stays up and stays silent.
-- One rejection now reaches `ping` that never did. A close ends the in-flight
-  ping's wait, and `ping` reopens on a rejection, so a close during that window
-  rebuilt the Socket that the caller had just closed. `ping` therefore reads
-  the same distinction that `onClose` reads from the close code: a close that the
-  caller asked for leaves the Socket closed.
+- Rejections now reach `ping` that never did, and `ping` reopens on a rejection.
+  A close during that window would rebuild the Socket the caller had just closed,
+  and a Reopen during it would queue a second Reopen behind the one already under
+  way. So an abandonment carries its own Error type, and `ping` reopens on every
+  rejection except that one: a connection that went away has already been
+  answered, by `onClose` or by the replacement itself, and only a server that goes
+  quiet asks the Liveness chain for a Reopen. The type is internal to the driver,
+  so this adds no public surface either.
+- The handshake is the one send with no caller of its own, and `createConnection`
+  waits on it through `onOpen`. Ending its wait therefore has to settle that wait
+  too — `onOpen` rejects the connection it was opening, rather than trading a
+  stranded send for a stranded `open()`.
 - A failed write of a `sub` DDP message leaves an entry in the subscription map.
   `send` writes that map before `send` writes to the Socket, and the write can now
   reject, so the map can hold an entry for a DDP subscription that the server never

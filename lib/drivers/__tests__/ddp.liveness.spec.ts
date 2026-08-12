@@ -201,12 +201,11 @@ describe('Socket liveness', () => {
       expect(socket.connected).toBe(true)
     })
 
-    it('does not reopen a socket the user closed while a ping was in flight', async () => {
+    it('does not reopen a socket the caller closed while a ping was in flight', async () => {
       // The ping's send is in flight for the whole window between the ping frame
-      // and the pong, and a close now ends that wait with a rejection. The
-      // rejection reaches the same `.catch(() => this.reopen())` that a missed
-      // pong does — so without a guard on the close, closing during that window
-      // rebuilds the socket the user just asked to be rid of.
+      // and the pong, and a close ends that wait with a rejection. That rejection
+      // reaches the same `.catch` a missed pong does — so without the guard,
+      // closing during that window rebuilds the socket the caller just closed.
       await jest.advanceTimersToNextTimerAsync()
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
 
@@ -220,6 +219,27 @@ describe('Socket liveness', () => {
       // would have elapsed.
       await jest.advanceTimersByTimeAsync(socket.config.reopen * 2)
       expect(fakeSockets).toHaveLength(1)
+    })
+
+    it('schedules no second reopen when a reopen replaces the connection mid-ping', async () => {
+      // The other rejection a connection going away hands the ping: `connecting`,
+      // from the replacement itself. Reopening on that would queue a redundant
+      // open against a connection that is already being rebuilt.
+      await jest.advanceTimersToNextTimerAsync()
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+
+      // No close event at all, so `connecting` from the replacement is the only
+      // thing that ends the ping's wait. Inside the ping's own deadline, so the
+      // unanswered ping is not what ends it.
+      transport.readyState = CLOSED
+      const opening = socket.open()
+      await driveToHandshake(fakeSockets[1])
+      await opening
+
+      // Nothing queued a reopen against the connection that just came back.
+      expect(fakeSockets).toHaveLength(2)
+      expect(socket.connected).toBe(true)
+      expect(socket.openTimeout).toBeUndefined()
     })
 
     it('clears both the ping and the reopen timer on close', async () => {

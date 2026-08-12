@@ -4,6 +4,7 @@ import { silentLogger } from '../../../test/silentLogger'
 import {
   CLOSED,
   FakeWebSocket,
+  OPEN,
   driveToHandshake,
   fakeSockets,
   openFakeConnection,
@@ -235,13 +236,15 @@ describe('Socket.send with several listeners on one event', () => {
   let socket: Socket
   let transport: FakeWebSocket
 
+  const createSocket = () => new Socket({
+    host: 'localhost:3000',
+    logger: silentLogger,
+    reopen: REOPEN_DELAY,
+    ping: 10 * 60 * 1000
+  })
+
   beforeEach(async () => {
-    socket = new Socket({
-      host: 'localhost:3000',
-      logger: silentLogger,
-      reopen: REOPEN_DELAY,
-      ping: 10 * 60 * 1000
-    })
+    socket = createSocket()
     transport = await openFakeConnection(socket)
   })
 
@@ -320,12 +323,8 @@ describe('Socket.send with several listeners on one event', () => {
   /**
    * A written send can only be answered on the connection it went out on. Once
    * that connection is gone the DDP response can never arrive, so the wait has
-   * to end.
-   *
-   * `disconnected` used to be the only event that ended it, and `reopenNow` is
-   * the only place that emits it — so the two ordinary ways a connection goes
-   * away, a close and a scheduled Reopen, stranded every send written to it. The
-   * events were already being emitted; `send` was listening for the wrong ones.
+   * to end — on any of the three events that end a connection, not on
+   * `disconnected` alone, which only `reopenNow` emits.
    */
   describe('when the connection the send went out on goes away', () => {
     const inFlight = () => [1, 2, 3].map(() =>
@@ -373,9 +372,9 @@ describe('Socket.send with several listeners on one event', () => {
     })
 
     it('leaves no listener behind for a send it abandoned', async () => {
-      // The stranded promise was only half the fault: the DDP response listener
-      // and the abandonment listeners stayed registered for the life of the
-      // Socket, so every Reopen leaked a few more and retained their closures.
+      // The other half of ending the wait: an abandoned send that left the DDP
+      // response listener and the abandonment listeners registered would leak a
+      // few more, and retain their closures, on every Reopen.
       const listenersFor = (event: string) =>
         ((socket as any)._listeners[event] || []).length
 
@@ -404,6 +403,23 @@ describe('Socket.send with several listeners on one event', () => {
 
       reopened.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
+    })
+
+    it('fails the open when the handshake is abandoned', async () => {
+      // The handshake is the one send with no caller of its own, and `open()`
+      // waits on it. Ending its wait has to settle that wait too, or the close
+      // trades a stranded send for a stranded `open()`.
+      const opening = createSocket().open()
+      const handshaking = fakeSockets[1]
+      handshaking.readyState = OPEN
+      handshaking.onopen?.({})
+      await jest.advanceTimersByTimeAsync(0)
+
+      const rejected = expect(opening).rejects
+        .toThrow('[ddp] connection closed before the response arrived')
+      handshaking.close(1006)
+
+      await rejected
     })
   })
 

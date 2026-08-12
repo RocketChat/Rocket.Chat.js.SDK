@@ -81,10 +81,10 @@ describe('Socket subscription bookkeeping', () => {
     expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
   })
 
-  it('holds nothing for a DDP subscription the server refused', async () => {
-    // `send` used to file every `sub` DDP message under its send-time id, so a
-    // refused DDP subscription left an entry nobody owned: never acknowledged,
-    // never unsubscribed, and resubscribed by `subscribeAll` forever.
+  it('holds nothing for a subscription the server refused', async () => {
+    // `send` used to file every `sub` frame under its send-time id, so a refused
+    // subscription left an entry nobody owned: never acknowledged, never
+    // unsubscribed, and resubscribed by `subscribeAll` forever.
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
     transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
 
@@ -96,7 +96,7 @@ describe('Socket subscription bookkeeping', () => {
     expect(transport.sent).toHaveLength(framesBefore)
   })
 
-  it('holds nothing while a DDP subscription is still in flight', async () => {
+  it('holds nothing while a subscription is still in flight', async () => {
     // The other half of the same change: the map is written on the server's
     // acknowledgement, so an unanswered `sub` is not in it yet.
     socket.subscribe('stream-room-messages', ['GENERAL'])
