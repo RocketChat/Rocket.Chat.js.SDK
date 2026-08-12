@@ -1,0 +1,125 @@
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
+import {
+  FakeWebSocket,
+  openFakeConnection,
+  useFakeClockAndSocketRegistry
+} from '../../../test/fakeTransport'
+
+// Hoisted above the imports by jest, so the driver's own `import WebSocket from
+// 'universal-websocket-client'` resolves to the fake. See test/fakeTransport.ts.
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
+
+useFakeClockAndSocketRegistry()
+
+const flushMicrotasks = async () => {
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
+}
+
+/**
+ * A `sub` and an `unsub` for one DDP subscription carry the same id, and `send`
+ * matches a DDP response to its request by id alone. Two of them in flight at
+ * once therefore leave one DDP response settling both sends. This file is about
+ * keeping one request per id on the wire; what the subscription map holds
+ * afterwards belongs to ddp.subscriptions.spec.ts.
+ */
+describe('one sub or unsub in flight per DDP subscription', () => {
+  let socket: Socket
+  let transport: FakeWebSocket
+
+  beforeEach(async () => {
+    socket = new Socket({ host: 'localhost:3000', logger: silentLogger })
+    transport = await openFakeConnection(socket)
+    const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+    transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
+    await subscribing
+  })
+
+  it('holds a sub until the unsub before it has been answered', async () => {
+    // `login` calls `subscribeAll`, and `unsubscribe` keeps its entry until the
+    // DDP response arrives — so the resubscribe reaches an id that is still
+    // being unsubscribed.
+    const unsubscribing = socket.unsubscribe('ddp-1').catch(() => undefined)
+    await flushMicrotasks()
+    expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+    const resubscribing = socket.subscribeAll()
+    await flushMicrotasks()
+    expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+    transport.receive({ msg: 'nosub', id: 'ddp-1' })
+    await unsubscribing
+    await flushMicrotasks()
+    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    await resubscribing
+  })
+
+  it('settles each request on the DDP response that answers it', async () => {
+    const unsubscribing = socket.unsubscribe('ddp-1').then(() => 'unsubscribed')
+    await flushMicrotasks()
+
+    const resubscribing = socket.subscribeAll()
+    await flushMicrotasks()
+
+    transport.receive({ msg: 'nosub', id: 'ddp-1' })
+    expect(await unsubscribing).toBe('unsubscribed')
+    await flushMicrotasks()
+
+    // Only now does the `sub` go out, so its `ready` cannot reach the `unsub`.
+    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    await resubscribing
+
+    expect(socket.subscriptions['ddp-1']).toMatchObject({
+      id: 'ddp-1',
+      name: 'stream-room-messages'
+    })
+  })
+
+  it('holds an unsub until the sub before it has been answered', async () => {
+    const resubscribing = socket.subscribeAll()
+    await flushMicrotasks()
+    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+    const unsubscribing = socket.unsubscribe('ddp-1').catch(() => undefined)
+    await flushMicrotasks()
+    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    await resubscribing
+    await flushMicrotasks()
+    expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+    transport.receive({ msg: 'nosub', id: 'ddp-1' })
+    await unsubscribing
+    expect(socket.subscriptions['ddp-1']).toBeUndefined()
+  })
+
+  it('does not hold an id behind a request the connection left unanswered', async () => {
+    // Only `reopenNow` rejects in-flight sends; the scheduled `reopen` leaves
+    // them pending forever. Waiting on one of those across a new connection
+    // would block the id for the life of the Socket.
+    socket.unsubscribe('ddp-1').catch(() => undefined)
+    await flushMicrotasks()
+    expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+    transport.close(1006)
+    const reopened = await openFakeConnection(socket)
+
+    socket.subscribeAll().catch(() => undefined)
+    await flushMicrotasks()
+    expect(reopened.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+  })
+
+  it('leaves a subscription with no id in flight unqueued', async () => {
+    // A first-time `subscribe` has no id to collide on, and `send` writes its
+    // frame synchronously — the queue must not delay it by a microtask.
+    socket.subscribe('stream-notify-user', ['alice/message'])
+
+    expect(transport.lastSent()).toMatchObject({
+      msg: 'sub',
+      name: 'stream-notify-user'
+    })
+  })
+})

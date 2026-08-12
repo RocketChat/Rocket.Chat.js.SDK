@@ -49,6 +49,7 @@ export class Socket extends SDKEventEmitter {
   session?: string
   logger: ILogger
   reopenPromise?: Promise<void>
+  private subscriptionRequests: { [id: string]: Promise<any> } = {}
 
   /** Create a websocket handler */
   constructor (
@@ -105,6 +106,11 @@ export class Socket extends SDKEventEmitter {
           this.logger.debug(`[ddp] open: previous connection teardown failed: ${(err as Error).message}`)
         }
       }
+      // A request still waiting on the socket being replaced will never be
+      // answered on the new one, and only `reopenNow` rejects in-flight sends —
+      // the scheduled `reopen` leaves them pending. Holding the queue across
+      // that would block every later `sub` and `unsub` for those ids.
+      this.subscriptionRequests = {}
       this.connection = connection
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
@@ -536,6 +542,38 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
+   * Hold a `sub` or `unsub` until the one before it on the same id has its DDP
+   * response.
+   *
+   * A `sub` and an `unsub` for one DDP subscription carry the same id, and
+   * `send` matches a DDP response to its request by id alone, so two of them in
+   * flight at once leave the first response settling both — the `nosub` that
+   * ends the DDP subscription also settles the `sub`, and the `ready` that
+   * establishes it also settles the `unsub`. The server takes one message from
+   * a session at a time and answers in that order, so waiting for the response
+   * is enough to keep one request per id on the wire.
+   *
+   * The wait is bounded by the connection, not by a deadline: a request whose
+   * DDP response never arrives would otherwise hold its id for the life of the
+   * Socket. `createConnection` drops the queue, so a new Socket starts clear.
+   */
+  private queueSubscriptionRequest = <T>(id: string | undefined, request: () => Promise<T>): Promise<T> => {
+    if (!id) return request()
+
+    // Called rather than chained when nothing is in flight: `send` writes its
+    // frame synchronously on an open connection, and a hop through `then` would
+    // delay every first request by a turn of the microtask queue.
+    const waiting = this.subscriptionRequests[id]
+    const sending = waiting ? waiting.then(request, request) : request()
+    const settled: Promise<any> = sending.then(() => undefined, () => undefined).then(() => {
+      if (this.subscriptionRequests[id] === settled) delete this.subscriptionRequests[id]
+    })
+    this.subscriptionRequests[id] = settled
+
+    return sending
+  }
+
+  /**
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
    *
@@ -546,7 +584,7 @@ export class Socket extends SDKEventEmitter {
    */
   subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback, id?: string) => {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
-    return this.send({ msg: 'sub', id, name, params })
+    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
         const id = (result.subs) ? result.subs[0] : undefined
         if (id) {
@@ -577,7 +615,7 @@ export class Socket extends SDKEventEmitter {
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
-    return this.send({ msg: 'unsub', id })
+    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((data: any) => {
         this.forgetSubscription(id)
         return data.result || data.subs
