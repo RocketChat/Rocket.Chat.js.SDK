@@ -1,17 +1,19 @@
-import { DDPDriver } from './ddp'
-import { ISocketOptions } from '../../interfaces'
-import { silentLogger } from '../../test/silentLogger'
+import { DDPDriver } from '../ddp'
+import { ISocketOptions } from '../../../interfaces'
+import { silentLogger } from '../../../test/silentLogger'
 import {
+  CLOSED,
+  driveToHandshake,
   FakeWebSocket,
   fakeSockets,
   OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
 // Same seam as the socket specs: the driver builds its Socket, the Socket builds
 // the fake through its normal code path. See test/fakeTransport.ts.
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
@@ -255,5 +257,39 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     // Both the poll interval and the deadline are cleared: a leaked interval
     // would keep resubscribing for the life of the process.
     expect(jest.getTimerCount()).toBe(timersBefore)
+  })
+})
+
+describe('DDPDriver.connect', () => {
+  it('keeps echoing open after a send has waited on it', async () => {
+    // `connect` registers a long-lived `open` listener to echo the socket's open
+    // as the driver's `connected`. A send that waits on open registers a `once`
+    // beside it, and removing that `once` once it has fired used to take the
+    // echo down with it — leaving the driver permanently silent about every
+    // later reconnect.
+    const driver = createDriver()
+    const connecting = driver.connect()
+    const transport = fakeSockets[0]
+
+    await driveToHandshake(transport)
+    await connecting
+
+    const connectedSeen = jest.fn()
+    driver.on('connected', connectedSeen)
+
+    transport.readyState = CLOSED
+    const sending = driver.ddp.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+
+    await driveToHandshake(transport)
+    await jest.advanceTimersByTimeAsync(0)
+    transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+    await expect(sending).resolves.toMatchObject({ result: 'ok' })
+
+    // The reopen the send rode in on is one echo; the next open has to produce
+    // another, which is what the dropped listener made impossible.
+    expect(connectedSeen).toHaveBeenCalledTimes(1)
+
+    await driveToHandshake(transport)
+    expect(connectedSeen).toHaveBeenCalledTimes(2)
   })
 })
