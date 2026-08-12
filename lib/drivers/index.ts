@@ -20,7 +20,7 @@ export interface ISocket {
   subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined>
   subscribeRaw (...args: any[]): Promise<ISubscription | undefined>
   unsubscribe (subscription: ISubscription): Promise<ISocket>
-  unsubscribeAll (): Promise<ISocket>
+  unsubscribeAll (): Promise<void>
 
   onStreamData (event: string, cb: ICallback): Promise<any>
 

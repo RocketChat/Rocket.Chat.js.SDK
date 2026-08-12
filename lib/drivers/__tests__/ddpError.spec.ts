@@ -1,4 +1,4 @@
-import { toError } from '../ddpError'
+import { DDPError, toError } from '../ddpError'
 
 /**
  * The seam where a DDP error — the error field of a failed DDP response, as the
@@ -49,6 +49,25 @@ describe('toError', () => {
       expect(error.name).toBe('Error')
       expect(error.stack).not.toBe('not a stack')
       expect(error.stack).toContain('nope')
+    })
+  })
+
+  describe('what it produces', () => {
+    it('is a DDPError, whatever shape the DDP error arrived in', () => {
+      // The only way a caller can tell a failure the server sent from one the
+      // SDK made itself, so a bare string cannot be left as a plain Error.
+      expect(toError({ error: 403, reason: 'User not found' })).toBeInstanceOf(DDPError)
+      expect(toError('you must be logged in')).toBeInstanceOf(DDPError)
+      expect(toError(null)).toBeInstanceOf(DDPError)
+    })
+
+    it('is still an Error', () => {
+      expect(toError('you must be logged in')).toBeInstanceOf(Error)
+    })
+
+    it('does not catch a rejection the SDK originated', () => {
+      expect(new Error('[ddp] connection reopened before the response arrived'))
+        .not.toBeInstanceOf(DDPError)
     })
   })
 

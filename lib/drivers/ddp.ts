@@ -29,7 +29,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
-import { toError } from './ddpError'
+import { DDPError, toError } from './ddpError'
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
@@ -215,7 +215,19 @@ export class Socket extends SDKEventEmitter {
       .catch(this.logger.error)
     }
 
+    this.forgetAllSubscriptions()
+
     return Promise.resolve()
+  }
+
+  /** Drop one DDP subscription. */
+  forgetSubscription = (id: string) => {
+    delete this.subscriptions[id]
+  }
+
+  /** Drop every DDP subscription, one key at a time, in the same object. */
+  forgetAllSubscriptions = () => {
+    Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
   }
 
   // Call open directly, so it skips openTimeout
@@ -569,24 +581,24 @@ export class Socket extends SDKEventEmitter {
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
-    delete this.subscriptions[id]
     return this.send({ msg: 'unsub', id })
-      .then((data: any) => data.result || data.subs)
+      .then((data: any) => {
+        this.forgetSubscription(id)
+        return data.result || data.subs
+      })
       .catch((err) => {
-        if (!err.msg && err.msg !== 'nosub') {
-          this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
-          throw err
-        }
+        if (err instanceof DDPError) this.forgetSubscription(id)
+        this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
+        throw err
       })
   }
 
-  /** Unsubscribe from all active subscriptions and reset collection */
+  /** Unsubscribe from all active subscriptions, ignoring any the server refuses */
   unsubscribeAll = () => {
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
-      return this.subscriptions[id].unsubscribe()
+      return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })
-    return Promise.all(unsubAll)
-      .then(() => this.subscriptions = {})
+    return Promise.all(unsubAll).then(() => undefined)
   }
 }
 
@@ -846,7 +858,7 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/** Unsubscribe from all subscriptions. Proxy for socket unsubscribeAll */
-  unsubscribeAll = (): Promise<any> => {
+  unsubscribeAll = (): Promise<void> => {
     return this.ddp.unsubscribeAll()
   }
 
