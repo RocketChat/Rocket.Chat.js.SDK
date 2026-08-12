@@ -260,11 +260,11 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
 
 describe('DDPDriver.connect', () => {
   it('keeps echoing open after a send has waited on it', async () => {
-    // `connect` registers a long-lived `open` listener to echo the socket's open
-    // as the driver's `connected`. A send that waits on open registers a `once`
+    // The driver holds a long-lived `open` listener that echoes the socket's
+    // open as its own `connected`. A send that waits on open registers a `once`
     // beside it, and removing that `once` once it has fired used to take the
     // echo down with it — leaving the driver permanently silent about every
-    // later reconnect.
+    // later Reopen.
     const driver = createDriver()
     const connecting = driver.connect()
     const transport = fakeSockets[0]
@@ -294,21 +294,22 @@ describe('DDPDriver.connect', () => {
   it('echoes open once however many times connect was called', async () => {
     const driver = createDriver()
     const connecting = driver.connect()
+    const transport = fakeSockets[0]
 
-    await driveToHandshake(fakeSockets[0])
+    await driveToHandshake(transport)
     await connecting
 
-    fakeSockets[0].close()
+    transport.close()
 
     const connectedSeen = jest.fn()
     driver.on('connected', connectedSeen)
 
-    // A caller that reconnects on foreground or on a network change reaches
-    // `connect` again with the socket down, so the early return does not cover
+    // A caller that calls `connect` on each foreground or network change
+    // reaches it again with the socket down, so the early return does not cover
     // it. One open still means one `connected`.
-    const reconnecting = driver.connect()
+    const connectingAgain = driver.connect()
     await driveToHandshake(fakeSockets[1])
-    await reconnecting
+    await connectingAgain
 
     expect(connectedSeen).toHaveBeenCalledTimes(1)
   })
@@ -316,8 +317,9 @@ describe('DDPDriver.connect', () => {
   it('takes its connected listener back down when the open fails', async () => {
     const driver = createDriver()
     const connecting = driver.connect()
+    const transport = fakeSockets[0]
 
-    fakeSockets[0].onerror?.(new Error('no route to host'))
+    transport.onerror?.(new Error('no route to host'))
     await expect(connecting).rejects.toThrow('no route to host')
 
     // A rejected connect settles on the error, so the listener it left behind

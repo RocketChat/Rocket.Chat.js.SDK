@@ -648,7 +648,7 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
 			// integration: string
     }
     this.ddp = new Socket({ ...this.config, logger })
-    this.ddp.on('open', () => this.emit('connected')) // echo ddp event
+    this.ddp.on('open', () => this.emit('connected'))
     this.logger = logger
   }
 
