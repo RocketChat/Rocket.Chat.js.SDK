@@ -219,6 +219,25 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     await expect(waiting).resolves.toBe(true)
   })
 
+  it('takes its deadline from the configured timeout when given none', async () => {
+    // Not the old hardcoded 8000: a deadline still bound to that literal would
+    // leave this pending after the second advance rather than resolving.
+    const timeout = 4000
+    const driver = createDriver({ timeout })
+    await openFakeConnection(driver.ddp)
+    driver.userId = userId
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    let resolved: boolean | undefined
+    waiting.then((value) => { resolved = value })
+
+    await jest.advanceTimersByTimeAsync(timeout - 1)
+    expect(resolved).toBeUndefined()
+
+    await jest.advanceTimersByTimeAsync(1)
+    await expect(waiting).resolves.toBe(false)
+  })
+
   it('resolves false when the subscriptions never appear before the deadline', async () => {
     const driver = createDriver()
     await openFakeConnection(driver.ddp)

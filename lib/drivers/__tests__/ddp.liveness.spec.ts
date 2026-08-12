@@ -169,6 +169,22 @@ describe('Socket liveness', () => {
       expect(jest.getTimerCount()).toBe(1)
     })
 
+    it('takes its deadline from the configured ping interval when given none', async () => {
+      // PING_INTERVAL is not the old hardcoded 2000, so a probe still bounded by
+      // that literal would settle long before the first advance ends.
+      const probing = socket.probe()
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
+      const settledEarly = jest.fn()
+      probing.then(settledEarly)
+      await Promise.resolve()
+      expect(settledEarly).not.toHaveBeenCalled()
+
+      await jest.advanceTimersByTimeAsync(1)
+
+      await expect(probing).resolves.toBe(false)
+    })
+
     it('succeeds when the pong lands after the clock has moved', async () => {
       // The millisecond advance is the whole test: without it this passes for the
       // wrong reason, resolving false on the timeout instead of true on the pong.

@@ -73,7 +73,8 @@ export class Socket extends SDKEventEmitter {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
       reopen: options.reopen || 10000,
-      ping: options.ping || options.timeout || 10000
+      ping: options.ping || options.timeout || 10000,
+      timeout: options.timeout || 10000
     }
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
@@ -286,6 +287,11 @@ export class Socket extends SDKEventEmitter {
    * then creates the connection directly so a concurrent open() cannot tear it
    * down. Unhandled creation errors are swallowed because cleanup already runs
    * via the open/timeout paths.
+   *
+   * The wait for the new socket's `open` is bounded by `config.timeout`: past it
+   * the promise resolves and `reopenPromise` is cleared even though the
+   * connection may still be down, so a consumer on a slow network raises this by
+   * raising `timeout`.
    */
   reopenNow = (): Promise<void> => {
     if (this.reopenPromise) {
@@ -311,7 +317,7 @@ export class Socket extends SDKEventEmitter {
 
       this.createConnection().catch(() => {})
 
-      const timeout = setTimeout(() => cleanup(), 10000)
+      const timeout = setTimeout(() => cleanup(), this.config.timeout)
     })
 
     return this.reopenPromise
@@ -320,8 +326,11 @@ export class Socket extends SDKEventEmitter {
   /**
    * Bounded liveness check for a socket in the gray zone. Returns true only if
    * the socket is open and the server answers the ping within the deadline.
+   *
+   * The deadline defaults to `config.ping`: the same wait the liveness chain
+   * already tolerates between a ping and its pong.
    */
-  probe = (timeoutMs = 2000): Promise<boolean> => {
+  probe = (timeoutMs = this.config.ping): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
       if (!this.connection || this.connection.readyState !== socketOpen) {
         return resolve(false)
@@ -813,9 +822,10 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
    * an observable readiness signal after a forced reconnect.
    *
    * If the subscriptions are not yet present (e.g. immediately after reopenNow),
-   * it polls the socket subscription map until they appear or the timeout expires.
+   * it polls the socket subscription map until they appear or `config.timeout`
+   * expires.
    */
-  waitForNotifyUserMediaSubs = (timeoutMs = 8000): Promise<boolean> => {
+  waitForNotifyUserMediaSubs = (timeoutMs = this.config.timeout): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
     }
