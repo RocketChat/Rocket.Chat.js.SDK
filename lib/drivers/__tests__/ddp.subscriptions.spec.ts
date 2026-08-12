@@ -1,6 +1,7 @@
 import { Socket } from '../ddp'
 import { silentLogger } from '../../../test/silentLogger'
 import {
+  CLOSED,
   FakeWebSocket,
   flushMicrotasks,
   fakeSockets,
@@ -161,14 +162,37 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
-  it('holds nothing for a subscription that never reached the wire', async () => {
-    // The transport threw, so the frame was never written and the server cannot
-    // have acted on it. There is no stream to name and nothing to re-establish.
-    transport.sendError = new Error('socket closed under the write')
+  describe('a subscription that never reached the wire', () => {
+    // Three ways a `sub` fails without the server seeing it. None can leave a
+    // stream behind, so none may leave an entry — only a connection that ends
+    // *after* the frame went out does.
 
-    await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+    it('holds nothing when the transport failed to write it', async () => {
+      transport.sendError = new Error('socket closed under the write')
 
-    expect(socket.subscriptions).toEqual({})
+      await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+
+      expect(socket.subscriptions).toEqual({})
+    })
+
+    it('holds nothing when the send expired waiting for the connection', async () => {
+      // Not connected and never opening: the send never gets to compose a frame.
+      transport.readyState = CLOSED
+
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      await jest.advanceTimersByTimeAsync(socket.config.reopen * 2 + 1)
+
+      await expect(subscribing).resolves.toBeUndefined()
+      expect(socket.subscriptions).toEqual({})
+    })
+
+    it('holds nothing when the socket was never opened', async () => {
+      const unopened = createSocket()
+
+      await expect(unopened.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+
+      expect(unopened.subscriptions).toEqual({})
+    })
   })
 
   it('rejects with an Error naming the id when unsubscribing from something not in the map', async () => {

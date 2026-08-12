@@ -49,17 +49,16 @@ class AbandonedWait extends Error {
 }
 
 /**
- * The rejection for a request that reached the wire and lost its answer when the
- * connection ended. It carries the id the request was sent under, so a caller
- * can still name what the server may have acted on. An `AbandonedWait`, so the
- * reopen decision is unchanged, and not a DDPError, under ADR-0003.
+ * An `AbandonedWait` for a request whose frame was already written, carrying the
+ * id so a caller can name what the server may have acted on. See ADR-0005.
+ * The prototype is restored by hand for the same reason DDPError restores its own.
  */
-export interface IAbandonedRequest extends AbandonedWait {
-  id: string
+export class AbandonedRequest extends AbandonedWait {
+  constructor (public id: string, message: string) {
+    super(message)
+    Object.setPrototypeOf(this, AbandonedRequest.prototype)
+  }
 }
-
-const abandonedRequest = (id: string, message: string): IAbandonedRequest =>
-  Object.assign(new AbandonedWait(message), { id })
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
@@ -470,9 +469,7 @@ export class Socket extends SDKEventEmitter {
       }
 
       // The DDP response can only arrive on the connection this message went out
-      // on, so every event that ends that connection ends this wait. The frame is
-      // already written by this point, so the rejection carries the id: the server
-      // may have acted on the request, and only the id can name it.
+      // on, so every event that ends that connection ends this wait.
       const abandonListeners = [
         { event: 'disconnected', message: abandonedByReopen },
         { event: 'connecting', message: abandonedByReopen },
@@ -481,7 +478,7 @@ export class Socket extends SDKEventEmitter {
         event,
         onAbandon: () => {
           removeListeners()
-          reject(abandonedRequest(id, message))
+          reject(new AbandonedRequest(id, message))
         }
       }))
 
@@ -637,10 +634,10 @@ export class Socket extends SDKEventEmitter {
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
    *
-   * Sole owner of `subscriptions`: the entry is written under the id the server
-   * acknowledged, and under the id the request was sent with when a Reopen
-   * abandoned the wait. A `sub` the server refused, and one that never reached
-   * the wire, leave nothing behind.
+   * Sole owner of `subscriptions`: the entry is written when the server
+   * acknowledged the `sub`, or when its answer was abandoned after the frame went
+   * out. A refused `sub`, and one that never reached the wire, leave nothing
+   * behind. See ADR-0005.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -653,8 +650,9 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        const abandonedId = !(err instanceof DDPError) && err.id
-        if (abandonedId) this.rememberSubscription(abandonedId, name, params, callback)
+        if (err instanceof AbandonedRequest) {
+          this.rememberSubscription(err.id, name, params, callback)
+        }
         return undefined
       })
   }
