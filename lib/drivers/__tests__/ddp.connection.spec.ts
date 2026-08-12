@@ -20,7 +20,7 @@ const INTENTIONAL_CLOSE = 4000
 
 /**
  * The delay `reopen` schedules its retry on, read from the `reopen` option.
- * Deliberately *not* the 10000 default, and deliberately not the fallback below:
+ * Deliberately *not* the 10000 default, and deliberately not the deadline below:
  * with either, a boundary assertion would pass whether or not the driver read
  * the option, and the two timers would be indistinguishable on the clock.
  */
@@ -31,7 +31,7 @@ const REOPEN_DELAY = 3000
  * anyway, read from the `timeout` option. Deliberately neither the 10000 default
  * nor `REOPEN_DELAY`, so the assertion below distinguishes all three.
  */
-const REOPEN_NOW_FALLBACK = 7000
+const REOPEN_NOW_DEADLINE = 7000
 
 /**
  * The ping interval is pushed far beyond every advance in this file on purpose:
@@ -43,7 +43,7 @@ const createSocket = () => new Socket({
   host: 'localhost:3000',
   logger: silentLogger,
   reopen: REOPEN_DELAY,
-  timeout: REOPEN_NOW_FALLBACK,
+  timeout: REOPEN_NOW_DEADLINE,
   ping: 10 * 60 * 1000
 })
 
@@ -183,7 +183,7 @@ describe('Socket connection lifecycle', () => {
     it('resolves on the configured timeout when no open ever arrives', async () => {
       const reopening = socket.reopenNow()
 
-      await jest.advanceTimersByTimeAsync(REOPEN_NOW_FALLBACK - 1)
+      await jest.advanceTimersByTimeAsync(REOPEN_NOW_DEADLINE - 1)
       expect(socket.reopenPromise).toBe(reopening)
 
       await jest.advanceTimersByTimeAsync(1)

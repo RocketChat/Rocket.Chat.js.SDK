@@ -173,12 +173,11 @@ describe('Socket liveness', () => {
       // PING_INTERVAL is not the old hardcoded 2000, so a probe still bounded by
       // that literal would settle long before the first advance ends.
       const probing = socket.probe()
+      let resolved: boolean | undefined
+      probing.then((value) => { resolved = value })
 
       await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
-      const settledEarly = jest.fn()
-      probing.then(settledEarly)
-      await Promise.resolve()
-      expect(settledEarly).not.toHaveBeenCalled()
+      expect(resolved).toBeUndefined()
 
       await jest.advanceTimersByTimeAsync(1)
 
