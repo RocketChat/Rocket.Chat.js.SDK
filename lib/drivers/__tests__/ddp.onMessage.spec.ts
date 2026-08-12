@@ -17,7 +17,7 @@ describe('Socket.onMessage', () => {
   const waiterOn = (key: string) => {
     const received: any[] = []
     const abandoned: any[] = []
-    socket.pending.expect(key, {
+    socket.pending.register(key, {
       receive: (response: any) => received.push(response),
       abandon: (reason: Error) => abandoned.push(reason)
     })
@@ -107,6 +107,25 @@ describe('Socket.onMessage', () => {
     expect(ignored.received).toEqual([])
   })
 
+  it('drops a ready frame with no subscription ids instead of throwing', () => {
+    // The emitter does not catch what a listener throws, so `onMessage` would
+    // carry a TypeError out to the websocket's `onmessage`.
+    expect(() => socket.onMessage(frame({ msg: 'ready' }))).not.toThrow()
+  })
+
+  it('settles the waiter after the consumers of the same frame', () => {
+    const order: string[] = []
+    socket.on('result', () => order.push('msg consumer'))
+    socket.pending.register('call-id', {
+      receive: () => order.push('waiter'),
+      abandon: () => undefined
+    })
+
+    socket.onMessage(frame({ msg: 'result', id: 'call-id', result: 'ok' }))
+
+    expect(order).toEqual(['msg consumer', 'waiter'])
+  })
+
   it('delivers a nosub frame on the id it refuses', () => {
     const payload = { msg: 'nosub', id: 'sub-id', error: { error: 404, reason: 'no such stream' } }
     const waiter = waiterOn('sub-id')
@@ -149,13 +168,13 @@ describe('PendingResponses', () => {
   const spyWaiter = () => ({ receive: jest.fn(), abandon: jest.fn() })
 
   it('settles every waiter registered on one correlation key', () => {
-    // A resubscribe racing `subscribeAll` puts two sends on one id. The emitter
-    // this replaced fired both, so the registry has to as well.
+    // A resubscribe racing `subscribeAll` puts two sends on one id, and both
+    // are answered by the one response.
     const pending = new PendingResponses()
     const first = spyWaiter()
     const second = spyWaiter()
-    pending.expect('sub-id', first)
-    pending.expect('sub-id', second)
+    pending.register('sub-id', first)
+    pending.register('sub-id', second)
 
     pending.deliver('sub-id', { msg: 'ready' })
 
@@ -166,7 +185,7 @@ describe('PendingResponses', () => {
   it('settles a correlation key only once', () => {
     const pending = new PendingResponses()
     const waiter = spyWaiter()
-    pending.expect('call-id', waiter)
+    pending.register('call-id', waiter)
 
     pending.deliver('call-id', { result: 'first' })
     pending.deliver('call-id', { result: 'second' })
@@ -177,7 +196,7 @@ describe('PendingResponses', () => {
   it('ignores a response with no correlation key, and one nobody is waiting on', () => {
     const pending = new PendingResponses()
     const waiter = spyWaiter()
-    pending.expect('call-id', waiter)
+    pending.register('call-id', waiter)
 
     expect(() => pending.deliver(undefined, { msg: 'changed' })).not.toThrow()
     expect(() => pending.deliver('another-id', { result: 'ok' })).not.toThrow()
@@ -187,7 +206,7 @@ describe('PendingResponses', () => {
   it('abandons every waiter with an Error carrying the reason', () => {
     const pending = new PendingResponses()
     const waiter = spyWaiter()
-    pending.expect('call-id', waiter)
+    pending.register('call-id', waiter)
 
     pending.abandonAll('[ddp] gone')
 
@@ -196,11 +215,11 @@ describe('PendingResponses', () => {
   })
 
   it('forgets the waiters it abandoned', () => {
-    // The listener this replaced stayed registered on the emitter after a
-    // Reopen rejected the send, so a late response settled a dead promise.
+    // A response landing after the abandonment must not settle a promise that
+    // has already rejected.
     const pending = new PendingResponses()
     const waiter = spyWaiter()
-    pending.expect('call-id', waiter)
+    pending.register('call-id', waiter)
 
     pending.abandonAll('[ddp] gone')
     pending.deliver('call-id', { result: 'late' })
