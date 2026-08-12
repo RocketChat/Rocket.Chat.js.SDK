@@ -3,6 +3,8 @@ import { silentLogger } from '../../../test/silentLogger'
 import {
   FakeWebSocket,
   flushMicrotasks,
+  fakeSockets,
+  driveToHandshake,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -97,6 +99,76 @@ describe('Socket subscription bookkeeping', () => {
     expect(socket.subscriptions).toEqual({})
 
     transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+  })
+
+  describe('a subscription a reopen abandoned', () => {
+    it('is kept under the id it was sent with', async () => {
+      // The `sub` reached the wire and the server never answered it, so the
+      // server may have acted on it. Forgetting it here left the stream with no
+      // name: nothing to unsubscribe with, and nothing for `subscribeAll` to
+      // re-establish at the next login.
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+      socket.reopenNow()
+      await expect(subscribing).resolves.toBeUndefined()
+
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+      expect(socket.subscriptions['ddp-1']).toMatchObject({
+        id: 'ddp-1',
+        name: 'stream-room-messages',
+        params: ['GENERAL']
+      })
+    })
+
+    it('is re-established under that same id at the next login', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      socket.reopenNow()
+      await subscribing
+
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+
+      const framesBefore = reopened.sent.length
+      socket.subscribeAll()
+      await flushMicrotasks()
+
+      expect(reopened.sent.slice(framesBefore).map((frame) => JSON.parse(frame))).toEqual([{
+        msg: 'sub',
+        id: 'ddp-1',
+        name: 'stream-room-messages',
+        params: ['GENERAL']
+      }])
+    })
+
+    it('can be unsubscribed from, unlike one that was never written', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      socket.reopenNow()
+      await subscribing
+
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+
+      // Nothing to await: the point is that the `unsub` goes out at all. Without
+      // the entry, `unsubscribe` rejects up front and never reaches the wire.
+      const unsubscribing = socket.unsubscribe('ddp-1').catch((err) => err)
+      await flushMicrotasks()
+
+      expect(reopened.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+      reopened.receive({ msg: 'result', id: 'ddp-1', result: true })
+      await unsubscribing
+    })
+  })
+
+  it('holds nothing for a subscription that never reached the wire', async () => {
+    // The transport threw, so the frame was never written and the server cannot
+    // have acted on it. There is no stream to name and nothing to re-establish.
+    transport.sendError = new Error('socket closed under the write')
+
+    await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+
+    expect(socket.subscriptions).toEqual({})
   })
 
   it('rejects with an Error naming the id when unsubscribing from something not in the map', async () => {

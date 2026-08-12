@@ -48,6 +48,19 @@ class AbandonedWait extends Error {
   }
 }
 
+/**
+ * The rejection for a request that reached the wire and lost its answer when the
+ * connection ended. It carries the id the request was sent under, so a caller
+ * can still name what the server may have acted on. An `AbandonedWait`, so the
+ * reopen decision is unchanged, and not a DDPError, under ADR-0003.
+ */
+export interface IAbandonedRequest extends AbandonedWait {
+  id: string
+}
+
+const abandonedRequest = (id: string, message: string): IAbandonedRequest =>
+  Object.assign(new AbandonedWait(message), { id })
+
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -457,7 +470,9 @@ export class Socket extends SDKEventEmitter {
       }
 
       // The DDP response can only arrive on the connection this message went out
-      // on, so every event that ends that connection ends this wait.
+      // on, so every event that ends that connection ends this wait. The frame is
+      // already written by this point, so the rejection carries the id: the server
+      // may have acted on the request, and only the id can name it.
       const abandonListeners = [
         { event: 'disconnected', message: abandonedByReopen },
         { event: 'connecting', message: abandonedByReopen },
@@ -466,7 +481,7 @@ export class Socket extends SDKEventEmitter {
         event,
         onAbandon: () => {
           removeListeners()
-          reject(new AbandonedWait(message))
+          reject(abandonedRequest(id, message))
         }
       }))
 
@@ -622,8 +637,10 @@ export class Socket extends SDKEventEmitter {
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
    *
-   * Sole owner of `subscriptions`: the entry is written on the server's
-   * acknowledgement, so a refused or unanswered `sub` leaves nothing behind.
+   * Sole owner of `subscriptions`: the entry is written under the id the server
+   * acknowledged, and under the id the request was sent with when a Reopen
+   * abandoned the wait. A `sub` the server refused, and one that never reached
+   * the wire, leave nothing behind.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -632,20 +649,29 @@ export class Socket extends SDKEventEmitter {
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
         const id = (result.subs) ? result.subs[0] : undefined
-        if (id) {
-          const unsubscribe = this.unsubscribe.bind(this, id)
-          const onEvent = this.onEvent.bind(this, name)
-          const subscription = { id, name, params, unsubscribe, onEvent }
-          if (callback) subscription.onEvent(callback)
-          this.subscriptions[id] = subscription
-          return subscription
-        }
+        if (id) return this.rememberSubscription(id, name, params, callback)
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        // throw err
+        const abandonedId = !(err instanceof DDPError) && err.id
+        if (abandonedId) this.rememberSubscription(abandonedId, name, params, callback)
         return undefined
       })
+  }
+
+  /** Write the entry that instructs `subscribeAll` to establish this stream. */
+  private rememberSubscription = (
+    id: string,
+    name: string,
+    params: any[],
+    callback?: ISocketMessageCallback
+  ) => {
+    const unsubscribe = this.unsubscribe.bind(this, id)
+    const onEvent = this.onEvent.bind(this, name)
+    const subscription = { id, name, params, unsubscribe, onEvent }
+    if (callback) subscription.onEvent(callback)
+    this.subscriptions[id] = subscription
+    return subscription
   }
 
   /** Subscribe to all pre-configured streams (e.g. on login resume) */
