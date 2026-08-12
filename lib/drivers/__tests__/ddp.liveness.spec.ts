@@ -155,6 +155,19 @@ describe('Socket liveness', () => {
       await expect(probing).resolves.toBe(true)
     })
 
+    it('still settles on a later pong after one lands in the probe millisecond', async () => {
+      const probing = socket.probe(2000)
+
+      transport.receive({ msg: 'pong' })
+      await jest.advanceTimersByTimeAsync(1)
+      transport.receive({ msg: 'pong' })
+
+      await expect(probing).resolves.toBe(true)
+
+      // Only the ping chain's timer: the probe's deadline was cleared.
+      expect(jest.getTimerCount()).toBe(1)
+    })
+
     it('succeeds when the pong lands after the clock has moved', async () => {
       // The millisecond advance is the whole test: without it this passes for the
       // wrong reason, resolving false on the timeout instead of true on the pong.
