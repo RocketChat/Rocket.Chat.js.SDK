@@ -284,8 +284,6 @@ export class Socket extends SDKEventEmitter {
         return resolve(false)
       }
 
-      const lastPingAtStart = this.lastPing
-
       let settled = false
       const cleanup = () => {
         if (settled) return
@@ -295,7 +293,6 @@ export class Socket extends SDKEventEmitter {
       }
 
       const onPong = () => {
-        if (this.lastPing <= lastPingAtStart) return
         cleanup()
         resolve(true)
       }
