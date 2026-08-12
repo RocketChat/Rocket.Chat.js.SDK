@@ -29,7 +29,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
-import { toError } from './ddpError'
+import { DDPError, toError } from './ddpError'
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
@@ -215,9 +215,19 @@ export class Socket extends SDKEventEmitter {
       .catch(this.logger.error)
     }
 
-    Object.keys(this.subscriptions).forEach((id) => delete this.subscriptions[id])
+    this.forgetAllSubscriptions()
 
     return Promise.resolve()
+  }
+
+  /** Drop one DDP subscription. */
+  forgetSubscription = (id: string) => {
+    delete this.subscriptions[id]
+  }
+
+  /** Drop every DDP subscription, one key at a time, in the same object. */
+  forgetAllSubscriptions = () => {
+    Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
   }
 
   // Call open directly, so it skips openTimeout
@@ -573,10 +583,11 @@ export class Socket extends SDKEventEmitter {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
     return this.send({ msg: 'unsub', id })
       .then((data: any) => {
-        delete this.subscriptions[id]
+        this.forgetSubscription(id)
         return data.result || data.subs
       })
       .catch((err) => {
+        if (err instanceof DDPError) this.forgetSubscription(id)
         this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
         throw err
       })

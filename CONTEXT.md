@@ -60,7 +60,7 @@ _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 
 **DDP subscription**:
 A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry.
-_Avoid_: Sub, subscription (unqualified)
+_Avoid_: Sub, subscription (unqualified), the map, the collection (that is a field on an incoming DDP message)
 
 **Method call**:
 A named server procedure invoked over the realtime connection, as opposed to a REST request.

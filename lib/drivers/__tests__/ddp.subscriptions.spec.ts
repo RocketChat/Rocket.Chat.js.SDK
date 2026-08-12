@@ -96,8 +96,8 @@ describe('Socket subscription bookkeeping', () => {
 
       const unsubscribing = socket.unsubscribe('ddp-1')
 
-      // The `unsub` frame is on the wire and unanswered, so the subscription is
-      // still the driver's to name.
+      // The `unsub` DDP message is on the wire and unanswered, so the
+      // subscription is still the driver's to name.
       expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
       expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
 
@@ -108,9 +108,10 @@ describe('Socket subscription bookkeeping', () => {
       expect(socket.subscriptions).toEqual({})
     })
 
-    it('can resubscribe the subscription after the server refuses', async () => {
-      // The unsubscribe failed, so the server is still streaming: the driver
-      // must still hold the id to resubscribe with.
+    it('forgets the subscription when the server answers with a DDP error', async () => {
+      // A `nosub` carrying a DDP error is the server saying it does not have
+      // this subscription. Keeping the entry would have `subscribeAll` re-ask
+      // for a stream nobody wants, on every login, for the life of the socket.
       await subscribe('stream-room-messages', ['GENERAL'])
 
       const unsubscribing = socket.unsubscribe('ddp-1')
@@ -118,27 +119,31 @@ describe('Socket subscription bookkeeping', () => {
       await expect(unsubscribing).rejects.toThrow('no such subscription')
       await expect(unsubscribing).rejects.toMatchObject({ reason: 'no such subscription' })
 
-      const resubscribing = socket.subscribeAll()
+      expect(socket.subscriptions).toEqual({})
 
-      expect(transport.lastSent()).toEqual({
-        msg: 'sub',
-        id: 'ddp-1',
-        name: 'stream-room-messages',
-        params: ['GENERAL']
-      })
+      await socket.subscribeAll()
 
-      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
-      await resubscribing
+      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+    })
+
+    it('keeps the subscription when the rejection is the SDK\'s own', async () => {
+      // No DDP response arrived, so the server may well still be streaming: the
+      // driver must still hold the id to resubscribe with.
+      await subscribe('stream-room-messages', ['GENERAL'])
+
+      const unsubscribing = socket.unsubscribe('ddp-1')
+      socket.reopenNow()
+      await expect(unsubscribing).rejects.toThrow('[ddp] connection reopened before the response arrived')
 
       expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
     })
   })
 
   describe('unsubscribing from all', () => {
-    it('leaves a refused subscription behind and resolves anyway', async () => {
-      // `unsubscribeAll` does not wipe the collection: each unsubscribe removes
-      // its own entry on acknowledgement, so a refused one survives. It is a
-      // best-effort cleanup, so one refusal does not fail the whole call.
+    it('resolves even when the server refuses one of them', async () => {
+      // `unsubscribeAll` does not wipe the collection: each unsubscribe decides
+      // its own entry. It is a best-effort cleanup, so one refusal does not fail
+      // the whole call — and a refusal the server sent forgets its entry too.
       await subscribe('stream-room-messages', ['GENERAL'])
       await subscribe('stream-notify-user', ['alice/message'])
 
@@ -148,7 +153,19 @@ describe('Socket subscription bookkeeping', () => {
       transport.receive({ msg: 'nosub', id: 'ddp-2', error: { reason: 'no such subscription' } })
       await unsubscribingAll
 
-      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-2'])
+      expect(socket.subscriptions).toEqual({})
+    })
+
+    it('leaves behind the ones the SDK rejected itself', async () => {
+      // Nothing reached the server, so both streams may still be running.
+      await subscribe('stream-room-messages', ['GENERAL'])
+      await subscribe('stream-notify-user', ['alice/message'])
+
+      const unsubscribingAll = socket.unsubscribeAll()
+      socket.reopenNow()
+      await unsubscribingAll
+
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1', 'ddp-2'])
     })
 
     it('still logs out when the server refuses an unsubscribe', async () => {
