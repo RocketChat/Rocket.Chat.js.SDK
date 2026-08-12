@@ -68,7 +68,9 @@ Each of the three modules declares exactly the surface that is read.
   `IMessage`'s fields. The API client both constructs it and annotates a return
   type with it, so replacing it with a function returning `IMessage` is a change
   to that module rather than to this one.
-- The lint ledger in `.oxlintrc.json` still carries a `no-this-alias` entry for
-  the deleted `debounce` helper, and its warning total is one higher than the
-  code now produces. Lint gates on errors, so nothing fails; the entry is stale
-  and clears with a separate change.
+- Two documents outside the shared modules now describe them wrongly, and both
+  are left to a separate change. `.oxlintrc.json` carries a `no-this-alias`
+  entry for the deleted `debounce` helper and a warning total one higher than the
+  code produces; lint gates on errors, so nothing fails. `AGENTS.md` and
+  `CLAUDE.md` both say `lib/settings.ts` reads `process.env` at import time,
+  which this ADR makes false.

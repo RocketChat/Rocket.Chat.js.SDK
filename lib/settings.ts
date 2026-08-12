@@ -1,4 +1,3 @@
-// The consuming app assigns this binding and the SDK reads it back through the
-// module namespace, so both the `let` and the wide type are load-bearing: the app
-// assigns an interface-typed object, which no index signature would accept.
+// The consuming app assigns this binding, and assigns an interface-typed object.
+// Narrowing either the `let` or the type breaks the app's compile, not this one's.
 export let customHeaders = {};

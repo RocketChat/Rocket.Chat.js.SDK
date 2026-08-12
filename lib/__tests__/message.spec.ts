@@ -28,7 +28,7 @@ describe('Message', () => {
     })
   })
 
-  it('traces an automated send by its integration', () => {
+  it('traces an automated send by its Integration', () => {
     expect({ ...new Message('hello', { rid: 'room', integrationId: 'js.SDK' }) }).toEqual({
       msg: 'hello',
       rid: 'room',
@@ -36,7 +36,7 @@ describe('Message', () => {
     })
   })
 
-  it('is not a bot send without an integration', () => {
+  it('is not an automated send without an Integration', () => {
     expect(new Message('hello', { rid: 'room' })).not.toHaveProperty('bot')
   })
 })
