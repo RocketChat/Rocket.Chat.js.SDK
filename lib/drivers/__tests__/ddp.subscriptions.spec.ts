@@ -171,4 +171,18 @@ describe('Socket subscription bookkeeping', () => {
       await expect(loggingOut).resolves.toBe(true)
     })
   })
+
+  describe('closing the connection', () => {
+    it('clears every subscription even though no response can arrive', async () => {
+      // `close` sends the `unsub` messages without awaiting them and then tears
+      // the connection down, so `unsubscribe` never gets its acknowledgement and
+      // never removes its own entry. The map is cleared by `close` itself.
+      await subscribe('stream-room-messages', ['GENERAL'])
+      await subscribe('stream-notify-user', ['alice/message'])
+
+      await socket.close()
+
+      expect(Object.keys(socket.subscriptions)).toEqual([])
+    })
+  })
 })

@@ -215,6 +215,8 @@ export class Socket extends SDKEventEmitter {
       .catch(this.logger.error)
     }
 
+    Object.keys(this.subscriptions).forEach((id) => delete this.subscriptions[id])
+
     return Promise.resolve()
   }
 
