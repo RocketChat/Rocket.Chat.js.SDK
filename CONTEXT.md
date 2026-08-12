@@ -32,11 +32,23 @@ _Avoid_: Msg, post, chat
 **Reaction**:
 An emoji attached to an existing message by a user.
 
+**Integration**:
+The automated sender a Message can be traced back to, named by an integration id
+and carried on the message as its `bot` field. A Message without one was sent by
+the user, not on their behalf.
+_Avoid_: Bot (that was a client this fork removed), webhook, app
+
 ### Realtime
 
 **Client**:
 The object a consuming app holds to reach a server — the SDK's entry point, covering both REST requests and realtime. Owns a Driver; is not one.
 _Avoid_: SDK instance, connection
+
+**Custom headers**:
+The headers the consuming app attaches to everything the SDK sends — every REST
+request and the Socket handshake alike. One binding shared by the whole process,
+assigned by the app and read back by the SDK, not per-Client configuration.
+_Avoid_: Settings (that is only the module holding it), auth headers, options
 
 **Driver**:
 The realtime transport behind a Client, speaking one wire protocol to the server. Not something a consuming app talks to directly.
