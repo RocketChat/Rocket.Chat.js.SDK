@@ -213,32 +213,18 @@ describe('Socket connection lifecycle', () => {
     })
   })
 
-  describe('the interval argument to open', () => {
-    it('becomes the retry interval for later reopens', async () => {
-      // The interval passed here is deliberately far shorter than the configured
-      // `REOPEN_DELAY`, so the boundary below can only pass if the retry ran on
-      // the argument rather than on the option.
-      const PASSED_DELAY = 25
-
-      transport.readyState = CLOSED
-      const opening = socket.open(PASSED_DELAY)
-
-      const reopened = fakeSockets[1]
-      await driveToHandshake(reopened)
-      await opening
-
-      expect(socket.config.reopen).toBe(PASSED_DELAY)
-
-      reopened.close(1006)
-
-      await jest.advanceTimersByTimeAsync(PASSED_DELAY - 1)
-      expect(fakeSockets).toHaveLength(2)
-
-      await jest.advanceTimersByTimeAsync(1)
-      expect(fakeSockets).toHaveLength(3)
-    })
-
-    it('leaves the configured interval alone when omitted', async () => {
+  describe('the retry interval', () => {
+    /**
+     * `open` used to take the interval as an argument and never read it. The
+     * parameter is gone, so the `reopen` option is the only way to set it — this
+     * asserts a socket reconnected through `open` still retries on that option,
+     * which is the behaviour the removed parameter appeared to offer.
+     *
+     * That the parameter is gone is a compile-time fact, enforced by the
+     * typecheck rather than by an assertion here: `socket.open(1)` no longer
+     * builds.
+     */
+    it('comes from the reopen option after a reconnect', async () => {
       transport.readyState = CLOSED
       const opening = socket.open()
 
