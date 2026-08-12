@@ -29,6 +29,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
+import { DDPError, toError } from './ddpError'
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
@@ -117,23 +118,18 @@ export class Socket extends SDKEventEmitter {
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
    */
-  open = (_ms: number = this.config.reopen) => {
-    return new Promise<any>(async (resolve, reject) => {
-      if (this.connected) {
-        return resolve(undefined)
-      }
+  open = async (_ms: number = this.config.reopen): Promise<any> => {
+    if (this.connected) {
+      return undefined
+    }
 
-      if (this.reopenPromise) {
-        return this.reopenPromise.then(() => resolve(this.connection)).catch(reject)
-      }
+    if (this.reopenPromise) {
+      await this.reopenPromise
+      return this.connection
+    }
 
-      try {
-        await this.createConnection()
-        resolve(this.connection)
-      } catch (err) {
-        reject(err)
-      }
-    })
+    await this.createConnection()
+    return this.connection
   }
 
   /** Send handshake message to confirm connection, start pinging. */
@@ -179,10 +175,23 @@ export class Socket extends SDKEventEmitter {
    */
   onMessage = (e: any) => {
     this.lastPing = Date.now()
-    const data = (e.data) ? JSON.parse(e.data) : undefined
-  
+    if (!e.data) return
+
+    // The caller is the websocket's `onmessage`, which has nowhere to put a
+    // throw — a malformed frame is logged and dropped.
+    let data
+    try {
+      data = JSON.parse(e.data)
+    } catch (err) {
+      return this.logger.error(
+        `[ddp] JSON parse error on frame: ${e.data} — ${(err as Error).message}`
+      )
+    }
+
+    // A frame that parses to a falsy value — `null`, `0`, `""` — carries
+    // nothing to dispatch on.
+    if (!data) return this.logger.debug(`[ddp] empty frame dropped: ${e.data}`)
     this.logger.debug(data) // 👈  very useful for debugging missing responses
-    if (!data) return this.logger.error(`[ddp] JSON parse error: ${e.message}`)
     this.logger.debug(`[ddp] messages received: ${e.data}`)
     if (data.collection) this.emit(data.collection, data)
     if (data.msg) this.emit(data.msg, data)
@@ -196,17 +205,28 @@ export class Socket extends SDKEventEmitter {
     this.openTimeout && clearTimeout(this.openTimeout as any)
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
 
-    if (this.connected) {
+    if (this.connection && this.connection.readyState !== 3) {
+      const connection = this.connection
       await new Promise((resolve) => {
-        if (this.connection) {
-          this.once('close', resolve)
-          this.connection.close(userDisconnectCloseCode)
-        }
+        this.once('close', resolve)
+        connection.close(userDisconnectCloseCode)
       })
       .catch(this.logger.error)
     }
 
+    this.forgetAllSubscriptions()
+
     return Promise.resolve()
+  }
+
+  /** Drop one DDP subscription. */
+  forgetSubscription = (id: string) => {
+    delete this.subscriptions[id]
+  }
+
+  /** Drop every DDP subscription, one key at a time, in the same object. */
+  forgetAllSubscriptions = () => {
+    Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
   }
 
   // Call open directly, so it skips openTimeout
@@ -326,6 +346,36 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
+   * Wait for the socket to open, bounded by the reopen interval. Rejects on the
+   * deadline so a send issued while the socket is down fails the caller rather
+   * than hanging for the life of the process.
+   *
+   * The default is twice `config.reopen`, not `config.reopen`: `reopen()` only
+   * *schedules* the retry at that interval, so a deadline of exactly `reopen`
+   * expires as the reconnect begins and every send issued at a drop fails.
+   */
+  private waitForOpen = (timeoutMs = this.config.reopen * 2): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        this.off('open', onOpen)
+        clearTimeout(timeout as any)
+      }
+
+      const onOpen = () => {
+        cleanup()
+        resolve()
+      }
+
+      this.once('open', onOpen)
+
+      const timeout = setTimeout(() => {
+        cleanup()
+        reject(new Error('[ddp] timed out waiting for the connection to open'))
+      }, timeoutMs)
+    })
+  }
+
+  /**
    * Send an object to the server via Socket. Adds handler to collection to
    * allow awaiting response matching an expected object. Most responses are
    * identified by their message event name and the ID they were sent with, but
@@ -337,35 +387,47 @@ export class Socket extends SDKEventEmitter {
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
   send = async (obj: any): Promise<any> => {
-    return new Promise<any>(async(resolve, reject) => {
-      if (!this.connection) throw new Error('[ddp] sending without open connection')
-      if (!this.connected) await new Promise(resolve => this.on('open', resolve))
+    // Outside the promise executor: a `throw` from an async executor is dropped
+    // on the floor as an unhandled rejection instead of rejecting the send.
+    if (!this.connection) throw new Error('[ddp] sending without open connection')
+    if (!this.connected) await this.waitForOpen()
 
+    return new Promise<any>((resolve, reject) => {
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const stringdata = JSON.stringify(data)
+      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
-      if (/^sub$/.test(obj.msg)) {
-        const { name, params } = obj;
-        this.subscriptions[id] = { id, name, params, unsubscribe: this.unsubscribe.bind(this, id) };
-      }
-
       try {
-        this.connection.send(stringdata)
-      } catch {
-        this.logger.error('[ddp] send without open connection');
+        // Read fresh rather than captured above the wait: a reopen while the send
+        // waited on `open` will have replaced the connection.
+        this.connection!.send(stringdata)
+      } catch (err) {
+        this.logger.error(`[ddp] the transport failed to write the message: ${stringdata}`);
+        return reject(err)
       }
 
-      this.once('disconnected', reject)
-      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
+      // Before any listener is attached: a frame with no reply to wait for —
+      // `pong` — would otherwise strand a `disconnected` listener forever.
       if (!listener) {
         return resolve(undefined)
       }
+
+      // Named, and the *same* reference `off` is given below: `disconnected` is
+      // emitted with no arguments, so handing `reject` straight to it rejected
+      // every in-flight send with `undefined` — and callers read `err.message`
+      // inside their `catch`, which then threw a TypeError from the rejection
+      // handler. The pairing matters as much as the Error: `off` only removes a
+      // listener it can match, and a miss is silently a no-op.
+      const rejectOnDisconnect = () =>
+        reject(new Error('[ddp] connection reopened before the response arrived'))
+
+      this.once('disconnected', rejectOnDisconnect)
       this.once(listener, (result: any) => {
-        this.off('disconnected', reject)
-        return (result.error ? reject(result.error) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+        this.off('disconnected', rejectOnDisconnect)
+        return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       })
     })
   }
@@ -374,9 +436,23 @@ export class Socket extends SDKEventEmitter {
   ping = async () => {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
-      this.send({ msg: 'ping' })
+      // The ping goes out while `connected` is still true, so its send never
+      // waits on `open` — it waits on a pong reply that a dead socket never
+      // sends, and without a deadline of its own the chain stops here and
+      // `reopen` is never reached. The deadline lives in `ping` rather than in
+      // `send`, so no other caller inherits a reply timeout.
+      let deadline: NodeJS.Timer | number | undefined
+      const answered = new Promise<void>((_, expire) => {
+        deadline = setTimeout(
+          () => expire(new Error('[ddp] ping went unanswered')),
+          this.config.ping
+        )
+      })
+
+      Promise.race([this.send({ msg: 'ping' }), answered])
         .then(() => this.ping())
         .catch(() => this.reopen())
+        .finally(() => clearTimeout(deadline as any))
     }, this.config.ping)
   }
 
@@ -460,6 +536,9 @@ export class Socket extends SDKEventEmitter {
   /**
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
+   *
+   * Sole owner of `subscriptions`: the entry is written on the server's
+   * acknowledgement, so a refused or unanswered `sub` leaves nothing behind.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -495,25 +574,25 @@ export class Socket extends SDKEventEmitter {
 
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
   unsubscribe = (id: any) => {
-    if (!this.subscriptions[id]) return Promise.reject(id)
-    delete this.subscriptions[id]
+    if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
     return this.send({ msg: 'unsub', id })
-      .then((data: any) => data.result || data.subs)
+      .then((data: any) => {
+        this.forgetSubscription(id)
+        return data.result || data.subs
+      })
       .catch((err) => {
-        if (!err.msg && err.msg !== 'nosub') {
-          this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
-          throw err
-        }
+        if (err instanceof DDPError) this.forgetSubscription(id)
+        this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
+        throw err
       })
   }
 
-  /** Unsubscribe from all active subscriptions and reset collection */
+  /** Unsubscribe from all active subscriptions, ignoring any the server refuses */
   unsubscribeAll = () => {
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
-      return this.subscriptions[id].unsubscribe()
+      return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })
-    return Promise.all(unsubAll)
-      .then(() => this.subscriptions = {})
+    return Promise.all(unsubAll).then(() => undefined)
   }
 }
 
@@ -560,7 +639,7 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
       ...config,
       ...moreConfigs,
       host: host.replace(/(^\w+:|^)\/\//, ''),
-      timeout: 10000
+      timeout: moreConfigs.timeout ?? config?.timeout ?? 10000
 			// reopen: number
 			// ping: number
 			// close: number
@@ -773,7 +852,7 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/** Unsubscribe from all subscriptions. Proxy for socket unsubscribeAll */
-  unsubscribeAll = (): Promise<any> => {
+  unsubscribeAll = (): Promise<void> => {
     return this.ddp.unsubscribeAll()
   }
 
