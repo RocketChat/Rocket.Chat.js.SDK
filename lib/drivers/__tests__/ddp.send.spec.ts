@@ -2,20 +2,18 @@ import { Socket } from '../ddp'
 import * as settings from '../../settings'
 import { silentLogger } from '../../../test/silentLogger'
 import {
-  CLOSED,
-  FakeWebSocket,
-  driveToHandshake,
-  fakeSockets,
+  connections,
+  FakeServer,
   openFakeConnection,
-  useFakeClockAndSocketRegistry
-} from '../../../test/fakeTransport'
+  useFakeServers
+} from '../../../test/fakeServer'
 
 // Hoisted above the imports by jest, so the driver's own `import WebSocket from
 // 'universal-websocket-client'` resolves to the fake. This is the whole seam:
 // the driver constructs the fake through its normal code path.
-jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeServer').fakeServerModule)
 
-useFakeClockAndSocketRegistry()
+useFakeServers()
 
 const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
 
@@ -24,33 +22,33 @@ describe('the transport seam', () => {
     // Replaced rather than assigned, for the same reason test/setup.ts does it:
     // jest owns the restore, so this cannot leak into the next test.
     jest.replaceProperty(settings, 'customHeaders', { 'X-Auth-Token': 'token' })
-    await openFakeConnection(createSocket())
+    const server = await openFakeConnection(createSocket())
 
-    expect(fakeSockets).toHaveLength(1)
-    expect(fakeSockets[0].url).toBe('ws://localhost:3000/websocket')
-    expect(fakeSockets[0].protocols).toBeNull()
-    expect(fakeSockets[0].options).toEqual({ headers: { 'X-Auth-Token': 'token' } })
+    expect(connections.count).toBe(1)
+    expect(server.url).toBe('ws://localhost:3000/websocket')
+    expect(server.protocols).toBeNull()
+    expect(server.options).toEqual({ headers: { 'X-Auth-Token': 'token' } })
   })
 
   it('starts the next test with the shared headers already reset', async () => {
     // Nothing in this file resets them: test/setup.ts registers the reset with
     // jest, and `restoreMocks` in jest.config.js applies it.
-    await openFakeConnection(createSocket())
+    const server = await openFakeConnection(createSocket())
 
-    expect(fakeSockets[0].options).toEqual({ headers: {} })
+    expect(server.options).toEqual({ headers: {} })
   })
 
   it('fires the close handler with the code it was closed with', async () => {
     const socket = createSocket()
-    const transport = await openFakeConnection(socket)
+    const server = await openFakeConnection(socket)
     const closed = jest.fn()
     socket.on('close', closed)
 
     // 4000 is the driver's own user-disconnect code; it is the branch that does
     // *not* schedule a reopen, so closing with it leaves no timer behind here.
-    transport.close(4000)
+    server.close(4000)
 
-    expect(transport.closedWith).toEqual([4000])
+    expect(server.closedWith).toEqual([4000])
     expect(closed).toHaveBeenCalledWith({ code: 4000 })
     expect(socket.connected).toBe(false)
   })
@@ -58,11 +56,11 @@ describe('the transport seam', () => {
 
 describe('Socket.send', () => {
   let socket: Socket
-  let transport: FakeWebSocket
+  let server: FakeServer
 
   beforeEach(async () => {
     socket = createSocket()
-    transport = await openFakeConnection(socket)
+    server = await openFakeConnection(socket)
   })
 
   describe('request ids', () => {
@@ -70,42 +68,42 @@ describe('Socket.send', () => {
       // The handshake was frame 0, so the first send from a test is `ddp-1`.
       const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
 
-      expect(transport.lastSent()).toEqual({
+      expect(server.lastFrame()).toEqual({
         msg: 'method',
         method: 'getUsersOfRoom',
         params: [],
         id: 'ddp-1'
       })
 
-      transport.receive({ msg: 'result', id: 'ddp-1', result: 'ok' })
+      server.deliver({ msg: 'result', id: 'ddp-1', result: 'ok' })
       await sending
     })
 
     it('keeps an id the caller supplied', async () => {
       const sending = socket.send({ msg: 'sub', id: 'given-id', name: 'stream', params: [] })
 
-      expect(transport.lastSent().id).toBe('given-id')
+      expect(server.lastFrame().id).toBe('given-id')
 
-      transport.receive({ msg: 'ready', subs: ['given-id'] })
+      server.deliver({ msg: 'ready', subs: ['given-id'] })
       await sending
     })
 
     it('sends the handshake, ping and pong without an id', async () => {
       // The three DDP messages the protocol matches by `msg` alone. The
       // handshake already proved `connect`; ping and pong are sent here.
-      expect(JSON.parse(transport.sent[0])).toEqual({
+      expect(server.frames()[0]).toEqual({
         msg: 'connect',
         version: '1',
         support: ['1', 'pre2', 'pre1']
       })
 
       const pinging = socket.send({ msg: 'ping' })
-      expect(transport.lastSent()).toEqual({ msg: 'ping' })
-      transport.receive({ msg: 'pong' })
+      expect(server.lastFrame()).toEqual({ msg: 'ping' })
+      server.deliver({ msg: 'pong' })
       await pinging
 
       await socket.send({ msg: 'pong' })
-      expect(transport.lastSent()).toEqual({ msg: 'pong' })
+      expect(server.lastFrame()).toEqual({ msg: 'pong' })
     })
 
     it('strips the id from any msg merely containing connect, ping or pong', async () => {
@@ -114,16 +112,16 @@ describe('Socket.send', () => {
       // pinned so that adding one is a visible decision rather than a surprise.
       await socket.send({ msg: 'preconnect' })
 
-      expect(transport.lastSent()).toEqual({ msg: 'preconnect' })
+      expect(server.lastFrame()).toEqual({ msg: 'preconnect' })
     })
 
     it('still counts the id-less frames', async () => {
       await socket.send({ msg: 'pong' })
 
       const sending = socket.send({ msg: 'method', method: 'ping', params: [] })
-      expect(transport.lastSent().id).toBe('ddp-2')
+      expect(server.lastFrame().id).toBe('ddp-2')
 
-      transport.receive({ msg: 'result', id: 'ddp-2' })
+      server.deliver({ msg: 'result', id: 'ddp-2' })
       await sending
     })
   })
@@ -133,8 +131,8 @@ describe('Socket.send', () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       // Deliberately noisy: a reply carrying a different id must not resolve it.
-      transport.receive({ msg: 'result', id: 'ddp-99', result: 'wrong' })
-      transport.receive({ msg: 'result', id: 'ddp-1', result: 'right' })
+      server.deliver({ msg: 'result', id: 'ddp-99', result: 'wrong' })
+      server.deliver({ msg: 'result', id: 'ddp-1', result: 'right' })
 
       await expect(sending).resolves.toEqual({ id: 'ddp-1', result: 'right', error: undefined })
     })
@@ -142,7 +140,7 @@ describe('Socket.send', () => {
     it('matches a ping on pong rather than on an id', async () => {
       const pinging = socket.send({ msg: 'ping' })
 
-      transport.receive({ msg: 'pong' })
+      server.deliver({ msg: 'pong' })
 
       // No `id` in the resolved value: the id-less requests get no id back.
       await expect(pinging).resolves.toEqual({ msg: 'pong' })
@@ -166,7 +164,7 @@ describe('Socket.send', () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       const error = { error: 403, reason: 'User not found', errorType: 'Meteor.Error' }
-      transport.receive({ msg: 'result', id: 'ddp-1', error })
+      server.deliver({ msg: 'result', id: 'ddp-1', error })
 
       // Callers up the stack log `err.message`; the reason has to survive there.
       await expect(sending).rejects.toBeInstanceOf(Error)
@@ -179,7 +177,7 @@ describe('Socket.send', () => {
 
   describe('sending while the connection is not open', () => {
     it('rejects on the deadline rather than waiting on open forever', async () => {
-      transport.readyState = CLOSED
+      server.closeQuietly()
 
       // Asserted before the clock moves: the rejection lands inside the advance,
       // and an unattached handler at that point is an unhandled rejection.
@@ -189,24 +187,24 @@ describe('Socket.send', () => {
       await jest.advanceTimersByTimeAsync(10 * 60 * 1000)
 
       await rejected
-      expect(transport.sent).toHaveLength(1) // the handshake only
+      expect(server.frameCount).toBe(1) // the handshake only
     })
 
     it('sends once the connection opens inside the deadline', async () => {
-      transport.readyState = CLOSED
+      server.closeQuietly()
 
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
       // `open` is emitted at the end of the handshake, so the whole reopen has to
       // run before the waiting send can go out.
-      await driveToHandshake(transport)
+      await server.accept()
       await jest.advanceTimersByTimeAsync(0)
 
       // `onOpen` sends its own handshake on the same tick, so the waiting send is
       // not necessarily the last frame — only that it was written at all.
-      expect(transport.sent.map(frame => JSON.parse(frame)))
+      expect(server.frames())
         .toContainEqual({ msg: 'method', method: 'login', params: [], id: 'ddp-2' })
-      transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+      server.deliver({ msg: 'result', id: 'ddp-2', result: 'ok' })
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
     })
 
@@ -233,7 +231,7 @@ describe('Socket.send with several listeners on one event', () => {
   const REOPEN_DELAY = 3000
 
   let socket: Socket
-  let transport: FakeWebSocket
+  let server: FakeServer
 
   beforeEach(async () => {
     socket = new Socket({
@@ -242,23 +240,23 @@ describe('Socket.send with several listeners on one event', () => {
       reopen: REOPEN_DELAY,
       ping: 10 * 60 * 1000
     })
-    transport = await openFakeConnection(socket)
+    server = await openFakeConnection(socket)
   })
 
   it('writes every send that was waiting on open, not just one', async () => {
-    transport.readyState = CLOSED
+    server.closeQuietly()
 
     const sends = [1, 2, 3].map(() =>
       socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
     )
 
-    await driveToHandshake(transport)
+    await server.accept()
     await jest.advanceTimersByTimeAsync(0)
 
-    const written = transport.sent.map(frame => JSON.parse(frame))
+    const written = server.frames()
     for (const id of ['ddp-2', 'ddp-3', 'ddp-4']) {
       expect(written).toContainEqual({ msg: 'method', method: 'getUsersOfRoom', params: [], id })
-      transport.receive({ msg: 'result', id, result: 'ok' })
+      server.deliver({ msg: 'result', id, result: 'ok' })
     }
 
     await expect(Promise.all(sends)).resolves.toHaveLength(3)
@@ -267,23 +265,22 @@ describe('Socket.send with several listeners on one event', () => {
   it('carries a send issued at a drop across the whole reopen cycle', async () => {
     // The deadline is twice the reopen delay, so the reconnect the close
     // scheduled has time to finish before the waiting send gives up.
-    transport.close(1006)
+    server.close(1006)
 
     const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
 
     await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
-    expect(fakeSockets).toHaveLength(2)
+    expect(connections.count).toBe(2)
 
-    const reopened = fakeSockets[1]
-    await driveToHandshake(reopened)
+    const reopened = connections.latest
+    await reopened.accept()
     await jest.advanceTimersByTimeAsync(0)
 
-    const written = reopened.sent.map(frame => JSON.parse(frame))
-    expect(written).toContainEqual({
+    expect(reopened.frames()).toContainEqual({
       msg: 'method', method: 'getUsersOfRoom', params: [], id: 'ddp-2'
     })
 
-    reopened.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+    reopened.deliver({ msg: 'result', id: 'ddp-2', result: 'ok' })
     await expect(sending).resolves.toMatchObject({ result: 'ok' })
   })
 
@@ -311,7 +308,7 @@ describe('Socket.send with several listeners on one event', () => {
     // failure used to be logged and swallowed, leaving the caller's promise
     // pending forever.
     const failure = new Error('transport write failed')
-    transport.sendError = failure
+    server.failWrites(failure)
 
     await expect(socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] }))
       .rejects.toBe(failure)
@@ -322,7 +319,7 @@ describe('Socket.send with several listeners on one event', () => {
     // `config.reopen`: at exactly `reopen` it expires as the reconnect begins,
     // so every send issued at a drop fails. Both boundaries are asserted, so
     // reverting the default to `config.reopen` fails here.
-    transport.readyState = CLOSED
+    server.closeQuietly()
 
     const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
     const settled = jest.fn()

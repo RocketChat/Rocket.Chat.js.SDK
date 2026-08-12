@@ -88,3 +88,7 @@ _Avoid_: Health check, ping (that is one message of the chain)
 **Deadline**:
 A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Every wait the SDK can be left holding has one.
 _Avoid_: Timeout — that is a config option, and it means only the connection one
+
+**Fake server**:
+The test stand-in for the Rocket.Chat server at the other end of a Socket. A spec never drives the raw websocket: it drives a fake server, which accepts the connection, delivers DDP messages, and reads the frames the driver sent. Built by the driver itself through the mocked transport module, so the code under test takes its normal path.
+_Avoid_: Mock socket, fake transport, stub, test double

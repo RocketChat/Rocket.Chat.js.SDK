@@ -2,20 +2,17 @@ import { DDPDriver } from '../ddp'
 import { ISocketOptions } from '../../../interfaces'
 import { silentLogger } from '../../../test/silentLogger'
 import {
-  CLOSED,
-  driveToHandshake,
-  FakeWebSocket,
-  fakeSockets,
-  OPEN,
+  connections,
+  FakeServer,
   openFakeConnection,
-  useFakeClockAndSocketRegistry
-} from '../../../test/fakeTransport'
+  useFakeServers
+} from '../../../test/fakeServer'
 
 // Same seam as the socket specs: the driver builds its Socket, the Socket builds
-// the fake through its normal code path. See test/fakeTransport.ts.
-jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
+// the fake through its normal code path. See test/fakeServer.ts.
+jest.mock('universal-websocket-client', () => require('../../../test/fakeServer').fakeServerModule)
 
-useFakeClockAndSocketRegistry()
+useFakeServers()
 
 // Typed rather than `object`: the option names have to typecheck, or the pin on
 // the discarded timeout would go green against a typo.
@@ -63,7 +60,7 @@ describe('new DDPDriver', () => {
 describe('DDPDriver.subscribe', () => {
   it('reshapes its arguments and drops the id on the way through', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const server = await openFakeConnection(driver.ddp)
 
     const subscribing = driver.subscribe('stream-notify-room', 'room-id/typing', false)
 
@@ -76,14 +73,14 @@ describe('DDPDriver.subscribe', () => {
     // send-time id instead. Resubscribing through this method therefore cannot
     // reuse an existing subscription's id; `waitForNotifyUserMediaSubs` goes
     // through the raw socket for exactly that reason.
-    expect(transport.lastSent()).toEqual({
+    expect(server.lastFrame()).toEqual({
       msg: 'sub',
       id: 'ddp-1',
       name: 'stream-notify-room',
       params: ['room-id/typing', { useCollection: false, args: [false] }]
     })
 
-    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    server.deliver({ msg: 'ready', subs: ['ddp-1'] })
 
     // And the subscription is filed under that send-time id, holding the
     // reshaped params rather than the ones the caller passed.
@@ -101,66 +98,63 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
   const topic = 'stream-notify-user'
 
   /** Register a media subscription on the socket, as a successful sub would. */
-  const addMediaSub = async (driver: DDPDriver, transport: FakeWebSocket, name: string) => {
+  const addMediaSub = async (driver: DDPDriver, server: FakeServer, name: string) => {
     const id = `sub-${name}`
     // Through the raw socket, with an explicit id: this is the shape the
     // readiness poll looks for — `name` the topic, `params[0]` the user event.
     const subscribing = driver.ddp.subscribe(topic, [`${userId}/${name}`], undefined, id)
-    transport.receive({ msg: 'ready', subs: [id] })
+    server.deliver({ msg: 'ready', subs: [id] })
     await subscribing
   }
 
   it('resolves false without a logged-in user, before scheduling anything', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
-    const sentBefore = transport.sent.length
+    const server = await openFakeConnection(driver.ddp)
+    const framesBefore = server.frameCount
     // The socket's own ping timer is pending here and stays that way; what the
     // guard has to avoid is adding the poll and the deadline on top of it.
     const timersBefore = jest.getTimerCount()
 
     await expect(driver.waitForNotifyUserMediaSubs()).resolves.toBe(false)
 
-    expect(transport.sent).toHaveLength(sentBefore)
+    expect(server.frameCount).toBe(framesBefore)
     expect(jest.getTimerCount()).toBe(timersBefore)
   })
 
-  it('resolves ready after an immediate reopen, on the socket the reopen built', async () => {
+  it('resolves ready after an immediate reopen, on the connection the reopen built', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const server = await openFakeConnection(driver.ddp)
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    await addMediaSub(driver, server, 'media-signal')
+    await addMediaSub(driver, server, 'media-calls')
 
-    // A real reopen: a second transport is constructed and handshaken, and the
+    // A real reopen: a second connection is built and handshaken, and the
     // subscription map survives it — which is what makes the resubscribe below
     // reuse the ids rather than mint new ones.
     const reopening = driver.reopenNow()
-    const reopened = fakeSockets[fakeSockets.length - 1]
-    expect(reopened).not.toBe(transport)
-    reopened.readyState = OPEN
-    reopened.onopen?.({})
-    await jest.advanceTimersByTimeAsync(0)
-    reopened.receive({ msg: 'connected', session: 'reopened-session' })
+    const reopened = connections.latest
+    expect(reopened).not.toBe(server)
+    await reopened.accept('reopened-session')
     await reopening
 
     const waiting = driver.waitForNotifyUserMediaSubs()
-    // The resubscribes go out on the new socket, not the dead one.
-    expect(reopened.sent.map((frame) => JSON.parse(frame).id))
+    // The resubscribes go out on the new connection, not the dead one.
+    expect(reopened.frames().map((frame) => frame.id))
       .toEqual(expect.arrayContaining(['sub-media-signal', 'sub-media-calls']))
-    reopened.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    reopened.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    reopened.deliver({ msg: 'ready', subs: ['sub-media-signal'] })
+    reopened.deliver({ msg: 'ready', subs: ['sub-media-calls'] })
 
     await expect(waiting).resolves.toBe(true)
   })
 
   it('does not resubscribe again while a resubscribe is still in flight', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const server = await openFakeConnection(driver.ddp)
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    await addMediaSub(driver, server, 'media-signal')
+    await addMediaSub(driver, server, 'media-calls')
 
-    const sentBefore = transport.sent.length
+    const framesBefore = server.frameCount
     const waiting = driver.waitForNotifyUserMediaSubs()
     let resolved: boolean | undefined
     waiting.then((value) => { resolved = value }, () => { resolved = false })
@@ -170,18 +164,18 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     // resubscribes — a storm the server would see as repeated sub requests.
     await jest.advanceTimersByTimeAsync(1000)
 
-    expect(transport.sent).toHaveLength(sentBefore + 2)
+    expect(server.frameCount).toBe(framesBefore + 2)
     expect(resolved).toBeUndefined()
 
     // Left settled so the pending timers do not outlive the test.
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    server.deliver({ msg: 'ready', subs: ['sub-media-signal'] })
+    server.deliver({ msg: 'ready', subs: ['sub-media-calls'] })
     await expect(waiting).resolves.toBe(true)
   })
 
   it('polls until both media subscriptions appear, then resubscribes on their own ids', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const server = await openFakeConnection(driver.ddp)
     // The field login writes. Assigning it keeps the reconnect being reproduced
     // here — subscriptions not yet restored — reachable without a login round.
     driver.userId = userId
@@ -195,26 +189,25 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     expect(resolved).toBeUndefined()
 
     // Half of what it waits for is not enough: the poll wants both.
-    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, server, 'media-signal')
     await jest.advanceTimersByTimeAsync(100)
     expect(resolved).toBeUndefined()
 
-    await addMediaSub(driver, transport, 'media-calls')
-    const sentBefore = transport.sent.length
+    await addMediaSub(driver, server, 'media-calls')
+    const framesBefore = server.frameCount
     await jest.advanceTimersByTimeAsync(100)
 
     // Both resubscribes go out on the existing ids, so the server treats them as
     // the same subscriptions rather than minting new ones.
-    const resent = transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame))
-    expect(resent).toEqual([
+    expect(server.framesSince(framesBefore)).toEqual([
       { msg: 'sub', id: 'sub-media-signal', name: topic, params: [`${userId}/media-signal`] },
       { msg: 'sub', id: 'sub-media-calls', name: topic, params: [`${userId}/media-calls`] }
     ])
 
     // Still pending until the server acks both: readiness is the ack, not the send.
     expect(resolved).toBeUndefined()
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    server.deliver({ msg: 'ready', subs: ['sub-media-signal'] })
+    server.deliver({ msg: 'ready', subs: ['sub-media-calls'] })
 
     await expect(waiting).resolves.toBe(true)
   })
@@ -237,10 +230,10 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
 
   it('leaves no timer behind once it settles', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const server = await openFakeConnection(driver.ddp)
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    await addMediaSub(driver, server, 'media-signal')
+    await addMediaSub(driver, server, 'media-calls')
 
     // The socket's own ping timer is already pending and stays that way; only
     // what the wait itself scheduled has to be gone by the end.
@@ -248,8 +241,8 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     // The first attempt runs synchronously, so both resubscribes are already out.
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    server.deliver({ msg: 'ready', subs: ['sub-media-signal'] })
+    server.deliver({ msg: 'ready', subs: ['sub-media-calls'] })
     await expect(waiting).resolves.toBe(true)
 
     // Both the poll interval and the deadline are cleared: a leaked interval
@@ -267,27 +260,27 @@ describe('DDPDriver.connect', () => {
     // later reconnect.
     const driver = createDriver()
     const connecting = driver.connect()
-    const transport = fakeSockets[0]
+    const server = connections.latest
 
-    await driveToHandshake(transport)
+    await server.accept()
     await connecting
 
     const connectedSeen = jest.fn()
     driver.on('connected', connectedSeen)
 
-    transport.readyState = CLOSED
+    server.closeQuietly()
     const sending = driver.ddp.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
 
-    await driveToHandshake(transport)
+    await server.accept()
     await jest.advanceTimersByTimeAsync(0)
-    transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+    server.deliver({ msg: 'result', id: 'ddp-2', result: 'ok' })
     await expect(sending).resolves.toMatchObject({ result: 'ok' })
 
     // The reopen the send rode in on is one echo; the next open has to produce
     // another, which is what the dropped listener made impossible.
     expect(connectedSeen).toHaveBeenCalledTimes(1)
 
-    await driveToHandshake(transport)
+    await server.accept()
     expect(connectedSeen).toHaveBeenCalledTimes(2)
   })
 })

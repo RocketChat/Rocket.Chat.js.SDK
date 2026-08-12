@@ -1,18 +1,15 @@
 import { Socket } from '../ddp'
 import { silentLogger } from '../../../test/silentLogger'
 import {
-  CLOSED,
-  driveToHandshake,
-  FakeWebSocket,
-  fakeSockets,
-  OPEN,
+  connections,
+  FakeServer,
   openFakeConnection,
-  useFakeClockAndSocketRegistry
-} from '../../../test/fakeTransport'
+  useFakeServers
+} from '../../../test/fakeServer'
 
-jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeServer').fakeServerModule)
 
-useFakeClockAndSocketRegistry()
+useFakeServers()
 
 /**
  * The interval the whole file is arithmetic about. Deliberately *not* the 10000
@@ -33,17 +30,17 @@ const createSocket = () => new Socket({
  * arithmetic under test is exactly the distance between that stamp and now.
  * Assigning it would make every assertion below vacuous.
  *
- * A pong is therefore always delivered with `transport.receive`, never with
+ * A pong is therefore always delivered with `server.deliver`, never with
  * `socket.emit('pong')`: emitting resolves a pending send but never touches the
  * stamp, so the chain dies a few ticks later with every earlier assertion green.
  */
 describe('Socket liveness', () => {
   let socket: Socket
-  let transport: FakeWebSocket
+  let server: FakeServer
 
   beforeEach(async () => {
     socket = createSocket()
-    transport = await openFakeConnection(socket)
+    server = await openFakeConnection(socket)
   })
 
   describe('alive', () => {
@@ -77,25 +74,25 @@ describe('Socket liveness', () => {
     }
 
     it('is not kept alive by an empty DDP message', async () => {
-      await deliverAtBoundaryThenStepPast(() => transport.receiveRaw(''))
+      await deliverAtBoundaryThenStepPast(() => server.deliverRaw(''))
 
       expect(socket.alive()).toBe(false)
     })
 
     it('is not kept alive by a malformed DDP message', async () => {
-      await deliverAtBoundaryThenStepPast(() => transport.receiveRaw('not json'))
+      await deliverAtBoundaryThenStepPast(() => server.deliverRaw('not json'))
 
       expect(socket.alive()).toBe(false)
     })
 
     it('is not kept alive by a DDP message that parses to nothing', async () => {
-      await deliverAtBoundaryThenStepPast(() => transport.receiveRaw('null'))
+      await deliverAtBoundaryThenStepPast(() => server.deliverRaw('null'))
 
       expect(socket.alive()).toBe(false)
     })
 
     it('is still kept alive by a DDP message it can read, so a healthy socket is never reconnected', async () => {
-      await deliverAtBoundaryThenStepPast(() => transport.receive({ msg: 'updated' }))
+      await deliverAtBoundaryThenStepPast(() => server.deliver({ msg: 'updated' }))
 
       expect(socket.alive()).toBe(true)
     })
@@ -103,13 +100,13 @@ describe('Socket liveness', () => {
 
   describe('connected', () => {
     it('needs both a ready socket and a fresh ping', () => {
-      expect(transport.readyState).toBe(OPEN)
+      expect(server.isOpen).toBe(true)
       expect(socket.alive()).toBe(true)
       expect(socket.connected).toBe(true)
     })
 
     it('is disconnected when the socket is not ready, however fresh the ping', () => {
-      transport.readyState = CLOSED
+      server.closeQuietly()
 
       expect(socket.alive()).toBe(true)
       expect(socket.connected).toBe(false)
@@ -118,7 +115,7 @@ describe('Socket liveness', () => {
     it('is disconnected when the ping is stale, however open the socket', async () => {
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
 
-      expect(transport.readyState).toBe(OPEN)
+      expect(server.isOpen).toBe(true)
       expect(socket.connected).toBe(false)
     })
 
@@ -127,14 +124,14 @@ describe('Socket liveness', () => {
 
       await socket.close()
 
-      expect(transport.closedWith).toEqual([4000]) // the user-disconnect code
-      expect(transport.readyState).toBe(CLOSED)
+      expect(server.closedWith).toEqual([4000]) // the user-disconnect code
+      expect(server.isOpen).toBe(false)
     })
   })
 
   describe('probe', () => {
     it('fails immediately when there is no ready socket', async () => {
-      transport.readyState = CLOSED
+      server.closeQuietly()
 
       await expect(socket.probe()).resolves.toBe(false)
     })
@@ -146,8 +143,8 @@ describe('Socket liveness', () => {
 
       const probing = socket.probe(2000)
 
-      expect(transport.lastSent()).toEqual({ msg: 'ping' })
-      transport.receive({ msg: 'pong' })
+      expect(server.lastFrame()).toEqual({ msg: 'ping' })
+      server.deliver({ msg: 'pong' })
 
       expect(pongSeen).toHaveBeenCalled()
       expect(socket.lastPing).toBe(stampBeforeProbe)
@@ -158,9 +155,9 @@ describe('Socket liveness', () => {
     it('still settles on a later pong after one lands in the probe millisecond', async () => {
       const probing = socket.probe(2000)
 
-      transport.receive({ msg: 'pong' })
+      server.deliver({ msg: 'pong' })
       await jest.advanceTimersByTimeAsync(1)
-      transport.receive({ msg: 'pong' })
+      server.deliver({ msg: 'pong' })
 
       await expect(probing).resolves.toBe(true)
 
@@ -174,7 +171,7 @@ describe('Socket liveness', () => {
       const probing = socket.probe(2000)
 
       await jest.advanceTimersByTimeAsync(1)
-      transport.receive({ msg: 'pong' })
+      server.deliver({ msg: 'pong' })
 
       await expect(probing).resolves.toBe(true)
     })
@@ -197,9 +194,9 @@ describe('Socket liveness', () => {
       await jest.advanceTimersByTimeAsync(0)
     }
 
-    const tickWithPong = () => tick(() => transport.receive({ msg: 'pong' }))
+    const tickWithPong = () => tick(() => server.deliver({ msg: 'pong' }))
     const tickWithoutPong = () => tick()
-    const tickWithUnreadableMessage = () => tick(() => transport.receiveRaw('not json'))
+    const tickWithUnreadableMessage = () => tick(() => server.deliverRaw('not json'))
 
     it('reschedules itself, leaving exactly one pending timer per tick', async () => {
       expect(jest.getTimerCount()).toBe(1)
@@ -209,7 +206,7 @@ describe('Socket liveness', () => {
 
         // The invariant that stops a silently dead chain from passing green.
         expect(jest.getTimerCount()).toBe(1)
-        expect(transport.lastSent()).toEqual({ msg: 'ping' })
+        expect(server.lastFrame()).toEqual({ msg: 'ping' })
         expect(socket.connected).toBe(true)
       }
     })
@@ -238,12 +235,12 @@ describe('Socket liveness', () => {
       expect(socket.connected).toBe(false)
       expect(socket.openTimeout).toBeDefined()
 
-      // And the reopen actually builds a replacement transport once its delay
+      // And the reopen actually builds a replacement connection once its delay
       // elapses — the socket is no longer abandoned open forever.
       await jest.advanceTimersByTimeAsync(socket.config.reopen)
 
-      expect(fakeSockets).toHaveLength(2)
-      await driveToHandshake(fakeSockets[1])
+      expect(connections.count).toBe(2)
+      await connections.latest.accept()
       expect(socket.connected).toBe(true)
     })
 
@@ -260,13 +257,13 @@ describe('Socket liveness', () => {
 
       await jest.advanceTimersByTimeAsync(socket.config.reopen)
 
-      expect(fakeSockets).toHaveLength(2)
+      expect(connections.count).toBe(2)
     })
 
     it('clears both the ping and the reopen timer on close', async () => {
       // A close the driver did not ask for schedules a reopen, so both of the
       // socket's timers are pending at once.
-      transport.close(1006)
+      server.close(1006)
 
       // Named rather than merely counted, so the assertion still means "the ping
       // and the reopen" if some other timer ever joins the count.

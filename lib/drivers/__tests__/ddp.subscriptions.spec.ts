@@ -1,16 +1,16 @@
 import { Socket } from '../ddp'
 import { silentLogger } from '../../../test/silentLogger'
 import {
-  FakeWebSocket,
+  FakeServer,
   openFakeConnection,
-  useFakeClockAndSocketRegistry
-} from '../../../test/fakeTransport'
+  useFakeServers
+} from '../../../test/fakeServer'
 
 // Hoisted above the imports by jest, so the driver's own `import WebSocket from
-// 'universal-websocket-client'` resolves to the fake. See test/fakeTransport.ts.
-jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
+// 'universal-websocket-client'` resolves to the fake. See test/fakeServer.ts.
+jest.mock('universal-websocket-client', () => require('../../../test/fakeServer').fakeServerModule)
 
-useFakeClockAndSocketRegistry()
+useFakeServers()
 
 const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
 
@@ -30,11 +30,11 @@ const flushMicrotasks = async () => {
  */
 describe('Socket subscription bookkeeping', () => {
   let socket: Socket
-  let transport: FakeWebSocket
+  let server: FakeServer
 
   beforeEach(async () => {
     socket = createSocket()
-    transport = await openFakeConnection(socket)
+    server = await openFakeConnection(socket)
   })
 
   /**
@@ -44,8 +44,8 @@ describe('Socket subscription bookkeeping', () => {
    */
   const subscribe = async (name: string, params: any[]) => {
     const subscribing = socket.subscribe(name, params)
-    const { id } = transport.lastSent()
-    transport.receive({ msg: 'ready', subs: [id] })
+    const { id } = server.lastFrame()
+    server.deliver({ msg: 'ready', subs: [id] })
     return subscribing
   }
 
@@ -67,14 +67,14 @@ describe('Socket subscription bookkeeping', () => {
 
     const resubscribing = socket.subscribeAll()
 
-    expect(transport.lastSent()).toEqual({
+    expect(server.lastFrame()).toEqual({
       msg: 'sub',
       id: 'ddp-1',
       name: 'stream-room-messages',
       params: ['GENERAL']
     })
 
-    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    server.deliver({ msg: 'ready', subs: ['ddp-1'] })
     await resubscribing
 
     // One entry, still under the original id — a minted id would leave two.
@@ -86,14 +86,14 @@ describe('Socket subscription bookkeeping', () => {
     // subscription left an entry nobody owned: never acknowledged, never
     // unsubscribed, and resubscribed by `subscribeAll` forever.
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-    transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
+    server.deliver({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
 
     await expect(subscribing).resolves.toBeUndefined()
     expect(socket.subscriptions).toEqual({})
 
-    const framesBefore = transport.sent.length
+    const framesBefore = server.frameCount
     await socket.subscribeAll()
-    expect(transport.sent).toHaveLength(framesBefore)
+    expect(server.frameCount).toBe(framesBefore)
   })
 
   it('holds nothing while a subscription is still in flight', async () => {
@@ -101,10 +101,10 @@ describe('Socket subscription bookkeeping', () => {
     // acknowledgement, so an unanswered `sub` is not in it yet.
     socket.subscribe('stream-room-messages', ['GENERAL'])
 
-    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+    expect(server.lastFrame()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
     expect(socket.subscriptions).toEqual({})
 
-    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    server.deliver({ msg: 'ready', subs: ['ddp-1'] })
   })
 
   it('rejects with an Error naming the id when unsubscribing from something not in the map', async () => {
@@ -124,10 +124,10 @@ describe('Socket subscription bookkeeping', () => {
 
       // The `unsub` DDP message is on the wire and unanswered, so the
       // subscription is still the driver's to name.
-      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+      expect(server.lastFrame()).toEqual({ msg: 'unsub', id: 'ddp-1' })
       expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
 
-      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+      server.deliver({ msg: 'result', id: 'ddp-1', result: true })
       await expect(unsubscribing).resolves.toBe(true)
 
       // Acknowledged — now it is gone.
@@ -141,7 +141,7 @@ describe('Socket subscription bookkeeping', () => {
       await subscribe('stream-room-messages', ['GENERAL'])
 
       const unsubscribing = socket.unsubscribe('ddp-1')
-      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
+      server.deliver({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
       await expect(unsubscribing).rejects.toThrow('no such subscription')
       await expect(unsubscribing).rejects.toMatchObject({ reason: 'no such subscription' })
 
@@ -149,7 +149,7 @@ describe('Socket subscription bookkeeping', () => {
 
       await socket.subscribeAll()
 
-      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+      expect(server.lastFrame()).toEqual({ msg: 'unsub', id: 'ddp-1' })
     })
 
     it('keeps the subscription when the rejection is the SDK\'s own', async () => {
@@ -175,8 +175,8 @@ describe('Socket subscription bookkeeping', () => {
 
       const unsubscribingAll = socket.unsubscribeAll()
 
-      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
-      transport.receive({ msg: 'nosub', id: 'ddp-2', error: { reason: 'no such subscription' } })
+      server.deliver({ msg: 'result', id: 'ddp-1', result: true })
+      server.deliver({ msg: 'nosub', id: 'ddp-2', error: { reason: 'no such subscription' } })
       await unsubscribingAll
 
       expect(socket.subscriptions).toEqual({})
@@ -204,13 +204,13 @@ describe('Socket subscription bookkeeping', () => {
       // this test.
       const loggingOut = socket.logout().catch((err) => err)
 
-      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
+      server.deliver({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
       await flushMicrotasks()
 
-      const loggingOutFrame = transport.lastSent()
+      const loggingOutFrame = server.lastFrame()
       expect(loggingOutFrame).toMatchObject({ msg: 'method', method: 'logout' })
 
-      transport.receive({ msg: 'result', id: loggingOutFrame.id, result: true })
+      server.deliver({ msg: 'result', id: loggingOutFrame.id, result: true })
       await expect(loggingOut).resolves.toBe(true)
     })
   })
