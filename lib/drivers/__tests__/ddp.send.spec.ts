@@ -210,6 +210,24 @@ describe('Socket.send', () => {
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
     })
 
+    it('sends on the open socket it already has when the last ping has gone stale', async () => {
+      // `connected` is false here because `alive()` is, but the transport is
+      // open — so there is no `open` event coming and waiting for one strands
+      // the send until its deadline.
+      socket.lastPing = Date.now() - socket.config.ping * 3
+      expect(socket.connected).toBe(false)
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+
+      expect(transport.lastSent()).toEqual({
+        msg: 'method', method: 'getUsersOfRoom', params: [], id: 'ddp-1'
+      })
+
+      transport.receive({ msg: 'result', id: 'ddp-1', result: 'ok' })
+      await expect(sending).resolves.toMatchObject({ result: 'ok' })
+      expect(fakeSockets).toHaveLength(1)
+    })
+
     it('rejects the send when there is no connection at all', async () => {
       // The guard used to sit inside an async promise executor, which dropped
       // the throw as an unhandled rejection instead of failing the caller.

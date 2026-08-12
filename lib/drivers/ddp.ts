@@ -392,7 +392,10 @@ export class Socket extends SDKEventEmitter {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
-    if (!this.connected) await this.waitForOpen()
+    // The transport's own ready state, not `connected`: a socket whose last ping
+    // has gone stale is still open, and waiting for an `open` event it has no
+    // reason to emit strands the send until the deadline.
+    if (this.connection.readyState !== 1) await this.waitForOpen()
 
     return new Promise<any>((resolve, reject) => {
       const id = obj.id || `ddp-${ this.sent }`
@@ -438,8 +441,8 @@ export class Socket extends SDKEventEmitter {
   ping = async () => {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
-      // The ping goes out while `connected` is still true, so its send never
-      // waits on `open` — it waits on a pong reply that a dead socket never
+      // The ping goes out on an open socket, so its send never waits on
+      // `open` — it waits on a pong reply that a dead socket never
       // sends, and without a deadline of its own the chain stops here and
       // `reopen` is never reached. The deadline lives in `ping` rather than in
       // `send`, so no other caller inherits a reply timeout.
