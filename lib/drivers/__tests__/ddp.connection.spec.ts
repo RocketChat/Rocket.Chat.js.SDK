@@ -71,6 +71,7 @@ describe('Socket connection lifecycle', () => {
       socket.on('close', closeSeen)
 
       const reopening = socket.reopenNow()
+      expect(connections.count).toBe(2)
       const replacement = connections.latest
       expect(replacement).not.toBe(server)
 

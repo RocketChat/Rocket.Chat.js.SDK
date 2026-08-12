@@ -26,7 +26,7 @@ const CLOSED = 3
 
 const TRANSPORT_HANDLERS = ['onopen', 'onmessage', 'onerror', 'onclose'] as const
 
-type DdpFrame = Record<string, any>
+type DdpFrame = Record<string, unknown>
 
 /**
  * A real class, not a stub object: a mocked class is what lets the fake satisfy
@@ -38,7 +38,7 @@ export class FakeServer {
   private writeFailure: Error | null = null
   private teardownFailure: Error | null = null
 
-  /** Every code the connection was closed with, in order. `undefined` for a bare close. */
+  /** `undefined` records a bare close, which the driver never issues. */
   closedWith: (number | undefined)[] = []
 
   readyState: number = CONNECTING
@@ -86,7 +86,6 @@ export class FakeServer {
     await jest.advanceTimersByTimeAsync(0)
   }
 
-  /** Deliver a DDP message to the driver. */
   deliver (ddpMessage: object): void {
     this.deliverRaw(JSON.stringify(ddpMessage))
   }
@@ -112,17 +111,16 @@ export class FakeServer {
     return this.readyState === OPEN
   }
 
-  /** Every DDP message the driver has sent, parsed. */
   frames (): DdpFrame[] {
     return this.frameBuffer.map((frame) => JSON.parse(frame))
   }
 
   lastFrame (): DdpFrame {
-    return this.frames()[this.frameBuffer.length - 1]
+    return this.frames()[this.frameCount - 1]
   }
 
-  framesSince (frameCount: number): DdpFrame[] {
-    return this.frames().slice(frameCount)
+  framesSince (previousFrameCount: number): DdpFrame[] {
+    return this.frames().slice(previousFrameCount)
   }
 
   get frameCount (): number {
@@ -130,14 +128,12 @@ export class FakeServer {
   }
 
   /**
-   * Make every later write throw instead of recording the frame, as a real
-   * websocket does once the socket has closed under it.
+   * A real websocket throws from `send` once the socket has closed under it.
    */
   failWrites (failure: Error): void {
     this.writeFailure = failure
   }
 
-  /** Make the driver's own teardown of this connection throw. */
   failTeardown (failure: Error): void {
     this.teardownFailure = failure
   }
@@ -153,7 +149,6 @@ export class FakeServer {
     return (code: number) => onclose({ code })
   }
 
-  /** Which of the four transport handlers the driver still has attached. */
   attachedHandlers (): string[] {
     return TRANSPORT_HANDLERS.filter((handler) => this[handler] !== null)
   }
@@ -193,7 +188,7 @@ export const connections = new ConnectionRegistry()
  * constructor. If it ever drifts toward an untyped object, the test program
  * fails here rather than in a spec.
  */
-const fakeTransportConstructor: new (
+const fakeServerConstructor: new (
   url: string,
   protocols?: string | string[] | null,
   options?: { headers?: { [key: string]: string } }
@@ -202,7 +197,7 @@ const fakeTransportConstructor: new (
 /** The module shape `jest.mock('universal-websocket-client', ...)` returns. */
 export const fakeServerModule = {
   __esModule: true,
-  default: fakeTransportConstructor
+  default: fakeServerConstructor
 }
 
 /**
