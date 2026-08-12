@@ -108,8 +108,6 @@ describe('Socket liveness', () => {
     })
 
     it('succeeds on a pong that lands in the same millisecond as the probe', async () => {
-      // The stamp cannot advance here, because no time passes on the frozen
-      // clock. The probe must answer on the pong itself, not on the timestamp.
       const stampBeforeProbe = socket.lastPing
       const pongSeen = jest.fn()
       socket.on('pong', pongSeen)
@@ -119,8 +117,6 @@ describe('Socket liveness', () => {
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
       transport.receive({ msg: 'pong' })
 
-      // Without these two the true below could not be told apart from a probe
-      // that resolved for some other reason.
       expect(pongSeen).toHaveBeenCalled()
       expect(socket.lastPing).toBe(stampBeforeProbe)
 
