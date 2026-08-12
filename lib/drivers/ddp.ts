@@ -397,7 +397,7 @@ export class Socket extends SDKEventEmitter {
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const stringdata = JSON.stringify(data)
-      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
+      const responseEvent = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
       try {
@@ -411,12 +411,12 @@ export class Socket extends SDKEventEmitter {
 
       // Before any listener is attached: a frame with no reply to wait for —
       // `pong` — would otherwise strand a `disconnected` listener forever.
-      if (!listener) {
+      if (!responseEvent) {
         return resolve(undefined)
       }
 
       const rejectOnDisconnect = () => {
-        this.off(listener, onResponse)
+        this.off(responseEvent, onResponse)
         reject(new Error('[ddp] connection reopened before the response arrived'))
       }
 
@@ -426,7 +426,7 @@ export class Socket extends SDKEventEmitter {
       }
 
       this.once('disconnected', rejectOnDisconnect)
-      this.once(listener, onResponse)
+      this.once(responseEvent, onResponse)
     })
   }
 

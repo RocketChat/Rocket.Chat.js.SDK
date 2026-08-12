@@ -337,7 +337,7 @@ describe('Socket.send with several listeners on one event', () => {
     await rejected
   })
 
-  it('leaves no response listener behind when the send is abandoned by a reopen', async () => {
+  it('leaves no DDP response listener behind when the send is abandoned by a reopen', async () => {
     const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
     const rejected = Promise.all([
       expect(sending).rejects.toBeInstanceOf(Error),
