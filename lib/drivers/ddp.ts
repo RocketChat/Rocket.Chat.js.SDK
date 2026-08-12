@@ -35,6 +35,69 @@ import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
 
+const reopenedBeforeResponse = '[ddp] connection reopened before the response arrived'
+
+interface IResponseWaiter {
+  receive: (response: any) => void
+  abandon: (reason: Error) => void
+}
+
+/**
+ * The correlation key a DDP response will arrive on, or `undefined` for a DDP
+ * message that answers nothing. Only these five `msg` values are responses;
+ * every other incoming message reaches its consumers through the emitter alone,
+ * so a document id can never settle a Method call.
+ */
+const correlationKey = (data: any): string | undefined => {
+  switch (data.msg) {
+    case 'result':
+    case 'nosub':
+      return data.id
+    case 'ready':
+      return data.subs && data.subs[0]
+    case 'connected':
+    case 'pong':
+      return data.msg
+    default:
+      return undefined
+  }
+}
+
+const asResponse = (data: any) =>
+  data.msg === 'result'
+    ? { id: data.id, result: data.result, error: data.error }
+    : data
+
+/**
+ * The callers waiting on a DDP response, held by correlation key. A key can
+ * carry more than one waiter — two sends may share an id, as a resubscribe
+ * racing `subscribeAll` does — and every one of them is settled by the single
+ * response that answers it.
+ */
+export class PendingResponses {
+  private waiters: { [key: string]: IResponseWaiter[] } = {}
+
+  expect = (key: string, waiter: IResponseWaiter) => {
+    this.waiters[key] = (this.waiters[key] || []).concat(waiter)
+  }
+
+  deliver = (key: string | undefined, response: any) => {
+    if (!key) return
+    const waiting = this.waiters[key]
+    if (!waiting) return
+    delete this.waiters[key]
+    waiting.forEach((waiter) => waiter.receive(response))
+  }
+
+  abandonAll = (reason: string) => {
+    const waiting = Object.keys(this.waiters).map((key) => this.waiters[key])
+    this.waiters = {}
+    waiting.forEach((waiters) =>
+      waiters.forEach((waiter) => waiter.abandon(new Error(reason)))
+    )
+  }
+}
+
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -49,6 +112,7 @@ export class Socket extends SDKEventEmitter {
   session?: string
   logger: ILogger
   reopenPromise?: Promise<void>
+  pending = new PendingResponses()
 
   /** Create a websocket handler */
   constructor (
@@ -71,8 +135,7 @@ export class Socket extends SDKEventEmitter {
       this.send({ msg: 'pong' }).then(this.logger.debug, this.logger.error)
     })
 
-    this.on('result', (data: any) => this.emit(data.id, { id: data.id, result: data.result, error: data.error }))
-    this.on('ready', (data: any) => this.emit(data.subs[0], data))
+    this.on('disconnected', () => this.pending.abandonAll(reopenedBeforeResponse))
   }
 
   /**
@@ -168,10 +231,9 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Find and call matching handlers for incoming message data.
-   * Handlers match on collection, id and/or msg attribute in that order.
-   * Any matched handlers are removed once called.
-   * All collection events are emitted with their `msg` as the event name.
+   * Fan an incoming DDP message out to its consumers, then hand it to the
+   * caller waiting on it. Consumers subscribe by collection or by `msg`; a
+   * waiting caller is found by correlation key, on a separate register.
    */
   onMessage = (e: any) => {
     if (!e.data) return
@@ -197,7 +259,7 @@ export class Socket extends SDKEventEmitter {
     this.logger.debug(`[ddp] messages received: ${e.data}`)
     if (data.collection) this.emit(data.collection, data)
     if (data.msg) this.emit(data.msg, data)
-    if (data.id) this.emit(data.id, data)
+    this.pending.deliver(correlationKey(data), asResponse(data))
   }
 
   /** Disconnect the DDP from server and clear all subscriptions. */
@@ -378,15 +440,11 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Send an object to the server via Socket. Adds handler to collection to
-   * allow awaiting response matching an expected object. Most responses are
-   * identified by their message event name and the ID they were sent with, but
-   * some responses don't return the ID fallback to just matching on event name.
-   * Data often includes an error attribute if something went wrong, but certain
-   * types of calls send back a different `msg` value instead, e.g. `nosub`.
-   * @param obj       Object to be sent
-   * @param msg       The `data.msg` value to wait for in response
-   * @param errorMsg  An alternate `data.msg` value indicating an error response
+   * Send a DDP message to the server and resolve with the DDP response that
+   * answers it. Most responses correlate on the id the request was sent with;
+   * the handshake and the ping have no id and correlate on the `msg` of their
+   * reply instead.
+   * @param obj  The DDP message to be sent
    */
   send = async (obj: any): Promise<any> => {
     // Outside the promise executor: a `throw` from an async executor is dropped
@@ -399,7 +457,7 @@ export class Socket extends SDKEventEmitter {
       this.sent += 1
       const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
       const stringdata = JSON.stringify(data)
-      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
+      const key = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
       try {
@@ -411,25 +469,22 @@ export class Socket extends SDKEventEmitter {
         return reject(err)
       }
 
-      // Before any listener is attached: a frame with no reply to wait for —
-      // `pong` — would otherwise strand a `disconnected` listener forever.
-      if (!listener) {
+      // A DDP message with no response to wait for — `pong` — has nothing to
+      // register against and is done as soon as it is written.
+      if (!key) {
         return resolve(undefined)
       }
 
-      // Named, and the *same* reference `off` is given below: `disconnected` is
-      // emitted with no arguments, so handing `reject` straight to it rejected
-      // every in-flight send with `undefined` — and callers read `err.message`
-      // inside their `catch`, which then threw a TypeError from the rejection
-      // handler. The pairing matters as much as the Error: `off` only removes a
-      // listener it can match, and a miss is silently a no-op.
-      const rejectOnDisconnect = () =>
-        reject(new Error('[ddp] connection reopened before the response arrived'))
-
-      this.once('disconnected', rejectOnDisconnect)
-      this.once(listener, (result: any) => {
-        this.off('disconnected', rejectOnDisconnect)
-        return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+      // `abandon` takes the Error the registry built rather than being handed
+      // `reject` as a bare listener: callers read `err.message` inside their
+      // `catch`, and a rejection with `undefined` throws a TypeError there.
+      this.pending.expect(key, {
+        receive: (response: any) => (
+          response.error
+            ? reject(toError(response.error))
+            : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }), ...response })
+        ),
+        abandon: reject
       })
     })
   }

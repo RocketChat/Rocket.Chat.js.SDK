@@ -54,6 +54,10 @@ _Avoid_: Message (unqualified), frame, packet, event
 The DDP message that answers a Method call or a DDP subscription — `result`, `ready` or `nosub`. A response carrying an error rather than a result is a failed response.
 _Avoid_: Reply, ack, result (that is one response type of three)
 
+**Correlation key**:
+The value that ties a DDP response back to the request waiting for it — the request id for a Method call or a DDP subscription, and the reply's own `msg` for the two requests sent without an id, the handshake and the ping. Only a DDP response has one; the document id on an `added` or `changed` DDP message is not a correlation key, however alike the two look.
+_Avoid_: Request id, message id, listener, event name
+
 **DDP error**:
 The error field of a failed DDP response, as the server sent it. What the SDK raises to its callers from one is an ordinary Error, not this. A rejection the SDK originates itself — a write that failed, a Deadline that expired, a Reopen that abandoned the wait — carries no DDP error and no server reason; only the server-sent kind is a DDP error.
 _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
