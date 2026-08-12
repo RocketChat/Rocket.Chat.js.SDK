@@ -1,21 +1,13 @@
 import * as settings from '../../settings'
 
-import Api, { IRestRequest, IRestTransport } from '../api'
-
-/**
- * The REST transport is the seam under `Api`: one `send` per request, with
- * `fetch` behind it. These specs pin both sides of that seam — what `Api` hands
- * down, and what the shipped transport turns it into on the wire.
- */
+import Api, { IRestRequest, IRestResponse, IRestTransport } from '../api'
 
 const jsonResponse = (status: number, data: any) => ({
   status,
   json: async () => data
 })
 
-// `fetch` is not on the node test environment's globals, so there is nothing to
-// spy on — the mock has to be installed, and taken back off, by hand.
-const mockFetch = () => {
+const installFetchMock = () => {
   const fetchMock = jest.fn().mockResolvedValue(jsonResponse(200, { success: true }))
   ;(globalThis as any).fetch = fetchMock
   return fetchMock
@@ -26,13 +18,13 @@ const lastCall = (fetchMock: jest.Mock) => {
   return { url: url as string, init: init as RequestInit }
 }
 
-const recordingTransport = () => {
+const recordingTransport = (response: IRestResponse = { status: 200, data: { ok: true } }) => {
   const sent: IRestRequest[] = []
   const transport: IRestTransport = {
     headers: {},
     send: async (request: IRestRequest) => {
       sent.push(request)
-      return { status: 200, data: { ok: true } }
+      return response
     }
   }
   return { sent, transport }
@@ -43,7 +35,7 @@ describe('the shipped REST transport', () => {
   const noFetch = (globalThis as any).fetch
 
   beforeEach(() => {
-    fetchMock = mockFetch()
+    fetchMock = installFetchMock()
   })
 
   afterEach(() => {
@@ -165,11 +157,7 @@ describe('Api over its transport', () => {
     expect(sent[0].options.signal.aborted).toBe(true)
   })
 
-  // `loggedIn()` asks whether every key of `currentLogin` is truthy, and an
-  // absent login has no keys — so it answers yes, and the `auth` guard in
-  // `request` never fires. Pinned as-is: this refactor changes how a request
-  // reaches the wire, not who is allowed to make one.
-  it('sends an authenticated request even before login', async () => {
+  it('sends an authenticated request before login, because an absent login has no key that could be falsy', async () => {
     const { sent, transport } = recordingTransport()
     const api = new Api({ transport })
 
@@ -178,10 +166,7 @@ describe('Api over its transport', () => {
   })
 
   it('rejects with the result when the status is a failure', async () => {
-    const transport: IRestTransport = {
-      headers: {},
-      send: async () => ({ status: 401, data: { error: 'unauthorized' } })
-    }
+    const { transport } = recordingTransport({ status: 401, data: { error: 'unauthorized' } })
     const api = new Api({ transport })
 
     await expect(api.get('info', {}, false)).rejects.toEqual({
@@ -191,22 +176,28 @@ describe('Api over its transport', () => {
   })
 
   it('accepts a failure status the caller chose to ignore', async () => {
-    const transport: IRestTransport = {
-      headers: {},
-      send: async () => ({ status: 401, data: { error: 'unauthorized' } })
-    }
+    const { transport } = recordingTransport({ status: 401, data: { error: 'unauthorized' } })
     const api = new Api({ transport })
 
     await expect(api.get('info', {}, false, /401/)).resolves.toEqual({ error: 'unauthorized' })
   })
 
   it('returns the whole result for a DELETE that carries no data', async () => {
-    const transport: IRestTransport = {
-      headers: {},
-      send: async () => ({ status: 200, data: undefined })
-    }
+    const { transport } = recordingTransport({ status: 200, data: undefined })
     const api = new Api({ transport })
 
     await expect(api.del('rooms.delete', {}, false)).resolves.toEqual({ status: 200, data: undefined })
+  })
+
+  it('passes each verb through untouched, with no fallback to POST', async () => {
+    const { sent, transport } = recordingTransport()
+    const api = new Api({ transport })
+
+    await api.get('info', {}, false)
+    await api.post('info', {}, false)
+    await api.put('info', {}, false)
+    await api.del('info', {}, false)
+
+    expect(sent.map(request => request.method)).toEqual(['GET', 'POST', 'PUT', 'DELETE'])
   })
 })

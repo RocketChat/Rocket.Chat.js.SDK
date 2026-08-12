@@ -54,18 +54,15 @@ class FetchTransport implements IRestTransport {
   }
 
   async send ({ method, endpoint, data = {}, options, apiVersion = 'v1' }: IRestRequest): Promise<IRestResponse> {
-    const response = await fetch(this.url(endpoint, apiVersion, method === 'GET' ? data : undefined), {
+    const path = `${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`
+    const carriesQuery = method === 'GET'
+    const response = await fetch(carriesQuery ? `${path}?${this.queryString(data)}` : path, {
       method,
-      body: method === 'GET' ? undefined : this.body(data),
+      body: carriesQuery ? undefined : this.body(data),
       headers: this.headersFor(options),
       signal: options && options.signal
     })
     return { status: response.status, data: await response.json() }
-  }
-
-  private url (endpoint: string, apiVersion: string, query?: any) {
-    const path = `${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`
-    return query ? `${path}?${this.queryString(query)}` : path
   }
 
   private headersFor (options?: any) {
@@ -100,7 +97,7 @@ export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
 
 /**
 	* @module API
-	* Provides a base client for handling requests with generic Rocket.Chat's REST API
+	* Sends REST requests to a Rocket.Chat server over a REST transport
 	*/
 
 export default class Api extends SDKEventEmitter {
@@ -132,7 +129,7 @@ export default class Api extends SDKEventEmitter {
 /**
 	* Do a request to an API endpoint.
 	* If it needs a token, login first (with defaults) to set auth headers.
-	* @param method   Request method GET | POST | PUT | DEL
+	* @param method   Request method GET | POST | PUT | DELETE
 	* @param endpoint The API endpoint (including version) e.g. `chat.update`
 	* @param data     Payload for POST request to endpoint
 	* @param auth     Require auth headers for endpoint, default true
