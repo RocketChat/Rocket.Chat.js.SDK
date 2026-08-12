@@ -643,8 +643,6 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
       ...config,
       ...moreConfigs,
       host: host.replace(/(^\w+:|^)\/\//, ''),
-      // A default, not an override: a caller-supplied `timeout` reaches the
-      // socket, where it becomes the ping interval when no `ping` is given.
       timeout: moreConfigs.timeout ?? config?.timeout ?? 10000
 			// reopen: number
 			// ping: number
