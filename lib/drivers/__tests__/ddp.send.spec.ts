@@ -331,6 +331,9 @@ describe('Socket.send with several listeners on one event', () => {
       socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
     )
 
+    const CLOSED_MESSAGE = '[ddp] connection closed before the response arrived'
+    const REOPENED_MESSAGE = '[ddp] connection reopened before the response arrived'
+
     const expectAllToReject = (sends: Promise<any>[], message: string) =>
       Promise.all(sends.flatMap(sending => [
         expect(sending).rejects.toBeInstanceOf(Error),
@@ -339,7 +342,7 @@ describe('Socket.send with several listeners on one event', () => {
 
     it('rejects every in-flight send when the socket is closed', async () => {
       const sends = inFlight()
-      const rejections = expectAllToReject(sends, '[ddp] connection closed before the response arrived')
+      const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
 
       await socket.close()
 
@@ -348,7 +351,7 @@ describe('Socket.send with several listeners on one event', () => {
 
     it('rejects every in-flight send when the transport drops', async () => {
       const sends = inFlight()
-      const rejections = expectAllToReject(sends, '[ddp] connection closed before the response arrived')
+      const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
 
       transport.close(1006)
 
@@ -361,7 +364,7 @@ describe('Socket.send with several listeners on one event', () => {
       // swallowed orphan close both leave behind. The replacement therefore
       // announces itself only as `connecting`, which is the event under test here.
       const sends = inFlight()
-      const rejections = expectAllToReject(sends, '[ddp] connection reopened before the response arrived')
+      const rejections = expectAllToReject(sends, REOPENED_MESSAGE)
 
       transport.readyState = CLOSED
       socket.reopen()
@@ -381,7 +384,7 @@ describe('Socket.send with several listeners on one event', () => {
       const before = ['ddp-1', 'close', 'connecting', 'disconnected'].map(listenersFor)
 
       const sends = inFlight()
-      const rejections = expectAllToReject(sends, '[ddp] connection closed before the response arrived')
+      const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
       await socket.close()
       await rejections
 
@@ -415,8 +418,7 @@ describe('Socket.send with several listeners on one event', () => {
       handshaking.onopen?.({})
       await jest.advanceTimersByTimeAsync(0)
 
-      const rejected = expect(opening).rejects
-        .toThrow('[ddp] connection closed before the response arrived')
+      const rejected = expect(opening).rejects.toThrow(CLOSED_MESSAGE)
       handshaking.close(1006)
 
       await rejected

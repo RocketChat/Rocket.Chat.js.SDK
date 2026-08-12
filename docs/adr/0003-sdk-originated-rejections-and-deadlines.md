@@ -71,7 +71,10 @@ an Error that the SDK writes.
   with a server reason goes through `toError` under ADR-0001. A rejection with a
   reason from the Socket passes that error through. A rejection that the SDK
   decides on, with no reason to carry, is a plain Error with a fixed message under
-  this ADR.
+  this ADR. One exception, added by the amendment below: a wait that a connection
+  going away abandoned carries a subclass of Error, because the driver itself
+  branches on it. It is a plain Error to every caller, and ADR-0004 still reads it
+  as one — the subclass is not a DDPError and does not carry a server reason.
 
 ## Consequences
 
@@ -106,18 +109,20 @@ an Error that the SDK writes.
   Reopen, and a caller retrying on the wrong one retries into a closed Socket.
   This is not a Deadline, and the paragraph above still holds: nothing here bounds
   a Method call on a connection that stays up and stays silent.
-- Rejections now reach `ping` that never did, and `ping` reopens on a rejection.
-  A close during that window would rebuild the Socket the caller had just closed,
-  and a Reopen during it would queue a second Reopen behind the one already under
-  way. So an abandonment carries its own Error type, and `ping` reopens on every
-  rejection except that one: a connection that went away has already been
-  answered, by `onClose` or by the replacement itself, and only a server that goes
-  quiet asks the Liveness chain for a Reopen. The type is internal to the driver,
-  so this adds no public surface either.
+- Rejections now reach the two places that Reopen on a failure — `ping` and the
+  retry inside `reopen` — that never reached them before. A close would rebuild
+  the Socket the caller had just closed, and a Reopen would queue a second Reopen
+  behind the one already under way. So an abandoned wait carries its own Error
+  type, and both places Reopen on every rejection except that one: a connection
+  that went away has already been answered, by `onClose` or by the replacement
+  itself, and only a failure that leaves nobody rebuilding it asks for a Reopen.
+  The type is internal to the driver, so this adds no public surface either.
 - The handshake is the one send with no caller of its own, and `createConnection`
   waits on it through `onOpen`. Ending its wait therefore has to settle that wait
   too — `onOpen` rejects the connection it was opening, rather than trading a
-  stranded send for a stranded `open()`.
+  stranded send for a stranded `open()`. `open` can therefore reject where it
+  used to hang, so `checkAndReopen`, which opens without awaiting, now handles
+  that rejection rather than raising it to the global handler of the app.
 - A failed write of a `sub` DDP message leaves an entry in the subscription map.
   `send` writes that map before `send` writes to the Socket, and the write can now
   reject, so the map can hold an entry for a DDP subscription that the server never

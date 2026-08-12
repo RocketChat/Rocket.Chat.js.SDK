@@ -37,10 +37,10 @@ const userDisconnectCloseCode = 4000;
 
 /**
  * The connection a message went out on went away before its DDP response could
- * arrive. Rebuilding the connection is already someone else's job on every path
- * that raises this, so the Liveness chain reads it and stands down.
+ * arrive. Read by `reopenUnlessAbandoned`, so it is a subclass rather than the
+ * plain Error the rest of ADR-0003 raises.
  */
-class ConnectionGone extends Error {}
+class AbandonedWait extends Error {}
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
@@ -140,13 +140,12 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Send handshake message to confirm connection, start pinging. */
-  onOpen = async (callback: Function, abandoned: Function) => {
+  onOpen = async (callback: Function, abandon: Function) => {
     this.lastPing = Date.now()
 
-    // The websocket's `onopen` has nowhere to put a throw, so a close or a Reopen
-    // landing while the handshake is in flight would surface as an unhandled
-    // rejection. There is no connection left to hand the callback, so the wait
-    // `createConnection` holds ends here rather than outliving the connection.
+    // The websocket's `onopen` has nowhere to put a throw, and there is no
+    // connection left to hand the callback, so an abandoned handshake ends the
+    // wait `createConnection` holds rather than outliving the connection.
     let connected
     try {
       connected = await this.send({
@@ -156,7 +155,7 @@ export class Socket extends SDKEventEmitter {
       })
     } catch (err) {
       this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
-      return abandoned(err)
+      return abandon(err)
     }
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
@@ -253,8 +252,20 @@ export class Socket extends SDKEventEmitter {
         clearTimeout(this.openTimeout as any)
         delete this.openTimeout
       }
-      this.open()
+      // Nothing here awaits the open, and it can reject — an unhandled rejection
+      // from the SDK reaches the global handler of a consuming app.
+      this.open().catch((err) => this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`))
     }
+  }
+
+  /**
+   * Only a failure that leaves nobody rebuilding the connection asks for a
+   * Reopen. A connection that went away has already been answered: a close the
+   * caller asked for leaves the Socket closed, any other close reopens from
+   * `onClose`, and a Reopen is a replacement already under way.
+   */
+  private reopenUnlessAbandoned = (err: unknown) => {
+    if (!(err instanceof AbandonedWait)) this.reopen()
   }
 
   /** Clear connection and try to connect again. */
@@ -267,7 +278,7 @@ export class Socket extends SDKEventEmitter {
         await this.open()
       } catch (err) {
         this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
-        this.reopen();
+        this.reopenUnlessAbandoned(err);
       }
     }, this.config.reopen);
   }
@@ -444,15 +455,14 @@ export class Socket extends SDKEventEmitter {
         { event: 'close', ending: 'closed' }
       ].map(({ event, ending }) => ({
         event,
-        // Named, and the *same* reference `stopWaiting` removes: these events are
-        // emitted with no arguments, so handing `reject` straight to one rejects
-        // the send with `undefined` — and callers read `err.message` inside their
-        // `catch`, which then throws a TypeError from the rejection handler. The
-        // pairing matters as much as the Error: `off` only removes a listener it
-        // can match, and a miss is silently a no-op.
+        // Named, and the *same* reference `stopWaiting` removes: `off` only
+        // removes a listener it can match, and a miss is silently a no-op. The
+        // Error matters as much: these events are emitted with no arguments, so
+        // `reject` handed straight to one rejects the send with `undefined`, and
+        // a caller reading `err.message` throws from its own `catch`.
         onAbandon: () => {
           stopWaiting()
-          reject(new ConnectionGone(`[ddp] connection ${ending} before the response arrived`))
+          reject(new AbandonedWait(`[ddp] connection ${ending} before the response arrived`))
         }
       }))
 
@@ -492,13 +502,7 @@ export class Socket extends SDKEventEmitter {
 
       Promise.race([this.send({ msg: 'ping' }), answered])
         .then(() => this.ping())
-        // Only a rejection that says the server went quiet asks for a Reopen. A
-        // connection that went away has already been answered: a close the caller
-        // asked for leaves the Socket closed, any other close reopens from
-        // `onClose`, and a Reopen is a replacement already under way.
-        .catch((err) => {
-          if (!(err instanceof ConnectionGone)) this.reopen()
-        })
+        .catch(this.reopenUnlessAbandoned)
         .finally(() => clearTimeout(deadline as any))
     }, this.config.ping)
   }
