@@ -11,14 +11,19 @@ export interface ILogger {
  * Connection options type
  * @param host        Host URL:PORT, converted to websocket protocol
  * @param useSsl      Use SSL (https/wss) to connect
- * @param timeout     How long to wait (ms) before abandoning connection
+ * @param timeout     How long to wait (ms) before abandoning connection. Also
+ *                    how long a forced immediate reopen waits for the new
+ *                    socket to open before resolving anyway, and how long the
+ *                    media-subscription readiness wait polls before giving up
  * @param reopen      ms interval before attempting reopens on disconnect. Twice
  *                    this is also how long a send waits for the connection to
  *                    open before it is rejected, so the deadline outlasts the
  *                    reopen it is waiting on
  * @param ping        ms interval between each ping, and also how long a ping
  *                    waits for its pong before the connection is reopened —
- *                    tightening it for liveness tightens that deadline too
+ *                    tightening it for liveness tightens that deadline too.
+ *                    Defaults to `timeout`, and is the default bound for a
+ *                    probe, so raising `timeout` alone widens the probe too
  * @param close       ms interval to wait for socket close to succeed
  * @param integration Name added to message `bot` attribute to identify SDK use
  */

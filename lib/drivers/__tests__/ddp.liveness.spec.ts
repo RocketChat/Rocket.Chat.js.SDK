@@ -170,8 +170,8 @@ describe('Socket liveness', () => {
     })
 
     it('takes its deadline from the configured ping interval when given none', async () => {
-      // PING_INTERVAL is not the old hardcoded 2000, so a probe still bounded by
-      // that literal would settle long before the first advance ends.
+      // The assertion only holds if the deadline is read from config: any fixed
+      // bound is a different number from PING_INTERVAL and settles elsewhere.
       const probing = socket.probe()
       let resolved: boolean | undefined
       probing.then((value) => { resolved = value })

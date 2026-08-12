@@ -220,8 +220,8 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
   })
 
   it('takes its deadline from the configured timeout when given none', async () => {
-    // Not the old hardcoded 8000: a deadline still bound to that literal would
-    // leave this pending after the second advance rather than resolving.
+    // The assertion only holds if the deadline is read from config: any fixed
+    // bound is a different number from this one and settles elsewhere.
     const timeout = 4000
     const driver = createDriver({ timeout })
     await openFakeConnection(driver.ddp)
