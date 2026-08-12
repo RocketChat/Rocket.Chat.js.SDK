@@ -3,7 +3,7 @@ import ClientRest from '../api/RocketChat'
 import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
 
-type Realtime = ISocket & IDriver
+type RealtimeDriver = ISocket & IDriver
 
 export interface IRocketChatClientOptions extends ISocketOptions {
   logger?: ILogger
@@ -11,31 +11,30 @@ export interface IRocketChatClientOptions extends ISocketOptions {
   [option: string]: any
 }
 
-const serverOptions = ({
-  logger: _logger,
-  protocol: _protocol,
+const splitOptions = ({
+  logger = Logger,
+  protocol = Protocols.DDP,
   allPublic: _allPublic,
   rooms: _rooms,
   integrationId: _integrationId,
-  ...options
-}: IRocketChatClientOptions) => options
+  ...serverOptions
+}: IRocketChatClientOptions) => ({ logger, protocol, serverOptions })
 
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
   logger: ILogger
-  socket: Promise<Realtime>
-  ddp?: Realtime
+  socket: Promise<RealtimeDriver>
+  ddp?: RealtimeDriver
 
   constructor (options: IRocketChatClientOptions) {
-    const { logger = Logger, protocol = Protocols.DDP } = options
-    const driverOptions = { ...serverOptions(options), logger }
-    super(driverOptions)
+    const { logger, protocol, serverOptions } = splitOptions(options)
+    super(serverOptions)
     this.logger = logger
     if (protocol !== Protocols.DDP) {
       throw new Error(`Invalid Protocol: ${protocol}, valids: ${Object.keys(Protocols).join()}`)
     }
     this.socket = import(/* webpackChunkName: 'ddp' */ '../drivers/ddp').then(({ DDPDriver }) => {
-      this.ddp = new DDPDriver(driverOptions)
+      this.ddp = new DDPDriver({ ...serverOptions, logger })
       return this.ddp
     })
   }

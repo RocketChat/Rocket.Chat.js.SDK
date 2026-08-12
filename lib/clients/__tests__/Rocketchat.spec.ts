@@ -33,7 +33,7 @@ jest.mock('../../drivers/ddp', () => ({
   }
 }))
 
-const connectedClient = async (options: any = {}) => {
+const clientWithDriver = async (options: any = {}) => {
   const client = new RocketChatClient({ logger: silentLogger, ...options })
   const driver: any = await client.socket
 
@@ -46,7 +46,7 @@ beforeEach(() => {
 
 describe('new RocketChatClient', () => {
   it('forwards the server options to the driver', async () => {
-    const { driver } = await connectedClient({
+    const { driver } = await clientWithDriver({
       host: 'https://open.rocket.chat',
       useSsl: true,
       timeout: 250,
@@ -64,7 +64,7 @@ describe('new RocketChatClient', () => {
   })
 
   it('keeps the options the client consumes itself out of the driver options', async () => {
-    const { driver } = await connectedClient({
+    const { driver } = await clientWithDriver({
       protocol: Protocols.DDP,
       allPublic: true,
       rooms: ['general'],
@@ -78,7 +78,7 @@ describe('new RocketChatClient', () => {
   })
 
   it('gives the driver the same logger it keeps', async () => {
-    const { client, driver } = await connectedClient()
+    const { client, driver } = await clientWithDriver()
 
     expect(client.logger).toBe(silentLogger)
     expect(driver.options.logger).toBe(silentLogger)
@@ -93,13 +93,13 @@ describe('new RocketChatClient', () => {
   })
 
   it('builds exactly one driver', async () => {
-    await connectedClient()
+    await clientWithDriver()
 
     expect(mockDrivers).toHaveLength(1)
   })
 
   it('exposes the resolved driver as `ddp`', async () => {
-    const { client, driver } = await connectedClient()
+    const { client, driver } = await clientWithDriver()
 
     expect(client.ddp).toBe(driver)
   })
@@ -112,14 +112,14 @@ describe('new RocketChatClient', () => {
 
 describe('RocketChatClient realtime delegation', () => {
   it('delegates connect with the given socket options', async () => {
-    const { client, driver } = await connectedClient()
+    const { client, driver } = await clientWithDriver()
 
     await expect(client.connect({ timeout: 250 })).resolves.toBe('connected')
     expect(driver.connect).toHaveBeenCalledWith({ timeout: 250 })
   })
 
   it('delegates subscribe with every argument', async () => {
-    const { client, driver } = await connectedClient()
+    const { client, driver } = await clientWithDriver()
 
     await client.subscribe('stream-room-messages', 'rid', false)
 
@@ -127,14 +127,14 @@ describe('RocketChatClient realtime delegation', () => {
   })
 
   it('delegates a method call with every argument', async () => {
-    const { client, driver } = await connectedClient()
+    const { client, driver } = await clientWithDriver()
 
     await expect(client.methodCall('loadHistory', 'rid', 20)).resolves.toBe('method-result')
     expect(driver.methodCall).toHaveBeenCalledWith('loadHistory', 'rid', 20)
   })
 
   it('delegates the remaining socket calls to the driver', async () => {
-    const { client, driver } = await connectedClient()
+    const { client, driver } = await clientWithDriver()
     const callback = jest.fn()
     const subscription: any = { id: 'sub-1' }
 
@@ -164,7 +164,7 @@ describe('RocketChatClient realtime delegation', () => {
   })
 
   it('reads the url off the driver config', async () => {
-    const { client } = await connectedClient({ host: 'https://open.rocket.chat' })
+    const { client } = await clientWithDriver({ host: 'https://open.rocket.chat' })
 
     await expect(client.url).resolves.toBe('https://open.rocket.chat')
   })
@@ -182,7 +182,7 @@ describe('RocketChatClient login', () => {
   })
 
   it('resumes the realtime side with the token from the rest login', async () => {
-    const { client, driver } = await connectedClient({ client: restClient() })
+    const { client, driver } = await clientWithDriver({ client: restClient() })
 
     await client.login({ username: 'user', password: 'pass' } as any)
 
@@ -190,7 +190,7 @@ describe('RocketChatClient login', () => {
   })
 
   it('resumes with the token it is given', async () => {
-    const { client, driver } = await connectedClient()
+    const { client, driver } = await clientWithDriver()
 
     await expect(client.resume({ token: 'a-token' })).resolves.toBe('realtime-login')
     expect(driver.login).toHaveBeenCalledWith({ token: 'a-token' }, {})

@@ -90,5 +90,5 @@ A bound after which the SDK settles a wait itself instead of waiting on the serv
 _Avoid_: Timeout — that is a config option, and it means only the connection one
 
 **Server options**:
-The part of a Client's options that describes the server to reach and how to reach it — host, SSL, and the connection's timeout, ping and reopen intervals. Forwarded unchanged to both the REST side and the Driver. Options a Client consumes itself, such as its logger or its protocol, are not server options and never reach the Driver.
+Whatever is left of a Client's options once the ones the Client consumes itself are taken out. What remains describes the server to reach and how to reach it — host, SSL, and the connection's timeout, ping and reopen intervals — and is what the Client builds its Driver from. Defined by subtraction, so an option no one has heard of is a server option. The Client's own logger and protocol are not server options; the logger still reaches the Driver, passed alongside them rather than as one of them.
 _Avoid_: Config (that is the shaped object a Driver or Socket holds), settings (that is the module of environment defaults), the bag
