@@ -415,20 +415,18 @@ export class Socket extends SDKEventEmitter {
         return resolve(undefined)
       }
 
-      // Named, and the *same* reference `off` is given below: `disconnected` is
-      // emitted with no arguments, so handing `reject` straight to it rejected
-      // every in-flight send with `undefined` — and callers read `err.message`
-      // inside their `catch`, which then threw a TypeError from the rejection
-      // handler. The pairing matters as much as the Error: `off` only removes a
-      // listener it can match, and a miss is silently a no-op.
-      const rejectOnDisconnect = () =>
+      const rejectOnDisconnect = () => {
+        this.off(listener, onResponse)
         reject(new Error('[ddp] connection reopened before the response arrived'))
+      }
 
-      this.once('disconnected', rejectOnDisconnect)
-      this.once(listener, (result: any) => {
+      const onResponse = (result: any) => {
         this.off('disconnected', rejectOnDisconnect)
         return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
-      })
+      }
+
+      this.once('disconnected', rejectOnDisconnect)
+      this.once(listener, onResponse)
     })
   }
 
