@@ -88,3 +88,13 @@ _Avoid_: Health check, ping (that is one message of the chain)
 **Deadline**:
 A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Every wait the SDK can be left holding has one.
 _Avoid_: Timeout — that is a config option, and it means only the connection one
+
+### REST
+
+**REST request**:
+One call to a server endpoint over HTTP, described as a value — method, endpoint, payload, per-request options and API version — rather than as a choice of function to call. The REST counterpart of a Method call.
+_Avoid_: Call, HTTP call, API call
+
+**REST transport**:
+What carries a REST request to the server and brings back its status and data. Sits under a Client on the REST side exactly as a Driver does on the realtime side, and like a Driver is not something a consuming app talks to directly.
+_Avoid_: Client (that is the consuming app's entry point), HTTP client, fetcher
