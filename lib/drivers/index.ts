@@ -17,6 +17,9 @@ export interface ILiveness {
   readonly lastPing: number
   readonly pingInterval: number
   probe (timeoutMs?: number): Promise<boolean>
+}
+
+export interface IReopen {
   checkAndReopen (): void
   reopenNow (): Promise<void>
 }
@@ -40,10 +43,9 @@ export interface ISocket {
   removeAllListeners (event?: string): Function[]
 }
 
-export interface IDriver extends ILiveness {
+export interface IDriver extends ILiveness, IReopen {
   config: ISocketOptions
   login (credentials: ICredentials, args: any): Promise<any>
-  logout (): Promise<void>
 
   subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]>
 
