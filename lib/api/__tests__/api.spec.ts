@@ -1,22 +1,16 @@
 import Api from '../api'
-import { FakeRestClient, loginPayload } from '../../../test/fakeRestClient'
+import { createApiWith, loginPayload, logIn } from '../../../test/fakeRestClient'
 
-const createApi = () => {
-  const client = new FakeRestClient()
-  return { client, api: new Api({ client }) }
-}
+const createApi = () => createApiWith(client => new Api({ client }))
 
 const createLoggedInApi = async () => {
   const { client, api } = createApi()
-  client.respond(loginPayload)
-  await api.login({ username: 'user', password: 'pass' })
-  client.requests = []
-  client.respond({})
+  await logIn(client, api)
   return { client, api }
 }
 
 describe('the REST request seam', () => {
-  it('forwards the verb it was asked for', async () => {
+  it('forwards the method it was asked for', async () => {
     const { client, api } = await createLoggedInApi()
 
     await api.get('info')
@@ -51,7 +45,7 @@ describe('the REST request seam', () => {
     expect(client.lastRequest.apiVersion).toBe('v2')
   })
 
-  it('adds the abort signal to the caller options without dropping them', async () => {
+  it('keeps the caller options and adds its own abort signal', async () => {
     const { client, api } = await createLoggedInApi()
 
     await api.get('info', {}, true, undefined, { customHeaders: { 'X-Custom': '1' } })
@@ -59,6 +53,15 @@ describe('the REST request seam', () => {
     expect(client.lastRequest.options.customHeaders).toEqual({ 'X-Custom': '1' })
     expect(client.lastRequest.options.signal).toBeInstanceOf(AbortSignal)
     expect(client.lastRequest.options.signal.aborted).toBe(false)
+  })
+
+  it('replaces a signal the caller supplied with its own', async () => {
+    const { client, api } = await createLoggedInApi()
+    const callerSignal = new AbortController().signal
+
+    await api.get('info', {}, true, undefined, { signal: callerSignal })
+
+    expect(client.lastRequest.options.signal).not.toBe(callerSignal)
   })
 })
 
@@ -71,9 +74,7 @@ describe('the login requirement', () => {
     expect(client.lastRequest.url).toBe('info')
   })
 
-  // `loggedIn` reduces the keys of `currentLogin || {}` with `every`, and `every`
-  // over no keys is true — so an endpoint needing auth is sent before any Login.
-  // Pinned, not fixed: consumers reach endpoints on this path today.
+  // https://github.com/RocketChat/Rocket.Chat.js.SDK/issues/270
   it('sends an endpoint that needs auth even with no current login', async () => {
     const { client, api } = createApi()
 

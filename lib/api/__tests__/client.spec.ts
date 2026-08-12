@@ -1,8 +1,6 @@
 import Api from '../api'
 import * as settings from '../../settings'
 
-// `fetch` is not a configurable own property of the test global, so jest cannot
-// spy on it — the fake is installed and taken away by hand instead.
 const fetchMock = jest.fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
 const realFetch = globalThis.fetch
 
@@ -62,8 +60,8 @@ describe('the url the default client builds', () => {
 })
 
 describe('the body the default client sends', () => {
-  it.each(['post', 'put', 'del'] as const)('serializes the payload for %s', async (verb) => {
-    await createApi('http://host')[verb]('chat.update', { msgId: 'message-id' }, false)
+  it.each(['post', 'put', 'del'] as const)('serializes the payload for %s', async (method) => {
+    await createApi('http://host')[method]('chat.update', { msgId: 'message-id' }, false)
 
     expect(requestedUrl()).toBe('http://host/api/v1/chat.update')
     expect(requestedInit().body).toBe('{"msgId":"message-id"}')
@@ -123,7 +121,7 @@ describe('the headers the default client sends', () => {
 })
 
 describe('what the default client returns', () => {
-  it('pairs the status with the parsed body', async () => {
+  it('returns the parsed body', async () => {
     respondWith(200, { success: true })
 
     await expect(createApi('http://host').get('info', {}, false)).resolves.toEqual({ success: true })

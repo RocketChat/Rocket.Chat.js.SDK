@@ -1,4 +1,4 @@
-import { IClient, RequestMethod } from '../lib/api/api'
+import Api, { IClient, RequestMethod } from '../lib/api/api'
 
 export interface IRecordedRequest {
   method: RequestMethod
@@ -8,19 +8,14 @@ export interface IRecordedRequest {
   apiVersion?: string
 }
 
-/**
- * The whole REST seam is one method, so a client stub is one method too. Specs
- * reach the recorded requests instead of reaching into the Api instance.
- */
 export class FakeRestClient implements IClient {
   headers: any = {}
   requests: IRecordedRequest[] = []
-  respondWith: (request: IRecordedRequest) => any = () => ({ status: 200, data: {} })
+  respondWith: () => any = () => ({ status: 200, data: {} })
 
   request (method: RequestMethod, url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
-    const request = { method, url, data, options, apiVersion }
-    this.requests.push(request)
-    return Promise.resolve(this.respondWith(request))
+    this.requests.push({ method, url, data, options, apiVersion })
+    return Promise.resolve(this.respondWith())
   }
 
   respond (data: any, status: number = 200) {
@@ -38,4 +33,16 @@ export const loginPayload = {
     userId: 'user-id',
     me: { username: 'user' }
   }
+}
+
+export const createApiWith = <T extends Api>(build: (client: FakeRestClient) => T) => {
+  const client = new FakeRestClient()
+  return { client, api: build(client) }
+}
+
+export const logIn = async (client: FakeRestClient, api: Api) => {
+  client.respond(loginPayload)
+  await api.login({ username: 'user', password: 'pass' })
+  client.requests = []
+  client.respond({})
 }

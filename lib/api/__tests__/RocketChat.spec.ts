@@ -1,13 +1,9 @@
 import ApiRocketChat, { userFields } from '../RocketChat'
-import { FakeRestClient, loginPayload } from '../../../test/fakeRestClient'
+import { createApiWith, logIn } from '../../../test/fakeRestClient'
 
 const createApi = async () => {
-  const client = new FakeRestClient()
-  const api = new ApiRocketChat({ client })
-  client.respond(loginPayload)
-  await api.login({ username: 'user', password: 'pass' })
-  client.requests = []
-  client.respond({})
+  const { client, api } = createApiWith(client => new ApiRocketChat({ client }))
+  await logIn(client, api)
   return { client, api }
 }
 

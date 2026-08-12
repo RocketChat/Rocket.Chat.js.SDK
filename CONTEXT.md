@@ -92,5 +92,5 @@ _Avoid_: Timeout — that is a config option, and it means only the connection o
 ### REST
 
 **REST request**:
-One HTTP call to a server endpoint, named by its method and endpoint — `POST chat.sendMessage`. The other way to reach a server, alongside a Method call over the realtime connection. Every REST request the SDK makes goes through a single seam on the Client, so the URL, headers, body and abort signal are decided in one place.
-_Avoid_: Call, API call, endpoint (that is the name, not the request)
+One HTTP call to a server endpoint, named by its request method and endpoint — `POST chat.sendMessage`. The other way to reach a server, alongside a Method call over the realtime connection. Every REST request the SDK makes goes through a single seam on the Client, so the URL, headers, body and abort signal are decided in one place.
+_Avoid_: Call, API call, verb (say request method), endpoint (that is the name, not the request)
