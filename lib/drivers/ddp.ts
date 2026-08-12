@@ -117,12 +117,6 @@ export class Socket extends SDKEventEmitter {
    * Open websocket connection.
    * Stores connection, setting up handlers for open/close/message events.
    * Resumes login if given token.
-   *
-   * The retry interval is the `reopen` option, read by `reopen` when a close
-   * schedules the next attempt. This method used to take it as an argument too,
-   * but never read it — every caller passed nothing, so the parameter is gone
-   * rather than made live: honouring it would have turned a dormant no-op into a
-   * real retry delay for anyone who did pass one.
    */
   open = async (): Promise<any> => {
     if (this.connected) {

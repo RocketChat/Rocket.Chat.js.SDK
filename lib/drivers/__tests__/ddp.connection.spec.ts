@@ -215,14 +215,8 @@ describe('Socket connection lifecycle', () => {
 
   describe('the retry interval', () => {
     /**
-     * `open` used to take the interval as an argument and never read it. The
-     * parameter is gone, so the `reopen` option is the only way to set it — this
-     * asserts a socket reconnected through `open` still retries on that option,
-     * which is the behaviour the removed parameter appeared to offer.
-     *
-     * That the parameter is gone is a compile-time fact, enforced by the
-     * typecheck rather than by an assertion here: `socket.open(1)` no longer
-     * builds.
+     * The `reopen` option is the only way to set the retry interval, so this
+     * asserts a socket reconnected through `open` still retries on it.
      */
     it('comes from the reopen option after a reconnect', async () => {
       transport.readyState = CLOSED
