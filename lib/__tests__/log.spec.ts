@@ -3,16 +3,14 @@ import * as log from '../log'
 
 const levels: (keyof ILogger)[] = ['debug', 'info', 'warning', 'warn', 'error']
 
+const fallbackLogger = log.logger
+
 describe('the fallback logger', () => {
   afterEach(() => log.silence())
 
-  it('is what an SDK object falls back to before anything replaces it', () => {
-    expect(log.logger).toBe(log.silentLogger)
-  })
-
   it('answers every level the ILogger contract names, including the legacy warn', () => {
     for (const level of levels) {
-      expect(log.silentLogger[level]('anything')).toBeUndefined()
+      expect(fallbackLogger[level]('anything')).toBeUndefined()
     }
   })
 
@@ -21,7 +19,7 @@ describe('the fallback logger', () => {
       jest.spyOn(console, write).mockImplementation(() => undefined)
     )
 
-    for (const level of levels) log.silentLogger[level]('anything')
+    for (const level of levels) fallbackLogger[level]('anything')
 
     for (const consoleWrite of consoleWrites) {
       expect(consoleWrite).not.toHaveBeenCalled()
@@ -34,7 +32,7 @@ describe('replacing the fallback logger', () => {
   afterEach(() => log.silence())
 
   it('is seen by everything that reads the logger afterwards', () => {
-    const appLogger = { ...log.silentLogger, error: jest.fn() }
+    const appLogger = { ...fallbackLogger, error: jest.fn() }
 
     log.replaceLog(appLogger)
 
@@ -44,10 +42,10 @@ describe('replacing the fallback logger', () => {
   })
 
   it('is undone by silence, back to the same fallback the SDK started with', () => {
-    log.replaceLog({ ...log.silentLogger, error: jest.fn() })
+    log.replaceLog({ ...fallbackLogger, error: jest.fn() })
 
     log.silence()
 
-    expect(log.logger).toBe(log.silentLogger)
+    expect(log.logger).toBe(fallbackLogger)
   })
 })

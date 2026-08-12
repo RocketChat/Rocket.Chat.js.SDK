@@ -5,12 +5,8 @@
 
 import { ILogger } from '../interfaces'
 
-/**
- * The fallback logger, used by any SDK object whose caller supplied none. It
- * writes nothing, so an SDK embedded in another app stays quiet until that app
- * hands over a logger of its own. Refer to ADR-0005.
- */
-export const silentLogger: ILogger = {
+/** Refer to ADR-0005. */
+const silentLogger: ILogger = {
   debug: () => undefined,
   info: () => undefined,
   warning: () => undefined,
@@ -26,7 +22,7 @@ export function replaceLog (externalLog: ILogger) {
   logger = externalLog
 }
 
-/** Null all log outputs */
+/** Return to the silent fallback logger */
 export function silence () {
   replaceLog(silentLogger)
 }

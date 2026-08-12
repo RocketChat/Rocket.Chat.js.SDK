@@ -24,9 +24,15 @@ pinned that `silence()` is the way back from `replaceLog`.
 
 ## Decision
 
-One exported value, `silentLogger`, is the only logger in this module that writes
-nothing. It is the initial value of `logger`, and `silence()` installs it.
-`InternalLog` is deleted.
+One value, `silentLogger`, is the only logger in this module that writes nothing.
+It is the initial value of `logger`, and `silence()` installs it. `InternalLog`
+is deleted.
+
+`silentLogger` is not exported. The module's public surface is unchanged:
+`logger`, `replaceLog` and `silence`, with the signatures they already had. The
+suite has its own recording logger for Sockets and Drivers, so nothing outside
+this module needs the value, and a second exported `silentLogger` in the package
+would be easy to import in place of that one by mistake.
 
 The fallback stays silent. It is not a console logger.
 
@@ -42,8 +48,6 @@ The fallback stays silent. It is not a console logger.
 
 - `silence()` and the initial value can no longer disagree, because they are the
   same value.
-- `silentLogger` is exported. A caller that wants a quiet Driver for one Socket
-  can pass it as the `logger` option instead of writing a fifth no-op object.
 - A spec pins the fallback, the swap `replaceLog` performs, and the return trip
   through `silence()`.
 - Anyone who finds this SDK silent about a failure is looking for the wrong
