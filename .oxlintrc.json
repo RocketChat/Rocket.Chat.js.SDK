@@ -19,10 +19,6 @@
 	//
 	// Not debt — correct as written, do not "fix":
 	//
-	//   no-this-alias                  1  lib/util.ts, the debounce helper.
-	//     NEVER FIX. The alias forwards the *caller's* `this` into the deferred
-	//     call. An arrow function would capture the wrong one.
-	//
 	//   triple-slash-reference         1  lib/drivers/ddp.ts
 	//     NEVER FIX. It points at an ambient module declaration, and ambient
 	//     modules are not importable. It is also the only thing pulling that
@@ -33,7 +29,7 @@
 	//   no-unsafe-declaration-merging  1  lib/message.ts
 	//     A documented workaround for a long-standing TypeScript issue.
 	//
-	// Total: 12 warnings, 0 errors.
+	// Total: 11 warnings, 0 errors.
 	//
 	// Every warning above is shipped-source debt. Specs and test helpers lint under
 	// these same rules — there are no test-file overrides and no rule changes for

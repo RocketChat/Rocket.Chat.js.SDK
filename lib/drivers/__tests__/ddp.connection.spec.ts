@@ -138,11 +138,7 @@ describe('Socket connection lifecycle', () => {
     it('replaces the predecessor even when tearing it down throws', async () => {
       transport.close = () => { throw new Error('teardown boom') }
 
-      // `silentLogger` is a shared module singleton and `restoreMocks` does not
-      // reset plain `jest.fn()`s, so the log assertion below would otherwise read
-      // calls this test never made.
       const debug = silentLogger.debug as jest.Mock
-      debug.mockClear()
 
       const reopening = socket.reopenNow()
 
@@ -198,9 +194,7 @@ describe('Socket connection lifecycle', () => {
       const failure = new Error('transport unavailable')
       jest.spyOn(fakeTransportModule, 'default').mockImplementation(() => { throw failure })
 
-      // Shared logger singleton, as above.
       const error = silentLogger.error as jest.Mock
-      error.mockClear()
 
       // The existing socket has to stop being connected first, or `open` short
       // circuits before it ever constructs anything.

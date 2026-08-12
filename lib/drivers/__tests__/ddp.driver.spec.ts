@@ -6,7 +6,6 @@ import {
   driveToHandshake,
   FakeWebSocket,
   fakeSockets,
-  OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -137,10 +136,7 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     const reopening = driver.reopenNow()
     const reopened = fakeSockets[fakeSockets.length - 1]
     expect(reopened).not.toBe(transport)
-    reopened.readyState = OPEN
-    reopened.onopen?.({})
-    await jest.advanceTimersByTimeAsync(0)
-    reopened.receive({ msg: 'connected', session: 'reopened-session' })
+    await driveToHandshake(reopened, 'reopened-session')
     await reopening
 
     const waiting = driver.waitForNotifyUserMediaSubs()

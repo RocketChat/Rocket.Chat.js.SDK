@@ -15,9 +15,6 @@ describe('Socket.onMessage', () => {
   let socket: Socket
 
   beforeEach(() => {
-    // `silentLogger` is a shared module, so its mocks keep calls between tests;
-    // the cases that assert on what was logged need a clean slate.
-    jest.clearAllMocks()
     socket = new Socket({ host: 'localhost:3000', logger: silentLogger })
   })
 
