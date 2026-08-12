@@ -86,11 +86,31 @@ an Error that the SDK writes.
   for the Liveness chain therefore also lowers the bound on the wait for the
   `pong`. The documentation of the option says this at `interfaces/index.ts`.
 - `send` still has **no** Deadline for the DDP response, and this ADR does not give
-  `send` one. A Method call on a Socket that is open and dead still waits without
-  end, while the server holds the connection and answers nothing. Something else
-  must end that wait: a close, or the Liveness chain. This ADR states the gap and
-  does not hide it. To close the gap, a person must choose a bound for each call,
-  and that choice is a separate decision about the public surface of the SDK.
+  `send` one. A Method call on a Socket that is open and dead does not wait on a
+  timer. Something else must end that wait: a close, or the Liveness chain. To put
+  a bound on the call itself, a person must choose that bound for each call, and
+  that choice is a separate decision about the public surface of the SDK.
+- **Amendment.** The sentence above named a close and the Liveness chain as the
+  escape from that wait, and neither was one. `send` listened for `disconnected`
+  alone, and `reopenNow` is the only place that emits it. A close and the Reopen
+  that the Liveness chain schedules each replaced the connection without that
+  event, so each stranded every send written to the connection it replaced — for
+  the life of the process, holding the caller's promise and leaking its listeners.
+  `send` now ends the wait on `close` and `connecting` as well. Both were already
+  emitted, by `onClose` and by `createConnection`, so no new event and no new
+  public surface answers this. The rule is the connection, not a clock: a DDP
+  response can only arrive on the connection its message went out on, so the wait
+  ends when that connection does. A Reopen rejects with
+  `'[ddp] connection reopened before the response arrived'`, and a close with
+  `'[ddp] connection closed before the response arrived'` — a close is not a
+  Reopen, and a caller retrying on the wrong one retries into a closed Socket.
+  This is not a Deadline, and the paragraph above still holds: nothing here bounds
+  a Method call on a connection that stays up and stays silent.
+- One rejection now reaches `ping` that never did. A close ends the in-flight
+  ping's wait, and `ping` reopens on a rejection, so a close during that window
+  rebuilt the Socket that the caller had just closed. `ping` therefore reads
+  the same distinction that `onClose` reads from the close code: a close that the
+  caller asked for leaves the Socket closed.
 - A failed write of a `sub` DDP message leaves an entry in the subscription map.
   `send` writes that map before `send` writes to the Socket, and the write can now
   reject, so the map can hold an entry for a DDP subscription that the server never

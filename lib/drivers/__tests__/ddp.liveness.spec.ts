@@ -201,6 +201,27 @@ describe('Socket liveness', () => {
       expect(socket.connected).toBe(true)
     })
 
+    it('does not reopen a socket the user closed while a ping was in flight', async () => {
+      // The ping's send is in flight for the whole window between the ping frame
+      // and the pong, and a close now ends that wait with a rejection. The
+      // rejection reaches the same `.catch(() => this.reopen())` that a missed
+      // pong does — so without a guard on the close, closing during that window
+      // rebuilds the socket the user just asked to be rid of.
+      await jest.advanceTimersToNextTimerAsync()
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+
+      await socket.close()
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(socket.openTimeout).toBeUndefined()
+      expect(jest.getTimerCount()).toBe(0)
+
+      // And no replacement is built once the reopen delay it might have scheduled
+      // would have elapsed.
+      await jest.advanceTimersByTimeAsync(socket.config.reopen * 2)
+      expect(fakeSockets).toHaveLength(1)
+    })
+
     it('clears both the ping and the reopen timer on close', async () => {
       // A close the driver did not ask for schedules a reopen, so both of the
       // socket's timers are pending at once.

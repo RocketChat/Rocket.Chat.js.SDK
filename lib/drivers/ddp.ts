@@ -50,6 +50,13 @@ export class Socket extends SDKEventEmitter {
   logger: ILogger
   reopenPromise?: Promise<void>
 
+  /**
+   * Set for a close the caller asked for, so the Liveness chain can tell that
+   * kind of failure from a dead server and leave the Socket closed. Cleared when
+   * a new connection is built, so a later `open()` starts pinging again.
+   */
+  userClosed = false
+
   /** Create a websocket handler */
   constructor (
     options: ISocketOptions | any = {},
@@ -105,6 +112,7 @@ export class Socket extends SDKEventEmitter {
           this.logger.debug(`[ddp] open: previous connection teardown failed: ${(err as Error).message}`)
         }
       }
+      this.userClosed = false
       this.connection = connection
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
@@ -136,11 +144,21 @@ export class Socket extends SDKEventEmitter {
   onOpen = async (callback: Function) => {
     this.lastPing = Date.now()
 
-    const connected = await this.send({
-      msg: 'connect',
-      version: '1',
-      support: ['1', 'pre2', 'pre1']
-    })
+    // The one send with no caller to reject to: the websocket's `onopen` has
+    // nowhere to put a throw, so a close or a Reopen landing while the handshake
+    // is in flight — which now ends that wait rather than stranding it — would
+    // surface as an unhandled rejection. The connection this ran for is already
+    // gone, so there is nothing to hand the callback.
+    let connected
+    try {
+      connected = await this.send({
+        msg: 'connect',
+        version: '1',
+        support: ['1', 'pre2', 'pre1']
+      })
+    } catch (err) {
+      return this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
+    }
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
@@ -200,6 +218,7 @@ export class Socket extends SDKEventEmitter {
 
   /** Disconnect the DDP from server and clear all subscriptions. */
   close = async () => {
+    this.userClosed = true
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
     this.openTimeout && clearTimeout(this.openTimeout as any)
@@ -409,26 +428,55 @@ export class Socket extends SDKEventEmitter {
         return reject(err)
       }
 
-      // Before any listener is attached: a frame with no reply to wait for —
+      // Before any listener is attached: a DDP message with no response to wait for —
       // `pong` — would otherwise strand a `disconnected` listener forever.
       if (!listener) {
         return resolve(undefined)
       }
 
-      // Named, and the *same* reference `off` is given below: `disconnected` is
-      // emitted with no arguments, so handing `reject` straight to it rejected
-      // every in-flight send with `undefined` — and callers read `err.message`
-      // inside their `catch`, which then threw a TypeError from the rejection
-      // handler. The pairing matters as much as the Error: `off` only removes a
-      // listener it can match, and a miss is silently a no-op.
-      const rejectOnDisconnect = () =>
-        reject(new Error('[ddp] connection reopened before the response arrived'))
+      // The DDP response can only arrive on the connection this message went out on, so
+      // every event that ends that connection has to end this wait. `disconnected`
+      // alone did not: only `reopenNow` emits it, so an ordinary close and a
+      // scheduled Reopen each stranded the send forever, and neither the Liveness
+      // chain nor `close()` could settle it. Both already announce themselves —
+      // `close` from `onClose`, `connecting` from `createConnection` — so this
+      // listens for the events the Socket emits rather than adding new ones.
+      const abandonments: { [event: string]: string } = {
+        disconnected: 'reopened',
+        connecting: 'reopened',
+        close: 'closed'
+      }
 
-      this.once('disconnected', rejectOnDisconnect)
-      this.once(listener, (result: any) => {
-        this.off('disconnected', rejectOnDisconnect)
+      // Named, and the *same* references `stopWaiting` removes: these events are
+      // emitted with no arguments, so handing `reject` straight to one rejected
+      // the send with `undefined` — and callers read `err.message` inside their
+      // `catch`, which then threw a TypeError from the rejection handler. The
+      // pairing matters as much as the Error: `off` only removes a listener it can
+      // match, and a miss is silently a no-op.
+      const onAbandon: { [event: string]: () => void } = {}
+
+      // Removes the DDP response listener too. A send that was abandoned used to
+      // leave both it and the abandonment listeners registered for the life of the
+      // Socket, so every Reopen leaked a few more and retained their closures.
+      const stopWaiting = () => {
+        this.off(listener, onResponse)
+        Object.keys(onAbandon).forEach((event) => this.off(event, onAbandon[event]))
+      }
+
+      const onResponse = (result: any) => {
+        stopWaiting()
         return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+      }
+
+      Object.keys(abandonments).forEach((event) => {
+        onAbandon[event] = () => {
+          stopWaiting()
+          reject(new Error(`[ddp] connection ${abandonments[event]} before the response arrived`))
+        }
+        this.once(event, onAbandon[event])
       })
+
+      this.once(listener, onResponse)
     })
   }
 
@@ -451,7 +499,10 @@ export class Socket extends SDKEventEmitter {
 
       Promise.race([this.send({ msg: 'ping' }), answered])
         .then(() => this.ping())
-        .catch(() => this.reopen())
+        // Not every rejection here is a dead server. A close ends the in-flight
+        // ping's wait too, and reopening on that would rebuild the Socket the
+        // caller just closed — `onClose` guards the same case on the close code.
+        .catch(() => this.userClosed || this.reopen())
         .finally(() => clearTimeout(deadline as any))
     }, this.config.ping)
   }

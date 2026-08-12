@@ -317,6 +317,96 @@ describe('Socket.send with several listeners on one event', () => {
       .rejects.toBe(failure)
   })
 
+  /**
+   * A written send can only be answered on the connection it went out on. Once
+   * that connection is gone the DDP response can never arrive, so the wait has
+   * to end.
+   *
+   * `disconnected` used to be the only event that ended it, and `reopenNow` is
+   * the only place that emits it — so the two ordinary ways a connection goes
+   * away, a close and a scheduled Reopen, stranded every send written to it. The
+   * events were already being emitted; `send` was listening for the wrong ones.
+   */
+  describe('when the connection the send went out on goes away', () => {
+    const inFlight = () => [1, 2, 3].map(() =>
+      socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+    )
+
+    const expectAllToReject = (sends: Promise<any>[], message: string) =>
+      Promise.all(sends.flatMap(sending => [
+        expect(sending).rejects.toBeInstanceOf(Error),
+        expect(sending).rejects.toThrow(message)
+      ]))
+
+    it('rejects every in-flight send when the socket is closed', async () => {
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, '[ddp] connection closed before the response arrived')
+
+      await socket.close()
+
+      await rejections
+    })
+
+    it('rejects every in-flight send when the transport drops', async () => {
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, '[ddp] connection closed before the response arrived')
+
+      transport.close(1006)
+
+      await rejections
+    })
+
+    it('rejects every in-flight send when a scheduled reopen replaces the connection', async () => {
+      // The one path with no close event at all: the transport is not open any
+      // more, but nothing fired `onclose` — the shape a stale-ping socket and a
+      // swallowed orphan close both leave behind. The replacement therefore
+      // announces itself only as `connecting`, which is the event under test here.
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, '[ddp] connection reopened before the response arrived')
+
+      transport.readyState = CLOSED
+      socket.reopen()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+
+      expect(fakeSockets).toHaveLength(2)
+      await rejections
+    })
+
+    it('leaves no listener behind for a send it abandoned', async () => {
+      // The stranded promise was only half the fault: the DDP response listener
+      // and the abandonment listeners stayed registered for the life of the
+      // Socket, so every Reopen leaked a few more and retained their closures.
+      const listenersFor = (event: string) =>
+        ((socket as any)._listeners[event] || []).length
+
+      const before = ['ddp-1', 'close', 'connecting', 'disconnected'].map(listenersFor)
+
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, '[ddp] connection closed before the response arrived')
+      await socket.close()
+      await rejections
+
+      expect(['ddp-1', 'close', 'connecting', 'disconnected'].map(listenersFor)).toEqual(before)
+    })
+
+    it('still carries a send issued before the connection came back', async () => {
+      // The counterpart to the tests above, and the line between them: this send
+      // is written *after* the reopen, so the reopen it waited through must not
+      // reject it.
+      transport.close(1006)
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+      await jest.advanceTimersByTimeAsync(0)
+
+      reopened.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+      await expect(sending).resolves.toMatchObject({ result: 'ok' })
+    })
+  })
+
   it('waits for open up to twice the reopen delay, and no longer', async () => {
     // The deadline has to outlast the retry `reopen()` merely *schedules* at
     // `config.reopen`: at exactly `reopen` it expires as the reconnect begins,
