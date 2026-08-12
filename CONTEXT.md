@@ -88,3 +88,7 @@ _Avoid_: Health check, ping (that is one message of the chain)
 **Deadline**:
 A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Every wait the SDK can be left holding has one.
 _Avoid_: Timeout — that is a config option, and it means only the connection one
+
+**Server options**:
+The part of a Client's options that describes the server to reach and how to reach it — host, SSL, and the connection's timeout, ping and reopen intervals. Forwarded unchanged to both the REST side and the Driver. Options a Client consumes itself, such as its logger or its protocol, are not server options and never reach the Driver.
+_Avoid_: Config (that is the shaped object a Driver or Socket holds), settings (that is the module of environment defaults), the bag
