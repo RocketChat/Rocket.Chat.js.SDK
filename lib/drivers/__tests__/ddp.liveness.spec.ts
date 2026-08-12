@@ -1,14 +1,16 @@
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 import {
   CLOSED,
+  driveToHandshake,
   FakeWebSocket,
+  fakeSockets,
   OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
-} from '../../test/fakeTransport'
+} from '../../../test/fakeTransport'
 
-jest.mock('universal-websocket-client', () => require('../../test/fakeTransport').fakeTransportModule)
+jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
@@ -88,16 +90,13 @@ describe('Socket liveness', () => {
       expect(socket.connected).toBe(false)
     })
 
-    it('skips closing a stale-ping socket, leaking it open', async () => {
-      // Pinned bug: `close` gates the actual close on `connected`, which a stale
-      // ping already made false — so the open transport is abandoned rather than
-      // closed. See test/PINNED-BUGS.md, row 12.
+    it('closes a stale-ping socket rather than leaking it open', async () => {
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
 
       await socket.close()
 
-      expect(transport.closedWith).toEqual([])
-      expect(transport.readyState).toBe(OPEN)
+      expect(transport.closedWith).toEqual([4000]) // the user-disconnect code
+      expect(transport.readyState).toBe(CLOSED)
     })
   })
 
@@ -109,8 +108,6 @@ describe('Socket liveness', () => {
     })
 
     it('succeeds on a pong that lands in the same millisecond as the probe', async () => {
-      // The stamp cannot advance here, because no time passes on the frozen
-      // clock. The probe must answer on the pong itself, not on the timestamp.
       const stampBeforeProbe = socket.lastPing
       const pongSeen = jest.fn()
       socket.on('pong', pongSeen)
@@ -120,8 +117,6 @@ describe('Socket liveness', () => {
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
       transport.receive({ msg: 'pong' })
 
-      // Without these two the true below could not be told apart from a probe
-      // that resolved for some other reason.
       expect(pongSeen).toHaveBeenCalled()
       expect(socket.lastPing).toBe(stampBeforeProbe)
 
@@ -173,28 +168,37 @@ describe('Socket liveness', () => {
       }
     })
 
-    it('dies for good when one pong is withheld, and a send then never returns', async () => {
+    it('reconnects when one pong is withheld', async () => {
+      // This test used to pin the opposite: the chain died for good, because the
+      // ping's send went out while `connected` was still true, waited forever on
+      // a pong reply, and the `.catch(() => this.reopen())` behind it never ran.
+      // `ping` now races its send against a deadline of its own, so the withheld
+      // pong is what triggers the reconnect rather than what prevents it.
       await tickWithPong()
       await tickWithPong()
 
       await tickWithoutPong()
 
-      // Nothing rescheduled: the ping send is still waiting on a pong that will
-      // never arrive, so there is no timer left to fire.
-      expect(jest.getTimerCount()).toBe(0)
+      // The ping's own deadline, the one timer the unanswered send leaves behind.
+      expect(jest.getTimerCount()).toBe(1)
 
-      // The stamp goes stale, and aliveness takes `connected` down with it.
-      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
+      // One millisecond past the deadline, which is also one past the aliveness
+      // boundary — the stamp last moved on the pong two ticks ago.
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
+
+      // The stamp is stale by now, so the socket reads as disconnected, and the
+      // expired ping has scheduled the reopen.
       expect(socket.alive()).toBe(false)
       expect(socket.connected).toBe(false)
+      expect(socket.openTimeout).toBeDefined()
 
-      let settled = false
-      socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
-        .then(() => { settled = true }, () => { settled = true })
+      // And the reopen actually builds a replacement transport once its delay
+      // elapses — the socket is no longer abandoned open forever.
+      await jest.advanceTimersByTimeAsync(socket.config.reopen)
 
-      await jest.advanceTimersByTimeAsync(10 * 60 * 1000)
-
-      expect(settled).toBe(false)
+      expect(fakeSockets).toHaveLength(2)
+      await driveToHandshake(fakeSockets[1])
+      expect(socket.connected).toBe(true)
     })
 
     it('clears both the ping and the reopen timer on close', async () => {

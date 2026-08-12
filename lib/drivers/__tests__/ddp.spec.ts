@@ -1,7 +1,7 @@
 import { sha256 } from 'js-sha256'
 
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 
 // `loginParams` reads only its argument, so one Socket serves every case here.
 // Constructing a Socket opens no connection and starts no timer. Bound rather
