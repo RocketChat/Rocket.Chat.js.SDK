@@ -45,7 +45,6 @@
   },
   "dependencies": {
     "js-sha256": "^0.9.0",
-    "mem": "^4.0.0",
     "tiny-events": "^1.0.1",
     "universal-websocket-client": "^1.0.2"
   }

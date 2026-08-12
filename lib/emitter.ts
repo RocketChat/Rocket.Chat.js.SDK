@@ -23,7 +23,7 @@ const registeredListener = (listener: Function): Function =>
  * The class is not exported from `index.ts`, but do not read that as freedom to
  * reshape it. `removeAllListeners` is public API twice over: `Socket`,
  * `DDPDriver` and `Api` inherit it, so it reaches consumers through
- * `Rocketchat`/`Bot`/`Livechat`, and `package.json` sets `"main": "index.ts"` —
+ * `Rocketchat`, and `package.json` sets `"main": "index.ts"` —
  * the package ships TypeScript source, so `lib/emitter` is importable directly.
  * Narrowing the signature is a breaking change.
  */
