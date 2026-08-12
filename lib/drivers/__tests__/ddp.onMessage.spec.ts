@@ -1,5 +1,5 @@
-import { Socket } from './ddp'
-import { silentLogger } from '../../test/silentLogger'
+import { Socket } from '../ddp'
+import { silentLogger } from '../../../test/silentLogger'
 
 // `onMessage` is handed frames directly — no socket is constructed and no timer
 // is started, so this file runs on Jest's default real timers.
@@ -15,6 +15,9 @@ describe('Socket.onMessage', () => {
   let socket: Socket
 
   beforeEach(() => {
+    // `silentLogger` is a shared module, so its mocks keep calls between tests;
+    // the cases that assert on what was logged need a clean slate.
+    jest.clearAllMocks()
     socket = new Socket({ host: 'localhost:3000', logger: silentLogger })
   })
 
@@ -98,10 +101,20 @@ describe('Socket.onMessage', () => {
     expect(ignored).not.toHaveBeenCalled()
   })
 
-  it('throws out of the callback on malformed JSON', () => {
-    // `JSON.parse` is unguarded, so a bad frame propagates to the caller —
-    // which in production is the websocket's `onmessage`. See
-    // test/PINNED-BUGS.md, row 5.
-    expect(() => socket.onMessage({ data: 'not json' })).toThrow(SyntaxError)
+  it('logs and swallows a malformed frame instead of throwing', () => {
+    // In production the caller is the websocket's `onmessage`, which has
+    // nowhere to put a throw.
+    const listener = jest.fn()
+    socket.on('changed', listener)
+
+    expect(() => socket.onMessage({ data: 'not json' })).not.toThrow()
+
+    expect(silentLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('[ddp] JSON parse error')
+    )
+    expect(silentLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('not json')
+    )
+    expect(listener).not.toHaveBeenCalled()
   })
 })
