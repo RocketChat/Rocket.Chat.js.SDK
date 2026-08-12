@@ -854,7 +854,7 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/** Unsubscribe from all subscriptions. Proxy for socket unsubscribeAll */
-  unsubscribeAll = (): Promise<any> => {
+  unsubscribeAll = (): Promise<void> => {
     return this.ddp.unsubscribeAll()
   }
 
