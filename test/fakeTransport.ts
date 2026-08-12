@@ -58,7 +58,16 @@ export class FakeWebSocket {
     fakeSockets.push(this)
   }
 
+  /**
+   * Set to make `send` throw instead of recording the frame — the only way to
+   * reach the driver's write-failure branch, since a real websocket throws from
+   * `send` on a socket that closed under it. Off by default, so a spec that does
+   * not set it sees the recording behaviour every other spec relies on.
+   */
+  sendError: Error | null = null
+
   send (data: string): void {
+    if (this.sendError) throw this.sendError
     this.sent.push(data)
   }
 
