@@ -205,12 +205,11 @@ export class Socket extends SDKEventEmitter {
     this.openTimeout && clearTimeout(this.openTimeout as any)
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
 
-    if (this.connected) {
+    if (this.connection && this.connection.readyState !== 3) {
+      const connection = this.connection
       await new Promise((resolve) => {
-        if (this.connection) {
-          this.once('close', resolve)
-          this.connection.close(userDisconnectCloseCode)
-        }
+        this.once('close', resolve)
+        connection.close(userDisconnectCloseCode)
       })
       .catch(this.logger.error)
     }
