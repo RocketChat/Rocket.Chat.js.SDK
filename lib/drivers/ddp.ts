@@ -404,11 +404,6 @@ export class Socket extends SDKEventEmitter {
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
-      if (/^sub$/.test(obj.msg)) {
-        const { name, params } = obj;
-        this.subscriptions[id] = { id, name, params, unsubscribe: this.unsubscribe.bind(this, id) };
-      }
-
       try {
         // Read fresh rather than captured above the wait: a reopen while the send
         // waited on `open` will have replaced the connection.
@@ -545,6 +540,9 @@ export class Socket extends SDKEventEmitter {
   /**
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
+   *
+   * Sole owner of `subscriptions`: the entry is written on the server's
+   * acknowledgement, so a refused or unanswered `sub` leaves nothing behind.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */

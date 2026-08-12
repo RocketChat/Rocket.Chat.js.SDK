@@ -37,7 +37,8 @@ point where the decision has to be made.
 
 ## Decision
 
-An entry is forgotten when the server has answered, and kept when it has not.
+An entry is forgotten when the server has answered, and kept when it has not. An
+entry is written on the same terms.
 
 - `toError` returns a `DDPError`. Every value it produces is a `DDPError`,
   including the one it builds from a DDP error that arrived as a bare string.
@@ -45,6 +46,10 @@ An entry is forgotten when the server has answered, and kept when it has not.
   ADR-0001, so the type marks provenance in the value itself, and a caller reads
   it with `instanceof`. A rejection the SDK originates under ADR-0003 is a plain
   `Error` and is therefore not a `DDPError`.
+- `subscribe` writes its entry when the server has answered. It is the only
+  writer, and it writes on the `ready` DDP response, under the id the server
+  confirmed. A `sub` the server refuses, and a `sub` whose response never
+  arrives, leave nothing behind.
 - `unsubscribe` forgets its DDP subscription on a DDP response, whether that
   response succeeded or carried a DDP error. It keeps its DDP subscription on
   any other rejection. It re-throws in both cases. The rejection a caller
@@ -79,14 +84,20 @@ An entry is forgotten when the server has answered, and kept when it has not.
   compiles this SDK from TypeScript source with its own toolchain, and a
   toolchain that downlevels classes breaks `instanceof` for a subclass of `Error`
   without it.
-- The rule governs the removal of an entry. It does not govern the writing of
-  one, and the writing is where the same fault survives. `send` writes an entry
-  for a `sub` DDP message before that message goes out, and `subscribe` swallows
-  its own failure without removing anything, so a failed subscribe leaves an
-  entry that `subscribeAll` re-requests at every Login. ADR-0003 already records
-  the failed write as one way to reach this. A separate issue tracks it. Until it
-  is corrected, this ADR describes an invariant that the `sub` path does not hold
-  to.
+- The rule now governs the writing of an entry as well as its removal, but only
+  the write itself. `subscribe` still swallows its own failure and resolves
+  `undefined` rather than re-throwing, and `subscribeAll` re-sends every entry
+  under its own id without removing one the server now refuses. An entry that a
+  successful `sub` wrote therefore survives a later refusal, and `subscribeAll`
+  re-requests it at every Login. A separate issue tracks it.
 - Whether a `sub` may be sent for an id whose `unsub` is still in flight is not
   settled here, and the behaviour of the server in that case is not known. A
   separate issue tracks the question.
+- Applying the rule to the write reopens, on the `sub` path, the case the Context
+  describes for `unsubscribe`. A Reopen rejects a `sub` that is still in flight,
+  under ADR-0003, while the server may already be streaming. `subscribe`
+  swallows that rejection and writes nothing, so the SDK holds no name for a
+  stream that exists and `subscribeAll` cannot restore it at the next Login. The
+  Socket accepts that in exchange for never holding an entry the server never
+  confirmed. Which side to prefer when a `sub` response is abandoned rather than
+  refused is not settled here. A separate issue tracks the question.
