@@ -200,25 +200,53 @@ export class Socket extends SDKEventEmitter {
     if (data.id) this.emit(data.id, data)
   }
 
-  /** Disconnect the DDP from server and clear all subscriptions. */
-  close = async () => {
+  /**
+   * Disconnect the DDP from server and clear all subscriptions.
+   *
+   * The wait for the close event is bounded. This runs on a socket the transport
+   * still calls open, which is exactly the socket a stale ping cannot vouch for,
+   * so the close frame may never be answered. On the deadline the socket is
+   * abandoned rather than waited on: a leaked socket costs less than a caller —
+   * a logout, a teardown, a reopen — that never returns.
+   *
+   * The connection is therefore dropped either way, so `close` resolves once and
+   * a second call has nothing left to wait for. A close event that arrives after
+   * the deadline reaches `onClose` as an orphan and is ignored there.
+   */
+  close = async (timeoutMs = 2000) => {
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
     this.openTimeout && clearTimeout(this.openTimeout as any)
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
 
-    if (this.connection && this.connection.readyState !== 3) {
-      const connection = this.connection
-      await new Promise((resolve) => {
-        this.once('close', resolve)
-        connection.close(userDisconnectCloseCode)
+    const connection = this.connection
+    if (connection && connection.readyState !== 3) {
+      await new Promise<void>((resolve) => {
+        let settled = false
+        const cleanup = () => {
+          if (settled) return
+          settled = true
+          this.off('close', onClose)
+          clearTimeout(deadline as any)
+          resolve()
+        }
+
+        const onClose = () => cleanup()
+        this.once('close', onClose)
+
+        const deadline = setTimeout(cleanup, timeoutMs)
+
+        try {
+          connection.close(userDisconnectCloseCode)
+        } catch (err) {
+          this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
+          cleanup()
+        }
       })
-      .catch(this.logger.error)
     }
 
+    delete this.connection
     this.forgetAllSubscriptions()
-
-    return Promise.resolve()
   }
 
   /** Drop one DDP subscription. */
