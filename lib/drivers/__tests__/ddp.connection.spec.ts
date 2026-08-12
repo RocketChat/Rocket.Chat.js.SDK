@@ -259,18 +259,33 @@ describe('Socket connection lifecycle', () => {
         expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
       })
 
-      it('reopens nothing when the abandoned socket closes late', async () => {
-        const closeSeen = jest.fn()
-        socket.on('close', closeSeen)
+      it('detaches the abandoned socket, so a peer that revives reaches nothing', async () => {
+        const closing = socket.close()
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        await closing
+
+        // The teardown in `createConnection` can never reach this socket again —
+        // the driver has dropped it — so `close` is the last chance to detach it.
+        expect(transport.onopen).toBeNull()
+        expect(transport.onmessage).toBeNull()
+        expect(transport.onerror).toBeNull()
+        expect(transport.onclose).toBeNull()
+        expect(socket.openTimeout).toBeUndefined()
+      })
+
+      it('is not kept alive by a revived peer it has already abandoned', async () => {
+        const stampAtClose = socket.lastPing
+        const messageSeen = jest.fn()
+        socket.on('updated', messageSeen)
 
         const closing = socket.close()
         await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
         await closing
 
-        transport.onclose!({ code: 1006 })
+        transport.receive({ msg: 'updated' })
 
-        expect(closeSeen).not.toHaveBeenCalled()
-        expect(socket.openTimeout).toBeUndefined()
+        expect(messageSeen).not.toHaveBeenCalled()
+        expect(socket.lastPing).toBe(stampAtClose)
       })
     })
   })

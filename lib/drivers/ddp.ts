@@ -35,6 +35,9 @@ import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
 
+/** How long `close` waits for the transport's close event before abandoning the socket. */
+const closeDeadline = 2000;
+
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -209,11 +212,13 @@ export class Socket extends SDKEventEmitter {
    * abandoned rather than waited on: a leaked socket costs less than a caller —
    * a logout, a teardown, a reopen — that never returns.
    *
-   * The connection is therefore dropped either way, so `close` resolves once and
-   * a second call has nothing left to wait for. A close event that arrives after
-   * the deadline reaches `onClose` as an orphan and is ignored there.
+   * The connection is dropped either way, so `close` resolves once and a second
+   * call has nothing left to wait for. Its handlers are detached with it: the
+   * teardown in `createConnection` can no longer reach a socket the driver has
+   * stopped holding, so a peer that revives would otherwise still reach
+   * `onMessage`, refresh the ping stamp and emit into a driver that has closed.
    */
-  close = async (timeoutMs = 2000) => {
+  close = async () => {
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
     this.openTimeout && clearTimeout(this.openTimeout as any)
@@ -226,15 +231,14 @@ export class Socket extends SDKEventEmitter {
         const cleanup = () => {
           if (settled) return
           settled = true
-          this.off('close', onClose)
+          this.off('close', cleanup)
           clearTimeout(deadline as any)
           resolve()
         }
 
-        const onClose = () => cleanup()
-        this.once('close', onClose)
+        this.once('close', cleanup)
 
-        const deadline = setTimeout(cleanup, timeoutMs)
+        const deadline = setTimeout(cleanup, closeDeadline)
 
         try {
           connection.close(userDisconnectCloseCode)
@@ -243,6 +247,13 @@ export class Socket extends SDKEventEmitter {
           cleanup()
         }
       })
+    }
+
+    if (connection) {
+      connection.onopen = null as any
+      connection.onmessage = null as any
+      connection.onerror = null as any
+      connection.onclose = null as any
     }
 
     delete this.connection
