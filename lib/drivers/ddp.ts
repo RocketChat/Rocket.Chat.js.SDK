@@ -573,8 +573,6 @@ export class Socket extends SDKEventEmitter {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
     return this.send({ msg: 'unsub', id })
       .then((data: any) => {
-        // Only once the server has acknowledged: a refused unsub leaves the
-        // subscription in the map, so it can still be named.
         delete this.subscriptions[id]
         return data.result || data.subs
       })
@@ -584,12 +582,7 @@ export class Socket extends SDKEventEmitter {
       })
   }
 
-  /**
-   * Unsubscribe from all active subscriptions. A best-effort cleanup: each
-   * `unsubscribe` removes its own entry on the server's acknowledgement, and a
-   * refused one stays behind without failing the rest — callers such as `logout`
-   * and `close` have to get on with their own work either way.
-   */
+  /** Unsubscribe from all active subscriptions, ignoring any the server refuses */
   unsubscribeAll = () => {
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
       return this.subscriptions[id].unsubscribe().catch(() => undefined)
