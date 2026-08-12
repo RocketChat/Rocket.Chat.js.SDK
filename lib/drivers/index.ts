@@ -12,14 +12,23 @@ import {
   ICredentials
 } from '../../interfaces'
 
+export interface ILiveness {
+  readonly connected: boolean
+  readonly lastPing: number
+  readonly pingInterval: number
+  probe (timeoutMs?: number): Promise<boolean>
+  checkAndReopen (): void
+  reopenNow (): Promise<void>
+}
+
 export interface ISocket {
   logger: ILogger
-  connect (options: ISocketOptions): Promise<ISocket | IDriver>
-  disconnect (): Promise<ISocket>
+  connect (options: ISocketOptions): Promise<IDriver>
+  disconnect (): Promise<void>
   checkAndReopen (): void
   subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined>
   subscribeRaw (...args: any[]): Promise<ISubscription | undefined>
-  unsubscribe (subscription: ISubscription): Promise<ISocket>
+  unsubscribe (subscription: ISubscription): Promise<any>
   unsubscribeAll (): Promise<void>
 
   onStreamData (event: string, cb: ICallback): Promise<any>
@@ -31,9 +40,10 @@ export interface ISocket {
   removeAllListeners (event?: string): Function[]
 }
 
-export interface IDriver {
-  config: any
+export interface IDriver extends ILiveness {
+  config: ISocketOptions
   login (credentials: ICredentials, args: any): Promise<any>
+  logout (): Promise<void>
 
   subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]>
 
@@ -44,8 +54,6 @@ export interface IDriver {
   subscribeLoggedNotify (): Promise<any>
 
   subscribeNotifyUser (): Promise<any>
-
-  subscribeNotifyUser (): Promise<IDriver>
 
   onTyping (cb: ICallback): Promise<any>
 
