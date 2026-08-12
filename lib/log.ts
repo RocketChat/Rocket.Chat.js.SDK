@@ -5,27 +5,21 @@
 
 import { ILogger } from '../interfaces'
 
-/** Temp logging, should override form adapter's log */
-class InternalLog implements ILogger {
-  debug (..._args: any[]) {
-    // console.log(...args)
-  }
-  info (..._args: any[]) {
-    // console.log(...args)
-  }
-  warning (..._args: any[]) {
-    // console.log(...args)
-  }
-  warn (...args: any[]) { // legacy method
-    return this.warning(...args)
-  }
-  error (..._args: any[]) {
-    // console.log(...args)
-  }
+/**
+ * The fallback logger, used by any SDK object whose caller supplied none. It
+ * writes nothing, so an SDK embedded in another app stays quiet until that app
+ * hands over a logger of its own. Refer to ADR-0005.
+ */
+export const silentLogger: ILogger = {
+  debug: () => undefined,
+  info: () => undefined,
+  warning: () => undefined,
+  warn: () => undefined,
+  error: () => undefined
 }
 
-/** Default basic console logging */
-export let logger: ILogger = new InternalLog()
+/** The logger an SDK object falls back to when its caller supplied none. */
+export let logger: ILogger = silentLogger
 
 /** Substitute logging handler */
 export function replaceLog (externalLog: ILogger) {
@@ -34,11 +28,5 @@ export function replaceLog (externalLog: ILogger) {
 
 /** Null all log outputs */
 export function silence () {
-  replaceLog({
-    debug: () => null,
-    info: () => null,
-    warn: () => null,
-    warning: () => null,
-    error: () => null
-  })
+  replaceLog(silentLogger)
 }

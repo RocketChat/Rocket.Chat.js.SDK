@@ -88,3 +88,9 @@ _Avoid_: Health check, ping (that is one message of the chain)
 **Deadline**:
 A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Every wait the SDK can be left holding has one.
 _Avoid_: Timeout — that is a config option, and it means only the connection one
+
+### Diagnostics
+
+**Fallback logger**:
+The logger an SDK object uses when its caller supplied none. It writes nothing, so an SDK embedded in a host app stays quiet until that app supplies a logger of its own. Silence from the SDK is this, not an absence of failures.
+_Avoid_: Default logger, internal log, no-op logger
