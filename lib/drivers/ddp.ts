@@ -693,6 +693,7 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
 			// integration: string
     }
     this.ddp = new Socket({ ...options, logger })
+    this.ddp.on('open', () => this.emit('connected'))
     this.config = { ...options, timeout: this.ddp.config.timeout }
     this.logger = logger
   }
@@ -715,17 +716,19 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     return new Promise((resolve, reject) => {
       this.logger.info('[driver] Connecting', { ...this.config, ...c })
       this.subscriptions = this.ddp.subscriptions
+
+      const onConnected = () => {
+        this.logger.info('[driver] Connected')
+        resolve(this as IDriver)
+      }
+
       this.ddp.open().catch((err: Error) => {
         this.logger.error(`[driver] Failed to connect: ${err.message}`)
+        this.off('connected', onConnected)
         reject(err)
       })
 
-      this.ddp.on('open', () => this.emit('connected')) // echo ddp event
-
-      this.once('connected', () => {
-        this.logger.info('[driver] Connected')
-        resolve(this as IDriver)
-      })
+      this.once('connected', onConnected)
     })
   }
 
