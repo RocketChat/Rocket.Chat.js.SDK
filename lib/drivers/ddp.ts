@@ -13,6 +13,7 @@ import * as settings from '../settings';
 
 import {
   ISocketOptions,
+  ISocketConfig,
   ISocketMessageHandler,
   ISubscription,
   ICredentials,
@@ -54,7 +55,7 @@ export class Socket extends SDKEventEmitter {
   lastPing = Date.now()
   subscriptions: { [id: string]: ISubscription } = {}
   handlers: ISocketMessageHandler[] = []
-  config: ISocketOptions | any
+  config: ISocketConfig
   openTimeout?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
   connection?: WebSocket
@@ -69,12 +70,13 @@ export class Socket extends SDKEventEmitter {
   ) {
     super()
     this.logger = options.logger || Logger
+    const timeout = options.timeout || 10000
     this.config = {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
       reopen: options.reopen || 10000,
-      ping: options.ping || options.timeout || 10000,
-      timeout: options.timeout || 10000
+      ping: options.ping || timeout,
+      timeout
     }
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
@@ -288,10 +290,8 @@ export class Socket extends SDKEventEmitter {
    * down. Unhandled creation errors are swallowed because cleanup already runs
    * via the open/timeout paths.
    *
-   * The wait for the new socket's `open` is bounded by `config.timeout`: past it
-   * the promise resolves and `reopenPromise` is cleared even though the
-   * connection may still be down, so a consumer on a slow network raises this by
-   * raising `timeout`.
+   * Past the deadline the promise resolves and `reopenPromise` is cleared even
+   * though the connection may still be down.
    */
   reopenNow = (): Promise<void> => {
     if (this.reopenPromise) {
@@ -326,9 +326,6 @@ export class Socket extends SDKEventEmitter {
   /**
    * Bounded liveness check for a socket in the gray zone. Returns true only if
    * the socket is open and the server answers the ping within the deadline.
-   *
-   * The default deadline is short by design: a caller needing to tolerate a
-   * slower server passes its own.
    */
   probe = (timeoutMs = 2000): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
@@ -688,17 +685,18 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   constructor ({ host = 'localhost:3000', integrationId: _integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
     super()
 
-    this.config = {
+    const options = {
       ...config,
       ...moreConfigs,
-      host: host.replace(/(^\w+:|^)\/\//, ''),
-      timeout: moreConfigs.timeout ?? config?.timeout ?? 10000
+      host: host.replace(/(^\w+:|^)\/\//, '')
 			// reopen: number
 			// ping: number
 			// close: number
 			// integration: string
     }
-    this.ddp = new Socket({ ...this.config, logger })
+    this.ddp = new Socket({ ...options, logger })
+    // Read back rather than default a second time: the socket decides it.
+    this.config = { ...options, timeout: this.ddp.config.timeout }
     this.logger = logger
   }
 
@@ -822,10 +820,9 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
    * an observable readiness signal after a forced reconnect.
    *
    * If the subscriptions are not yet present (e.g. immediately after reopenNow),
-   * it polls the socket subscription map until they appear or `config.timeout`
-   * expires.
+   * it polls the socket subscription map until they appear or the deadline expires.
    */
-  waitForNotifyUserMediaSubs = (timeoutMs = this.config.timeout): Promise<boolean> => {
+  waitForNotifyUserMediaSubs = (timeoutMs = this.ddp.config.timeout): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
     }

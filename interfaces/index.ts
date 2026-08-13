@@ -11,10 +11,9 @@ export interface ILogger {
  * Connection options type
  * @param host        Host URL:PORT, converted to websocket protocol
  * @param useSsl      Use SSL (https/wss) to connect
- * @param timeout     How long to wait (ms) before abandoning connection. Also
- *                    how long a forced immediate reopen waits for the new
- *                    socket to open before resolving anyway, and how long the
- *                    media-subscription readiness wait polls before giving up
+ * @param timeout     How long to wait (ms) before abandoning connection, and
+ *                    the value several other deadlines are derived from — each
+ *                    is documented where it is used
  * @param reopen      ms interval before attempting reopens on disconnect. Twice
  *                    this is also how long a send waits for the connection to
  *                    open before it is rejected, so the deadline outlasts the
@@ -35,6 +34,13 @@ export interface ISocketOptions {
   close?: number
   integration?: string
 }
+
+/**
+ * The options the socket itself reads, after defaults are applied, so every
+ * deadline read from it is a number. `close` and `integration` are left out
+ * because the socket never reads them.
+ */
+export type ISocketConfig = Required<Pick<ISocketOptions, 'host' | 'useSsl' | 'timeout' | 'reopen' | 'ping'>>
 
 /**
  * DDP Message Handler defines attributes to match on incoming messages and
