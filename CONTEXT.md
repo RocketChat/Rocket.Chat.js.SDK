@@ -77,6 +77,10 @@ _Avoid_: Reauth, refresh
 A retry scheduled after a connection drops, waited out before a new Socket is built. Distinct from the immediate reconnect a caller forces, which skips the wait — the two are separate paths in the code and the difference decides whether an in-flight send is abandoned now or later.
 _Avoid_: Reconnect (unqualified — say which of the two), retry
 
+**Connected echo**:
+The Driver re-emitting its Socket's open as a single `connected` event. One open means one `connected`, however many times a caller asked the Driver to connect.
+_Avoid_: Connect event, ready
+
 **Liveness chain**:
 The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. A Socket the server has stopped answering still reads as open to the transport.
 _Avoid_: Heartbeat, keepalive
