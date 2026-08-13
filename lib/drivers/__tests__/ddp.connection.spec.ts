@@ -6,6 +6,7 @@ import {
   FakeWebSocket,
   fakeSockets,
   fakeTransportModule,
+  OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -187,6 +188,44 @@ describe('Socket connection lifecycle', () => {
 
       await expect(reopening).resolves.toBeUndefined()
       expect(socket.reopenPromise).toBeUndefined()
+    })
+  })
+
+  describe('an open abandoned by a close mid-handshake', () => {
+    const handshakeInFlight = async () => {
+      const replacement = fakeSockets[1]
+      replacement.readyState = OPEN
+      replacement.onopen?.({})
+      await jest.advanceTimersByTimeAsync(0)
+    }
+
+    it('schedules no further reopen behind the one that was abandoned', async () => {
+      transport.close(1006)
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      await handshakeInFlight()
+
+      await socket.close()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY * 2)
+
+      expect(socket.openTimeout).toBeUndefined()
+      expect(fakeSockets).toHaveLength(2)
+    })
+
+    it('logs rather than leaving checkAndReopen an unhandled rejection', async () => {
+      // `checkAndReopen` opens without awaiting, so the rejection has nowhere to
+      // go but the global handler of the consuming app.
+      const error = silentLogger.error as jest.Mock
+      error.mockClear()
+      transport.readyState = CLOSED
+
+      socket.checkAndReopen()
+      await handshakeInFlight()
+      await socket.close()
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(error).toHaveBeenCalledWith(
+        '[ddp] Reopen error: [ddp] connection closed before the response arrived'
+      )
     })
   })
 

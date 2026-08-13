@@ -22,6 +22,7 @@ import type { Socket } from '../lib/drivers/ddp'
 export const CONNECTING = 0
 export const OPEN = 1
 export const CLOSED = 3
+export const USER_DISCONNECT = 4000
 
 /**
  * Every socket the driver has constructed, in construction order. Reaching the
