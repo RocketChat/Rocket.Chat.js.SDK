@@ -169,21 +169,6 @@ describe('Socket liveness', () => {
       expect(jest.getTimerCount()).toBe(1)
     })
 
-    it('takes its deadline from the configured ping interval when given none', async () => {
-      // The assertion only holds if the deadline is read from config: any fixed
-      // bound is a different number from PING_INTERVAL and settles elsewhere.
-      const probing = socket.probe()
-      let resolved: boolean | undefined
-      probing.then((value) => { resolved = value })
-
-      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
-      expect(resolved).toBeUndefined()
-
-      await jest.advanceTimersByTimeAsync(1)
-
-      await expect(probing).resolves.toBe(false)
-    })
-
     it('succeeds when the pong lands after the clock has moved', async () => {
       // The millisecond advance is the whole test: without it this passes for the
       // wrong reason, resolving false on the timeout instead of true on the pong.

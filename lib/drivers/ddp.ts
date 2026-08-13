@@ -327,10 +327,10 @@ export class Socket extends SDKEventEmitter {
    * Bounded liveness check for a socket in the gray zone. Returns true only if
    * the socket is open and the server answers the ping within the deadline.
    *
-   * The deadline defaults to `config.ping`: the same wait the liveness chain
-   * already tolerates between a ping and its pong.
+   * The default deadline is short by design: a caller needing to tolerate a
+   * slower server passes its own.
    */
-  probe = (timeoutMs = this.config.ping): Promise<boolean> => {
+  probe = (timeoutMs = 2000): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
       if (!this.connection || this.connection.readyState !== socketOpen) {
         return resolve(false)

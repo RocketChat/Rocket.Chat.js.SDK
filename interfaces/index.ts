@@ -22,8 +22,7 @@ export interface ILogger {
  * @param ping        ms interval between each ping, and also how long a ping
  *                    waits for its pong before the connection is reopened —
  *                    tightening it for liveness tightens that deadline too.
- *                    Defaults to `timeout`, and is the default bound for a
- *                    probe, so raising `timeout` alone widens the probe too
+ *                    Defaults to `timeout`
  * @param close       ms interval to wait for socket close to succeed
  * @param integration Name added to message `bot` attribute to identify SDK use
  */
