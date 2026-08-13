@@ -109,6 +109,15 @@ an Error that the SDK writes.
   Reopen, and a caller retrying on the wrong one retries into a closed Socket.
   This is not a Deadline, and the paragraph above still holds: nothing here bounds
   a Method call on a connection that stays up and stays silent.
+  One window stays open to all three events: `send` attaches its listeners a
+  microtask after `waitForOpen` resolves, so a connection lost in between is
+  announced to nobody, and a guard at that point abandons the wait instead. The
+  guard reads `readyState`, not `connected`: `connected` is bookkeeping the SDK
+  updates when the events land, and in this window they have not landed, so only
+  the transport knows whether the connection went away. Reading `connected` there
+  also folds in `alive()`, which would abandon a send on a socket that is open and
+  merely quiet — and, because an abandoned wait suppresses the Reopen, would
+  suppress it for the one connection with nobody rebuilding it.
 - Rejections now reach the two places that Reopen on a failure — `ping` and the
   retry inside `reopen` — that never reached them before. A close would rebuild
   the Socket the caller had just closed, and a Reopen would queue a second Reopen

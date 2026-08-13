@@ -424,6 +424,19 @@ describe('Socket.send with several listeners on one event', () => {
       await rejection
     })
 
+    it('carries a send released onto an open socket whose ping went stale', async () => {
+      socket.lastPing = Date.now() - socket.config.ping * 3
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+
+      socket.emit('open')
+      await jest.advanceTimersByTimeAsync(0)
+
+      transport.receive({ msg: 'result', id: 'ddp-1', result: 'ok' })
+
+      await expect(sending).resolves.toMatchObject({ result: 'ok' })
+    })
+
     it('keeps the first ending when a second one follows', async () => {
       const sends = inFlight()
       const rejections = expectAllToReject(sends, CLOSED_MESSAGE)

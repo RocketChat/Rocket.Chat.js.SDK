@@ -34,6 +34,11 @@ import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
+const socketOpen = 1;
+const socketClosed = 3;
+
+const abandonedByReopen = '[ddp] connection reopened before the response arrived'
+const abandonedByClose = '[ddp] connection closed before the response arrived'
 
 class AbandonedWait extends Error {
   constructor (message?: string) {
@@ -140,7 +145,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Send handshake message to confirm connection, start pinging. */
-  onOpen = async (callback: Function, reject: Function) => {
+  onOpen = async (resolve: Function, reject: Function) => {
     this.lastPing = Date.now()
 
     // `onopen` is a websocket callback, so a throw here has nowhere to go.
@@ -158,7 +163,7 @@ export class Socket extends SDKEventEmitter {
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
-    return callback(this.connection)
+    return resolve(this.connection)
   }
 
   /** Emit close event so it can be used for promise resolve in close() */
@@ -221,7 +226,7 @@ export class Socket extends SDKEventEmitter {
     this.openTimeout && clearTimeout(this.openTimeout as any)
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
 
-    if (this.connection && this.connection.readyState !== 3) {
+    if (this.connection && this.connection.readyState !== socketClosed) {
       const connection = this.connection
       await new Promise((resolve) => {
         this.once('close', resolve)
@@ -318,7 +323,7 @@ export class Socket extends SDKEventEmitter {
    */
   probe = (timeoutMs = 2000): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
-      if (!this.connection || this.connection.readyState !== 1) {
+      if (!this.connection || this.connection.readyState !== socketOpen) {
         return resolve(false)
       }
 
@@ -355,7 +360,7 @@ export class Socket extends SDKEventEmitter {
   get connected () {
     return !!(
       this.connection &&
-      this.connection.readyState === 1 &&
+      this.connection.readyState === socketOpen &&
       this.alive()
     )
   }
@@ -414,7 +419,9 @@ export class Socket extends SDKEventEmitter {
       await this.waitForOpen()
       // The wait resolves a microtask before the listeners below are attached, so
       // a connection lost in that window would be missed by all three of them.
-      if (!this.connected) throw new AbandonedWait('[ddp] connection closed before the response arrived')
+      // `readyState` rather than `connected`: in that window the events have not
+      // been delivered, so only the transport knows whether the connection went away.
+      if (this.connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
     }
 
     return new Promise<any>((resolve, reject) => {
@@ -443,10 +450,10 @@ export class Socket extends SDKEventEmitter {
       // The DDP response can only arrive on the connection this message went out
       // on, so every event that ends that connection ends this wait.
       const abandonListeners = [
-        ['disconnected', '[ddp] connection reopened before the response arrived'],
-        ['connecting', '[ddp] connection reopened before the response arrived'],
-        ['close', '[ddp] connection closed before the response arrived']
-      ].map(([event, message]) => ({
+        { event: 'disconnected', message: abandonedByReopen },
+        { event: 'connecting', message: abandonedByReopen },
+        { event: 'close', message: abandonedByClose }
+      ].map(({ event, message }) => ({
         event,
         onAbandon: () => {
           removeListeners()

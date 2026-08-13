@@ -7,6 +7,7 @@ import {
   fakeSockets,
   OPEN,
   openFakeConnection,
+  USER_DISCONNECT,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -127,7 +128,7 @@ describe('Socket liveness', () => {
 
       await socket.close()
 
-      expect(transport.closedWith).toEqual([4000]) // the user-disconnect code
+      expect(transport.closedWith).toEqual([USER_DISCONNECT])
       expect(transport.readyState).toBe(CLOSED)
     })
   })
