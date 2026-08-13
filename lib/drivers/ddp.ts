@@ -693,7 +693,6 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
 			// integration: string
     }
     this.ddp = new Socket({ ...options, logger })
-    // Read back rather than default a second time: the socket decides it.
     this.config = { ...options, timeout: this.ddp.config.timeout }
     this.logger = logger
   }
