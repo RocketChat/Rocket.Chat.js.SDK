@@ -219,6 +219,50 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     await expect(waiting).resolves.toBe(true)
   })
 
+  it('resolves false when the server refuses both resubscribes', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    transport.receive({ msg: 'nosub', id: 'sub-media-signal' })
+    transport.receive({ msg: 'nosub', id: 'sub-media-calls' })
+
+    await expect(waiting).resolves.toBe(false)
+  })
+
+  it('resolves false when only one of the two resubscribes is refused', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
+    transport.receive({ msg: 'nosub', id: 'sub-media-calls' })
+
+    await expect(waiting).resolves.toBe(false)
+  })
+
+  it('resolves false when a resubscribe is acked without a subscription id', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    // Answered, but carrying nothing to subscribe with: the stream is no more
+    // restored than it is by a refusal.
+    transport.receive({ msg: 'ready', id: 'sub-media-signal', subs: [] })
+    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+
+    await expect(waiting).resolves.toBe(false)
+  })
+
   it('takes its deadline from the configured timeout when given none', async () => {
     const timeout = 4000
     const driver = createDriver({ timeout })

@@ -877,7 +877,13 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     const resubscribe = (subs: any[]) => Promise.all(
       subs.map((sub: any) => this.ddp.subscribe(topic, sub.params, undefined, sub.id))
     )
-      .then(() => true)
+      .then(results => {
+        const unacknowledged = subs.filter((_: any, index: number) => !results[index])
+        unacknowledged.forEach((sub: any) => this.logger.error(
+          `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
+        ))
+        return unacknowledged.length === 0
+      })
       .catch(() => false)
     return new Promise<boolean>(resolve => {
       let settled = false
