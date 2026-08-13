@@ -13,7 +13,7 @@ import * as settings from '../settings';
 
 import {
   ISocketOptions,
-  ISocketMessageHandler,
+  ISocketConfig,
   ISubscription,
   ICredentials,
   ILoginResult,
@@ -54,8 +54,7 @@ export class Socket extends SDKEventEmitter {
   host: string
   lastPing = Date.now()
   subscriptions: { [id: string]: ISubscription } = {}
-  handlers: ISocketMessageHandler[] = []
-  config: ISocketOptions | any
+  config: ISocketConfig
   openTimeout?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
   connection?: WebSocket
@@ -71,11 +70,13 @@ export class Socket extends SDKEventEmitter {
   ) {
     super()
     this.logger = options.logger || Logger
+    const timeout = options.timeout || 10000
     this.config = {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
       reopen: options.reopen || 10000,
-      ping: options.ping || options.timeout || 10000
+      ping: options.ping || timeout,
+      timeout
     }
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
@@ -189,10 +190,10 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Find and call matching handlers for incoming message data.
-   * Handlers match on collection, id and/or msg attribute in that order.
-   * Any matched handlers are removed once called.
-   * All collection events are emitted with their `msg` as the event name.
+   * Dispatch incoming message data as events. A frame is emitted once under each
+   * of `collection`, `msg` and `id` that it carries, so a subscriber can listen
+   * on whichever of the three it knows. Any frame at all also counts as a sign of
+   * life and moves `lastPing`.
    */
   onMessage = (e: any) => {
     if (!e.data) return
@@ -288,6 +289,9 @@ export class Socket extends SDKEventEmitter {
    * then creates the connection directly so a concurrent open() cannot tear it
    * down. Unhandled creation errors are swallowed because cleanup already runs
    * via the open/timeout paths.
+   *
+   * Past the deadline the promise resolves and `reopenPromise` is cleared even
+   * though the connection may still be down.
    */
   reopenNow = (): Promise<void> => {
     if (this.reopenPromise) {
@@ -313,7 +317,7 @@ export class Socket extends SDKEventEmitter {
 
       this.createConnection().catch(() => {})
 
-      const timeout = setTimeout(() => cleanup(), 10000)
+      const timeout = setTimeout(() => cleanup(), this.config.timeout)
     })
 
     return this.reopenPromise
@@ -716,18 +720,18 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   constructor ({ host = 'localhost:3000', integrationId: _integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
     super()
 
-    this.config = {
+    const options = {
       ...config,
       ...moreConfigs,
-      host: host.replace(/(^\w+:|^)\/\//, ''),
-      timeout: moreConfigs.timeout ?? config?.timeout ?? 10000
+      host: host.replace(/(^\w+:|^)\/\//, '')
 			// reopen: number
 			// ping: number
 			// close: number
 			// integration: string
     }
-    this.ddp = new Socket({ ...this.config, logger })
+    this.ddp = new Socket({ ...options, logger })
     this.ddp.on('open', () => this.emit('connected'))
+    this.config = { ...options, timeout: this.ddp.config.timeout }
     this.logger = logger
   }
 
@@ -746,10 +750,8 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     if (this.connected) {
       return Promise.resolve(this)
     }
-    const config: ISocketOptions = { ...this.config, ...c } // override defaults
-
     return new Promise((resolve, reject) => {
-      this.logger.info('[driver] Connecting', config)
+      this.logger.info('[driver] Connecting', { ...this.config, ...c })
       this.subscriptions = this.ddp.subscriptions
 
       const onConnected = () => {
@@ -853,9 +855,9 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
    * an observable readiness signal after a forced reconnect.
    *
    * If the subscriptions are not yet present (e.g. immediately after reopenNow),
-   * it polls the socket subscription map until they appear or the timeout expires.
+   * it polls the socket subscription map until they appear or the deadline expires.
    */
-  waitForNotifyUserMediaSubs = (timeoutMs = 8000): Promise<boolean> => {
+  waitForNotifyUserMediaSubs = (timeoutMs = this.ddp.config.timeout): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
     }

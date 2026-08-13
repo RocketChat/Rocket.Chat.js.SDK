@@ -172,3 +172,17 @@ an Error that the SDK writes.
   ADR-0001 established. The spec asserts that the value is an `Error`, and the spec
   asserts the message that a caller reads. A later change therefore cannot return
   to a rejection with a bare value.
+- **Amendment.** `reopenNow` and `waitForNotifyUserMediaSubs` now take their
+  Deadline from `config.timeout`, where each held a constant of its own before.
+  `probe` does not, and keeps a default of 2000ms that no option derives. This is
+  deliberate, and it is the one Deadline in the driver that no option moves.
+  `probe` answers whether a Socket in the gray zone still has a server behind it,
+  and the caller acts on the answer — a `false` from `probe` is what decides on a
+  Reopen. So `probe` has to settle faster than the wait it exists to diagnose. A
+  `probe` bound to `config.timeout` would grow with the wait it is meant to
+  shorten, and an app that raises `timeout` to be patient with a Login would make
+  its own liveness check slower to notice a dead pipe. The two bounds answer
+  opposite questions: `timeout` asks how long a caller is willing to wait for an
+  answer, and `probe` asks how long is too long to still call the connection
+  alive. `probe` takes its bound as an argument, so a caller that wants a
+  different one passes it, and no option is needed to reach it.
