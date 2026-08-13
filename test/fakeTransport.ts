@@ -83,7 +83,14 @@ export class FakeWebSocket {
    * Closes and fires the close handler with the code it was given — code 4000
    * versus anything else is a live branch in `onClose`.
    */
+  /**
+   * Set to make `close` throw instead of recording the code — the only way to
+   * reach the driver's branch for a transport that refuses to close at all.
+   */
+  closeError: Error | null = null
+
   close (code?: number): void {
+    if (this.closeError) throw this.closeError
     this.closedWith.push(code)
     if (!this.answersClose) return
     this.readyState = CLOSED

@@ -273,6 +273,20 @@ describe('Socket connection lifecycle', () => {
       expect(socket.connection).toBeUndefined()
     })
 
+    it('settles without waiting when the transport refuses to close', async () => {
+      transport.closeError = new Error('already gone')
+      const closeSeen = jest.fn()
+      socket.on('close', closeSeen)
+
+      const settled = jest.fn()
+      socket.close(CLOSE_DEADLINE).then(settled)
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(settled).toHaveBeenCalled()
+      expect(closeSeen).toHaveBeenCalledWith({ code: INTENTIONAL_CLOSE })
+      expect(socket.connection).toBeUndefined()
+    })
+
     describe('when the peer never answers', () => {
       beforeEach(() => {
         transport.answersClose = false
