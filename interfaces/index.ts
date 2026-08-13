@@ -11,14 +11,17 @@ export interface ILogger {
  * Connection options type
  * @param host        Host URL:PORT, converted to websocket protocol
  * @param useSsl      Use SSL (https/wss) to connect
- * @param timeout     How long to wait (ms) before abandoning connection
+ * @param timeout     How long to wait (ms) before abandoning connection, and
+ *                    the value several other deadlines are derived from — each
+ *                    is documented where it is used
  * @param reopen      ms interval before attempting reopens on disconnect. Twice
  *                    this is also how long a send waits for the connection to
  *                    open before it is rejected, so the deadline outlasts the
  *                    reopen it is waiting on
  * @param ping        ms interval between each ping, and also how long a ping
  *                    waits for its pong before the connection is reopened —
- *                    tightening it for liveness tightens that deadline too
+ *                    tightening it for liveness tightens that deadline too.
+ *                    Defaults to `timeout`
  * @param close       ms interval to wait for socket close to succeed
  * @param integration Name added to message `bot` attribute to identify SDK use
  */
@@ -33,21 +36,11 @@ export interface ISocketOptions {
 }
 
 /**
- * DDP Message Handler defines attributes to match on incoming messages and
- * fire a callback. There may be multiple handlers for any given message.
- * @param callback    Function to call when matching message received
- * @param persist     Optionally (true) to continue using handler after matching
- * @param msg         The `data.msg` value to match in message
- * @param id          The `data.id` value to match in message
- * @param collection  The `data.collection` value to match in message
+ * The options the socket itself reads, after defaults are applied, so every
+ * deadline read from it is a number. `close` and `integration` are left out
+ * because the socket never reads them.
  */
-export interface ISocketMessageHandler {
-  callback: ISocketMessageCallback
-  persist?: boolean
-  msg?: string
-  id?: string
-  collection?: string
-}
+export type ISocketConfig = Required<Pick<ISocketOptions, 'host' | 'useSsl' | 'timeout' | 'reopen' | 'ping'>>
 
 /** Function interface for DDP message handler callback */
 export interface ISocketMessageCallback {

@@ -87,7 +87,7 @@ _Avoid_: Health check, ping (that is one message of the chain)
 
 **Deadline**:
 A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Where a connection ends the wait instead, that is stated at the call.
-_Avoid_: Timeout — that is a config option, and it means only the connection one
+_Avoid_: Timeout — that is a config option, and several Deadlines are derived from it
 
 **Abandoned wait**:
 A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline — no clock decides it, the connection does.
