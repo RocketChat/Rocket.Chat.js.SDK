@@ -93,6 +93,22 @@ describe('one sub or unsub in flight per DDP subscription', () => {
     expect(socket.subscriptions['ddp-1']).toBeUndefined()
   })
 
+  it('holds a third request behind the second rather than behind the first', async () => {
+    socket.unsubscribe('ddp-1').catch(() => undefined)
+    await flushMicrotasks()
+
+    socket.subscribeAll().catch(() => undefined)
+    socket.subscribeAll().catch(() => undefined)
+    await flushMicrotasks()
+
+    const written = transport.sent.length
+    transport.receive({ msg: 'nosub', id: 'ddp-1' })
+    await flushMicrotasks()
+
+    expect(transport.sent.length - written).toBe(1)
+    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+  })
+
   it('does not hold an id behind a request the connection left unanswered', async () => {
     // Only `reopenNow` rejects in-flight sends; the scheduled `reopen` leaves
     // them pending forever. Waiting on one of those across a new connection

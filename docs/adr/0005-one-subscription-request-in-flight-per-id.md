@@ -61,20 +61,15 @@ the first to have its DDP response before its own frame is written.
 - The wait ends on the response, whether it succeeded or carried a DDP error.
   Neither outcome is examined here — what a rejection does to the entry stays
   with ADR-0004.
-- The wait is bounded by the Socket, not by a Deadline. A request records the
-  Socket it was written to, and `releaseQueuedRequests` — called from
-  `createConnection` and from `close` — lets go of everything still waiting on a
-  Socket that is going away. Only `reopenNow` rejects in-flight sends; the
-  scheduled `reopen` and `close` leave them pending, so without this a request
-  queued behind one of those would never be written and its caller would never
-  settle. `logout` waits on `unsubscribeAll`, which makes that a Logout that can
-  never complete.
-- A released request registers itself as it goes out, under the Socket it is
-  written to. Registering at the point of writing rather than at the point of
-  queueing is what keeps the id held across the release: a later request finds
-  the entry and waits, instead of joining it on one Socket and re-creating the
-  fault this ADR removes. An entry naming a Socket that is no longer current is
-  ignored rather than cleared.
+- Nothing bounds the wait but the request before it. There is no Deadline and no
+  bookkeeping about the connection. The amendment to ADR-0003 gives the reason: a
+  send cannot outlive the connection it was issued on, so every request settles,
+  and a chain always drains.
+- A request registers itself when it is queued, not when its frame is written. A
+  third request must find the second and wait behind it. If the entry were
+  written only at the moment the frame goes out, the second and the third would
+  both find the first, both wait on it, and both be released together — two
+  requests under one id, which is the fault this ADR removes.
 
 ## Consequences
 
@@ -93,3 +88,11 @@ the first to have its DDP response before its own frame is written.
   `reopen` is still able to catch a later response under the same id. That is
   the same class of fault and it is not fixed here. Separate issues track it,
   along with a `ready` that names more than one subscription id.
+- A request that a Reopen abandons is not re-sent by the queue. The queue holds
+  the order of requests and nothing else. `subscribeAll` re-establishes the DDP
+  subscriptions after a Login, and that stays the one path that re-sends.
+- No single place on `Socket` owns what happens to work in flight when the
+  connection changes. That knowledge is in the abandon listeners of `send`, in
+  `waitForOpen`, and in `reopenUnlessAbandoned`. This ADR removes one of the
+  places that held a piece of it. Whether the rest belongs together is open, and
+  is not a question for a correction of this fault.

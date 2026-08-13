@@ -74,7 +74,7 @@ Logging in again with the token from a previous login rather than with credentia
 _Avoid_: Reauth, refresh
 
 **Reopen**:
-A retry scheduled after a connection drops, waited out before a new Socket is built. Distinct from the immediate reconnect a caller forces, which skips the wait — the two are separate paths in the code and the difference decides whether an in-flight send is abandoned now or later.
+A retry scheduled after a connection drops, waited out before a new Socket is built. Distinct from the immediate reconnect a caller forces, which skips the wait — the two are separate paths in the code, and the difference is how long an in-flight send waits before it is abandoned, not whether it is.
 _Avoid_: Reconnect (unqualified — say which of the two), retry
 
 **Liveness chain**:
@@ -90,5 +90,5 @@ A bound after which the SDK settles a wait itself instead of waiting on the serv
 _Avoid_: Timeout — that is a config option, and it means only the connection one
 
 **Abandoned wait**:
-A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline — no clock decides it, the connection does.
+A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline — no clock decides it, the connection does. A DDP message waiting to be written is abandoned on the same rule: it belongs to the connection it was issued on and is never written to the one that replaces it.
 _Avoid_: Cancelled, timed out
