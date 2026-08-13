@@ -55,7 +55,7 @@ The DDP message that answers a Method call or a DDP subscription — `result`, `
 _Avoid_: Reply, ack, result (that is one response type of three)
 
 **DDP error**:
-The error field of a failed DDP response, as the server sent it. What the SDK raises to its callers from one is an ordinary Error, not this. A rejection the SDK originates itself — a write that failed, a Deadline that expired, a Reopen that abandoned the wait — carries no DDP error and no server reason; only the server-sent kind is a DDP error.
+The error field of a failed DDP response, as the server sent it. What the SDK raises to its callers from one is an ordinary Error, not this. A rejection the SDK originates itself — a write that failed, a Deadline that expired, a connection that went away and abandoned the wait — carries no DDP error and no server reason; only the server-sent kind is a DDP error.
 _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 
 **DDP subscription**:
@@ -74,8 +74,12 @@ Logging in again with the token from a previous login rather than with credentia
 _Avoid_: Reauth, refresh
 
 **Reopen**:
-A retry scheduled after a connection drops, waited out before a new Socket is built. Distinct from the immediate reconnect a caller forces, which skips the wait — the two are separate paths in the code and the difference decides whether an in-flight send is abandoned now or later.
+A retry scheduled after a connection drops, waited out before a new Socket is built. Distinct from the immediate reconnect a caller forces, which skips the wait — the two are separate paths in the code, and the difference is how long an in-flight send waits before it is abandoned, not whether it is.
 _Avoid_: Reconnect (unqualified — say which of the two), retry
+
+**Connected echo**:
+The Driver re-emitting its Socket's open as a single `connected` event. One open means one `connected`, however many times a caller asked the Driver to connect.
+_Avoid_: Connect event, ready
 
 **Liveness chain**:
 The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. A Socket the server has stopped answering still reads as open to the transport.
@@ -86,5 +90,9 @@ A single bounded liveness check on a Socket that looks open, asked for on demand
 _Avoid_: Health check, ping (that is one message of the chain)
 
 **Deadline**:
-A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Every wait the SDK can be left holding has one.
-_Avoid_: Timeout — that is a config option, and it means only the connection one
+A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Where a connection ends the wait instead, that is stated at the call.
+_Avoid_: Timeout — that is a config option, and several Deadlines are derived from it
+
+**Abandoned wait**:
+A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline — no clock decides it, the connection does. A DDP message waiting to be written is abandoned on the same rule: it belongs to the connection it was issued on and is never written to the one that replaces it.
+_Avoid_: Cancelled, timed out
