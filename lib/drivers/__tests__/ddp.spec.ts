@@ -46,7 +46,8 @@ describe('new Socket', () => {
       host: 'http://localhost:3000',
       useSsl: false,
       reopen: 10000,
-      ping: 10000
+      ping: 10000,
+      timeout: 10000
     })
   })
 })

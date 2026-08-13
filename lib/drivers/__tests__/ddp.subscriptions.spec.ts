@@ -2,6 +2,7 @@ import { Socket } from '../ddp'
 import { silentLogger } from '../../../test/silentLogger'
 import {
   FakeWebSocket,
+  flushMicrotasks,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -13,15 +14,6 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 useFakeClockAndSocketRegistry()
 
 const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
-
-/**
- * Timers are faked, so there is no macrotask to await: settling a chain that
- * hops several promises before its next frame goes out means turning the
- * microtask queue over by hand.
- */
-const flushMicrotasks = async () => {
-  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
-}
 
 /**
  * What the subscription map holds, and when. The send plumbing underneath —

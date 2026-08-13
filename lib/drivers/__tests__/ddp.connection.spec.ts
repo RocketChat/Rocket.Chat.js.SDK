@@ -6,6 +6,7 @@ import {
   FakeWebSocket,
   fakeSockets,
   fakeTransportModule,
+  OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -19,17 +20,18 @@ const INTENTIONAL_CLOSE = 4000
 
 /**
  * The delay `reopen` schedules its retry on, read from the `reopen` option.
- * Deliberately *not* the 10000 default, and deliberately not the fallback below:
+ * Deliberately *not* the 10000 default, and deliberately not the deadline below:
  * with either, a boundary assertion would pass whether or not the driver read
  * the option, and the two timers would be indistinguishable on the clock.
  */
 const REOPEN_DELAY = 3000
 
 /**
- * The hard fallback inside `reopenNow`, hardcoded in the driver rather than
- * configurable — so the number lives here as a constant the test names.
+ * How long `reopenNow` waits for the new socket's `open` before resolving
+ * anyway, read from the `timeout` option. Deliberately neither the 10000 default
+ * nor `REOPEN_DELAY`, so the assertion below distinguishes all three.
  */
-const REOPEN_NOW_FALLBACK = 10000
+const REOPEN_NOW_DEADLINE = 7000
 
 /**
  * The ping interval is pushed far beyond every advance in this file on purpose:
@@ -41,7 +43,8 @@ const createSocket = () => new Socket({
   host: 'localhost:3000',
   logger: silentLogger,
   reopen: REOPEN_DELAY,
-  timeout: 10 * 60 * 1000
+  timeout: REOPEN_NOW_DEADLINE,
+  ping: 10 * 60 * 1000
 })
 
 /**
@@ -177,16 +180,54 @@ describe('Socket connection lifecycle', () => {
       expect(socket.reopenPromise).toBeUndefined()
     })
 
-    it('resolves on its hard fallback timer when no open ever arrives', async () => {
+    it('resolves on the configured timeout when no open ever arrives', async () => {
       const reopening = socket.reopenNow()
 
-      await jest.advanceTimersByTimeAsync(REOPEN_NOW_FALLBACK - 1)
+      await jest.advanceTimersByTimeAsync(REOPEN_NOW_DEADLINE - 1)
       expect(socket.reopenPromise).toBe(reopening)
 
       await jest.advanceTimersByTimeAsync(1)
 
       await expect(reopening).resolves.toBeUndefined()
       expect(socket.reopenPromise).toBeUndefined()
+    })
+  })
+
+  describe('an open abandoned by a close mid-handshake', () => {
+    const handshakeInFlight = async () => {
+      const replacement = fakeSockets[1]
+      replacement.readyState = OPEN
+      replacement.onopen?.({})
+      await jest.advanceTimersByTimeAsync(0)
+    }
+
+    it('schedules no further reopen behind the one that was abandoned', async () => {
+      transport.close(1006)
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      await handshakeInFlight()
+
+      await socket.close()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY * 2)
+
+      expect(socket.openTimeout).toBeUndefined()
+      expect(fakeSockets).toHaveLength(2)
+    })
+
+    it('logs rather than leaving checkAndReopen an unhandled rejection', async () => {
+      // `checkAndReopen` opens without awaiting, so the rejection has nowhere to
+      // go but the global handler of the consuming app.
+      const error = silentLogger.error as jest.Mock
+      error.mockClear()
+      transport.readyState = CLOSED
+
+      socket.checkAndReopen()
+      await handshakeInFlight()
+      await socket.close()
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(error).toHaveBeenCalledWith(
+        '[ddp] Reopen error: [ddp] connection closed before the response arrived'
+      )
     })
   })
 

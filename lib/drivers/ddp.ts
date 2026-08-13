@@ -13,7 +13,7 @@ import * as settings from '../settings';
 
 import {
   ISocketOptions,
-  ISocketMessageHandler,
+  ISocketConfig,
   ISubscription,
   ICredentials,
   ILoginResult,
@@ -34,6 +34,19 @@ import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
+const socketOpen = 1;
+const socketClosed = 3;
+
+const abandonedByReopen = '[ddp] connection reopened before the response arrived'
+const abandonedByClose = '[ddp] connection closed before the response arrived'
+const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
+
+class AbandonedWait extends Error {
+  constructor (message?: string) {
+    super(message)
+    Object.setPrototypeOf(this, AbandonedWait.prototype)
+  }
+}
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
@@ -41,14 +54,14 @@ export class Socket extends SDKEventEmitter {
   host: string
   lastPing = Date.now()
   subscriptions: { [id: string]: ISubscription } = {}
-  handlers: ISocketMessageHandler[] = []
-  config: ISocketOptions | any
+  config: ISocketConfig
   openTimeout?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
   connection?: WebSocket
   session?: string
   logger: ILogger
   reopenPromise?: Promise<void>
+  private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   /** Create a websocket handler */
   constructor (
@@ -57,11 +70,13 @@ export class Socket extends SDKEventEmitter {
   ) {
     super()
     this.logger = options.logger || Logger
+    const timeout = options.timeout || 10000
     this.config = {
       host: options.host || 'http://localhost:3000',
       useSsl: options.useSsl || false,
       reopen: options.reopen || 10000,
-      ping: options.ping || options.timeout || 10000
+      ping: options.ping || timeout,
+      timeout
     }
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
@@ -108,7 +123,7 @@ export class Socket extends SDKEventEmitter {
       this.connection = connection
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
-      this.connection.onopen = this.onOpen.bind(this, resolve)
+      this.connection.onopen = this.onOpen.bind(this, resolve, reject)
       this.emit('connecting')
     })
   }
@@ -133,18 +148,25 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Send handshake message to confirm connection, start pinging. */
-  onOpen = async (callback: Function) => {
+  onOpen = async (resolve: Function, reject: Function) => {
     this.lastPing = Date.now()
 
-    const connected = await this.send({
-      msg: 'connect',
-      version: '1',
-      support: ['1', 'pre2', 'pre1']
-    })
+    // `onopen` is a websocket callback, so a throw here has nowhere to go.
+    let connected
+    try {
+      connected = await this.send({
+        msg: 'connect',
+        version: '1',
+        support: ['1', 'pre2', 'pre1']
+      })
+    } catch (err) {
+      this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
+      return reject(err)
+    }
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
-    return callback(this.connection)
+    return resolve(this.connection)
   }
 
   /** Emit close event so it can be used for promise resolve in close() */
@@ -168,10 +190,10 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Find and call matching handlers for incoming message data.
-   * Handlers match on collection, id and/or msg attribute in that order.
-   * Any matched handlers are removed once called.
-   * All collection events are emitted with their `msg` as the event name.
+   * Dispatch incoming message data as events. A frame is emitted once under each
+   * of `collection`, `msg` and `id` that it carries, so a subscriber can listen
+   * on whichever of the three it knows. Any frame at all also counts as a sign of
+   * life and moves `lastPing`.
    */
   onMessage = (e: any) => {
     if (!e.data) return
@@ -207,7 +229,7 @@ export class Socket extends SDKEventEmitter {
     this.openTimeout && clearTimeout(this.openTimeout as any)
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
 
-    if (this.connection && this.connection.readyState !== 3) {
+    if (this.connection && this.connection.readyState !== socketClosed) {
       const connection = this.connection
       await new Promise((resolve) => {
         this.once('close', resolve)
@@ -238,8 +260,12 @@ export class Socket extends SDKEventEmitter {
         clearTimeout(this.openTimeout as any)
         delete this.openTimeout
       }
-      this.open()
+      this.open().catch((err) => this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`))
     }
+  }
+
+  private reopenUnlessAbandoned = (err: unknown) => {
+    if (!(err instanceof AbandonedWait)) this.reopen()
   }
 
   /** Clear connection and try to connect again. */
@@ -252,7 +278,7 @@ export class Socket extends SDKEventEmitter {
         await this.open()
       } catch (err) {
         this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
-        this.reopen();
+        this.reopenUnlessAbandoned(err);
       }
     }, this.config.reopen);
   }
@@ -263,6 +289,9 @@ export class Socket extends SDKEventEmitter {
    * then creates the connection directly so a concurrent open() cannot tear it
    * down. Unhandled creation errors are swallowed because cleanup already runs
    * via the open/timeout paths.
+   *
+   * Past the deadline the promise resolves and `reopenPromise` is cleared even
+   * though the connection may still be down.
    */
   reopenNow = (): Promise<void> => {
     if (this.reopenPromise) {
@@ -288,7 +317,7 @@ export class Socket extends SDKEventEmitter {
 
       this.createConnection().catch(() => {})
 
-      const timeout = setTimeout(() => cleanup(), 10000)
+      const timeout = setTimeout(() => cleanup(), this.config.timeout)
     })
 
     return this.reopenPromise
@@ -335,7 +364,7 @@ export class Socket extends SDKEventEmitter {
 
   /** Check if there is a websocket and the transport reads it as open. */
   get transportOpen () {
-    return !!(this.connection && this.connection.readyState === 1)
+    return !!(this.connection && this.connection.readyState === socketOpen)
   }
 
   /** Check if websocket connected and ready. */
@@ -393,7 +422,21 @@ export class Socket extends SDKEventEmitter {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
-    if (!this.transportOpen) await this.waitForOpen()
+    // A message belongs to the connection that was current when it was sent. It
+    // is never written to a successor: the DDP session, and any Login on it, is
+    // the old connection's.
+    const connection = this.connection
+    // The transport's own state, not `connected`: an open socket whose last ping
+    // went stale has no reason to emit `open`, so waiting on one strands the send.
+    if (!this.transportOpen) {
+      await this.waitForOpen()
+      if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)
+      // The wait resolves a microtask before the listeners below are attached, so
+      // a connection lost in that window would be missed by all three of them.
+      // `readyState` rather than `connected`: in that window the events have not
+      // been delivered, so only the transport knows whether the connection went away.
+      if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
+    }
 
     return new Promise<any>((resolve, reject) => {
       const id = obj.id || `ddp-${ this.sent }`
@@ -404,34 +447,44 @@ export class Socket extends SDKEventEmitter {
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
       try {
-        // Read fresh rather than captured above the wait: a reopen while the send
-        // waited on `open` will have replaced the connection.
-        this.connection!.send(stringdata)
+        connection.send(stringdata)
       } catch (err) {
         this.logger.error(`[ddp] the transport failed to write the message: ${stringdata}`);
         return reject(err)
       }
 
-      // Before any listener is attached: a frame with no reply to wait for —
+      // Before any listener is attached: a DDP message with no response to wait for —
       // `pong` — would otherwise strand a `disconnected` listener forever.
       if (!listener) {
         return resolve(undefined)
       }
 
-      // Named, and the *same* reference `off` is given below: `disconnected` is
-      // emitted with no arguments, so handing `reject` straight to it rejected
-      // every in-flight send with `undefined` — and callers read `err.message`
-      // inside their `catch`, which then threw a TypeError from the rejection
-      // handler. The pairing matters as much as the Error: `off` only removes a
-      // listener it can match, and a miss is silently a no-op.
-      const rejectOnDisconnect = () =>
-        reject(new Error('[ddp] connection reopened before the response arrived'))
+      // The DDP response can only arrive on the connection this message went out
+      // on, so every event that ends that connection ends this wait.
+      const abandonListeners = [
+        { event: 'disconnected', message: abandonedByReopen },
+        { event: 'connecting', message: abandonedByReopen },
+        { event: 'close', message: abandonedByClose }
+      ].map(({ event, message }) => ({
+        event,
+        onAbandon: () => {
+          removeListeners()
+          reject(new AbandonedWait(message))
+        }
+      }))
 
-      this.once('disconnected', rejectOnDisconnect)
-      this.once(listener, (result: any) => {
-        this.off('disconnected', rejectOnDisconnect)
+      const removeListeners = () => {
+        this.off(listener, onResponse)
+        abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
+      }
+
+      const onResponse = (result: any) => {
+        removeListeners()
         return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
-      })
+      }
+
+      abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
+      this.once(listener, onResponse)
     })
   }
 
@@ -454,7 +507,7 @@ export class Socket extends SDKEventEmitter {
 
       Promise.race([this.send({ msg: 'ping' }), answered])
         .then(() => this.ping())
-        .catch(() => this.reopen())
+        .catch(this.reopenUnlessAbandoned)
         .finally(() => clearTimeout(deadline as any))
     }, this.config.ping)
   }
@@ -537,6 +590,38 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
+   * Hold a `sub` or `unsub` until the one before it on the same id has its DDP
+   * response.
+   *
+   * A `sub` and an `unsub` for one DDP subscription carry the same id, and
+   * `send` matches a DDP response to its request by id alone, so two of them in
+   * flight at once leave the first response settling both — the `nosub` that
+   * ends the DDP subscription also settles the `sub`, and the `ready` that
+   * establishes it also settles the `unsub`. The server takes one message from
+   * a session at a time and answers in that order, so waiting for the response
+   * is enough to keep one request per id on the wire.
+   *
+   * Nothing bounds the wait but the request before it. A send that loses its
+   * connection is abandoned rather than left pending, so a chain always drains.
+   */
+  private queueSubscriptionRequest = <T>(id: string | undefined, request: () => Promise<T>): Promise<T> => {
+    if (!id) return request()
+
+    // The tail is registered here rather than when the frame goes out, so a
+    // third request queues behind the second rather than behind the first.
+    const waiting = this.subscriptionRequests[id]
+    const sending = waiting ? waiting.then(request) : request()
+    const settled = sending.then(() => undefined, () => undefined)
+
+    this.subscriptionRequests[id] = settled
+    settled.then(() => {
+      if (this.subscriptionRequests[id] === settled) delete this.subscriptionRequests[id]
+    })
+
+    return sending
+  }
+
+  /**
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
    *
@@ -547,7 +632,7 @@ export class Socket extends SDKEventEmitter {
    */
   subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback, id?: string) => {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
-    return this.send({ msg: 'sub', id, name, params })
+    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
         const id = (result.subs) ? result.subs[0] : undefined
         if (id) {
@@ -578,7 +663,7 @@ export class Socket extends SDKEventEmitter {
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
-    return this.send({ msg: 'unsub', id })
+    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((data: any) => {
         this.forgetSubscription(id)
         return data.result || data.subs
@@ -638,17 +723,18 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   constructor ({ host = 'localhost:3000', integrationId: _integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
     super()
 
-    this.config = {
+    const options = {
       ...config,
       ...moreConfigs,
-      host: host.replace(/(^\w+:|^)\/\//, ''),
-      timeout: moreConfigs.timeout ?? config?.timeout ?? 10000
+      host: host.replace(/(^\w+:|^)\/\//, '')
 			// reopen: number
 			// ping: number
 			// close: number
 			// integration: string
     }
-    this.ddp = new Socket({ ...this.config, logger })
+    this.ddp = new Socket({ ...options, logger })
+    this.ddp.on('open', () => this.emit('connected'))
+    this.config = { ...options, timeout: this.ddp.config.timeout }
     this.logger = logger
   }
 
@@ -667,22 +753,22 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     if (this.connected) {
       return Promise.resolve(this)
     }
-    const config: ISocketOptions = { ...this.config, ...c } // override defaults
-
     return new Promise((resolve, reject) => {
-      this.logger.info('[driver] Connecting', config)
+      this.logger.info('[driver] Connecting', { ...this.config, ...c })
       this.subscriptions = this.ddp.subscriptions
+
+      const onConnected = () => {
+        this.logger.info('[driver] Connected')
+        resolve(this as IDriver)
+      }
+
       this.ddp.open().catch((err: Error) => {
         this.logger.error(`[driver] Failed to connect: ${err.message}`)
+        this.off('connected', onConnected)
         reject(err)
       })
 
-      this.ddp.on('open', () => this.emit('connected')) // echo ddp event
-
-      this.once('connected', () => {
-        this.logger.info('[driver] Connected')
-        resolve(this as IDriver)
-      })
+      this.once('connected', onConnected)
     })
   }
 
@@ -772,9 +858,9 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
    * an observable readiness signal after a forced reconnect.
    *
    * If the subscriptions are not yet present (e.g. immediately after reopenNow),
-   * it polls the socket subscription map until they appear or the timeout expires.
+   * it polls the socket subscription map until they appear or the deadline expires.
    */
-  waitForNotifyUserMediaSubs = (timeoutMs = 8000): Promise<boolean> => {
+  waitForNotifyUserMediaSubs = (timeoutMs = this.ddp.config.timeout): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
     }
@@ -794,7 +880,13 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     const resubscribe = (subs: any[]) => Promise.all(
       subs.map((sub: any) => this.ddp.subscribe(topic, sub.params, undefined, sub.id))
     )
-      .then(() => true)
+      .then(results => {
+        const unacknowledged = subs.filter((_: any, index: number) => !results[index])
+        unacknowledged.forEach((sub: any) => this.logger.error(
+          `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
+        ))
+        return unacknowledged.length === 0
+      })
       .catch(() => false)
     return new Promise<boolean>(resolve => {
       let settled = false
