@@ -31,13 +31,17 @@ the same class of fault.
 
 The Socket has one private bounded wait, `awaitEvent(event, deadlineMs, start)`.
 It listens for the event, gives up on the Deadline, and detaches the listener and
-clears the timer on either outcome. It resolves true when the event arrived and
-false when the Deadline expired.
+clears the timer on either outcome. It answers one question — did the event
+arrive in time — as true or false, and nothing else.
 
 - `start` runs with the listener already attached, so a server that answers in
   the same tick as the write cannot be missed. Returning false from `start`
-  abandons the wait, leaving neither timer nor listener behind. This is how a
-  Probe reports a transport that refused the write.
+  abandons the wait, leaving neither timer nor listener behind, and short
+  circuits to that same false answer. This is how a Probe reports a transport
+  that refused the write: no caller distinguishes a refused write from an
+  expired Deadline, because both mean the Socket cannot be trusted and both
+  lead to a Reopen. Only a refusal is a signal, so a `start` with nothing to
+  report returns nothing.
 - `reopenNow`, `probe` and `waitForOpen` are each expressed in terms of it.
 - The Liveness chain is expressed as a repeated Probe: probe on the interval,
   schedule the next turn when the server answers, Reopen when it does not. The
@@ -65,6 +69,10 @@ choose for the consuming app, still holds. Only the mechanism moved.
   whenever the transport will not take the ping — because it threw, or because it
   is no longer open. The second case used to reach `waitForOpen` through `send`
   and wait up to twice the Reopen interval before failing into `reopen`.
+- The mirror of that is a connection that drops *after* the ping was written. The
+  turn holds a Deadline and a pong listener, and nothing that watches for the
+  drop, so it waits the Deadline out before reopening where `send`'s
+  `disconnected` listener would have failed it immediately.
 - The `settled` booleans are gone. Settling removes the listener and clears the
   timer together, so neither racer reaches the promise a second time. Where a
   wait is abandoned in the same tick as its event arrives, the second `off` is a
@@ -75,4 +83,6 @@ choose for the consuming app, still holds. Only the mechanism moved.
   than synchronously inside the emit. A caller that asks for an immediate
   reconnect from inside an `open` listener therefore joins the reopen that is
   settling instead of starting a new one. That was already true of any listener
-  registered ahead of the old cleanup; it is now true of all of them.
+  registered ahead of the old cleanup; it is now true of all of them. The field
+  holds the same object `reopenNow` returns, by construction rather than by
+  statement order, so a joiner can be identified by identity.

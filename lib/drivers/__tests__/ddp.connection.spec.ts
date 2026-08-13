@@ -188,6 +188,28 @@ describe('Socket connection lifecycle', () => {
       await expect(reopening).resolves.toBeUndefined()
       expect(socket.reopenPromise).toBeUndefined()
     })
+
+    it('is still joinable from an open listener that runs after the wait settles', async () => {
+      const reopening = socket.reopenNow()
+
+      // Registered after `reopenNow`, so it runs after the listener the wait
+      // itself attached — the worst case for a cleanup that ran inside the emit.
+      let joined: Promise<void> | undefined
+      let socketsWhenNotified = 0
+      socket.on('open', () => {
+        joined = socket.reopenNow()
+        socketsWhenNotified = fakeSockets.length
+      })
+
+      await driveToHandshake(fakeSockets[1])
+
+      // Identity, not equality: two distinct promises serialise the same, so
+      // only `toBe` catches a second Reopen being started here.
+      expect(joined).toBe(reopening)
+      expect(socketsWhenNotified).toBe(2)
+
+      await reopening
+    })
   })
 
   describe('a transport constructor that throws', () => {

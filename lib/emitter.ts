@@ -71,6 +71,11 @@ export class SDKEventEmitter extends EventEmitter {
     return this
   }
 
+  /** How many listeners the event holds, an unfired `once` counting as one. */
+  listenerCount (event: string): number {
+    return (this._listeners[event] || []).length
+  }
+
   /** Drop the listeners for one event, or for every event, and return them. */
   removeAllListeners (event?: string): Function[] {
     if (event) {

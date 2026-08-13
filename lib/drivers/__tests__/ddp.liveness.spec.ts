@@ -173,10 +173,9 @@ describe('Socket liveness', () => {
 
       await expect(socket.probe(2000)).resolves.toBe(false)
 
-      // Only the ping chain's timer: the probe left neither a deadline nor a
-      // listener behind on the way out.
+      // Only the ping chain's timer.
       expect(jest.getTimerCount()).toBe(1)
-      expect(socket.removeAllListeners('pong')).toHaveLength(0)
+      expect(socket.listenerCount('pong')).toBe(0)
     })
 
     it('succeeds when the pong lands after the clock has moved', async () => {
@@ -226,13 +225,11 @@ describe('Socket liveness', () => {
     })
 
     it('leaves no pong listener behind, however many turns it runs', async () => {
-      // The chain is a probe per turn, and a probe listens for one pong. A turn
-      // that failed to detach would pile listeners up on a long-lived socket.
       for (let turn = 1; turn <= 5; turn += 1) {
         await tickWithPong()
       }
 
-      expect(socket.removeAllListeners('pong')).toHaveLength(0)
+      expect(socket.listenerCount('pong')).toBe(0)
     })
 
     it('reopens without waiting out the deadline when the transport refuses the ping write', async () => {
@@ -240,17 +237,13 @@ describe('Socket liveness', () => {
 
       await tickWithoutPong()
 
-      // The reopen is already scheduled, with no time advanced past the ping
-      // interval — a socket that cannot even be written to is dead now, not at
-      // the deadline.
+      // No time has advanced past the ping interval, so the scheduled reopen is
+      // the whole assertion.
       expect(socket.openTimeout).toBeDefined()
       expect(fakeSockets).toHaveLength(1)
     })
 
     it('reopens without waiting out the deadline when the socket is no longer open', async () => {
-      // This turn used to go out through `send`, which waited on `open` for
-      // twice the reopen interval before failing into the reopen. A socket that
-      // cannot be written to is dead now, not two reopen intervals from now.
       transport.readyState = CLOSED
 
       await tickWithoutPong()
@@ -258,18 +251,36 @@ describe('Socket liveness', () => {
       expect(socket.openTimeout).toBeDefined()
     })
 
+    it('waits out the deadline when the connection drops after the ping is written', async () => {
+      // The mirror of the two above. The write landed, so the turn holds a
+      // Deadline and nothing else: a Probe listens for its pong, not for the
+      // 'disconnected' a send would have listened for.
+      await jest.advanceTimersToNextTimerAsync()
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+
+      transport.readyState = CLOSED
+      socket.emit('disconnected')
+      await jest.advanceTimersByTimeAsync(0)
+
+      // The drop alone reopens nothing: a send would have rejected on it here.
+      expect(socket.openTimeout).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
+
+      expect(socket.openTimeout).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(1)
+
+      expect(socket.openTimeout).toBeDefined()
+    })
+
     it('reconnects when one pong is withheld', async () => {
-      // This test used to pin the opposite: the chain died for good, because the
-      // ping's send went out while `connected` was still true, waited forever on
-      // a pong reply, and the `.catch(() => this.reopen())` behind it never ran.
-      // `ping` now races its send against a deadline of its own, so the withheld
-      // pong is what triggers the reconnect rather than what prevents it.
       await tickWithPong()
       await tickWithPong()
 
       await tickWithoutPong()
 
-      // The ping's own deadline, the one timer the unanswered send leaves behind.
+      // The Probe's Deadline, the one timer an unanswered ping leaves behind.
       expect(jest.getTimerCount()).toBe(1)
 
       // One millisecond past the deadline, which is also one past the aliveness

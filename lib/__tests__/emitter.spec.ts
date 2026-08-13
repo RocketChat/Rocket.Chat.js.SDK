@@ -79,6 +79,38 @@ describe('SDKEventEmitter.removeAllListeners', () => {
   })
 })
 
+describe('SDKEventEmitter.listenerCount', () => {
+  let emitter: SDKEventEmitter
+
+  beforeEach(() => {
+    emitter = new SDKEventEmitter()
+  })
+
+  it('counts the listeners of one event, an unfired `once` among them', () => {
+    emitter.on('greeting', jest.fn())
+    emitter.once('greeting', jest.fn())
+    emitter.on('unrelated', jest.fn())
+
+    expect(emitter.listenerCount('greeting')).toBe(2)
+  })
+
+  it('returns 0 for an event that was never registered', () => {
+    expect(emitter.listenerCount('never-registered')).toBe(0)
+  })
+
+  it('can be asked twice, then follows a real removal down to 0', () => {
+    const listener = jest.fn()
+    emitter.on('greeting', listener)
+
+    expect(emitter.listenerCount('greeting')).toBe(1)
+    expect(emitter.listenerCount('greeting')).toBe(1)
+
+    emitter.off('greeting', listener)
+
+    expect(emitter.listenerCount('greeting')).toBe(0)
+  })
+})
+
 /**
  * `off` and `emit` are overridden for the same reason: `tiny-events` mutates the
  * listener array by index, and both of its index bugs are silent — a listener

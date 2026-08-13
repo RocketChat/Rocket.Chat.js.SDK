@@ -144,7 +144,7 @@ export class Socket extends SDKEventEmitter {
       support: ['1', 'pre2', 'pre1']
     })
     this.session = connected.session
-    this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
+    this.ping()
     this.emit('open')
     return callback(this.connection)
   }
@@ -261,19 +261,19 @@ export class Socket extends SDKEventEmitter {
 
   /**
    * The one bounded wait every other wait in the connection lifecycle is built
-   * from. Resolves true when the event arrived, false when the Deadline expired.
-   *
-   * `start` runs with the listener already attached, so an event answered in the
-   * same tick as the write cannot be missed; returning false from it abandons
-   * the wait. Pairing `once` with the matching `off` is what ADR-0002 hardened
-   * the emitter for, and this is the only place the SDK now writes that pairing.
+   * from. `start` runs with the listener already attached, so an event answered
+   * in the same tick as the write cannot be missed, and returning false from it
+   * abandons the wait. The `once`/`off` pairing this writes is what ADR-0002
+   * hardened the emitter for.
    */
   private awaitEvent = (
     event: string,
     deadlineMs: number,
-    start: () => boolean = () => true
+    start: () => boolean | void = () => {}
   ): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
+      let deadline: NodeJS.Timer | number
+
       const settle = (arrived: boolean) => {
         this.off(event, onArrival)
         clearTimeout(deadline as any)
@@ -282,11 +282,11 @@ export class Socket extends SDKEventEmitter {
 
       const onArrival = () => settle(true)
 
-      const deadline = setTimeout(() => settle(false), deadlineMs)
+      deadline = setTimeout(() => settle(false), deadlineMs)
 
       this.once(event, onArrival)
 
-      if (!start()) settle(false)
+      if (start() === false) settle(false)
     })
   }
 
@@ -306,14 +306,14 @@ export class Socket extends SDKEventEmitter {
     this.lastPing = 0
     this.emit('disconnected')
 
-    this.reopenPromise = this.awaitEvent('open', reopenNowDeadline, () => {
+    const reopening = this.awaitEvent('open', reopenNowDeadline, () => {
       this.createConnection().catch(() => {})
-      return true
     }).then(() => {
       delete this.reopenPromise
     })
+    this.reopenPromise = reopening
 
-    return this.reopenPromise
+    return reopening
   }
 
   private writePing = (): boolean => {
@@ -422,12 +422,11 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * The Liveness chain: one Probe per interval, repeated for as long as the
-   * server keeps answering, and a Reopen the moment it stops. The Deadline the
-   * chain depends on belongs to the Probe rather than to `send`, so no other
-   * caller inherits a reply timeout — see ADR-0003 and ADR-0005.
+   * The Liveness chain. The Deadline it depends on belongs to the Probe rather
+   * than to `send`, so no other caller inherits a reply timeout — see ADR-0003
+   * and ADR-0005.
    */
-  ping = async () => {
+  ping = () => {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(async () => {
       if (await this.probe(this.config.ping)) return this.ping()
