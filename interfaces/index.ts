@@ -42,23 +42,6 @@ export interface ISocketOptions {
  */
 export type ISocketConfig = Required<Pick<ISocketOptions, 'host' | 'useSsl' | 'timeout' | 'reopen' | 'ping'>>
 
-/**
- * DDP Message Handler defines attributes to match on incoming messages and
- * fire a callback. There may be multiple handlers for any given message.
- * @param callback    Function to call when matching message received
- * @param persist     Optionally (true) to continue using handler after matching
- * @param msg         The `data.msg` value to match in message
- * @param id          The `data.id` value to match in message
- * @param collection  The `data.collection` value to match in message
- */
-export interface ISocketMessageHandler {
-  callback: ISocketMessageCallback
-  persist?: boolean
-  msg?: string
-  id?: string
-  collection?: string
-}
-
 /** Function interface for DDP message handler callback */
 export interface ISocketMessageCallback {
   (data: any): void

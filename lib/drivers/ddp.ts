@@ -14,7 +14,6 @@ import * as settings from '../settings';
 import {
   ISocketOptions,
   ISocketConfig,
-  ISocketMessageHandler,
   ISubscription,
   ICredentials,
   ILoginResult,
@@ -54,7 +53,6 @@ export class Socket extends SDKEventEmitter {
   host: string
   lastPing = Date.now()
   subscriptions: { [id: string]: ISubscription } = {}
-  handlers: ISocketMessageHandler[] = []
   config: ISocketConfig
   openTimeout?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
@@ -190,10 +188,10 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Find and call matching handlers for incoming message data.
-   * Handlers match on collection, id and/or msg attribute in that order.
-   * Any matched handlers are removed once called.
-   * All collection events are emitted with their `msg` as the event name.
+   * Dispatch incoming message data as events. A frame is emitted once under each
+   * of `collection`, `msg` and `id` that it carries, so a subscriber can listen
+   * on whichever of the three it knows. Any frame at all also counts as a sign of
+   * life and moves `lastPing`.
    */
   onMessage = (e: any) => {
     if (!e.data) return
@@ -715,10 +713,8 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     if (this.connected) {
       return Promise.resolve(this)
     }
-    const config: ISocketOptions = { ...this.config, ...c } // override defaults
-
     return new Promise((resolve, reject) => {
-      this.logger.info('[driver] Connecting', config)
+      this.logger.info('[driver] Connecting', { ...this.config, ...c })
       this.subscriptions = this.ddp.subscriptions
       this.ddp.open().catch((err: Error) => {
         this.logger.error(`[driver] Failed to connect: ${err.message}`)
