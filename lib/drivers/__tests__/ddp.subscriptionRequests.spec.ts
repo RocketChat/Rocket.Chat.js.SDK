@@ -110,9 +110,6 @@ describe('one sub or unsub in flight per DDP subscription', () => {
   })
 
   it('does not hold an id behind a request the connection left unanswered', async () => {
-    // Only `reopenNow` rejects in-flight sends; the scheduled `reopen` leaves
-    // them pending forever. Waiting on one of those across a new connection
-    // would block the id for the life of the Socket.
     socket.unsubscribe('ddp-1').catch(() => undefined)
     await flushMicrotasks()
     expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })

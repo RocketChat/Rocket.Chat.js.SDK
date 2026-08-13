@@ -88,6 +88,11 @@ the first to have its DDP response before its own frame is written.
   `reopen` is still able to catch a later response under the same id. That is
   the same class of fault and it is not fixed here. Separate issues track it,
   along with a `ready` that names more than one subscription id.
+- A queued request is issued when it is released, not when it is queued, so it
+  is written on whatever connection is current at that moment. A `sub` released
+  onto a connection that has not logged in yet is refused, `subscribe` resolves
+  `undefined`, and the entry it would have written is already there and
+  survives. The next Login's `subscribeAll` re-establishes the stream.
 - A request that a Reopen abandons is not re-sent by the queue. The queue holds
   the order of requests and nothing else. `subscribeAll` re-establishes the DDP
   subscriptions after a Login, and that stays the one path that re-sends.
