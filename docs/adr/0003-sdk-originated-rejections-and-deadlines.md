@@ -186,3 +186,18 @@ an Error that the SDK writes.
   answer, and `probe` asks how long is too long to still call the connection
   alive. `probe` takes its bound as an argument, so a caller that wants a
   different one passes it, and no option is needed to reach it.
+- **Amendment.** `close` joins `probe` as a Deadline no option moves, and takes its
+  bound the same way — an argument with a default of 2000ms. The socket it waits on
+  is by construction one the transport still calls open and a stale ping cannot
+  vouch for, so the close frame may never be answered. That is the liveness
+  question `probe` asks, not the patience question `timeout` asks, and binding a
+  logout's exit to `timeout` would make the app that raised it slowest to leave.
+  On the Deadline the Socket becomes a Detached socket rather than one the driver
+  keeps waiting on: a socket the peer never releases costs less than a caller — a
+  logout, a teardown, a Reopen — that never returns.
+  This Deadline settles the wait rather than rejecting it, because `close` promises
+  only that the driver has let the connection go, which is true either way. The
+  driver emits `close` itself when the Deadline wins, carrying the user-disconnect
+  code, so an in-flight `send` learns its connection ended on the same event the
+  transport would have used and no Reopen follows — the driver standing in for the
+  transport's event, on the same rule as the Connected echo.

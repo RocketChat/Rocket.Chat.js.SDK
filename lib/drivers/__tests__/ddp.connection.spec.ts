@@ -33,8 +33,12 @@ const REOPEN_DELAY = 3000
  */
 const REOPEN_NOW_DEADLINE = 7000
 
-/** The bound `close` puts on the wait for the transport's close event. */
-const CLOSE_DEADLINE = 2000
+/**
+ * The bound the tests below hand `close` for its wait on the transport's close
+ * event. Deliberately not the 2000 default, and distinct from every other delay
+ * in this file, so an assertion on it passes only if the argument was read.
+ */
+const CLOSE_DEADLINE = 5000
 
 /**
  * The ping interval is pushed far beyond every advance in this file on purpose:
@@ -274,10 +278,10 @@ describe('Socket connection lifecycle', () => {
         transport.answersClose = false
       })
 
-      it('settles on its deadline instead of waiting for a close that never arrives', async () => {
+      it('settles on the deadline it was given instead of waiting for a close that never arrives', async () => {
         const settled = jest.fn()
 
-        socket.close().then(settled)
+        socket.close(CLOSE_DEADLINE).then(settled)
 
         await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
         expect(settled).not.toHaveBeenCalled()
@@ -286,27 +290,25 @@ describe('Socket connection lifecycle', () => {
         expect(settled).toHaveBeenCalled()
       })
 
-      it('abandons the socket, so a second close waits for nothing', async () => {
-        const abandoning = socket.close()
+      it('drops the socket, so a second close waits for nothing', async () => {
+        const closing = socket.close(CLOSE_DEADLINE)
         await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
-        await abandoning
+        await closing
         expect(socket.connection).toBeUndefined()
 
         const settled = jest.fn()
-        socket.close().then(settled)
+        socket.close(CLOSE_DEADLINE).then(settled)
         await jest.advanceTimersByTimeAsync(0)
 
         expect(settled).toHaveBeenCalled()
         expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
       })
 
-      it('detaches the abandoned socket, so a peer that revives reaches nothing', async () => {
-        const closing = socket.close()
+      it('detaches the socket, so a peer that revives reaches nothing', async () => {
+        const closing = socket.close(CLOSE_DEADLINE)
         await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
         await closing
 
-        // The teardown in `createConnection` can never reach this socket again —
-        // the driver has dropped it — so `close` is the last chance to detach it.
         expect(transport.onopen).toBeNull()
         expect(transport.onmessage).toBeNull()
         expect(transport.onerror).toBeNull()
@@ -314,12 +316,40 @@ describe('Socket connection lifecycle', () => {
         expect(socket.openTimeout).toBeUndefined()
       })
 
-      it('is not kept alive by a revived peer it has already abandoned', async () => {
+      it('announces the close it never got, so a wait on this connection ends', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+
+        const closing = socket.close(CLOSE_DEADLINE)
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        await closing
+
+        expect(closeSeen).toHaveBeenCalledWith({ code: INTENTIONAL_CLOSE })
+      })
+
+      it('leaves a connection installed during the wait wired and held', async () => {
+        const closing = socket.close(CLOSE_DEADLINE)
+
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        const reopening = socket.reopenNow()
+        const replacement = fakeSockets[fakeSockets.length - 1]
+        await driveToHandshake(replacement)
+        await reopening
+
+        await jest.advanceTimersByTimeAsync(1)
+        await closing
+
+        expect(socket.connection).toBe(replacement)
+        expect(replacement.onclose).not.toBeNull()
+        expect(replacement.onmessage).not.toBeNull()
+      })
+
+      it('is not kept alive by a revived peer it has already detached', async () => {
         const stampAtClose = socket.lastPing
         const messageSeen = jest.fn()
         socket.on('updated', messageSeen)
 
-        const closing = socket.close()
+        const closing = socket.close(CLOSE_DEADLINE)
         await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
         await closing
 

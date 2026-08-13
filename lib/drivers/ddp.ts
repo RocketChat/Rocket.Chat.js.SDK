@@ -48,9 +48,6 @@ class AbandonedWait extends Error {
   }
 }
 
-/** How long `close` waits for the transport's close event before abandoning the socket. */
-const closeDeadline = 2000;
-
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -228,19 +225,14 @@ export class Socket extends SDKEventEmitter {
   /**
    * Disconnect the DDP from server and clear all subscriptions.
    *
-   * The wait for the close event is bounded. This runs on a socket the transport
-   * still calls open, which is exactly the socket a stale ping cannot vouch for,
-   * so the close frame may never be answered. On the deadline the socket is
-   * abandoned rather than waited on: a leaked socket costs less than a caller —
-   * a logout, a teardown, a reopen — that never returns.
-   *
-   * The connection is dropped either way, so `close` resolves once and a second
-   * call has nothing left to wait for. Its handlers are detached with it: the
-   * teardown in `createConnection` can no longer reach a socket the driver has
-   * stopped holding, so a peer that revives would otherwise still reach
-   * `onMessage`, refresh the ping stamp and emit into a driver that has closed.
+   * The wait for the transport's close event is bounded, and past that Deadline
+   * the socket is left detached rather than waited on further. The driver emits
+   * the close itself there, so a wait that depended on this connection learns it
+   * ended on the same event the transport would have used. `deadlineMs` follows
+   * `probe` rather than `config.timeout`: both ask how long is too long to still
+   * call a socket alive, not how long a caller will wait for an answer.
    */
-  close = async () => {
+  close = async (deadlineMs = 2000) => {
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
     this.openTimeout && clearTimeout(this.openTimeout as any)
@@ -250,35 +242,40 @@ export class Socket extends SDKEventEmitter {
     if (connection && connection.readyState !== socketClosed) {
       await new Promise<void>((resolve) => {
         let settled = false
-        const cleanup = () => {
+        const settle = (announceClose: boolean) => {
           if (settled) return
           settled = true
-          this.off('close', cleanup)
+          this.off('close', onTransportClose)
           clearTimeout(deadline as any)
+          if (announceClose) this.emit('close', { code: userDisconnectCloseCode })
           resolve()
         }
 
-        this.once('close', cleanup)
+        const onTransportClose = () => settle(false)
+        this.once('close', onTransportClose)
 
-        const deadline = setTimeout(cleanup, closeDeadline)
+        const deadline = setTimeout(() => settle(true), deadlineMs)
 
         try {
           connection.close(userDisconnectCloseCode)
         } catch (err) {
           this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
-          cleanup()
+          settle(true)
         }
       })
     }
 
-    if (connection) {
+    // A reopen during the wait installs a new connection over this one, so an
+    // unconditional teardown here would strip the wrong socket and drop the
+    // driver's only reference to the live one. Same identity rule as `onClose`.
+    if (connection && connection === this.connection) {
       connection.onopen = null as any
       connection.onmessage = null as any
       connection.onerror = null as any
       connection.onclose = null as any
+      delete this.connection
     }
 
-    delete this.connection
     this.forgetAllSubscriptions()
   }
 

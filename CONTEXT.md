@@ -89,6 +89,10 @@ _Avoid_: Heartbeat, keepalive
 A single bounded liveness check on a Socket that looks open, asked for on demand rather than on the chain's schedule.
 _Avoid_: Health check, ping (that is one message of the chain)
 
+**Detached socket**:
+A Socket the Driver has dropped its reference to and unhooked every handler from, without the transport having confirmed the close. It may still be open to the peer, and may still revive; nothing it does afterwards reaches the Driver.
+_Avoid_: Orphan, zombie, abandoned socket — abandoning belongs to waits, leaked socket
+
 **Deadline**:
 A bound after which the SDK settles a wait itself instead of waiting on the server any longer. Where a connection ends the wait instead, that is stated at the call.
 _Avoid_: Timeout — that is a config option, and several Deadlines are derived from it
