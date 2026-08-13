@@ -248,6 +248,27 @@ describe('Socket liveness', () => {
       expect(socket.connected).toBe(true)
     })
 
+    it('leaves the reconnect to the close when a ping is abandoned by it', async () => {
+      // A ping abandoned because its connection was replaced must not schedule a
+      // reopen of its own: the close that replaced it already scheduled one, and
+      // the replacement starts its own chain.
+      await tickWithPong()
+
+      transport.close(1006)
+      await jest.advanceTimersToNextTimerAsync()
+
+      await jest.advanceTimersByTimeAsync(socket.config.reopen)
+      expect(fakeSockets).toHaveLength(2)
+
+      await driveToHandshake(fakeSockets[1])
+      transport = fakeSockets[1]
+
+      await tickWithPong()
+      expect(fakeSockets).toHaveLength(2)
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+      expect(socket.connected).toBe(true)
+    })
+
     it('does not reopen a socket the caller closed while a ping was in flight', async () => {
       await jest.advanceTimersToNextTimerAsync()
       expect(transport.lastSent()).toEqual({ msg: 'ping' })

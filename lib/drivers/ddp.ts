@@ -39,6 +39,7 @@ const socketClosed = 3;
 
 const abandonedByReopen = '[ddp] connection reopened before the response arrived'
 const abandonedByClose = '[ddp] connection closed before the response arrived'
+const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
 
 class AbandonedWait extends Error {
   constructor (message?: string) {
@@ -60,6 +61,7 @@ export class Socket extends SDKEventEmitter {
   session?: string
   logger: ILogger
   reopenPromise?: Promise<void>
+  private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   /** Create a websocket handler */
   constructor (
@@ -419,13 +421,18 @@ export class Socket extends SDKEventEmitter {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
+    // A message belongs to the connection that was current when it was sent. It
+    // is never written to a successor: the DDP session, and any Login on it, is
+    // the old connection's.
+    const connection = this.connection
     if (!this.connected) {
       await this.waitForOpen()
+      if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)
       // The wait resolves a microtask before the listeners below are attached, so
       // a connection lost in that window would be missed by all three of them.
       // `readyState` rather than `connected`: in that window the events have not
       // been delivered, so only the transport knows whether the connection went away.
-      if (this.connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
+      if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
     }
 
     return new Promise<any>((resolve, reject) => {
@@ -437,9 +444,7 @@ export class Socket extends SDKEventEmitter {
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
       try {
-        // Read fresh rather than captured above the wait: a reopen while the send
-        // waited on `open` will have replaced the connection.
-        this.connection!.send(stringdata)
+        connection.send(stringdata)
       } catch (err) {
         this.logger.error(`[ddp] the transport failed to write the message: ${stringdata}`);
         return reject(err)
@@ -582,6 +587,38 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
+   * Hold a `sub` or `unsub` until the one before it on the same id has its DDP
+   * response.
+   *
+   * A `sub` and an `unsub` for one DDP subscription carry the same id, and
+   * `send` matches a DDP response to its request by id alone, so two of them in
+   * flight at once leave the first response settling both — the `nosub` that
+   * ends the DDP subscription also settles the `sub`, and the `ready` that
+   * establishes it also settles the `unsub`. The server takes one message from
+   * a session at a time and answers in that order, so waiting for the response
+   * is enough to keep one request per id on the wire.
+   *
+   * Nothing bounds the wait but the request before it. A send that loses its
+   * connection is abandoned rather than left pending, so a chain always drains.
+   */
+  private queueSubscriptionRequest = <T>(id: string | undefined, request: () => Promise<T>): Promise<T> => {
+    if (!id) return request()
+
+    // The tail is registered here rather than when the frame goes out, so a
+    // third request queues behind the second rather than behind the first.
+    const waiting = this.subscriptionRequests[id]
+    const sending = waiting ? waiting.then(request) : request()
+    const settled = sending.then(() => undefined, () => undefined)
+
+    this.subscriptionRequests[id] = settled
+    settled.then(() => {
+      if (this.subscriptionRequests[id] === settled) delete this.subscriptionRequests[id]
+    })
+
+    return sending
+  }
+
+  /**
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
    *
@@ -592,7 +629,7 @@ export class Socket extends SDKEventEmitter {
    */
   subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback, id?: string) => {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
-    return this.send({ msg: 'sub', id, name, params })
+    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
         const id = (result.subs) ? result.subs[0] : undefined
         if (id) {
@@ -623,7 +660,7 @@ export class Socket extends SDKEventEmitter {
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
-    return this.send({ msg: 'unsub', id })
+    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((data: any) => {
         this.forgetSubscription(id)
         return data.result || data.subs

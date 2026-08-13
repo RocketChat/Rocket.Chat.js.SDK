@@ -181,3 +181,14 @@ export const driveToHandshake = async (transport: FakeWebSocket, session = 'fake
   // And let everything the handshake reply resolves actually run.
   await jest.advanceTimersByTimeAsync(0)
 }
+
+/**
+ * Turn the microtask queue over by hand.
+ *
+ * Timers are faked, so there is no macrotask to await: settling a chain that
+ * hops several promises before its next frame goes out means driving those
+ * hops directly.
+ */
+export const flushMicrotasks = async (): Promise<void> => {
+  for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
+}

@@ -142,6 +142,32 @@ an Error that the SDK writes.
   ahead of the answer of the server in each case. But the failed write is a new way
   to reach the fault. A separate issue tracks the fault, and this ADR does not
   correct it.
+- **Second amendment.** The rule above is the connection, not a clock, but one
+  path did not follow it. `send` waits in `waitForOpen` when the connection is
+  not open, and then wrote its DDP message to whichever connection was current at
+  that moment. A send issued at a drop therefore moved to the connection that
+  replaced the one it was issued on. A send does not do this now. `send` holds the
+  connection that was current when it was called, writes to that connection alone,
+  and rejects with
+  `'[ddp] connection replaced before the message was written'` if another
+  connection has taken its place. The type is the same one an abandoned wait
+  carries, so `ping` and the retry inside `reopen` do not Reopen for it. This is
+  correct: the connection was replaced by `createConnection`, which the close or
+  the Reopen that replaced it had already started, and the replacement starts its
+  own Liveness chain in `onOpen`.
+  A DDP session belongs to the connection that carries it. The replacement has a
+  session of its own, and no Login on it yet, so a Method call moved to it is sent
+  under an identity the caller did not ask for. A `sub` moved to it is worse: it
+  is written under an id from a session that has ended.
+  A send waiting on a connection that stays open and merely quiet is unaffected.
+  That send waits for the same connection to open, and its Deadline still bounds
+  it.
+- A caller that got a result after a Reopen gets a rejection instead. `subscribe`
+  turns each rejection into `undefined` and `unsubscribeAll` ignores each one, so
+  the DDP subscription paths do not change for a caller. A Method call issued in
+  the window between a drop and the next open now fails, where before it was
+  answered on the connection that followed. The consuming app decides whether to
+  call again. It could not have made that decision before, because it was not told.
 - A spec that asserts a rejection of this type asserts both halves, in the way that
   ADR-0001 established. The spec asserts that the value is an `Error`, and the spec
   asserts the message that a caller reads. A later change therefore cannot return
