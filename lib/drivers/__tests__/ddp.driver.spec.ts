@@ -215,6 +215,67 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     await expect(waiting).resolves.toBe(true)
   })
 
+  it('resolves false when the server refuses both resubscribes', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    transport.receive({ msg: 'nosub', id: 'sub-media-signal' })
+    transport.receive({ msg: 'nosub', id: 'sub-media-calls' })
+
+    await expect(waiting).resolves.toBe(false)
+  })
+
+  it('resolves false when only one of the two resubscribes is refused', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
+    transport.receive({ msg: 'nosub', id: 'sub-media-calls' })
+
+    await expect(waiting).resolves.toBe(false)
+  })
+
+  it('resolves false when a resubscribe is acked without a subscription id', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    // Answered, but carrying nothing to subscribe with: the stream is no more
+    // restored than it is by a refusal.
+    transport.receive({ msg: 'ready', id: 'sub-media-signal', subs: [] })
+    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+
+    await expect(waiting).resolves.toBe(false)
+  })
+
+  it('takes its deadline from the configured timeout when given none', async () => {
+    const timeout = 4000
+    const driver = createDriver({ timeout })
+    await openFakeConnection(driver.ddp)
+    driver.userId = userId
+
+    const waiting = driver.waitForNotifyUserMediaSubs()
+    let resolved: boolean | undefined
+    waiting.then((value) => { resolved = value })
+
+    await jest.advanceTimersByTimeAsync(timeout - 1)
+    expect(resolved).toBeUndefined()
+
+    await jest.advanceTimersByTimeAsync(1)
+    await expect(waiting).resolves.toBe(false)
+  })
+
   it('resolves false when the subscriptions never appear before the deadline', async () => {
     const driver = createDriver()
     await openFakeConnection(driver.ddp)
@@ -256,11 +317,11 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
 
 describe('DDPDriver.connect', () => {
   it('keeps echoing open after a send has waited on it', async () => {
-    // `connect` registers a long-lived `open` listener to echo the socket's open
-    // as the driver's `connected`. A send that waits on open registers a `once`
+    // The driver holds a long-lived `open` listener that echoes the socket's
+    // open as its own `connected`. A send that waits on open registers a `once`
     // beside it, and removing that `once` once it has fired used to take the
     // echo down with it — leaving the driver permanently silent about every
-    // later reconnect.
+    // later Reopen.
     const driver = createDriver()
     const connecting = driver.connect()
     const transport = fakeSockets[0]
@@ -285,5 +346,41 @@ describe('DDPDriver.connect', () => {
 
     await driveToHandshake(transport)
     expect(connectedSeen).toHaveBeenCalledTimes(2)
+  })
+
+  it('echoes open once however many times connect was called', async () => {
+    const driver = createDriver()
+    const connecting = driver.connect()
+    const transport = fakeSockets[0]
+
+    await driveToHandshake(transport)
+    await connecting
+
+    transport.close()
+
+    const connectedSeen = jest.fn()
+    driver.on('connected', connectedSeen)
+
+    // A caller that calls `connect` on each foreground or network change
+    // reaches it again with the socket down, so the early return does not cover
+    // it. One open still means one `connected`.
+    const connectingAgain = driver.connect()
+    await driveToHandshake(fakeSockets[1])
+    await connectingAgain
+
+    expect(connectedSeen).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes its connected listener back down when the open fails', async () => {
+    const driver = createDriver()
+    const connecting = driver.connect()
+    const transport = fakeSockets[0]
+
+    transport.onerror?.(new Error('no route to host'))
+    await expect(connecting).rejects.toThrow('no route to host')
+
+    // A rejected connect settles on the error, so the listener it left behind
+    // could never resolve anything — it only accumulates, one per failed call.
+    expect(driver.removeAllListeners('connected')).toHaveLength(0)
   })
 })

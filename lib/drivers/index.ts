@@ -14,7 +14,7 @@ import {
 
 export interface ISocket {
   logger: ILogger
-  connect (options: ISocketOptions): Promise<ISocket | IDriver>
+  connect (options: ISocketOptions): Promise<IDriver>
   disconnect (): Promise<ISocket>
   checkAndReopen (): void
   subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined>
@@ -44,8 +44,6 @@ export interface IDriver {
   subscribeLoggedNotify (): Promise<any>
 
   subscribeNotifyUser (): Promise<any>
-
-  subscribeNotifyUser (): Promise<IDriver>
 
   onTyping (cb: ICallback): Promise<any>
 

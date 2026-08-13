@@ -7,7 +7,6 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   logger: ILogger = Logger
   socket: Promise<ISocket | IDriver>
   ddp?: any
-  config: any
 
   // `allPublic`, `rooms` and `integrationId` are destructured only to keep them
   // out of `...config`, which is forwarded to `super` and to `DDPDriver`.
