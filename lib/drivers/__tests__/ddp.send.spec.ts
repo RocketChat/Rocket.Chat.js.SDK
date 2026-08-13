@@ -366,18 +366,72 @@ describe('Socket.send with several listeners on one event', () => {
       await rejections
     })
 
-    it('leaves no listener behind for a send it abandoned', async () => {
-      const listenersFor = (event: string) =>
-        ((socket as any)._listeners[event] || []).length
+    const listenerCounts = () => {
+      const counts: { [event: string]: number } = {}
+      Object.entries((socket as any)._listeners).forEach(([event, listeners]) => {
+        const { length } = listeners as any[]
+        if (length) counts[event] = length
+      })
+      return counts
+    }
 
-      const before = ['ddp-1', 'close', 'connecting', 'disconnected'].map(listenersFor)
+    it('leaves no listener behind for a send it abandoned', async () => {
+      const before = listenerCounts()
 
       const sends = inFlight()
       const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
       await socket.close()
       await rejections
 
-      expect(['ddp-1', 'close', 'connecting', 'disconnected'].map(listenersFor)).toEqual(before)
+      expect(listenerCounts()).toEqual(before)
+    })
+
+    it('leaves no listener behind when a scheduled reopen abandons the send', async () => {
+      const before = listenerCounts()
+
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, REOPENED_MESSAGE)
+
+      transport.readyState = CLOSED
+      socket.reopen()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      await rejections
+
+      expect(listenerCounts()).toEqual(before)
+    })
+
+    it('leaves no listener behind for a send that got its response', async () => {
+      const before = listenerCounts()
+
+      const sends = inFlight()
+      sends.forEach((_, index) =>
+        transport.receive({ msg: 'result', id: `ddp-${index + 1}`, result: 'ok' })
+      )
+      await Promise.all(sends)
+
+      expect(listenerCounts()).toEqual(before)
+    })
+
+    it('rejects a send whose connection went away as its wait on open ended', async () => {
+      transport.readyState = CLOSED
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+      const rejection = expect(sending).rejects.toThrow(CLOSED_MESSAGE)
+
+      socket.emit('open')
+      await jest.advanceTimersByTimeAsync(0)
+
+      await rejection
+    })
+
+    it('keeps the first ending when a second one follows', async () => {
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
+
+      transport.close(1006)
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+
+      await rejections
     })
 
     it('still carries a send issued before the connection came back', async () => {

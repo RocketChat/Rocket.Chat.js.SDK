@@ -116,7 +116,10 @@ an Error that the SDK writes.
   type, and both places Reopen on every rejection except that one: a connection
   that went away has already been answered, by `onClose` or by the replacement
   itself, and only a failure that leaves nobody rebuilding it asks for a Reopen.
-  The type is internal to the driver, so this adds no public surface either.
+  The type is unexported and sets no `name`, so a caller that receives one — the
+  rejection does reach callers, through `open()` — sees an ordinary Error and the
+  message above. It adds no public surface because nothing about it is
+  observable, not because it stays inside the driver.
 - The handshake is the one send with no caller of its own, and `createConnection`
   waits on it through `onOpen`. Ending its wait therefore has to settle that wait
   too — `onOpen` rejects the connection it was opening, rather than trading a

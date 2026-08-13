@@ -35,7 +35,12 @@ import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
 
-class AbandonedWait extends Error {}
+class AbandonedWait extends Error {
+  constructor (message?: string) {
+    super(message)
+    Object.setPrototypeOf(this, AbandonedWait.prototype)
+  }
+}
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
@@ -405,7 +410,12 @@ export class Socket extends SDKEventEmitter {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
-    if (!this.connected) await this.waitForOpen()
+    if (!this.connected) {
+      await this.waitForOpen()
+      // The wait resolves a microtask before the listeners below are attached, so
+      // a connection lost in that window would be missed by all three of them.
+      if (!this.connected) throw new AbandonedWait('[ddp] connection closed before the response arrived')
+    }
 
     return new Promise<any>((resolve, reject) => {
       const id = obj.id || `ddp-${ this.sent }`
