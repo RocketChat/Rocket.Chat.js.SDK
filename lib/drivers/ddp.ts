@@ -329,7 +329,8 @@ export class Socket extends SDKEventEmitter {
    */
   probe = (timeoutMs = 2000): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
-      if (!this.transportOpen) {
+      const connection = this.connection
+      if (!connection || connection.readyState !== socketOpen) {
         return resolve(false)
       }
 
@@ -354,7 +355,7 @@ export class Socket extends SDKEventEmitter {
       }, timeoutMs)
 
       try {
-        this.connection!.send(JSON.stringify({ msg: 'ping' }))
+        connection.send(JSON.stringify({ msg: 'ping' }))
       } catch {
         cleanup()
         resolve(false)

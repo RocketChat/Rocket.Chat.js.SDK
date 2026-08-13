@@ -234,8 +234,6 @@ describe('Socket.send', () => {
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
       // Still the socket it started with: the send used the transport it had.
       expect(fakeSockets).toHaveLength(1)
-
-      clearTimeout(socket.openTimeout as any)
     })
 
     it('rejects the send when there is no connection at all', async () => {
