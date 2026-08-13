@@ -35,11 +35,6 @@ import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
 
-/**
- * The connection a message went out on went away before its DDP response could
- * arrive. Read by `reopenUnlessAbandoned`, so it is a subclass rather than the
- * plain Error the rest of ADR-0003 raises.
- */
 class AbandonedWait extends Error {}
 
 /** Websocket handler class, manages connections and subscriptions by DDP */
@@ -140,12 +135,10 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Send handshake message to confirm connection, start pinging. */
-  onOpen = async (callback: Function, abandon: Function) => {
+  onOpen = async (callback: Function, reject: Function) => {
     this.lastPing = Date.now()
 
-    // The websocket's `onopen` has nowhere to put a throw, and there is no
-    // connection left to hand the callback, so an abandoned handshake ends the
-    // wait `createConnection` holds rather than outliving the connection.
+    // `onopen` is a websocket callback, so a throw here has nowhere to go.
     let connected
     try {
       connected = await this.send({
@@ -155,7 +148,7 @@ export class Socket extends SDKEventEmitter {
       })
     } catch (err) {
       this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
-      return abandon(err)
+      return reject(err)
     }
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
@@ -254,18 +247,10 @@ export class Socket extends SDKEventEmitter {
         clearTimeout(this.openTimeout as any)
         delete this.openTimeout
       }
-      // Nothing here awaits the open, and it can reject — an unhandled rejection
-      // from the SDK reaches the global handler of a consuming app.
       this.open().catch((err) => this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`))
     }
   }
 
-  /**
-   * Only a failure that leaves nobody rebuilding the connection asks for a
-   * Reopen. A connection that went away has already been answered: a close the
-   * caller asked for leaves the Socket closed, any other close reopens from
-   * `onClose`, and a Reopen is a replacement already under way.
-   */
   private reopenUnlessAbandoned = (err: unknown) => {
     if (!(err instanceof AbandonedWait)) this.reopen()
   }
@@ -446,41 +431,30 @@ export class Socket extends SDKEventEmitter {
       }
 
       // The DDP response can only arrive on the connection this message went out
-      // on, so every event that ends that connection ends this wait. All three
-      // are already emitted — `close` by `onClose`, `connecting` by
-      // `createConnection`, `disconnected` by `reopenNow`. A close gets its own
-      // wording: a caller retrying on a Reopen retries into a live connection,
-      // and one retrying on a close retries into a closed Socket.
-      const abandonments = [
-        { event: 'disconnected', ending: 'reopened' },
-        { event: 'connecting', ending: 'reopened' },
-        { event: 'close', ending: 'closed' }
-      ].map(({ event, ending }) => ({
+      // on, so every event that ends that connection ends this wait.
+      const abandonListeners = [
+        ['disconnected', '[ddp] connection reopened before the response arrived'],
+        ['connecting', '[ddp] connection reopened before the response arrived'],
+        ['close', '[ddp] connection closed before the response arrived']
+      ].map(([event, message]) => ({
         event,
-        // Named, and the *same* reference `stopWaiting` removes: `off` only
-        // removes a listener it can match, and a miss is silently a no-op. The
-        // Error matters as much: these events are emitted with no arguments, so
-        // `reject` handed straight to one rejects the send with `undefined`, and
-        // a caller reading `err.message` throws from its own `catch`.
         onAbandon: () => {
-          stopWaiting()
-          reject(new AbandonedWait(`[ddp] connection ${ending} before the response arrived`))
+          removeListeners()
+          reject(new AbandonedWait(message))
         }
       }))
 
-      // The DDP response listener goes with them: an abandoned send that left it
-      // registered would leak one more listener, and its closure, on every Reopen.
-      const stopWaiting = () => {
+      const removeListeners = () => {
         this.off(listener, onResponse)
-        abandonments.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
+        abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
       }
 
       const onResponse = (result: any) => {
-        stopWaiting()
+        removeListeners()
         return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       }
 
-      abandonments.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
+      abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
       this.once(listener, onResponse)
     })
   }

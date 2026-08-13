@@ -55,7 +55,7 @@ The DDP message that answers a Method call or a DDP subscription — `result`, `
 _Avoid_: Reply, ack, result (that is one response type of three)
 
 **DDP error**:
-The error field of a failed DDP response, as the server sent it. What the SDK raises to its callers from one is an ordinary Error, not this. A rejection the SDK originates itself — a write that failed, a Deadline that expired, a Reopen that abandoned the wait — carries no DDP error and no server reason; only the server-sent kind is a DDP error.
+The error field of a failed DDP response, as the server sent it. What the SDK raises to its callers from one is an ordinary Error, not this. A rejection the SDK originates itself — a write that failed, a Deadline that expired, a connection that went away and abandoned the wait — carries no DDP error and no server reason; only the server-sent kind is a DDP error.
 _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 
 **DDP subscription**:

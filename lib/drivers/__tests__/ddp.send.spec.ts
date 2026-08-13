@@ -320,12 +320,6 @@ describe('Socket.send with several listeners on one event', () => {
       .rejects.toBe(failure)
   })
 
-  /**
-   * A written send can only be answered on the connection it went out on. Once
-   * that connection is gone the DDP response can never arrive, so the wait has
-   * to end — on any of the three events that end a connection, not on
-   * `disconnected` alone, which only `reopenNow` emits.
-   */
   describe('when the connection the send went out on goes away', () => {
     const inFlight = () => [1, 2, 3].map(() =>
       socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
@@ -359,10 +353,8 @@ describe('Socket.send with several listeners on one event', () => {
     })
 
     it('rejects every in-flight send when a scheduled reopen replaces the connection', async () => {
-      // The one path with no close event at all: the transport is not open any
-      // more, but nothing fired `onclose` — the shape a stale-ping socket and a
-      // swallowed orphan close both leave behind. The replacement therefore
-      // announces itself only as `connecting`, which is the event under test here.
+      // The transport is not open any more, but nothing fired `onclose`, so the
+      // replacement announces itself only as `connecting`.
       const sends = inFlight()
       const rejections = expectAllToReject(sends, REOPENED_MESSAGE)
 
@@ -375,9 +367,6 @@ describe('Socket.send with several listeners on one event', () => {
     })
 
     it('leaves no listener behind for a send it abandoned', async () => {
-      // The other half of ending the wait: an abandoned send that left the DDP
-      // response listener and the abandonment listeners registered would leak a
-      // few more, and retain their closures, on every Reopen.
       const listenersFor = (event: string) =>
         ((socket as any)._listeners[event] || []).length
 
@@ -392,9 +381,6 @@ describe('Socket.send with several listeners on one event', () => {
     })
 
     it('still carries a send issued before the connection came back', async () => {
-      // The counterpart to the tests above, and the line between them: this send
-      // is written *after* the reopen, so the reopen it waited through must not
-      // reject it.
       transport.close(1006)
 
       const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
@@ -410,8 +396,7 @@ describe('Socket.send with several listeners on one event', () => {
 
     it('fails the open when the handshake is abandoned', async () => {
       // The handshake is the one send with no caller of its own, and `open()`
-      // waits on it. Ending its wait has to settle that wait too, or the close
-      // trades a stranded send for a stranded `open()`.
+      // waits on it.
       const opening = createSocket().open()
       const handshaking = fakeSockets[1]
       handshaking.readyState = OPEN

@@ -191,12 +191,6 @@ describe('Socket connection lifecycle', () => {
     })
   })
 
-  /**
-   * The handshake is a send like any other, so a close now ends its wait and the
-   * open it was running for fails. Both callers that open without a caller of
-   * their own have to answer that rejection: neither may treat it as a server
-   * that went quiet, and neither may leave it unhandled.
-   */
   describe('an open abandoned by a close mid-handshake', () => {
     const handshakeInFlight = async () => {
       const replacement = fakeSockets[1]

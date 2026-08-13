@@ -248,10 +248,6 @@ describe('Socket liveness', () => {
     })
 
     it('does not reopen a socket the caller closed while a ping was in flight', async () => {
-      // The ping's send is in flight for the whole window between the ping frame
-      // and the pong, and a close ends that wait with a rejection. That rejection
-      // reaches the same `.catch` a missed pong does — so without the guard,
-      // closing during that window rebuilds the socket the caller just closed.
       await jest.advanceTimersToNextTimerAsync()
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
 
@@ -268,15 +264,11 @@ describe('Socket liveness', () => {
     })
 
     it('schedules no second reopen when a reopen replaces the connection mid-ping', async () => {
-      // The other rejection a connection going away hands the ping: `connecting`,
-      // from the replacement itself. Reopening on that would queue a redundant
-      // open against a connection that is already being rebuilt.
       await jest.advanceTimersToNextTimerAsync()
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
 
-      // No close event at all, so `connecting` from the replacement is the only
-      // thing that ends the ping's wait. Inside the ping's own deadline, so the
-      // unanswered ping is not what ends it.
+      // No close event, and inside the ping's own deadline, so `connecting` from
+      // the replacement is the only thing that can end the ping's wait.
       transport.readyState = CLOSED
       const opening = socket.open()
       await driveToHandshake(fakeSockets[1])
