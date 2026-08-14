@@ -230,7 +230,6 @@ describe('Socket.send', () => {
 
       transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
-      // Still the socket it started with: the send used the transport it had.
       expect(fakeSockets).toHaveLength(1)
     })
 

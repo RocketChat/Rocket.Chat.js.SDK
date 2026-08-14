@@ -47,12 +47,6 @@ an Error that the SDK writes.
   outlasts the Reopen that the send waits for, where before the Deadline expired
   as that Reopen started. A measurement gives the multiplier of 2. It is not a
   margin for comfort: at exactly `config.reopen`, no Reopen can meet the Deadline.
-- Whether `send` waits for `open` at all is decided on the transport's own state,
-  not on `connected`. `connected` folds in the Liveness chain, and a Socket that
-  is Transport open and merely quiet will never emit `open` again, so a send that
-  waits on one waits forever. A send on a Transport open Socket is written at
-  once, and the connection's own events, not this Deadline, end its wait. The
-  second amendment says otherwise; the third amendment below corrects it.
 - `ping` races its send against a Deadline of `config.ping`. If the Deadline wins,
   `ping` calls `reopen()`. A `pong` that does not arrive therefore causes the
   reconnect that it always had to cause.
