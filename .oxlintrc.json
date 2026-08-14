@@ -32,8 +32,7 @@
 	// these same rules — there are no test-file overrides and no rule changes for
 	// them — and test code stays at zero warnings.
 	//
-	// A rule reaches "error" once its entry above is cleared, and every rule still
-	// at "warn" carries violations.
+	// A rule reaches "error" once its entry above is cleared.
 	//
 	// `no-async-promise-executor` is the first one cleared, so it gates: both
 	// executors are gone — `send`'s dropped its guard's `throw` on the floor, and
