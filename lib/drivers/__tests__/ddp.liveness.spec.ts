@@ -1,5 +1,5 @@
 import { Socket } from '../ddp'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
   driveToHandshake,
@@ -24,7 +24,7 @@ const PING_INTERVAL = 3000
 
 const createSocket = () => new Socket({
   host: 'localhost:3000',
-  logger: silentLogger,
+  logger: createSilentLogger(),
   timeout: PING_INTERVAL
 })
 

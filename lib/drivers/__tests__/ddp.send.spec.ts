@@ -1,6 +1,6 @@
 import { Socket } from '../ddp'
 import * as settings from '../../settings'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
   FakeWebSocket,
@@ -18,7 +18,7 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
+const createSocket = () => new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
 
 describe('the transport seam', () => {
   it('constructs the transport with the driver arguments and the shared headers', async () => {
@@ -238,7 +238,7 @@ describe('Socket.send with several listeners on one event', () => {
 
   const createSocket = () => new Socket({
     host: 'localhost:3000',
-    logger: silentLogger,
+    logger: createSilentLogger(),
     reopen: REOPEN_DELAY,
     ping: 10 * 60 * 1000
   })

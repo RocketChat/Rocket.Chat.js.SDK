@@ -1,5 +1,5 @@
 import { Socket } from '../ddp'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
   FakeWebSocket,
@@ -16,7 +16,7 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
+const createSocket = () => new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
 
 /**
  * What the subscription map holds, and when. The send plumbing underneath —
