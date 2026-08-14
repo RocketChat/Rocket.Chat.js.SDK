@@ -14,16 +14,20 @@ Consumers do reach past it. Rocket.Chat.ReactNative takes `Socket` and
 `DDPDriver` from `@rocket.chat/sdk/lib/drivers/ddp` in two files,
 `app/lib/services/ddpSocket.test.ts` and
 `app/lib/services/__tests__/socketHealth.integration.test.ts`. Both are tests;
-no application code deep-imports. `interfaces/` and `clients/` are equally
-reachable and are not currently reached.
+no application code deep-imports.
+
+The repository has also built for the practice. `clients/Rocketchat.ts` is a
+one-line re-export over a module whose only export is a default, so it forwards
+nothing, and no file in this repository imports it. It exists only to give a
+consumer the deep path `@rocket.chat/sdk/clients/Rocketchat`.
 
 Because no line was drawn, no change to a module under `lib/` could be judged.
 Deleting the unused `debounce` helper from `lib/util.ts` was answerable only by
 grepping the consumer, and the same grep would be needed for every internal
-symbol a refactor touches. ADRs 0001 through 0005 all revise driver internals —
-the rejection rules, the emitter, the deadlines, the subscription queue — which
-is exactly the code a consumer can reach today. Treating what is reachable as
-what is supported would make each of those a breaking change.
+symbol a refactor touches. ADRs 0001 through 0005 all revise internals a
+consumer can reach today — the rejection rules, the emitter, the deadlines, the
+subscription queue. Treating what is reachable as what is supported would make
+each of those a breaking change.
 
 ## Decision
 
@@ -32,9 +36,12 @@ internal, and changing or removing it is not a breaking change.
 
 - Making something public means adding it to `index.ts`. A deep path is never
   the way, whatever it resolves to.
-- Rocket.Chat.ReactNative's use of `@rocket.chat/sdk/lib/drivers/ddp` in the two
-  files above is a named exception, recorded so it is not mistaken for support.
-  It is the only one.
+- `clients/Rocketchat.ts` is deleted. A file whose only purpose is to serve a
+  deep path is the practice this ADR bans, and it forwards nothing.
+- One exception stands: Rocket.Chat.ReactNative deep-imports
+  `@rocket.chat/sdk/lib/drivers/ddp` from test files only. A deep import from
+  application code is not covered by it. Recording the shape rather than the
+  file names keeps the exception true as the consumer's tests move.
 - The rule is unenforced convention until an `exports` map exists. Stating it
   changes what a reviewer may rely on, not what the resolver permits.
 
@@ -59,4 +66,4 @@ internal, and changing or removing it is not a breaking change.
   differently from Node.
 
 - Until then a deep import still resolves and still compiles. Nothing reports
-  one, so the exception list is kept by hand.
+  one, so the exception holds only as long as review keeps it.
