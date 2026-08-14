@@ -188,8 +188,10 @@ an Error that the SDK writes.
   different one passes it, and no option is needed to reach it.
 - **Amendment.** `close` joins `probe` as a Deadline no option moves, and takes its
   bound the same way — an argument with a default of 2000ms. The socket it waits on
-  is by construction one the transport still calls open and a stale ping cannot
-  vouch for, so the close frame may never be answered. That is the liveness
+  may be one the transport never called open at all — a still-connecting socket is
+  closed and waited on the same way, and letting it go settles that open as an
+  Abandoned wait rather than leaving it pending — and a stale ping cannot vouch for
+  any of them, so the close frame may never be answered. That is the liveness
   question `probe` asks, not the patience question `timeout` asks, and binding a
   logout's exit to `timeout` would make the app that raised it slowest to leave.
   On the Deadline the Socket becomes a Detached socket rather than one the driver

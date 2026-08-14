@@ -3,6 +3,7 @@ import { ILogger } from '../../../interfaces'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
+  CONNECTING,
   driveToHandshake,
   FakeWebSocket,
   fakeSockets,
@@ -65,7 +66,7 @@ const createSocket = (logger: ILogger) => new Socket({
  * asserted against a value the test itself wrote. A real socket reporting OPEN
  * over a dead pipe — the grey zone `probe` exists for — is unreachable through
  * this seam. The replacement test below therefore proves the identity
- * comparison in `onClose`, not that a real zombie socket behaves the way that
+ * comparison in `onClose`, not that a real replaced socket behaves the way that
  * guard assumes.
  */
 describe('Socket connection lifecycle', () => {
@@ -149,7 +150,7 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('replaces the predecessor even when tearing it down throws', async () => {
-      transport.close = () => { throw new Error('teardown boom') }
+      transport.closeError = new Error('teardown boom')
 
       const debug = logger.debug as jest.Mock
 
@@ -279,7 +280,11 @@ describe('Socket connection lifecycle', () => {
       await jest.advanceTimersByTimeAsync(0)
 
       expect(settled).toHaveBeenCalled()
-      expect(closeSeen).toHaveBeenCalledWith({ code: INTENTIONAL_CLOSE })
+      expect(closeSeen).toHaveBeenCalledWith({
+        code: INTENTIONAL_CLOSE,
+        reason: 'the transport refused to close',
+        wasClean: false
+      })
       expect(socket.connection).toBeUndefined()
     })
 
@@ -333,7 +338,6 @@ describe('Socket connection lifecycle', () => {
         expect(transport.onmessage).toBeNull()
         expect(transport.onerror).toBeNull()
         expect(transport.onclose).toBeNull()
-        expect(socket.openTimeout).toBeUndefined()
       })
 
       it('announces the close it never got, so a wait on this connection ends', async () => {
@@ -344,7 +348,11 @@ describe('Socket connection lifecycle', () => {
         await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE)
         await closing
 
-        expect(closeSeen).toHaveBeenCalledWith({ code: INTENTIONAL_CLOSE })
+        expect(closeSeen).toHaveBeenCalledWith({
+          code: INTENTIONAL_CLOSE,
+          reason: 'the transport did not answer the close',
+          wasClean: false
+        })
       })
 
       it('leaves a connection installed during the wait wired and held', async () => {
@@ -355,7 +363,7 @@ describe('Socket connection lifecycle', () => {
 
         await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE - 1)
         const reopening = socket.reopenNow()
-        const replacement = fakeSockets[fakeSockets.length - 1]
+        const replacement = fakeSockets[1]
         await driveToHandshake(replacement)
         await reopening
 
@@ -376,7 +384,7 @@ describe('Socket connection lifecycle', () => {
 
         await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE - 1)
         const reopening = socket.reopenNow()
-        const replacement = fakeSockets[fakeSockets.length - 1]
+        const replacement = fakeSockets[1]
         await driveToHandshake(replacement)
         await reopening
 
@@ -400,7 +408,7 @@ describe('Socket connection lifecycle', () => {
 
         await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE - 1)
         const reopening = socket.reopenNow()
-        const replacement = fakeSockets[fakeSockets.length - 1]
+        const replacement = fakeSockets[1]
         await driveToHandshake(replacement)
         await reopening
 
@@ -430,6 +438,121 @@ describe('Socket connection lifecycle', () => {
         expect(messageSeen).not.toHaveBeenCalled()
         expect(socket.lastPing).toBe(stampAtClose)
       })
+    })
+  })
+
+  /**
+   * A close shares the driver with the reopen machinery, and each of these pins
+   * one way that interplay goes wrong: a reopen the close should have cancelled
+   * surviving it, a close ending on the wrong socket's event, and an open left
+   * hanging by the teardown.
+   */
+  describe('close racing a reopen', () => {
+    it('deletes the pending reopen it cancels, so a later close can schedule one again', async () => {
+      transport.close(1006)
+      expect(socket.openTimeout).toBeDefined()
+
+      await socket.close()
+      expect(socket.openTimeout).toBeUndefined()
+
+      // A reopen still arms on the next connection: the field being left set
+      // would read as "already scheduled" to every reopen from here on.
+      const reopened = await openFakeConnection(socket)
+      reopened.close(1006)
+      expect(socket.openTimeout).toBeDefined()
+    })
+
+    it('does not let a reopen armed during the wait survive it', async () => {
+      // The peer answers the close with its own code rather than echoing 4000,
+      // which real sockets do — and a code that is not 4000 arms a reopen.
+      transport.answersClose = false
+      const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+      await jest.advanceTimersByTimeAsync(0)
+
+      transport.onclose?.({ code: 1006 })
+      await closing
+
+      expect(socket.openTimeout).toBeUndefined()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      expect(fakeSockets).toHaveLength(1)
+    })
+
+    it('is not ended by a different socket closing', async () => {
+      transport.answersClose = false
+      const settled = jest.fn()
+      const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE).then(settled)
+      await jest.advanceTimersByTimeAsync(0)
+
+      const reopening = socket.reopenNow()
+      const replacement = fakeSockets[1]
+      await driveToHandshake(replacement)
+      await reopening
+
+      // The replacement's own close is none of this wait's business: only the
+      // socket close() asked to close can end it.
+      replacement.close(INTENTIONAL_CLOSE)
+      await jest.advanceTimersByTimeAsync(0)
+      expect(settled).not.toHaveBeenCalled()
+
+      await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE)
+      await closing
+      expect(settled).toHaveBeenCalled()
+    })
+
+    it('rejects a pending open rather than hanging it when the connecting socket is closed', async () => {
+      transport.readyState = CLOSED
+      const opening = socket.open()
+      const connecting = fakeSockets[1]
+      expect(connecting.readyState).toBe(CONNECTING)
+
+      await socket.close()
+
+      await expect(opening).rejects.toThrow('[ddp] connection closed before it opened')
+      expect(socket.connection).toBeUndefined()
+    })
+
+    it('leaves the next open free to build a socket when it interrupted a forced reconnect', async () => {
+      const reopening = socket.reopenNow()
+      const closing = socket.close()
+      await jest.advanceTimersByTimeAsync(0)
+      await closing
+
+      const opening = socket.open()
+      await jest.advanceTimersByTimeAsync(REOPEN_NOW_DEADLINE)
+      await reopening
+
+      const rebuilt = fakeSockets[2]
+      expect(rebuilt).toBeDefined()
+      await driveToHandshake(rebuilt)
+      await expect(opening).resolves.toBe(rebuilt)
+    })
+
+    it('never writes its unsubscribes to a replacement installed during the wait', async () => {
+      // The unsub close fires queues behind this resubscribe on the same id, so
+      // it only runs after the reopen below has installed the replacement.
+      const id = 'sub-1'
+      const first = socket.subscribe('stream-room-messages', ['GENERAL'], undefined, id)
+      transport.receive({ msg: 'ready', subs: [id] })
+      await first
+
+      const resubscribing = socket.subscribe('stream-room-messages', ['GENERAL'], undefined, id)
+      expect(transport.lastSent()).toMatchObject({ msg: 'sub', id })
+
+      transport.answersClose = false
+      const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+      await jest.advanceTimersByTimeAsync(0)
+
+      const reopening = socket.reopenNow()
+      const replacement = fakeSockets[1]
+      await driveToHandshake(replacement)
+      await reopening
+      await resubscribing
+
+      await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE)
+      await closing
+
+      const messagesOnReplacement = replacement.sent.map((data) => JSON.parse(data))
+      expect(messagesOnReplacement.filter((data) => data.msg === 'unsub')).toEqual([])
     })
   })
 
