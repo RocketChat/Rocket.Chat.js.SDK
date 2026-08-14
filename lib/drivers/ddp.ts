@@ -37,6 +37,13 @@ const userDisconnectCloseCode = 4000;
 const socketOpen = 1;
 const socketClosed = 3;
 
+/**
+ * How long either question about a socket that still reads as open waits for
+ * the peer before the SDK answers it: whether the socket is alive, and whether
+ * it has closed.
+ */
+const defaultSocketDeadline = 2000;
+
 const abandonedByReopen = '[ddp] connection reopened before the response arrived'
 const abandonedByClose = '[ddp] connection closed before the response arrived'
 const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
@@ -232,7 +239,7 @@ export class Socket extends SDKEventEmitter {
    * `probe` rather than `config.timeout`: both ask how long is too long to still
    * call a socket alive, not how long a caller will wait for an answer.
    */
-  close = async (deadlineMs = 2000) => {
+  close = async (deadlineMs = defaultSocketDeadline) => {
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
     this.openTimeout && clearTimeout(this.openTimeout as any)
@@ -363,7 +370,7 @@ export class Socket extends SDKEventEmitter {
    * Bounded liveness check for a socket in the gray zone. Returns true only if
    * the socket is open and the server answers the ping within the deadline.
    */
-  probe = (timeoutMs = 2000): Promise<boolean> => {
+  probe = (timeoutMs = defaultSocketDeadline): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
       if (!this.connection || this.connection.readyState !== socketOpen) {
         return resolve(false)
