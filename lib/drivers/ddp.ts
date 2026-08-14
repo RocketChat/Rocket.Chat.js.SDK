@@ -249,12 +249,61 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Disconnect the DDP from server and clear all subscriptions.
+   * Whether a different connection now stands where this one did. Having no
+   * connection installed at all does not count: nothing took its place.
+   */
+  private replaced = (connection?: WebSocket) =>
+    this.connection !== undefined && this.connection !== connection
+
+  /**
+   * Ask the transport to close and wait for the close event it owes back, up to
+   * `deadlineMs`. Past that, or when the transport refuses to close at all, the
+   * driver answers the question itself.
+   */
+  private waitForClose = (connection: WebSocket, deadlineMs: number) =>
+    new Promise<void>((resolve) => {
+      let settled = false
+      const stopWaiting = () => {
+        if (settled) return false
+        settled = true
+        this.off('close', acceptTransportClose)
+        clearTimeout(deadline as any)
+        return true
+      }
+
+      const acceptTransportClose = () => {
+        if (stopWaiting()) resolve()
+      }
+
+      const announceCloseOurselves = () => {
+        if (!stopWaiting()) return
+        if (!this.replaced(connection)) this.emit('close', { code: userDisconnectCloseCode })
+        resolve()
+      }
+
+      this.once('close', acceptTransportClose)
+      const deadline = setTimeout(announceCloseOurselves, deadlineMs)
+
+      try {
+        connection.close(userDisconnectCloseCode)
+      } catch (err) {
+        this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
+        announceCloseOurselves()
+      }
+    })
+
+  /**
+   * Disconnect the DDP from server and clear all subscriptions, unless a reopen
+   * during the wait installed a different connection over this one: that socket
+   * and the subscriptions it filled are left as they are.
    *
    * The wait for the transport's close event is bounded, and past that Deadline
    * the socket is left detached rather than waited on further. The driver emits
    * the close itself there, so a wait that depended on this connection learns it
-   * ended on the same event the transport would have used. `deadlineMs` follows
+   * ended on the same event the transport would have used — unless a reopen
+   * replaced this connection meanwhile, which already emitted `disconnected`
+   * for those waits and leaves a live socket no close should be claimed for.
+   * `deadlineMs` follows
    * `probe` rather than `config.timeout`: both ask how long is too long to still
    * call a socket alive, not how long a caller will wait for an answer.
    */
@@ -266,39 +315,17 @@ export class Socket extends SDKEventEmitter {
 
     const connection = this.connection
     if (connection && connection.readyState !== socketClosed) {
-      await new Promise<void>((resolve) => {
-        let settled = false
-        const settle = (announceClose: boolean) => {
-          if (settled) return
-          settled = true
-          this.off('close', onTransportClose)
-          clearTimeout(deadline as any)
-          if (announceClose) this.emit('close', { code: userDisconnectCloseCode })
-          resolve()
-        }
-
-        const onTransportClose = () => settle(false)
-        this.once('close', onTransportClose)
-
-        const deadline = setTimeout(() => settle(true), deadlineMs)
-
-        try {
-          connection.close(userDisconnectCloseCode)
-        } catch (err) {
-          this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
-          settle(true)
-        }
-      })
+      await this.waitForClose(connection, deadlineMs)
     }
 
-    // A reopen during the wait installs a new connection over this one, so an
-    // unconditional teardown here would strip the wrong socket and drop the
-    // driver's only reference to the live one.
-    if (connection && connection === this.connection) {
+    const replaced = this.replaced(connection)
+
+    if (connection && !replaced) {
       this.detach(connection)
       delete this.connection
-      this.forgetAllSubscriptions()
     }
+
+    if (!replaced) this.forgetAllSubscriptions()
   }
 
   /** Drop one DDP subscription. */
@@ -681,8 +708,9 @@ export class Socket extends SDKEventEmitter {
    *
    * Sole owner of `subscriptions`: the entry is written when the server
    * acknowledged the `sub`, or when its answer was abandoned after the frame went
-   * out. A refused `sub`, and one that never reached the wire, leave nothing
-   * behind. See ADR-0006.
+   * out on a connection that is still installed. A refused `sub`, one that never
+   * reached the wire, and one whose connection is gone leave nothing behind.
+   * See ADR-0006.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -702,13 +730,18 @@ export class Socket extends SDKEventEmitter {
       })
   }
 
-  /** Write the entry that instructs `subscribeAll` to establish this stream. */
+  /**
+   * Write the entry that instructs `subscribeAll` to establish this stream.
+   * A stream only belongs to an installed connection, so with none there is
+   * nothing for a later login to re-establish.
+   */
   private rememberSubscription = (
     id: string,
     name: string,
     params: any[],
     callback?: ISocketMessageCallback
   ) => {
+    if (!this.connection) return
     const unsubscribe = this.unsubscribe.bind(this, id)
     const onEvent = this.onEvent.bind(this, name)
     const subscription = { id, name, params, unsubscribe, onEvent }

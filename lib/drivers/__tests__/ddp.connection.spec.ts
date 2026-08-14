@@ -36,10 +36,10 @@ const REOPEN_NOW_DEADLINE = 7000
 
 /**
  * The bound the tests below hand `close` for its wait on the transport's close
- * event. Deliberately not the 2000 default, and distinct from every other delay
- * in this file, so an assertion on it passes only if the argument was read.
+ * event. Distinct from every other delay in this file, so an assertion on it
+ * passes only if the argument was read.
  */
-const CLOSE_DEADLINE = 5000
+const OVERRIDDEN_CLOSE_DEADLINE = 5000
 
 /**
  * The ping interval is pushed far beyond every advance in this file on purpose:
@@ -275,12 +275,22 @@ describe('Socket connection lifecycle', () => {
       socket.on('close', closeSeen)
 
       const settled = jest.fn()
-      socket.close(CLOSE_DEADLINE).then(settled)
+      socket.close(OVERRIDDEN_CLOSE_DEADLINE).then(settled)
       await jest.advanceTimersByTimeAsync(0)
 
       expect(settled).toHaveBeenCalled()
       expect(closeSeen).toHaveBeenCalledWith({ code: INTENTIONAL_CLOSE })
       expect(socket.connection).toBeUndefined()
+    })
+
+    it('leaves no subscription behind for a sub it abandoned', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+
+      await socket.close()
+      await subscribing
+
+      expect(socket.connection).toBeUndefined()
+      expect(socket.subscriptions).toEqual({})
     })
 
     describe('when the peer never answers', () => {
@@ -291,9 +301,9 @@ describe('Socket connection lifecycle', () => {
       it('settles on the deadline it was given instead of waiting for a close that never arrives', async () => {
         const settled = jest.fn()
 
-        socket.close(CLOSE_DEADLINE).then(settled)
+        socket.close(OVERRIDDEN_CLOSE_DEADLINE).then(settled)
 
-        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE - 1)
         expect(settled).not.toHaveBeenCalled()
 
         await jest.advanceTimersByTimeAsync(1)
@@ -301,13 +311,13 @@ describe('Socket connection lifecycle', () => {
       })
 
       it('drops the socket, so a second close waits for nothing', async () => {
-        const closing = socket.close(CLOSE_DEADLINE)
-        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+        await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE)
         await closing
         expect(socket.connection).toBeUndefined()
 
         const settled = jest.fn()
-        socket.close(CLOSE_DEADLINE).then(settled)
+        socket.close(OVERRIDDEN_CLOSE_DEADLINE).then(settled)
         await jest.advanceTimersByTimeAsync(0)
 
         expect(settled).toHaveBeenCalled()
@@ -315,8 +325,8 @@ describe('Socket connection lifecycle', () => {
       })
 
       it('detaches the socket, so a peer that revives reaches nothing', async () => {
-        const closing = socket.close(CLOSE_DEADLINE)
-        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+        await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE)
         await closing
 
         expect(transport.onopen).toBeNull()
@@ -330,17 +340,20 @@ describe('Socket connection lifecycle', () => {
         const closeSeen = jest.fn()
         socket.on('close', closeSeen)
 
-        const closing = socket.close(CLOSE_DEADLINE)
-        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+        await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE)
         await closing
 
         expect(closeSeen).toHaveBeenCalledWith({ code: INTENTIONAL_CLOSE })
       })
 
       it('leaves a connection installed during the wait wired and held', async () => {
-        const closing = socket.close(CLOSE_DEADLINE)
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
 
-        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+
+        await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE - 1)
         const reopening = socket.reopenNow()
         const replacement = fakeSockets[fakeSockets.length - 1]
         await driveToHandshake(replacement)
@@ -352,12 +365,40 @@ describe('Socket connection lifecycle', () => {
         expect(socket.connection).toBe(replacement)
         expect(replacement.onclose).not.toBeNull()
         expect(replacement.onmessage).not.toBeNull()
+        expect(closeSeen).not.toHaveBeenCalled()
+      })
+
+      it('announces no close for a connection it did not close, so sends on the replacement survive', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+
+        const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+
+        await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE - 1)
+        const reopening = socket.reopenNow()
+        const replacement = fakeSockets[fakeSockets.length - 1]
+        await driveToHandshake(replacement)
+        await reopening
+
+        const calling = socket.call('getRoomByTypeAndName')
+        const { id } = replacement.lastSent()
+
+        await jest.advanceTimersByTimeAsync(1)
+        await closing
+
+        replacement.receive({ msg: 'result', id, result: 'answered' })
+
+        await expect(calling).resolves.toBe('answered')
+        expect(closeSeen).not.toHaveBeenCalled()
       })
 
       it('leaves the subscriptions of a connection installed during the wait alone', async () => {
-        const closing = socket.close(CLOSE_DEADLINE)
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
 
-        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+
+        await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE - 1)
         const reopening = socket.reopenNow()
         const replacement = fakeSockets[fakeSockets.length - 1]
         await driveToHandshake(replacement)
@@ -372,6 +413,7 @@ describe('Socket connection lifecycle', () => {
         await closing
 
         expect(Object.keys(socket.subscriptions)).toEqual([id])
+        expect(closeSeen).not.toHaveBeenCalled()
       })
 
       it('is not kept alive by a revived peer it has already detached', async () => {
@@ -379,8 +421,8 @@ describe('Socket connection lifecycle', () => {
         const messageSeen = jest.fn()
         socket.on('updated', messageSeen)
 
-        const closing = socket.close(CLOSE_DEADLINE)
-        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+        await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE)
         await closing
 
         transport.receive({ msg: 'updated' })

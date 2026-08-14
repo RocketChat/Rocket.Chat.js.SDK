@@ -74,14 +74,12 @@ export class FakeWebSocket {
 
   /**
    * Set to false for a socket whose peer is gone: `close` is recorded, but no
-   * close event ever comes back and the state stays as it was. The only way to
-   * reach the driver's wait for a close that never arrives.
+   * close event ever comes back and the state stays as it was.
    */
   answersClose: boolean = true
 
   /**
-   * Set to make `close` throw instead of recording the code — the only way to
-   * reach the driver's branch for a transport that refuses to close at all.
+   * Set to make `close` throw instead of recording the code.
    */
   closeError: Error | null = null
 
