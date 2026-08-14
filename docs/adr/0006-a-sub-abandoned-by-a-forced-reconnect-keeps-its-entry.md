@@ -50,10 +50,15 @@ The server's answer decides; silence keeps the instruction.
   server confirmed, and also when the connection ended before the answer came,
   under the id the request was sent with. A `sub` the server refused with a
   `nosub` carrying a DDP error still leaves nothing behind.
-- A `sub` that never reached the wire leaves nothing behind. A failed write, and
-  a send that expired waiting for the connection to open, are both cases where
-  the server cannot have acted on the request. The entry is written only when
-  the frame went out and no answer came.
+- A `sub` that was never written to the transport leaves nothing behind. A failed
+  write, and a send that expired waiting for the connection to open, are both
+  cases where the server cannot have acted on the request. The entry is written
+  only when the frame was written to the transport and no answer came.
+- Written to the transport is not the same as delivered. A send on a Socket that
+  is Transport open while the Liveness chain has lapsed writes a frame the peer
+  may never read, and that write keeps an entry. The entry is an instruction to
+  establish the stream, not a claim the server holds it, so a stream the server
+  never saw is established by the re-subscribe rather than duplicated by it.
 - That line is drawn by where the rejection comes from, not by which event ended
   the connection. `send` abandons a wait in two places: before the frame is
   written, where it throws a bare `AbandonedWait`, and after, from the listeners

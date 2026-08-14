@@ -435,8 +435,6 @@ export class Socket extends SDKEventEmitter {
     // is never written to a successor: the DDP session, and any Login on it, is
     // the old connection's.
     const connection = this.connection
-    // Transport open, not `connected`: `connected` folds in the Liveness chain,
-    // and a quiet-but-open socket will not emit `open` again.
     if (!this.transportOpen) {
       await this.waitForOpen()
       if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)

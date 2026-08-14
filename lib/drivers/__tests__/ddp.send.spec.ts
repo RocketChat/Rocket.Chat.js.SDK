@@ -212,11 +212,9 @@ describe('Socket.send', () => {
     })
 
     it('sends on the open socket it already has when the last ping has gone stale', async () => {
-      // The reported shape, reached the way the driver reaches it rather than by
-      // assigning the stamp: the ping goes unanswered, so the chain schedules a
-      // reopen and `alive()` lapses — while the transport stays open. The
-      // pending `openTimeout` is the part that bites, because it suppresses any
-      // further reopen, so no `open` event is coming for a send to wait on.
+      // An unanswered ping lapses `alive()` and schedules a reopen, while the
+      // transport stays open. The pending `openTimeout` suppresses any further
+      // reopen, so no `open` event is coming for a send to wait on.
       await jest.advanceTimersByTimeAsync(socket.config.ping * 2 + 1)
 
       expect(socket.openTimeout).toBeDefined()
