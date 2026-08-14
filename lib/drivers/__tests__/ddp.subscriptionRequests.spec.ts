@@ -1,5 +1,5 @@
 import { Socket } from '../ddp'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   FakeWebSocket,
   flushMicrotasks,
@@ -25,7 +25,7 @@ describe('one sub or unsub in flight per DDP subscription', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = new Socket({ host: 'localhost:3000', logger: silentLogger })
+    socket = new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
     transport = await openFakeConnection(socket)
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
     transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })

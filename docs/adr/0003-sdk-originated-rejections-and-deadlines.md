@@ -201,3 +201,12 @@ an Error that the SDK writes.
   code, so an in-flight `send` learns its connection ended on the same event the
   transport would have used and no Reopen follows — the driver standing in for the
   transport's event, on the same rule as the Connected echo.
+- **Third amendment.** The second amendment says a send waiting on a connection
+  that stays open and merely quiet is unaffected, and that its Deadline still
+  bounds it. Neither holds now. Whether `send` waits at all is decided on the
+  transport's own state, so a send on a Transport open Socket does not wait: it
+  is written to that connection at once, and `waitForOpen` — the only Deadline
+  in this path — is never reached. What the second amendment decided is
+  unchanged, because the connection is read before the write either way. What
+  changes is that a quiet connection is no longer a bounded case at all. The
+  rule is the one the first amendment states: the connection, not a clock.

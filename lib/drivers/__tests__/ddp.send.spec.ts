@@ -1,6 +1,6 @@
 import { Socket } from '../ddp'
 import * as settings from '../../settings'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
   FakeWebSocket,
@@ -18,7 +18,7 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
+const createSocket = () => new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
 
 describe('the transport seam', () => {
   it('constructs the transport with the driver arguments and the shared headers', async () => {
@@ -211,6 +211,28 @@ describe('Socket.send', () => {
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
     })
 
+    it('sends on the open socket it already has when the last ping has gone stale', async () => {
+      // An unanswered ping lapses `alive()` and schedules a reopen, while the
+      // transport stays open. The pending `openTimeout` suppresses any further
+      // reopen, so no `open` event is coming for a send to wait on.
+      await jest.advanceTimersByTimeAsync(socket.config.ping * 2 + 1)
+
+      expect(socket.openTimeout).toBeDefined()
+      expect(socket.connected).toBe(false)
+      expect(socket.transportOpen).toBe(true)
+      expect(fakeSockets).toHaveLength(1)
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+
+      expect(transport.lastSent()).toEqual({
+        msg: 'method', method: 'getUsersOfRoom', params: [], id: 'ddp-2'
+      })
+
+      transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+      await expect(sending).resolves.toMatchObject({ result: 'ok' })
+      expect(fakeSockets).toHaveLength(1)
+    })
+
     it('rejects the send when there is no connection at all', async () => {
       // The guard used to sit inside an async promise executor, which dropped
       // the throw as an unhandled rejection instead of failing the caller.
@@ -238,7 +260,7 @@ describe('Socket.send with several listeners on one event', () => {
 
   const createSocket = () => new Socket({
     host: 'localhost:3000',
-    logger: silentLogger,
+    logger: createSilentLogger(),
     reopen: REOPEN_DELAY,
     ping: 10 * 60 * 1000
   })

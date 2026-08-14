@@ -1,12 +1,11 @@
 import { DDPDriver } from '../ddp'
 import { ISocketOptions } from '../../../interfaces'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
   driveToHandshake,
   FakeWebSocket,
   fakeSockets,
-  OPEN,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -20,7 +19,7 @@ useFakeClockAndSocketRegistry()
 // Typed rather than `object`: the option names have to typecheck, or the pin on
 // the discarded timeout would go green against a typo.
 const createDriver = (options: ISocketOptions = {}) =>
-  new DDPDriver({ host: 'localhost:3000', logger: silentLogger, ...options })
+  new DDPDriver({ host: 'localhost:3000', logger: createSilentLogger(), ...options })
 
 /**
  * Accepted gaps, on the record rather than silently skipped:
@@ -137,10 +136,7 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
     const reopening = driver.reopenNow()
     const reopened = fakeSockets[fakeSockets.length - 1]
     expect(reopened).not.toBe(transport)
-    reopened.readyState = OPEN
-    reopened.onopen?.({})
-    await jest.advanceTimersByTimeAsync(0)
-    reopened.receive({ msg: 'connected', session: 'reopened-session' })
+    await driveToHandshake(reopened, 'reopened-session')
     await reopening
 
     const waiting = driver.waitForNotifyUserMediaSubs()

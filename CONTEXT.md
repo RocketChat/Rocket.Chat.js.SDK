@@ -62,6 +62,10 @@ _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry.
 _Avoid_: Sub, subscription (unqualified), the map, the collection (that is a field on an incoming DDP message)
 
+**Abandoned sub**:
+A DDP subscription whose `sub` reached the wire but whose DDP response the connection ended before delivering. The server may have acted on it, so its entry is kept and re-established rather than forgotten.
+_Avoid_: Lost subscription, orphaned stream, phantom
+
 **Method call**:
 A named server procedure invoked over the realtime connection, as opposed to a REST request.
 _Avoid_: RPC, command
@@ -81,8 +85,12 @@ _Avoid_: Reconnect (unqualified — say which of the two), retry
 The Driver re-emitting its Socket's open as a single `connected` event. One open means one `connected`, however many times a caller asked the Driver to connect.
 _Avoid_: Connect event, ready
 
+**Transport open**:
+What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its transport reports it open — not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive.
+_Avoid_: Open (unqualified), ready, readyState
+
 **Liveness chain**:
-The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. A Socket the server has stopped answering still reads as open to the transport.
+The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. A Socket that is Transport open can still be dead.
 _Avoid_: Heartbeat, keepalive
 
 **Probe**:
