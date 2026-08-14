@@ -286,9 +286,8 @@ export class Socket extends SDKEventEmitter {
     if (connection && connection === this.connection) {
       this.detach(connection)
       delete this.connection
+      this.forgetAllSubscriptions()
     }
-
-    this.forgetAllSubscriptions()
   }
 
   /** Drop one DDP subscription. */

@@ -358,6 +358,26 @@ describe('Socket connection lifecycle', () => {
         expect(replacement.onmessage).not.toBeNull()
       })
 
+      it('leaves the subscriptions of a connection installed during the wait alone', async () => {
+        const closing = socket.close(CLOSE_DEADLINE)
+
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        const reopening = socket.reopenNow()
+        const replacement = fakeSockets[fakeSockets.length - 1]
+        await driveToHandshake(replacement)
+        await reopening
+
+        const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+        const { id } = replacement.lastSent()
+        replacement.receive({ msg: 'ready', subs: [id] })
+        await subscribing
+
+        await jest.advanceTimersByTimeAsync(1)
+        await closing
+
+        expect(Object.keys(socket.subscriptions)).toEqual([id])
+      })
+
       it('is not kept alive by a revived peer it has already detached', async () => {
         const stampAtClose = socket.lastPing
         const messageSeen = jest.fn()
