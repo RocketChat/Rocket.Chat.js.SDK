@@ -1,0 +1,21 @@
+{
+  "name": "exports-proto-consumer",
+  "version": "0.0.0",
+  "private": true,
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@babel/preset-env": "^7.25.0",
+    "@babel/preset-typescript": "^7.24.0",
+    "@types/node": "^25.9.5",
+    "babel-jest": "^30.0.0",
+    "jest": "^30.0.0",
+    "metro": "0.83.3",
+    "metro-config": "0.83.3",
+    "metro-core": "0.83.3",
+    "metro-runtime": "0.83.3",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@rocket.chat/sdk": "github:RocketChat/Rocket.Chat.js.SDK#mobile"
+  }
+}
