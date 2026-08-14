@@ -26,7 +26,7 @@
     "typescript"
   ],
   "scripts": {
-    "lint": "oxlint --max-warnings=11",
+    "lint": "oxlint",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "test": "TZ=UTC jest",
     "test:watch": "TZ=UTC jest --watch",
