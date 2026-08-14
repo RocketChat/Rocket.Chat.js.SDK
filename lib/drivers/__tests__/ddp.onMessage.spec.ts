@@ -1,5 +1,6 @@
 import { Socket } from '../ddp'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
+import { ILogger } from '../../../interfaces'
 
 // `onMessage` is handed frames directly — no socket is constructed and no timer
 // is started, so this file runs on Jest's default real timers.
@@ -13,9 +14,11 @@ describe('Socket.onMessage', () => {
   // A fresh Socket per test: every case attaches listeners, and the emitter
   // keeps them for the life of the instance.
   let socket: Socket
+  let logger: ILogger
 
   beforeEach(() => {
-    socket = new Socket({ host: 'localhost:3000', logger: silentLogger })
+    logger = createSilentLogger()
+    socket = new Socket({ host: 'localhost:3000', logger })
   })
 
   it('emits the collection, the message type and the id from a single frame', () => {
@@ -106,10 +109,10 @@ describe('Socket.onMessage', () => {
 
     expect(() => socket.onMessage({ data: 'not json' })).not.toThrow()
 
-    expect(silentLogger.error).toHaveBeenCalledWith(
+    expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('[ddp] JSON parse error')
     )
-    expect(silentLogger.error).toHaveBeenCalledWith(
+    expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('not json')
     )
     expect(listener).not.toHaveBeenCalled()

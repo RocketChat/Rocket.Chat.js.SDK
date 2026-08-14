@@ -1,5 +1,6 @@
 import { Socket } from '../ddp'
-import { silentLogger } from '../../../test/silentLogger'
+import { ILogger } from '../../../interfaces'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
   driveToHandshake,
@@ -39,9 +40,9 @@ const REOPEN_NOW_DEADLINE = 7000
  * assertions below are about. Nothing here is arithmetic about pinging — see
  * `ddp.liveness.spec.ts` for that.
  */
-const createSocket = () => new Socket({
+const createSocket = (logger: ILogger) => new Socket({
   host: 'localhost:3000',
-  logger: silentLogger,
+  logger,
   reopen: REOPEN_DELAY,
   timeout: REOPEN_NOW_DEADLINE,
   ping: 10 * 60 * 1000
@@ -63,9 +64,11 @@ const createSocket = () => new Socket({
 describe('Socket connection lifecycle', () => {
   let socket: Socket
   let transport: FakeWebSocket
+  let logger: ILogger
 
   beforeEach(async () => {
-    socket = createSocket()
+    logger = createSilentLogger()
+    socket = createSocket(logger)
     transport = await openFakeConnection(socket)
   })
 
@@ -141,7 +144,7 @@ describe('Socket connection lifecycle', () => {
     it('replaces the predecessor even when tearing it down throws', async () => {
       transport.close = () => { throw new Error('teardown boom') }
 
-      const debug = silentLogger.debug as jest.Mock
+      const debug = logger.debug as jest.Mock
 
       const reopening = socket.reopenNow()
 
@@ -212,8 +215,7 @@ describe('Socket connection lifecycle', () => {
     it('logs rather than leaving checkAndReopen an unhandled rejection', async () => {
       // `checkAndReopen` opens without awaiting, so the rejection has nowhere to
       // go but the global handler of the consuming app.
-      const error = silentLogger.error as jest.Mock
-      error.mockClear()
+      const error = logger.error as jest.Mock
       transport.readyState = CLOSED
 
       socket.checkAndReopen()
@@ -235,7 +237,7 @@ describe('Socket connection lifecycle', () => {
       const failure = new Error('transport unavailable')
       jest.spyOn(fakeTransportModule, 'default').mockImplementation(() => { throw failure })
 
-      const error = silentLogger.error as jest.Mock
+      const error = logger.error as jest.Mock
 
       // The existing socket has to stop being connected first, or `open` short
       // circuits before it ever constructs anything.

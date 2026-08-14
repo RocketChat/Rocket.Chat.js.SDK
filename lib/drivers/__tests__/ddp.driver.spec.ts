@@ -1,6 +1,6 @@
 import { DDPDriver } from '../ddp'
 import { ISocketOptions } from '../../../interfaces'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
   driveToHandshake,
@@ -19,7 +19,7 @@ useFakeClockAndSocketRegistry()
 // Typed rather than `object`: the option names have to typecheck, or the pin on
 // the discarded timeout would go green against a typo.
 const createDriver = (options: ISocketOptions = {}) =>
-  new DDPDriver({ host: 'localhost:3000', logger: silentLogger, ...options })
+  new DDPDriver({ host: 'localhost:3000', logger: createSilentLogger(), ...options })
 
 /**
  * Accepted gaps, on the record rather than silently skipped:
