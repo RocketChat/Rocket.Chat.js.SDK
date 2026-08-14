@@ -118,10 +118,7 @@ export class Socket extends SDKEventEmitter {
       // socket from later firing onClose and clobbering the live connection.
       if (this.connection) {
         try {
-          this.connection.onopen = null as any
-          this.connection.onmessage = null as any
-          this.connection.onerror = null as any
-          this.connection.onclose = null as any
+          this.detach(this.connection)
           this.connection.close(userDisconnectCloseCode)
         } catch (err) {
           this.logger.debug(`[ddp] open: previous connection teardown failed: ${(err as Error).message}`)
@@ -230,6 +227,17 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
+   * Unhook every handler from a socket, so nothing it does afterwards reaches
+   * this driver. Closing it is a separate obligation, left to the caller.
+   */
+  private detach = (connection: WebSocket) => {
+    connection.onopen = null as any
+    connection.onmessage = null as any
+    connection.onerror = null as any
+    connection.onclose = null as any
+  }
+
+  /**
    * Disconnect the DDP from server and clear all subscriptions.
    *
    * The wait for the transport's close event is bounded, and past that Deadline
@@ -274,12 +282,9 @@ export class Socket extends SDKEventEmitter {
 
     // A reopen during the wait installs a new connection over this one, so an
     // unconditional teardown here would strip the wrong socket and drop the
-    // driver's only reference to the live one. Same identity rule as `onClose`.
+    // driver's only reference to the live one.
     if (connection && connection === this.connection) {
-      connection.onopen = null as any
-      connection.onmessage = null as any
-      connection.onerror = null as any
-      connection.onclose = null as any
+      this.detach(connection)
       delete this.connection
     }
 
