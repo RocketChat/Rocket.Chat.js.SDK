@@ -1,6 +1,6 @@
 /**
- * @module Socket
- * Provides high-level helpers for DDP connection, method calls, subscriptions.
+ * @module contracts
+ * Realtime layer contracts: the ISocket and IDriver interfaces every driver implements.
  */
 
 import { EventEmitter } from 'tiny-events'
@@ -52,7 +52,5 @@ export interface IDriver {
   methodCall (method: string, ...args: any[]): Promise<any>
 }
 
-export enum Protocols {
-	MQTT = 'mqtt',
-	DDP = 'ddp'
-}
+export { Socket } from './ddp'
+export { DDPDriver } from './ddpDriver'
