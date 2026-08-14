@@ -50,10 +50,9 @@ class AbandonedWait extends Error {
 
 /**
  * An `AbandonedWait` for a request whose frame was already written, carrying the
- * id so a caller can name what the server may have acted on. See ADR-0005.
- * The prototype is restored by hand for the same reason DDPError restores its own.
+ * id so a caller can name what the server may have acted on. See ADR-0006.
  */
-export class AbandonedRequest extends AbandonedWait {
+class AbandonedRequest extends AbandonedWait {
   constructor (public id: string, message: string) {
     super(message)
     Object.setPrototypeOf(this, AbandonedRequest.prototype)
@@ -637,7 +636,7 @@ export class Socket extends SDKEventEmitter {
    * Sole owner of `subscriptions`: the entry is written when the server
    * acknowledged the `sub`, or when its answer was abandoned after the frame went
    * out. A refused `sub`, and one that never reached the wire, leave nothing
-   * behind. See ADR-0005.
+   * behind. See ADR-0006.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -645,8 +644,8 @@ export class Socket extends SDKEventEmitter {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
-        const id = (result.subs) ? result.subs[0] : undefined
-        if (id) return this.rememberSubscription(id, name, params, callback)
+        const confirmedId = (result.subs) ? result.subs[0] : undefined
+        if (confirmedId) return this.rememberSubscription(confirmedId, name, params, callback)
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)

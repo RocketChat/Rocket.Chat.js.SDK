@@ -1,8 +1,8 @@
-# ADR-0005: A `sub` abandoned by a forced reconnect keeps its entry
+# ADR-0006: A `sub` abandoned by a forced reconnect keeps its entry
 
 **Status:** Accepted
 
-**Succeeds:** ADR-0004
+**Succeeds:** ADR-0005
 
 ## Context
 
@@ -92,13 +92,11 @@ The server's answer decides; silence keeps the instruction.
   refuses: `unsubscribeAll` catches each failure, and `close` forgets everything
   regardless.
 - `DDPDriver.waitForNotifyUserMediaSubs` polls `subscriptions` for the two media
-  entries and treats their presence as readiness. An entry written on an
-  abandoned `sub` now satisfies that poll where it would previously have kept
-  waiting, so the readiness it reports can stand on a `sub` the server never
-  confirmed. That is the same trade this ADR makes everywhere else — the entry
-  names a stream the server probably has — but this reader turns it into a
-  signal rather than an instruction, and is the one place worth revisiting if
-  the signal proves too eager.
+  entries, and an entry written on an abandoned `sub` now ends that poll where
+  it would previously have kept waiting. Readiness itself is unchanged: the poll
+  only decides when to re-send, and the gate resolves on whether that resubscribe
+  was acknowledged. An abandoned one resolves `undefined`, which the gate counts
+  as unacknowledged.
 - ADR-0004's remaining open question is untouched: whether a `sub` may be sent
   for an id whose `unsub` is still in flight is still not settled, and the
   behaviour of the server in that case is still not known. This ADR does make

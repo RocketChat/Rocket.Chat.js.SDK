@@ -162,6 +162,22 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
+  it('keeps a subscription the socket closed under, on the same rule as a reopen', async () => {
+    // A close and a forced reopen are the same loss: the frame went out and the
+    // answer can never arrive. Both must leave the entry behind.
+    const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+    transport.close()
+    await expect(subscribing).resolves.toBeUndefined()
+
+    expect(socket.subscriptions['ddp-1']).toMatchObject({
+      id: 'ddp-1',
+      name: 'stream-room-messages',
+      params: ['GENERAL']
+    })
+  })
+
   describe('a subscription that never reached the wire', () => {
     // Three ways a `sub` fails without the server seeing it. None can leave a
     // stream behind, so none may leave an entry — only a connection that ends
