@@ -1,4 +1,4 @@
-import { Socket } from '../ddp'
+import { Socket } from '../index'
 import * as settings from '../../settings'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
