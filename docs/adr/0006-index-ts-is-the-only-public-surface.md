@@ -10,9 +10,9 @@ resolvable by a consuming app. `index.ts` itself exports two symbols, `settings`
 and `Rocketchat`. Nothing else is named there, and nothing stops a consuming app
 reaching past it.
 
-Rocket.Chat.ReactNative does reach past it. Two of its files import from
-`@rocket.chat/sdk/lib/drivers/ddp`: both take `DDPDriver`, one of them `Socket`
-as well. Both are tests; no application code deep-imports.
+Rocket.Chat.ReactNative does reach past it, importing `DDPDriver` and `Socket`
+from `@rocket.chat/sdk/lib/drivers/ddp`. That is a fact about the other
+repository, and nothing here can observe it or keep it true.
 
 The repository has also built for the practice. `clients/Rocketchat.ts` is a
 one-line re-export over a module whose only export is a default, so it forwards
@@ -36,10 +36,10 @@ internal, and changing or removing it is not a breaking change.
   the way, whatever it resolves to.
 - `clients/Rocketchat.ts` is deleted. A file whose only purpose is to serve a
   deep path is the practice this ADR bans, and it forwards nothing.
-- One exception stands: Rocket.Chat.ReactNative deep-imports
-  `@rocket.chat/sdk/lib/drivers/ddp` from test files only. A deep import from
-  application code is not covered by it. Recording the shape rather than the
-  file names keeps the exception true as the consuming app's tests move.
+- Rocket.Chat.ReactNative is expected to import `index.ts` and nothing else.
+  Its remaining deep imports of `lib/drivers/ddp` are what the retirement below
+  clears, and the `exports` map is what makes the expectation true. No exception
+  is written here, because this repository could not tell whether one still held.
 - The rule is unenforced convention until an `exports` map exists. Stating it
   changes what a reviewer may rely on, not what the resolver permits.
 
@@ -48,12 +48,12 @@ internal, and changing or removing it is not a breaking change.
 - A driver refactor no longer needs a survey of the consuming app. Whether a
   symbol is public is read off `index.ts`.
 
-- Retiring the exception takes three steps in order, and only the last makes the
-  rule real:
+- Retiring the remaining deep imports takes three steps in order, and only the
+  last makes the rule real:
 
   1. Widen `index.ts`. `ISocket` and `IDriver` in `lib/drivers/index.ts` are
      already the contracts for the realtime layer, and re-exporting them with
-     `Protocols` and the DDP driver gives the two test files a public path.
+     `Protocols` and the DDP driver gives those imports a public path.
   2. Move Rocket.Chat.ReactNative onto that path.
   3. Add an `exports` map to `package.json`. This is the step that turns the
      convention into resolution, and it breaks any consuming app still on a
@@ -64,4 +64,4 @@ internal, and changing or removing it is not a breaking change.
   differently from Node.
 
 - Until then a deep import still resolves and still compiles. Nothing reports
-  one, so the exception holds only as long as review keeps it.
+  one, so the rule holds only as long as review keeps it.

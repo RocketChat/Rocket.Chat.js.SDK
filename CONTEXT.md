@@ -96,3 +96,13 @@ _Avoid_: Timeout — that is a config option, and several Deadlines are derived 
 **Abandoned wait**:
 A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline — no clock decides it, the connection does. A DDP message waiting to be written is abandoned on the same rule: it belongs to the connection it was issued on and is never written to the one that replaces it.
 _Avoid_: Cancelled, timed out
+
+### Package
+
+**Public surface**:
+What a consuming app is supported in importing: the symbols `index.ts` exports, and nothing else. Everything the resolver additionally reaches is internal, and changing or removing it is not a breaking change.
+_Avoid_: Public API, exports (that is the `package.json` field), entry point (that is the Client)
+
+**Deep import**:
+An import by a path under the package rather than by the package name, such as `@rocket.chat/sdk/lib/drivers/ddp`. It resolves today because the package ships source with no `exports` map; it is never how something becomes part of the Public surface.
+_Avoid_: Subpath import, direct import
