@@ -363,17 +363,14 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
-  /** Check if there is a websocket and the transport reads it as open. */
   get transportOpen () {
     return !!(this.connection && this.connection.readyState === socketOpen)
   }
 
-  /** Check if websocket connected and ready. */
   get connected () {
     return this.transportOpen && this.alive()
   }
 
-  /** Check if connected and logged in */
   get loggedIn () {
     return (this.connected && !!this.resume)
   }
@@ -427,8 +424,8 @@ export class Socket extends SDKEventEmitter {
     // is never written to a successor: the DDP session, and any Login on it, is
     // the old connection's.
     const connection = this.connection
-    // The transport's own state, not `connected`: an open socket whose last ping
-    // went stale has no reason to emit `open`, so waiting on one strands the send.
+    // Transport open, not `connected`: `connected` folds in the Liveness chain,
+    // and a quiet-but-open socket will not emit `open` again.
     if (!this.transportOpen) {
       await this.waitForOpen()
       if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)

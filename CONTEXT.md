@@ -82,7 +82,7 @@ The Driver re-emitting its Socket's open as a single `connected` event. One open
 _Avoid_: Connect event, ready
 
 **Transport open**:
-What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when the transport has seen no close — which is not the same as anyone still answering on it. Being connected is Transport open and alive.
+What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its transport reports it open — not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive.
 _Avoid_: Open (unqualified), ready, readyState
 
 **Liveness chain**:

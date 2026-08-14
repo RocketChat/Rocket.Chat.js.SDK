@@ -51,7 +51,8 @@ an Error that the SDK writes.
   not on `connected`. `connected` folds in the Liveness chain, and a Socket that
   is Transport open and merely quiet will never emit `open` again, so a send that
   waits on one waits forever. A send on a Transport open Socket is written at
-  once, and the connection's own events, not this Deadline, end its wait.
+  once, and the connection's own events, not this Deadline, end its wait. The
+  second amendment says otherwise; the third amendment below corrects it.
 - `ping` races its send against a Deadline of `config.ping`. If the Deadline wins,
   `ping` calls `reopen()`. A `pong` that does not arrive therefore causes the
   reconnect that it always had to cause.
@@ -191,3 +192,12 @@ an Error that the SDK writes.
   answer, and `probe` asks how long is too long to still call the connection
   alive. `probe` takes its bound as an argument, so a caller that wants a
   different one passes it, and no option is needed to reach it.
+- **Third amendment.** The second amendment says a send waiting on a connection
+  that stays open and merely quiet is unaffected, and that its Deadline still
+  bounds it. Neither holds now. Whether `send` waits at all is decided on the
+  transport's own state, so a send on a Transport open Socket does not wait: it
+  is written to that connection at once, and `waitForOpen` — the only Deadline
+  in this path — is never reached. What the second amendment decided is
+  unchanged, because the connection is read before the write either way. What
+  changes is that a quiet connection is no longer a bounded case at all. The
+  rule is the one the first amendment states: the connection, not a clock.
