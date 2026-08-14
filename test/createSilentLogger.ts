@@ -5,10 +5,10 @@ import { ILogger } from '../interfaces'
  * and, being jest mocks, lets a spec assert on what was logged when that is the
  * behaviour under test.
  */
-export const silentLogger: ILogger = {
+export const createSilentLogger = (): ILogger => ({
   debug: jest.fn(),
   info: jest.fn(),
   warning: jest.fn(),
   warn: jest.fn(),
   error: jest.fn()
-}
+})

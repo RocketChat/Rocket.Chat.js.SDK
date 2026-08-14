@@ -48,6 +48,17 @@ class AbandonedWait extends Error {
   }
 }
 
+/**
+ * An `AbandonedWait` for a request whose frame was already written, carrying the
+ * id so a caller can name what the server may have acted on. See ADR-0006.
+ */
+class AbandonedRequest extends AbandonedWait {
+  constructor (public id: string, message: string) {
+    super(message)
+    Object.setPrototypeOf(this, AbandonedRequest.prototype)
+  }
+}
+
 /** Websocket handler class, manages connections and subscriptions by DDP */
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -467,7 +478,7 @@ export class Socket extends SDKEventEmitter {
         event,
         onAbandon: () => {
           removeListeners()
-          reject(new AbandonedWait(message))
+          reject(new AbandonedRequest(id, message))
         }
       }))
 
@@ -623,8 +634,10 @@ export class Socket extends SDKEventEmitter {
    * Subscribe to a stream on server via socket and returns a promise resolved
    * with the subscription object when the subscription is ready.
    *
-   * Sole owner of `subscriptions`: the entry is written on the server's
-   * acknowledgement, so a refused or unanswered `sub` leaves nothing behind.
+   * Sole owner of `subscriptions`: the entry is written when the server
+   * acknowledged the `sub`, or when its answer was abandoned after the frame went
+   * out. A refused `sub`, and one that never reached the wire, leave nothing
+   * behind. See ADR-0006.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -632,21 +645,31 @@ export class Socket extends SDKEventEmitter {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
-        const id = (result.subs) ? result.subs[0] : undefined
-        if (id) {
-          const unsubscribe = this.unsubscribe.bind(this, id)
-          const onEvent = this.onEvent.bind(this, name)
-          const subscription = { id, name, params, unsubscribe, onEvent }
-          if (callback) subscription.onEvent(callback)
-          this.subscriptions[id] = subscription
-          return subscription
-        }
+        const confirmedId = (result.subs) ? result.subs[0] : undefined
+        if (confirmedId) return this.rememberSubscription(confirmedId, name, params, callback)
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        // throw err
+        if (err instanceof AbandonedRequest) {
+          this.rememberSubscription(err.id, name, params, callback)
+        }
         return undefined
       })
+  }
+
+  /** Write the entry that instructs `subscribeAll` to establish this stream. */
+  private rememberSubscription = (
+    id: string,
+    name: string,
+    params: any[],
+    callback?: ISocketMessageCallback
+  ) => {
+    const unsubscribe = this.unsubscribe.bind(this, id)
+    const onEvent = this.onEvent.bind(this, name)
+    const subscription = { id, name, params, unsubscribe, onEvent }
+    if (callback) subscription.onEvent(callback)
+    this.subscriptions[id] = subscription
+    return subscription
   }
 
   /** Subscribe to all pre-configured streams (e.g. on login resume) */

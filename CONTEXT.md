@@ -62,6 +62,10 @@ _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry.
 _Avoid_: Sub, subscription (unqualified), the map, the collection (that is a field on an incoming DDP message)
 
+**Abandoned sub**:
+A DDP subscription whose `sub` reached the wire but whose DDP response the connection ended before delivering. The server may have acted on it, so its entry is kept and re-established rather than forgotten.
+_Avoid_: Lost subscription, orphaned stream, phantom
+
 **Method call**:
 A named server procedure invoked over the realtime connection, as opposed to a REST request.
 _Avoid_: RPC, command

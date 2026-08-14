@@ -1,8 +1,11 @@
 import { Socket } from '../ddp'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
+  CLOSED,
   FakeWebSocket,
   flushMicrotasks,
+  fakeSockets,
+  driveToHandshake,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -13,7 +16,7 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
+const createSocket = () => new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
 
 /**
  * What the subscription map holds, and when. The send plumbing underneath —
@@ -97,6 +100,115 @@ describe('Socket subscription bookkeeping', () => {
     expect(socket.subscriptions).toEqual({})
 
     transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+  })
+
+  describe('a subscription a reopen abandoned', () => {
+    it('is kept under the id it was sent with', async () => {
+      // The `sub` reached the wire and the server never answered it, so the
+      // server may have acted on it. Forgetting it here left the stream with no
+      // name: nothing to unsubscribe with, and nothing for `subscribeAll` to
+      // re-establish at the next login.
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+      socket.reopenNow()
+      await expect(subscribing).resolves.toBeUndefined()
+
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+      expect(socket.subscriptions['ddp-1']).toMatchObject({
+        id: 'ddp-1',
+        name: 'stream-room-messages',
+        params: ['GENERAL']
+      })
+    })
+
+    it('is re-established under that same id at the next login', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      socket.reopenNow()
+      await subscribing
+
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+
+      const framesBefore = reopened.sent.length
+      socket.subscribeAll()
+      await flushMicrotasks()
+
+      expect(reopened.sent.slice(framesBefore).map((frame) => JSON.parse(frame))).toEqual([{
+        msg: 'sub',
+        id: 'ddp-1',
+        name: 'stream-room-messages',
+        params: ['GENERAL']
+      }])
+    })
+
+    it('can be unsubscribed from, unlike one that was never written', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      socket.reopenNow()
+      await subscribing
+
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+
+      // Nothing to await: the point is that the `unsub` goes out at all. Without
+      // the entry, `unsubscribe` rejects up front and never reaches the wire.
+      const unsubscribing = socket.unsubscribe('ddp-1').catch((err) => err)
+      await flushMicrotasks()
+
+      expect(reopened.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+      reopened.receive({ msg: 'result', id: 'ddp-1', result: true })
+      await unsubscribing
+    })
+  })
+
+  it('keeps a subscription the socket closed under, on the same rule as a reopen', async () => {
+    // A close and a forced reopen are the same loss: the frame went out and the
+    // answer can never arrive. Both must leave the entry behind.
+    const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+    transport.close()
+    await expect(subscribing).resolves.toBeUndefined()
+
+    expect(socket.subscriptions['ddp-1']).toMatchObject({
+      id: 'ddp-1',
+      name: 'stream-room-messages',
+      params: ['GENERAL']
+    })
+  })
+
+  describe('a subscription that never reached the wire', () => {
+    // Three ways a `sub` fails without the server seeing it. None can leave a
+    // stream behind, so none may leave an entry — only a connection that ends
+    // *after* the frame went out does.
+
+    it('holds nothing when the transport failed to write it', async () => {
+      transport.sendError = new Error('socket closed under the write')
+
+      await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+
+      expect(socket.subscriptions).toEqual({})
+    })
+
+    it('holds nothing when the send expired waiting for the connection', async () => {
+      // Not connected and never opening: the send never gets to compose a frame.
+      transport.readyState = CLOSED
+
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      await jest.advanceTimersByTimeAsync(socket.config.reopen * 2 + 1)
+
+      await expect(subscribing).resolves.toBeUndefined()
+      expect(socket.subscriptions).toEqual({})
+    })
+
+    it('holds nothing when the socket was never opened', async () => {
+      const unopened = createSocket()
+
+      await expect(unopened.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+
+      expect(unopened.subscriptions).toEqual({})
+    })
   })
 
   it('rejects with an Error naming the id when unsubscribing from something not in the map', async () => {
