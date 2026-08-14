@@ -71,7 +71,10 @@ an Error that the SDK writes.
   with a server reason goes through `toError` under ADR-0001. A rejection with a
   reason from the Socket passes that error through. A rejection that the SDK
   decides on, with no reason to carry, is a plain Error with a fixed message under
-  this ADR.
+  this ADR. One exception, added by the amendment below: a wait that a connection
+  going away abandoned carries a subclass of Error, because the driver itself
+  branches on it. It is a plain Error to every caller, and ADR-0004 still reads it
+  as one — the subclass is not a DDPError and does not carry a server reason.
 
 ## Consequences
 
@@ -86,11 +89,52 @@ an Error that the SDK writes.
   for the Liveness chain therefore also lowers the bound on the wait for the
   `pong`. The documentation of the option says this at `interfaces/index.ts`.
 - `send` still has **no** Deadline for the DDP response, and this ADR does not give
-  `send` one. A Method call on a Socket that is open and dead still waits without
-  end, while the server holds the connection and answers nothing. Something else
-  must end that wait: a close, or the Liveness chain. This ADR states the gap and
-  does not hide it. To close the gap, a person must choose a bound for each call,
-  and that choice is a separate decision about the public surface of the SDK.
+  `send` one. A Method call on a Socket that is open and dead does not wait on a
+  timer. Something else must end that wait: a close, or the Liveness chain. To put
+  a bound on the call itself, a person must choose that bound for each call, and
+  that choice is a separate decision about the public surface of the SDK.
+- **Amendment.** The sentence above named a close and the Liveness chain as the
+  escape from that wait, and neither was one. `send` listened for `disconnected`
+  alone, and `reopenNow` is the only place that emits it. A close and the Reopen
+  that the Liveness chain schedules each replaced the connection without that
+  event, so each stranded every send written to the connection it replaced — for
+  the life of the process, holding the caller's promise and leaking its listeners.
+  `send` now ends the wait on `close` and `connecting` as well. Both were already
+  emitted, by `onClose` and by `createConnection`, so no new event and no new
+  public surface answers this. The rule is the connection, not a clock: a DDP
+  response can only arrive on the connection its message went out on, so the wait
+  ends when that connection does. A Reopen rejects with
+  `'[ddp] connection reopened before the response arrived'`, and a close with
+  `'[ddp] connection closed before the response arrived'` — a close is not a
+  Reopen, and a caller retrying on the wrong one retries into a closed Socket.
+  This is not a Deadline, and the paragraph above still holds: nothing here bounds
+  a Method call on a connection that stays up and stays silent.
+  One window stays open to all three events: `send` attaches its listeners a
+  microtask after `waitForOpen` resolves, so a connection lost in between is
+  announced to nobody, and a guard at that point abandons the wait instead. The
+  guard reads `readyState`, not `connected`: `connected` is bookkeeping the SDK
+  updates when the events land, and in this window they have not landed, so only
+  the transport knows whether the connection went away. Reading `connected` there
+  also folds in `alive()`, which would abandon a send on a socket that is open and
+  merely quiet — and, because an abandoned wait suppresses the Reopen, would
+  suppress it for the one connection with nobody rebuilding it.
+- Rejections now reach the two places that Reopen on a failure — `ping` and the
+  retry inside `reopen` — that never reached them before. A close would rebuild
+  the Socket the caller had just closed, and a Reopen would queue a second Reopen
+  behind the one already under way. So an abandoned wait carries its own Error
+  type, and both places Reopen on every rejection except that one: a connection
+  that went away has already been answered, by `onClose` or by the replacement
+  itself, and only a failure that leaves nobody rebuilding it asks for a Reopen.
+  The type is unexported and sets no `name`, so a caller that receives one — the
+  rejection does reach callers, through `open()` — sees an ordinary Error and the
+  message above. It adds no public surface because nothing about it is
+  observable, not because it stays inside the driver.
+- The handshake is the one send with no caller of its own, and `createConnection`
+  waits on it through `onOpen`. Ending its wait therefore has to settle that wait
+  too — `onOpen` rejects the connection it was opening, rather than trading a
+  stranded send for a stranded `open()`. `open` can therefore reject where it
+  used to hang, so `checkAndReopen`, which opens without awaiting, now handles
+  that rejection rather than raising it to the global handler of the app.
 - A failed write of a `sub` DDP message leaves an entry in the subscription map.
   `send` writes that map before `send` writes to the Socket, and the write can now
   reject, so the map can hold an entry for a DDP subscription that the server never
@@ -98,7 +142,56 @@ an Error that the SDK writes.
   ahead of the answer of the server in each case. But the failed write is a new way
   to reach the fault. A separate issue tracks the fault, and this ADR does not
   correct it.
+- **Second amendment.** The rule above is the connection, not a clock, but one
+  path did not follow it. `send` waits in `waitForOpen` when the connection is
+  not open, and then wrote its DDP message to whichever connection was current at
+  that moment. A send issued at a drop therefore moved to the connection that
+  replaced the one it was issued on. A send does not do this now. `send` holds the
+  connection that was current when it was called, writes to that connection alone,
+  and rejects with
+  `'[ddp] connection replaced before the message was written'` if another
+  connection has taken its place. The type is the same one an abandoned wait
+  carries, so `ping` and the retry inside `reopen` do not Reopen for it. This is
+  correct: the connection was replaced by `createConnection`, which the close or
+  the Reopen that replaced it had already started, and the replacement starts its
+  own Liveness chain in `onOpen`.
+  A DDP session belongs to the connection that carries it. The replacement has a
+  session of its own, and no Login on it yet, so a Method call moved to it is sent
+  under an identity the caller did not ask for. A `sub` moved to it is worse: it
+  is written under an id from a session that has ended.
+  A send waiting on a connection that stays open and merely quiet is unaffected.
+  That send waits for the same connection to open, and its Deadline still bounds
+  it.
+- A caller that got a result after a Reopen gets a rejection instead. `subscribe`
+  turns each rejection into `undefined` and `unsubscribeAll` ignores each one, so
+  the DDP subscription paths do not change for a caller. A Method call issued in
+  the window between a drop and the next open now fails, where before it was
+  answered on the connection that followed. The consuming app decides whether to
+  call again. It could not have made that decision before, because it was not told.
 - A spec that asserts a rejection of this type asserts both halves, in the way that
   ADR-0001 established. The spec asserts that the value is an `Error`, and the spec
   asserts the message that a caller reads. A later change therefore cannot return
   to a rejection with a bare value.
+- **Amendment.** `reopenNow` and `waitForNotifyUserMediaSubs` now take their
+  Deadline from `config.timeout`, where each held a constant of its own before.
+  `probe` does not, and keeps a default of 2000ms that no option derives. This is
+  deliberate, and it is the one Deadline in the driver that no option moves.
+  `probe` answers whether a Socket in the gray zone still has a server behind it,
+  and the caller acts on the answer — a `false` from `probe` is what decides on a
+  Reopen. So `probe` has to settle faster than the wait it exists to diagnose. A
+  `probe` bound to `config.timeout` would grow with the wait it is meant to
+  shorten, and an app that raises `timeout` to be patient with a Login would make
+  its own liveness check slower to notice a dead pipe. The two bounds answer
+  opposite questions: `timeout` asks how long a caller is willing to wait for an
+  answer, and `probe` asks how long is too long to still call the connection
+  alive. `probe` takes its bound as an argument, so a caller that wants a
+  different one passes it, and no option is needed to reach it.
+- **Third amendment.** The second amendment says a send waiting on a connection
+  that stays open and merely quiet is unaffected, and that its Deadline still
+  bounds it. Neither holds now. Whether `send` waits at all is decided on the
+  transport's own state, so a send on a Transport open Socket does not wait: it
+  is written to that connection at once, and `waitForOpen` — the only Deadline
+  in this path — is never reached. What the second amendment decided is
+  unchanged, because the connection is read before the write either way. What
+  changes is that a quiet connection is no longer a bounded case at all. The
+  rule is the one the first amendment states: the connection, not a clock.

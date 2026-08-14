@@ -1,9 +1,10 @@
 import { Socket } from '../ddp'
 import * as settings from '../../settings'
-import { silentLogger } from '../../../test/silentLogger'
+import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
   FakeWebSocket,
+  OPEN,
   driveToHandshake,
   fakeSockets,
   openFakeConnection,
@@ -17,7 +18,7 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-const createSocket = () => new Socket({ host: 'localhost:3000', logger: silentLogger })
+const createSocket = () => new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
 
 describe('the transport seam', () => {
   it('constructs the transport with the driver arguments and the shared headers', async () => {
@@ -210,6 +211,28 @@ describe('Socket.send', () => {
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
     })
 
+    it('sends on the open socket it already has when the last ping has gone stale', async () => {
+      // An unanswered ping lapses `alive()` and schedules a reopen, while the
+      // transport stays open. The pending `openTimeout` suppresses any further
+      // reopen, so no `open` event is coming for a send to wait on.
+      await jest.advanceTimersByTimeAsync(socket.config.ping * 2 + 1)
+
+      expect(socket.openTimeout).toBeDefined()
+      expect(socket.connected).toBe(false)
+      expect(socket.transportOpen).toBe(true)
+      expect(fakeSockets).toHaveLength(1)
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+
+      expect(transport.lastSent()).toEqual({
+        msg: 'method', method: 'getUsersOfRoom', params: [], id: 'ddp-1'
+      })
+
+      transport.receive({ msg: 'result', id: 'ddp-1', result: 'ok' })
+      await expect(sending).resolves.toMatchObject({ result: 'ok' })
+      expect(fakeSockets).toHaveLength(1)
+    })
+
     it('rejects the send when there is no connection at all', async () => {
       // The guard used to sit inside an async promise executor, which dropped
       // the throw as an unhandled rejection instead of failing the caller.
@@ -235,13 +258,15 @@ describe('Socket.send with several listeners on one event', () => {
   let socket: Socket
   let transport: FakeWebSocket
 
+  const createSocket = () => new Socket({
+    host: 'localhost:3000',
+    logger: createSilentLogger(),
+    reopen: REOPEN_DELAY,
+    ping: 10 * 60 * 1000
+  })
+
   beforeEach(async () => {
-    socket = new Socket({
-      host: 'localhost:3000',
-      logger: silentLogger,
-      reopen: REOPEN_DELAY,
-      ping: 10 * 60 * 1000
-    })
+    socket = createSocket()
     transport = await openFakeConnection(socket)
   })
 
@@ -262,29 +287,6 @@ describe('Socket.send with several listeners on one event', () => {
     }
 
     await expect(Promise.all(sends)).resolves.toHaveLength(3)
-  })
-
-  it('carries a send issued at a drop across the whole reopen cycle', async () => {
-    // The deadline is twice the reopen delay, so the reconnect the close
-    // scheduled has time to finish before the waiting send gives up.
-    transport.close(1006)
-
-    const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
-
-    await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
-    expect(fakeSockets).toHaveLength(2)
-
-    const reopened = fakeSockets[1]
-    await driveToHandshake(reopened)
-    await jest.advanceTimersByTimeAsync(0)
-
-    const written = reopened.sent.map(frame => JSON.parse(frame))
-    expect(written).toContainEqual({
-      msg: 'method', method: 'getUsersOfRoom', params: [], id: 'ddp-2'
-    })
-
-    reopened.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
-    await expect(sending).resolves.toMatchObject({ result: 'ok' })
   })
 
   it('rejects every in-flight send on one reopenNow', async () => {
@@ -315,6 +317,167 @@ describe('Socket.send with several listeners on one event', () => {
 
     await expect(socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] }))
       .rejects.toBe(failure)
+  })
+
+  describe('when the connection the send went out on goes away', () => {
+    const inFlight = () => [1, 2, 3].map(() =>
+      socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+    )
+
+    const CLOSED_MESSAGE = '[ddp] connection closed before the response arrived'
+    const REPLACED_MESSAGE = '[ddp] connection replaced before the message was written'
+    const REOPENED_MESSAGE = '[ddp] connection reopened before the response arrived'
+
+    const expectAllToReject = (sends: Promise<any>[], message: string) =>
+      Promise.all(sends.flatMap(sending => [
+        expect(sending).rejects.toBeInstanceOf(Error),
+        expect(sending).rejects.toThrow(message)
+      ]))
+
+    it('rejects every in-flight send when the socket is closed', async () => {
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
+
+      await socket.close()
+
+      await rejections
+    })
+
+    it('rejects every in-flight send when the transport drops', async () => {
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
+
+      transport.close(1006)
+
+      await rejections
+    })
+
+    it('rejects every in-flight send when a scheduled reopen replaces the connection', async () => {
+      // The transport is not open any more, but nothing fired `onclose`, so the
+      // replacement announces itself only as `connecting`.
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, REOPENED_MESSAGE)
+
+      transport.readyState = CLOSED
+      socket.reopen()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+
+      expect(fakeSockets).toHaveLength(2)
+      await rejections
+    })
+
+    const listenerCounts = () => {
+      const counts: { [event: string]: number } = {}
+      Object.entries((socket as any)._listeners).forEach(([event, listeners]) => {
+        const { length } = listeners as any[]
+        if (length) counts[event] = length
+      })
+      return counts
+    }
+
+    it('leaves no listener behind for a send it abandoned', async () => {
+      const before = listenerCounts()
+
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
+      await socket.close()
+      await rejections
+
+      expect(listenerCounts()).toEqual(before)
+    })
+
+    it('leaves no listener behind when a scheduled reopen abandons the send', async () => {
+      const before = listenerCounts()
+
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, REOPENED_MESSAGE)
+
+      transport.readyState = CLOSED
+      socket.reopen()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      await rejections
+
+      expect(listenerCounts()).toEqual(before)
+    })
+
+    it('leaves no listener behind for a send that got its response', async () => {
+      const before = listenerCounts()
+
+      const sends = inFlight()
+      sends.forEach((_, index) =>
+        transport.receive({ msg: 'result', id: `ddp-${index + 1}`, result: 'ok' })
+      )
+      await Promise.all(sends)
+
+      expect(listenerCounts()).toEqual(before)
+    })
+
+    it('rejects a send whose connection went away as its wait on open ended', async () => {
+      transport.readyState = CLOSED
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+      const rejection = expect(sending).rejects.toThrow(CLOSED_MESSAGE)
+
+      socket.emit('open')
+      await jest.advanceTimersByTimeAsync(0)
+
+      await rejection
+    })
+
+    it('carries a send released onto an open socket whose ping went stale', async () => {
+      socket.lastPing = Date.now() - socket.config.ping * 3
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+
+      socket.emit('open')
+      await jest.advanceTimersByTimeAsync(0)
+
+      transport.receive({ msg: 'result', id: 'ddp-1', result: 'ok' })
+
+      await expect(sending).resolves.toMatchObject({ result: 'ok' })
+    })
+
+    it('keeps the first ending when a second one follows', async () => {
+      const sends = inFlight()
+      const rejections = expectAllToReject(sends, CLOSED_MESSAGE)
+
+      transport.close(1006)
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+
+      await rejections
+    })
+
+    it('abandons a send issued before the connection came back rather than writing it on the new one', async () => {
+      // The DDP session belongs to the connection the send was issued on. The
+      // new one has its own session and is not logged in yet.
+      transport.close(1006)
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+      const abandoned = expect(sending).rejects.toThrow(REPLACED_MESSAGE)
+
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+      await jest.advanceTimersByTimeAsync(0)
+
+      await abandoned
+      expect(reopened.sent.map((frame: string) => JSON.parse(frame).msg)).not.toContain('method')
+    })
+
+    it('fails the open when the handshake is abandoned', async () => {
+      // The handshake is the one send with no caller of its own, and `open()`
+      // waits on it.
+      const opening = createSocket().open()
+      const handshaking = fakeSockets[1]
+      handshaking.readyState = OPEN
+      handshaking.onopen?.({})
+      await jest.advanceTimersByTimeAsync(0)
+
+      const rejected = expect(opening).rejects.toThrow(CLOSED_MESSAGE)
+      handshaking.close(1006)
+
+      await rejected
+    })
   })
 
   it('waits for open up to twice the reopen delay, and no longer', async () => {
