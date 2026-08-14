@@ -340,7 +340,8 @@ export class Socket extends SDKEventEmitter {
    */
   probe = (timeoutMs = 2000): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
-      if (!this.connection || this.connection.readyState !== socketOpen) {
+      const connection = this.connection
+      if (!connection || connection.readyState !== socketOpen) {
         return resolve(false)
       }
 
@@ -365,7 +366,7 @@ export class Socket extends SDKEventEmitter {
       }, timeoutMs)
 
       try {
-        this.connection.send(JSON.stringify({ msg: 'ping' }))
+        connection.send(JSON.stringify({ msg: 'ping' }))
       } catch {
         cleanup()
         resolve(false)
@@ -373,16 +374,14 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
-  /** Check if websocket connected and ready. */
-  get connected () {
-    return !!(
-      this.connection &&
-      this.connection.readyState === socketOpen &&
-      this.alive()
-    )
+  get transportOpen () {
+    return !!(this.connection && this.connection.readyState === socketOpen)
   }
 
-  /** Check if connected and logged in */
+  get connected () {
+    return this.transportOpen && this.alive()
+  }
+
   get loggedIn () {
     return (this.connected && !!this.resume)
   }
@@ -436,7 +435,7 @@ export class Socket extends SDKEventEmitter {
     // is never written to a successor: the DDP session, and any Login on it, is
     // the old connection's.
     const connection = this.connection
-    if (!this.connected) {
+    if (!this.transportOpen) {
       await this.waitForOpen()
       if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)
       // The wait resolves a microtask before the listeners below are attached, so
@@ -500,8 +499,8 @@ export class Socket extends SDKEventEmitter {
   ping = async () => {
     this.pingTimeout && clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
-      // The ping goes out while `connected` is still true, so its send never
-      // waits on `open` — it waits on a pong reply that a dead socket never
+      // The ping goes out on an open socket, so its send never waits on
+      // `open` — it waits on a pong reply that a dead socket never
       // sends, and without a deadline of its own the chain stops here and
       // `reopen` is never reached. The deadline lives in `ping` rather than in
       // `send`, so no other caller inherits a reply timeout.

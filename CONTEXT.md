@@ -85,8 +85,12 @@ _Avoid_: Reconnect (unqualified — say which of the two), retry
 The Driver re-emitting its Socket's open as a single `connected` event. One open means one `connected`, however many times a caller asked the Driver to connect.
 _Avoid_: Connect event, ready
 
+**Transport open**:
+What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its transport reports it open — not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive.
+_Avoid_: Open (unqualified), ready, readyState
+
 **Liveness chain**:
-The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. A Socket the server has stopped answering still reads as open to the transport.
+The repeating ping and its pong, the only thing that decides whether an apparently-open Socket is actually alive. A Socket that is Transport open can still be dead.
 _Avoid_: Heartbeat, keepalive
 
 **Probe**:
