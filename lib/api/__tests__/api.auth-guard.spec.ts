@@ -1,4 +1,5 @@
 import Api from '../api'
+import ClientRest from '../RocketChat'
 import { FakeClient } from '../../../test/fakeClient'
 
 const anonymousApi = () => {
@@ -16,7 +17,7 @@ describe('Api auth guard', () => {
   it('refuses an authenticated request with no login', async () => {
     const { api, client } = anonymousApi()
 
-    await expect(api.get('me', {})).rejects.toThrow()
+    await expect(api.get('me', {})).rejects.toThrow(/requires a login/)
     expect(client.requests).toHaveLength(0)
   })
 
@@ -40,5 +41,15 @@ describe('Api auth guard', () => {
 
     await expect(pending).resolves.toMatchObject({ userId: 'id' })
     expect(api.loggedIn()).toBe(true)
+  })
+
+  it('allows info() with no login', async () => {
+    const client = new FakeClient()
+    const rest = new ClientRest({ client })
+
+    const pending = rest.info()
+    client.lastRequest().resolve({ status: 200, data: { info: { version: '6.0.0' } } })
+
+    await expect(pending).resolves.toEqual({ version: '6.0.0' })
   })
 })

@@ -46,6 +46,26 @@ describe('client.ddp', () => {
   })
 })
 
+describe('client.resume', () => {
+  const resumed = async () => {
+    const client = createClient()
+    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
+    await client.resume({ token: 'token' })
+    return client
+  }
+
+  it('leaves the client logged in for REST', async () => {
+    expect((await resumed()).loggedIn()).toBe(true)
+  })
+
+  it('sets the REST auth headers', async () => {
+    expect((await resumed()).client.headers).toMatchObject({
+      'X-Auth-Token': 'token',
+      'X-User-Id': 'id'
+    })
+  })
+})
+
 describe('client.url', () => {
   it('resolves to the driver host', async () => {
     expect(await createClient().url).toBe('localhost:3000')

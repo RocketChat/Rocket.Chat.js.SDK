@@ -284,18 +284,22 @@ export default class Api extends SDKEventEmitter {
 
   async login (credentials: ICredentials, args?: any): Promise<any> {
     const { data } = await this.post('login', { ...credentials, ...args }, false)
-    this.userId = data.userId
-    this.currentLogin = {
+    this.setLogin({
       username: data.me.username,
       userId: data.userId,
       authToken: data.authToken,
       result: data
-    }
-    this.client.headers = {
-      'X-Auth-Token': data.authToken,
-      'X-User-Id': data.userId
-    }
+    })
     return data
+  }
+
+  setLogin (login: NonNullable<Api['currentLogin']>) {
+    this.userId = login.userId
+    this.currentLogin = login
+    this.client.headers = {
+      'X-Auth-Token': login.authToken,
+      'X-User-Id': login.userId
+    }
   }
   async logout () {
     if (!this.currentLogin) {
