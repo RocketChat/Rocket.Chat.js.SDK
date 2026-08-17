@@ -101,4 +101,5 @@ A follow-up SDK pull request carries all three, paired with one in the app:
 2. The app PR pins that SDK commit and updates its readers in the same change —
    `sdk.current?.ddp` becomes `sdk.current?.driver`, and its integration tests
    move to `driver['socket']`.
-3. Neither merges alone, for the reason Consequences gives.
+3. The app's pin does not move to the renamed SDK until its own PR is ready,
+   for the reason Consequences gives.
