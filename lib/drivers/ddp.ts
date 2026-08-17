@@ -899,8 +899,8 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     return !!this.ddp.connected
   }
 
-  disconnect = (deadlineMs?: number): Promise<any> => {
-    return this.ddp.close(deadlineMs)
+  disconnect = (): Promise<any> => {
+    return this.ddp.close()
   }
 
   checkAndReopen = (): void => {
