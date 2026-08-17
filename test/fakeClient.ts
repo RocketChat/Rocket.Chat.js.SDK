@@ -1,27 +1,22 @@
 import type { IClient } from '../lib/api/api'
 
 /**
- * The one and only way a spec gets an API client: `Api` takes one through its
- * constructor, so the fake reaches the Api on its normal path and nothing is
- * ever assigned onto `api.client`.
- *
- * Every request is recorded with the options the Api built for it — the abort
- * signal among them — and left pending until the spec resolves or rejects it,
- * so a spec can hold a request open across an `abort()`.
+ * Every request is recorded with the options the Api built for it and left
+ * pending until the spec resolves or rejects it, so a spec can hold a request
+ * open across an `abort()`.
  */
 
 export interface FakeRequest {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE'
   url: string
   data: any
-  options: any
+  options: { signal?: AbortSignal }
   apiVersion: string
   resolve (result: any): void
   reject (error: any): void
 }
 
-/** The rejection `fetch` produces once its signal aborts. */
-export const abortError = (): Error => {
+const abortError = (): Error => {
   const error = new Error('Aborted')
   error.name = 'AbortError'
   return error
@@ -30,7 +25,6 @@ export const abortError = (): Error => {
 export class FakeClient implements IClient {
   headers: any = {}
 
-  /** Every request the Api has made, in order. */
   requests: FakeRequest[] = []
 
   get = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
@@ -45,7 +39,6 @@ export class FakeClient implements IClient {
   delete = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
     this.record('DELETE', url, data, options, apiVersion)
 
-  /** The request the Api made last. */
   lastRequest (): FakeRequest {
     return this.requests[this.requests.length - 1]
   }
