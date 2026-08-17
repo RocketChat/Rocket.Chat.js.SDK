@@ -266,8 +266,12 @@ export default class Api extends SDKEventEmitter {
 	/** Do a DELETE request to an API endpoint. */
   del: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('DELETE', endpoint, data, auth, ignore, options, apiVersion)
 
-  /** Abort all current API requests. */
-  abort = (): void => this.controller.abort()
+  /** Abort all current API requests, leaving the next request free to run. */
+  abort = (): void => {
+    const aborting = this.controller
+    this.controller = new AbortController()
+    aborting.abort()
+  }
 
 	/** Check result data for success, allowing override to ignore some errors */
   success (result: any, ignore?: RegExp) {

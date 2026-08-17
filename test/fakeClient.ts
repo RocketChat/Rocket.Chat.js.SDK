@@ -1,0 +1,61 @@
+import type { IClient } from '../lib/api/api'
+
+/**
+ * Every request is recorded with the options the Api built for it and left
+ * pending until the spec resolves or rejects it, so a spec can hold a request
+ * open across an `abort()`.
+ */
+
+export interface FakeRequest {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  url: string
+  data: any
+  options: { signal?: AbortSignal }
+  apiVersion: string
+  resolve (result: any): void
+  reject (error: any): void
+}
+
+const abortError = (): Error => {
+  const error = new Error('Aborted')
+  error.name = 'AbortError'
+  return error
+}
+
+export class FakeClient implements IClient {
+  headers: any = {}
+
+  requests: FakeRequest[] = []
+
+  get = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
+    this.record('GET', url, data, options, apiVersion)
+
+  post = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
+    this.record('POST', url, data, options, apiVersion)
+
+  put = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
+    this.record('PUT', url, data, options, apiVersion)
+
+  delete = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
+    this.record('DELETE', url, data, options, apiVersion)
+
+  lastRequest (): FakeRequest {
+    return this.requests[this.requests.length - 1]
+  }
+
+  private record (
+    method: FakeRequest['method'],
+    url: string,
+    data: any,
+    options: any,
+    apiVersion: string
+  ): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const request: FakeRequest = { method, url, data, options, apiVersion, resolve, reject }
+      this.requests.push(request)
+      const { signal } = options || {}
+      if (signal?.aborted) return reject(abortError())
+      signal?.addEventListener('abort', () => reject(abortError()))
+    })
+  }
+}
