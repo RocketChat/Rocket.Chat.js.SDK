@@ -41,7 +41,7 @@ describe('client.ddp', () => {
     expect(subscribe).toHaveBeenCalledWith('stream-room-messages', 'GENERAL', false)
   })
 
-  it('replaces the socket field the client used to hold', () => {
+  it('is not exposed on the client under a socket field', () => {
     expect('socket' in createClient()).toBe(false)
   })
 })
