@@ -311,7 +311,7 @@ export class Socket extends SDKEventEmitter {
    * close: that socket and the subscriptions it filled are left as they are.
    * See ADR-0003.
    */
-  close = async (deadlineMs = defaultSocketDeadline): Promise<boolean> => {
+  close = async (deadlineMs = defaultSocketDeadline): Promise<void> => {
     this.settleReopen?.()
 
     const connection = this.connection
@@ -320,7 +320,7 @@ export class Socket extends SDKEventEmitter {
       await this.waitForClose(connection, deadlineMs)
     }
 
-    if (this.replaced(connection)) return false
+    if (this.replaced(connection)) return
 
     this.cancelScheduledReopen()
     if (this.pingTimeout) {
@@ -334,7 +334,6 @@ export class Socket extends SDKEventEmitter {
     }
 
     this.forgetAllSubscriptions()
-    return true
   }
 
   /** Drop one DDP subscription. */
