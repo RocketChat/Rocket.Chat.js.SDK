@@ -48,7 +48,7 @@ _Avoid_: Websocket, Transport (that is the layer below), ddp
 
 **Transport**:
 The raw websocket a Socket owns and writes its DDP messages to. The layer below a Socket, and the only one with no DDP vocabulary of its own.
-_Avoid_: Socket (that is the layer above), connection, wire
+_Avoid_: Socket (that is the layer above), wire
 
 **Stream**:
 A named server-side feed a client asks to receive events from, such as room messages or user notifications.

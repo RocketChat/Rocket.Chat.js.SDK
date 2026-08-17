@@ -1,6 +1,6 @@
 /**
  * @module Driver
- * The realtime transport behind a Client, speaking DDP over the Socket it owns.
+ * The realtime layer behind a Client, speaking DDP over the Socket it owns.
  */
 
 import { SDKEventEmitter } from '../emitter'
