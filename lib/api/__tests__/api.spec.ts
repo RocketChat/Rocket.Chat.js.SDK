@@ -2,10 +2,9 @@ import Api from '../api'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import { FakeClient, loginResponse } from '../../../test/fakeClient'
 
-const newApi = (client: FakeClient, logger?: any) => new Api(logger ? { client, logger } : { client })
+const newApi = (client: FakeClient) => new Api({ client })
 
-const loggedInApi = async (client: FakeClient, logger?: any) => {
-  const api = newApi(client, logger)
+const loggedInApi = async (client: FakeClient, api = newApi(client)) => {
   client.reply('post', loginResponse())
   await api.login({ username: 'user', password: 'pass' })
   return api
@@ -181,7 +180,8 @@ describe('api', () => {
   describe('logger', () => {
     it('logs to the logger it was handed', async () => {
       const logger = createSilentLogger()
-      const api = await loggedInApi(new FakeClient(), logger)
+      const client = new FakeClient()
+      const api = await loggedInApi(client, new Api({ client, logger }))
 
       await api.get('me', {})
 
@@ -191,12 +191,12 @@ describe('api', () => {
     it('logs the failure to the logger it was handed', async () => {
       const logger = createSilentLogger()
       const client = new FakeClient()
-      const api = await loggedInApi(client, logger)
+      const api = await loggedInApi(client, new Api({ client, logger }))
       client.reply('get', { status: 400, data: {} })
 
       await expect(api.get('me', {})).rejects.toBeDefined()
 
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('[API] POST error(me)'))
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('[API] GET error(me)'))
     })
 
     it('falls back to the module logger when handed none', () => {

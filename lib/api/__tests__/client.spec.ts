@@ -1,11 +1,6 @@
 import Api from '../api'
 import * as settings from '../../settings'
 
-/**
- * The default `IClient` adapter has no injection point of its own — `Api` builds
- * it when no client is handed in — so it is driven the way it runs, through an
- * `Api` and the global fetch.
- */
 const fetchAnswering = (body: any, status = 200) =>
   jest.fn().mockResolvedValue({ status, json: async () => body })
 
@@ -13,14 +8,19 @@ const loggedInApi = async (host = 'http://localhost:3000') => {
   const api = new Api({ host })
   global.fetch = fetchAnswering({ data: { authToken: 't', userId: 'u', me: { username: 'n' } } }) as any
   await api.login({ username: 'user', password: 'pass' })
+  global.fetch = fetchAnswering({}) as any
   return api
+}
+
+const fetchCall = (): { url: string, init: any } => {
+  const [url, init] = (global.fetch as jest.Mock).mock.calls[0]
+  return { url, init }
 }
 
 describe('api client', () => {
   describe('url', () => {
     it('addresses the host, api version and endpoint', async () => {
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
 
       await api.get('me', {})
 
@@ -32,47 +32,54 @@ describe('api client', () => {
 
     it('addresses the api version the caller asked for', async () => {
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
 
       await api.get('rooms.info', {}, true, undefined, {}, 'v2')
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/api/v2/rooms.info?',
-        expect.anything()
-      )
+      expect(fetchCall().url).toBe('http://localhost:3000/api/v2/rooms.info?')
+    })
+
+    it('addresses the endpoint on a put', async () => {
+      const api = await loggedInApi()
+
+      await api.put('chat.update', { msg: 'edited' })
+
+      expect(fetchCall().url).toBe('http://localhost:3000/api/v1/chat.update')
+    })
+
+    it('addresses the endpoint on a delete', async () => {
+      const api = await loggedInApi()
+
+      await api.del('rooms.delete', { roomId: 'r' })
+
+      expect(fetchCall().url).toBe('http://localhost:3000/api/v1/rooms.delete')
     })
   })
 
   describe('query params', () => {
-    const urlOf = () => (global.fetch as jest.Mock).mock.calls[0][0] as string
-
     it('encodes an array as repeated bracketed keys', async () => {
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
 
       await api.get('rooms.info', { roomIds: ['one', 'two'] })
 
-      expect(urlOf()).toContain('roomIds[]=one&roomIds[]=two')
+      expect(fetchCall().url).toContain('roomIds[]=one&roomIds[]=two')
     })
 
     it('encodes an object as json', async () => {
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
 
       await api.get('users.list', { query: { status: 'online' } })
 
-      expect(urlOf()).toContain(`query=${encodeURIComponent('{"status":"online"}')}`)
+      expect(fetchCall().url).toContain(`query=${encodeURIComponent('{"status":"online"}')}`)
     })
   })
 
   describe('headers', () => {
     it('sends the auth headers the login installed', async () => {
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
 
       await api.get('me', {})
 
-      expect((global.fetch as jest.Mock).mock.calls[0][1].headers).toEqual({
+      expect(fetchCall().init.headers).toEqual({
         'Content-Type': 'application/json',
         'X-Auth-Token': 't',
         'X-User-Id': 'u'
@@ -82,43 +89,53 @@ describe('api client', () => {
     it('sends the custom headers the consumer set on the settings', async () => {
       jest.replaceProperty(settings, 'customHeaders', { 'X-Custom': 'yes' })
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
 
       await api.get('me', {})
 
-      expect((global.fetch as jest.Mock).mock.calls[0][1].headers).toMatchObject({
-        'X-Custom': 'yes'
-      })
+      expect(fetchCall().init.headers).toMatchObject({ 'X-Custom': 'yes' })
     })
 
     it('sends only the headers the caller passed as options', async () => {
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
 
       await api.get('me', {}, true, undefined, { customHeaders: { 'X-Only': 'this' } })
 
-      expect((global.fetch as jest.Mock).mock.calls[0][1].headers).toEqual({ 'X-Only': 'this' })
+      expect(fetchCall().init.headers).toEqual({ 'X-Only': 'this' })
     })
   })
 
   describe('body', () => {
     it('sends a json body on a post', async () => {
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
 
       await api.post('chat.postMessage', { msg: 'hello' })
 
-      expect((global.fetch as jest.Mock).mock.calls[0][1].body).toBe('{"msg":"hello"}')
+      expect(fetchCall().init.body).toBe('{"msg":"hello"}')
     })
 
     it('sends a form body untouched on a post', async () => {
       const api = await loggedInApi()
-      global.fetch = fetchAnswering({}) as any
       const form = new FormData()
 
       await api.post('rooms.upload', form)
 
-      expect((global.fetch as jest.Mock).mock.calls[0][1].body).toBe(form)
+      expect(fetchCall().init.body).toBe(form)
+    })
+
+    it('sends a json body on a put', async () => {
+      const api = await loggedInApi()
+
+      await api.put('chat.update', { msg: 'edited' })
+
+      expect(fetchCall().init).toMatchObject({ method: 'PUT', body: '{"msg":"edited"}' })
+    })
+
+    it('sends a json body on a delete', async () => {
+      const api = await loggedInApi()
+
+      await api.del('rooms.delete', { roomId: 'r' })
+
+      expect(fetchCall().init).toMatchObject({ method: 'DELETE', body: '{"roomId":"r"}' })
     })
   })
 

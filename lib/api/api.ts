@@ -195,10 +195,10 @@ export default class Api extends SDKEventEmitter {
   } | null = null
   controller: AbortController
 
-  constructor ({ client, host, logger = Logger }: any) {
+  constructor ({ client, host, logger }: any) {
     super()
     this.client = client || new Client({ host } as any)
-    this.logger = logger
+    this.logger = logger || Logger
     this.controller = new AbortController();
   }
 
@@ -250,7 +250,7 @@ export default class Api extends SDKEventEmitter {
       const hasDataInsideResult = result && !result.data
       return (method === 'DELETE') && hasDataInsideResult ? result : result.data
     } catch (err) {
-      this.logger && this.logger.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
+      this.logger && this.logger.error(`[API] ${ method } error(${ endpoint }): ${ JSON.stringify(err) }`)
       throw err
     }
   }
