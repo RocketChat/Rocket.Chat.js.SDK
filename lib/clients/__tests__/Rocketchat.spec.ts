@@ -9,25 +9,18 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 const createClient = () =>
   new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger() })
 
-describe('client.socket', () => {
-  it('is the Driver itself', () => {
+describe('client.ddp', () => {
+  it('is the Driver, held directly rather than behind a Promise', () => {
     const client = createClient()
 
-    expect(client.socket).toBeInstanceOf(Driver)
-    expect(client.socket).toBe(client.ddp)
+    expect(client.ddp).toBeInstanceOf(Driver)
   })
 
-  it('stays valid awaited, as callers written against the old Promise wrote it', async () => {
-    const client = createClient()
-
-    expect(await client.socket).toBe(client.ddp)
-  })
-
-  it('reaches the driver directly, without awaiting', async () => {
+  it('reaches the driver without awaiting', async () => {
     const client = createClient()
     const methodCall = jest.spyOn(client.ddp, 'methodCall').mockResolvedValue(undefined as any)
 
-    await client.socket.methodCall('getRoomIdByNameOrId', 'general')
+    await client.ddp.methodCall('getRoomIdByNameOrId', 'general')
 
     expect(methodCall).toHaveBeenCalledWith('getRoomIdByNameOrId', 'general')
   })
@@ -39,6 +32,10 @@ describe('client.socket', () => {
     await client.subscribeRoom('GENERAL')
 
     expect(subscribeRoom).toHaveBeenCalledWith('GENERAL')
+  })
+
+  it('is the only name the client holds it under', () => {
+    expect('socket' in createClient()).toBe(false)
   })
 })
 

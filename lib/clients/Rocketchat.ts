@@ -6,18 +6,16 @@ import { logger as Logger } from '../log'
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
   logger: ILogger = Logger
-  socket: Driver
   ddp: Driver
 
   constructor ({ logger, ...config }: any) {
     super({ ...config, logger })
     this.logger = logger
     this.ddp = new Driver({ ...config, logger })
-    this.socket = this.ddp
   }
 
   async resume ({ token }: { token: string }) {
-    return this.socket.login({ token } as any, {})
+    return this.ddp.login({ token } as any, {})
   }
 
   async login (credentials: ICredentials) {
@@ -25,24 +23,24 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }
 
-  async connect (options: ISocketOptions): Promise<any> { return this.socket.connect(options) }
-  async disconnect (): Promise<any> { return this.socket.disconnect() }
-  async checkAndReopen (): Promise<void> { return this.socket.checkAndReopen() }
-  async onStreamData (event: string, cb: ICallback): Promise<any> { return this.socket.onStreamData(event, cb) }
-  async subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined> { return (this.socket as ISocket).subscribe(topic, ...args) }
-  async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return this.socket.subscribeRaw(...args) }
-  async unsubscribe (subscription: ISubscription): Promise<any> { return this.socket.unsubscribe(subscription) }
-  async unsubscribeAll (): Promise<any> { return this.socket.unsubscribeAll() }
-  async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return this.socket.subscribeRoom(rid, ...args) }
-  async subscribeNotifyAll (): Promise<any> { return this.socket.subscribeNotifyAll() }
-  async subscribeLoggedNotify (): Promise<any> { return this.socket.subscribeLoggedNotify() }
-  async subscribeNotifyUser (): Promise<any> { return this.socket.subscribeNotifyUser() }
+  async connect (options: ISocketOptions): Promise<any> { return this.ddp.connect(options) }
+  async disconnect (): Promise<any> { return this.ddp.disconnect() }
+  async checkAndReopen (): Promise<void> { return this.ddp.checkAndReopen() }
+  async onStreamData (event: string, cb: ICallback): Promise<any> { return this.ddp.onStreamData(event, cb) }
+  async subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined> { return (this.ddp as ISocket).subscribe(topic, ...args) }
+  async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return this.ddp.subscribeRaw(...args) }
+  async unsubscribe (subscription: ISubscription): Promise<any> { return this.ddp.unsubscribe(subscription) }
+  async unsubscribeAll (): Promise<any> { return this.ddp.unsubscribeAll() }
+  async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return this.ddp.subscribeRoom(rid, ...args) }
+  async subscribeNotifyAll (): Promise<any> { return this.ddp.subscribeNotifyAll() }
+  async subscribeLoggedNotify (): Promise<any> { return this.ddp.subscribeLoggedNotify() }
+  async subscribeNotifyUser (): Promise<any> { return this.ddp.subscribeNotifyUser() }
   get url () {
-    return Promise.resolve(this.socket.config.host)
+    return Promise.resolve(this.ddp.config.host)
   }
   async onMessage (cb: ICallback): Promise<any> {
-    return this.socket.onMessage(cb)
+    return this.ddp.onMessage(cb)
   }
-  async methodCall (method: string, ...args: any[]): Promise<ISubscription> { return this.socket.methodCall(method, ...args) }
+  async methodCall (method: string, ...args: any[]): Promise<ISubscription> { return this.ddp.methodCall(method, ...args) }
 
 }
