@@ -1,5 +1,5 @@
 /**
- * @module DDPDriver
+ * @module Driver
  * The realtime transport behind a Client, speaking DDP over the Socket it owns.
  */
 
@@ -17,7 +17,7 @@ import {
   ILogger
 } from '../../interfaces'
 
-export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
+export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   logger: ILogger
   config: ISocketOptions
   ddp: Socket

@@ -97,7 +97,7 @@ The server's answer decides; silence keeps the instruction.
   before, and send `unsub` frames for them. Both already tolerate a server that
   refuses: `unsubscribeAll` catches each failure, and `close` forgets everything
   regardless.
-- `DDPDriver.waitForNotifyUserMediaSubs` polls `subscriptions` for the two media
+- `Driver.waitForNotifyUserMediaSubs` polls `subscriptions` for the two media
   entries, and an entry written on an abandoned `sub` now ends that poll where
   it would previously have kept waiting. Readiness itself is unchanged: the poll
   only decides when to re-send, and the gate resolves on whether that resubscribe
