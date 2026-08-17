@@ -1,5 +1,4 @@
 import Api from '../api'
-import RocketChatClient from '../../clients/Rocketchat'
 import { logger as moduleLogger } from '../../log'
 import { FakeClient } from '../../../test/fakeClient'
 import { createSilentLogger } from '../../../test/createSilentLogger'
@@ -24,21 +23,5 @@ describe('Api options', () => {
     const api = new Api({ client: new FakeClient(), loggr: createSilentLogger() })
 
     expect(api).toBeInstanceOf(Api)
-  })
-})
-
-describe('RocketChatClient options', () => {
-  it('keeps the logger it was handed', () => {
-    const logger = createSilentLogger()
-
-    const client = new RocketChatClient({ host: 'localhost:3000', logger })
-
-    expect(client.logger).toBe(logger)
-  })
-
-  it('falls back to the module logger when handed none', () => {
-    const client = new RocketChatClient({ host: 'localhost:3000' })
-
-    expect(client.logger).toBe(moduleLogger)
   })
 })
