@@ -195,10 +195,10 @@ export default class Api extends SDKEventEmitter {
   } | null = null
   controller: AbortController
 
-  constructor ({ client, host }: any) {
+  constructor ({ client, host, logger = Logger }: any) {
     super()
     this.client = client || new Client({ host } as any)
-    this.logger = Logger
+    this.logger = logger
     this.controller = new AbortController();
   }
 
