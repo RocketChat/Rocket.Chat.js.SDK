@@ -173,7 +173,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     }
     const topic = 'stream-notify-user'
     const userId = this.userId
-    return this.ddp.resubscribeWhenRecorded(
+    return this.resubscribeWhenRecorded(
       ['media-signal', 'media-calls'].map(name => ({ name: topic, params: [`${userId}/${name}`] })),
       timeoutMs
     )
