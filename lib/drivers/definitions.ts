@@ -1,8 +1,3 @@
-/**
- * @module Socket
- * Provides high-level helpers for DDP connection, method calls, subscriptions.
- */
-
 import { EventEmitter } from 'tiny-events'
 import {
   ILogger,

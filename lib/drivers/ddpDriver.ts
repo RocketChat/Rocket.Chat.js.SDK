@@ -20,10 +20,6 @@ import {
 export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   logger: ILogger
   config: ISocketOptions
-	/**
-	 * An Websocket instance for interacting with Rocket.Chat.
-	 * Variable not initialised until `connect` called.
-	 */
   ddp: Socket
 
 	/** Save messages subscription to ensure only one created */

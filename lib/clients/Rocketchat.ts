@@ -7,7 +7,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
   logger: ILogger = Logger
   socket: Promise<ISocket | IDriver>
-  ddp?: any
+  ddp: DDPDriver
 
   constructor ({ logger, ...config }: any) {
     super({ ...config, logger })
