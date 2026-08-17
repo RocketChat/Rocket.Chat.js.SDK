@@ -227,7 +227,7 @@ export default class Api extends SDKEventEmitter {
     options?: any,
     apiVersion: string = 'v1'
 	) => {
-    this.logger && this.logger.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
+    this.logger?.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
       if (auth && !this.loggedIn()) {
         throw new Error('')
@@ -246,11 +246,11 @@ export default class Api extends SDKEventEmitter {
       }
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
-      this.logger && this.logger.debug(`[API] ${method} ${endpoint} result ${result.status}`)
+      this.logger?.debug(`[API] ${method} ${endpoint} result ${result.status}`)
       const hasDataInsideResult = result && !result.data
       return (method === 'DELETE') && hasDataInsideResult ? result : result.data
     } catch (err) {
-      this.logger && this.logger.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
+      this.logger?.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
       throw err
     }
   }
