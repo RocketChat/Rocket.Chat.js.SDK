@@ -1,6 +1,6 @@
 /**
  * Hand-written declaration for `universal-websocket-client`, covering only the
- * surface `lib/drivers/ddp.ts` uses. The package's `browser` field points at
+ * surface `lib/drivers/socket.ts` uses. The package's `browser` field points at
  * the global `WebSocket`, which is what React Native actually runs — so
  * `@types/ws` would describe code that never executes, and the DOM lib has no
  * 3-argument constructor. This describes the real runtime instead.

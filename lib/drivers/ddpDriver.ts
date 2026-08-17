@@ -5,7 +5,7 @@
 
 import { SDKEventEmitter } from '../emitter'
 import { logger as Logger } from '../log'
-import { Socket } from './ddp'
+import { Socket } from './socket'
 import type { ISocket, IDriver } from './definitions'
 
 import {

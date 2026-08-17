@@ -4,7 +4,7 @@
 
 ## Context
 
-`Socket.send` in `lib/drivers/ddp.ts` rejected with the DDP error as the server
+`Socket.send` in `lib/drivers/socket.ts` rejected with the DDP error as the server
 sent it — a plain object with `error`, `reason` and `errorType`, and no
 `message`. Every caller up the stack (`call`, `subscribe`, `unsubscribe`) logs
 `err.message`, so the reason the server gave was lost at exactly the point

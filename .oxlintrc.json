@@ -11,7 +11,7 @@
 	// expression. There is no single "behaviour PR": each known defect is one issue
 	// and one PR, so this debt clears a piece at a time and most PRs clear none.
 	//
-	//   no-unused-expressions          7  lib/api/api.ts, lib/drivers/ddp.ts
+	//   no-unused-expressions          7  lib/api/api.ts, lib/drivers/socket.ts
 	//   no-this-alias                  2  lib/api/RocketChat.ts
 	//
 	//     No issue owns these nine. Nothing on the
@@ -19,7 +19,7 @@
 	//
 	// Not debt — correct as written, do not "fix":
 	//
-	//   triple-slash-reference         1  lib/drivers/ddp.ts
+	//   triple-slash-reference         1  lib/drivers/socket.ts
 	//     NEVER FIX. It points at an ambient module declaration, and ambient
 	//     modules are not importable. It is also the only thing pulling that
 	//     declaration into the *app's* compile — the app's config will never glob

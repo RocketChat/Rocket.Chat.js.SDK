@@ -1,6 +1,6 @@
 import { sha256 } from 'js-sha256'
 
-import { Socket } from '../ddp'
+import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 
 // `loginParams` reads only its argument, so one Socket serves every case here.

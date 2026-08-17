@@ -12,7 +12,7 @@ makes itself. For that type there is no DDP response, and therefore there is no
 server reason to carry. The two ADRs do not overlap. If a server reason is part
 of the rejection, ADR-0001 applies. If not, this ADR applies.
 
-Three waits in `lib/drivers/ddp.ts` made no rejection at all. Each of the three
+Three waits in `lib/drivers/socket.ts` made no rejection at all. Each of the three
 left a caller with a promise that could never settle.
 
 `send` writes the DDP message to the Socket inside a `try` block. If that write
