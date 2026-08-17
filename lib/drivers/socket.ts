@@ -28,6 +28,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
+import { IStream } from './definitions'
 import { DDPError, toError } from './ddpError'
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
@@ -764,7 +765,7 @@ export class Socket extends SDKEventEmitter {
    * params given. `subscriptions` is keyed by DDP subscription id, so a caller
    * that knows a stream by name and params reads it through here.
    */
-  findSubscriptions = ({ name, params = [] }: { name: string, params?: any[] }): ISubscription[] =>
+  findSubscriptions = ({ name, params = [] }: IStream): ISubscription[] =>
     Object.keys(this.subscriptions || {})
       .map((id) => this.subscriptions[id])
       .filter((sub) => (
@@ -772,6 +773,57 @@ export class Socket extends SDKEventEmitter {
         sub.name === name &&
         params.every((param, index) => sub.params?.[index] === param)
       ))
+
+  /**
+   * Re-send the given streams on the current connection under the ids they were
+   * first sent with, and resolve on whether the server acked every one of them.
+   *
+   * Nothing goes out until every stream asked for is recorded here, so the
+   * deadline expiring first resolves false.
+   */
+  resubscribeWhenRecorded = (
+    streams: IStream[],
+    timeoutMs = this.config.timeout
+  ): Promise<boolean> => {
+    const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
+    const resubscribe = (subs: ISubscription[]) => Promise.all(
+      subs.map((sub) => this.subscribe(sub.name, sub.params, undefined, sub.id))
+    )
+      .then((results) => {
+        const unacknowledged = subs.filter((_, index) => !results[index])
+        unacknowledged.forEach((sub) => this.logger.error(
+          `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
+        ))
+        return unacknowledged.length === 0
+      })
+      .catch(() => false)
+
+    return new Promise<boolean>((resolve) => {
+      let settled = false
+      let inFlight = false
+      const finish = (value: boolean) => {
+        if (settled) return
+        settled = true
+        clearInterval(poll)
+        clearTimeout(deadline)
+        resolve(value)
+      }
+      const attempt = () => {
+        if (inFlight) return
+        const perStream = recordedPerStream()
+        if (!perStream.every((subs) => subs.length > 0)) return
+        inFlight = true
+        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as ISubscription[])
+        resubscribe(recorded).then((value) => {
+          inFlight = false
+          finish(value)
+        })
+      }
+      const deadline = setTimeout(() => finish(false), timeoutMs)
+      const poll = setInterval(attempt, 100)
+      attempt()
+    })
+  }
 
   /** Subscribe to all pre-configured streams (e.g. on login resume) */
   subscribeAll = () => {
