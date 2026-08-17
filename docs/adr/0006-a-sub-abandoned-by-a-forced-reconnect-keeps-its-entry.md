@@ -97,12 +97,12 @@ The server's answer decides; silence keeps the instruction.
   before, and send `unsub` frames for them. Both already tolerate a server that
   refuses: `unsubscribeAll` catches each failure, and `close` forgets everything
   regardless.
-- `Driver.waitForNotifyUserMediaSubs` polls `subscriptions` for the two media
-  entries, and an entry written on an abandoned `sub` now ends that poll where
-  it would previously have kept waiting. Readiness itself is unchanged: the poll
-  only decides when to re-send, and the gate resolves on whether that resubscribe
-  was acknowledged. An abandoned one resolves `undefined`, which the gate counts
-  as unacknowledged.
+- `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
+  polls `subscriptions` for the two media entries, and an entry written on an
+  abandoned `sub` now ends that poll where it would previously have kept waiting.
+  Readiness itself is unchanged: the poll only decides when to re-send, and the
+  gate resolves on whether that resubscribe was acknowledged. An abandoned one
+  resolves `undefined`, which the gate counts as unacknowledged.
 - ADR-0004's remaining open question is untouched: whether a `sub` may be sent
   for an id whose `unsub` is still in flight is still not settled, and the
   behaviour of the server in that case is still not known. This ADR does make
