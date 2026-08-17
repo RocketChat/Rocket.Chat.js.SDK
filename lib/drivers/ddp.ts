@@ -77,6 +77,7 @@ export class Socket extends SDKEventEmitter {
   logger: ILogger
   reopenPromise?: Promise<void>
   private settleReopen?: () => void
+  private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   /** Create a websocket handler */
@@ -117,6 +118,7 @@ export class Socket extends SDKEventEmitter {
       try {
         connection = new WebSocket(this.host, null, { headers: settings.customHeaders })
         connection.onerror = reject
+        this.pendingOpenRejects.set(connection, reject)
       } catch (err) {
         this.logger.error(err)
         return reject(err)
@@ -241,13 +243,14 @@ export class Socket extends SDKEventEmitter {
   /**
    * Unhook every handler from a socket, so nothing it does afterwards reaches
    * this driver. Closing it is a separate obligation, left to the caller.
+   *
+   * An open of this socket that is still pending is abandoned on a microtask,
+   * so a handshake rejection already in flight settles it first.
    */
   private detach = (connection: WebSocket) => {
-    // onerror is still the pending open's reject while the socket has not
-    // opened. Settle it a tick later so a handshake rejection already in
-    // flight settles first; rejecting a settled promise is a no-op.
-    const settlePendingOpen = connection.onerror
-    Promise.resolve().then(() => settlePendingOpen?.(new AbandonedWait(abandonedBeforeOpen)))
+    const rejectPendingOpen = this.pendingOpenRejects.get(connection)
+    this.pendingOpenRejects.delete(connection)
+    Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedBeforeOpen)))
     connection.onopen = null as any
     connection.onmessage = null as any
     connection.onerror = null as any
