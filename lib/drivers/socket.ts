@@ -27,6 +27,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
+import { BoundedWait } from './boundedWait'
 import { DDPError, toError } from './ddpError'
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
@@ -257,45 +258,39 @@ export class Socket extends SDKEventEmitter {
    * `close` event: a close emitted for the connection that replaced this one
    * says nothing about the socket being closed here.
    */
-  private waitForClose = (connection: WebSocket, deadlineMs: number) =>
-    new Promise<void>((resolve) => {
-      let settled = false
-      const driverOnClose = connection.onclose
+  private waitForClose = (connection: WebSocket, deadlineMs: number) => {
+    const driverOnClose = connection.onclose
 
-      const settle = () => {
-        if (settled) return
-        settled = true
-        clearTimeout(deadline as any)
-        resolve()
-      }
+    const answerCloseOurselves = (reason: string) => {
+      // Null rather than restore: a transport close that lands after this
+      // would otherwise re-enter onClose, emit a second close and arm a
+      // reopen for a socket the driver is already letting go.
+      if (connection.onclose === onTransportClose) connection.onclose = null as any
+      this.onClose({ code: userDisconnectCloseCode, reason, wasClean: false }, connection)
+      wait.resolve(undefined)
+    }
 
-      const onTransportClose = (e: any) => {
-        driverOnClose?.(e)
-        settle()
-      }
+    const wait = new BoundedWait<void>(
+      deadlineMs,
+      () => answerCloseOurselves('the transport did not answer the close')
+    )
 
-      const answerCloseOurselves = (reason: string) => {
-        // Null rather than restore: a transport close that lands after this
-        // would otherwise re-enter onClose, emit a second close and arm a
-        // reopen for a socket the driver is already letting go.
-        if (connection.onclose === onTransportClose) connection.onclose = null as any
-        this.onClose({ code: userDisconnectCloseCode, reason, wasClean: false }, connection)
-        settle()
-      }
+    const onTransportClose = (e: any) => {
+      driverOnClose?.(e)
+      wait.resolve(undefined)
+    }
 
-      connection.onclose = onTransportClose
-      const deadline = setTimeout(
-        () => answerCloseOurselves('the transport did not answer the close'),
-        deadlineMs
-      )
+    connection.onclose = onTransportClose
 
-      try {
-        connection.close(userDisconnectCloseCode)
-      } catch (err) {
-        this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
-        answerCloseOurselves('the transport refused to close')
-      }
-    })
+    try {
+      connection.close(userDisconnectCloseCode)
+    } catch (err) {
+      this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
+      answerCloseOurselves('the transport refused to close')
+    }
+
+    return wait.promise
+  }
 
   /**
    * Disconnect the DDP from server and forget every subscription locally: the
@@ -388,29 +383,24 @@ export class Socket extends SDKEventEmitter {
       return this.reopenPromise
     }
 
-    this.reopenPromise = new Promise<void>(resolve => {
-      this.cancelScheduledReopen()
-      this.lastPing = 0
-      this.emit('disconnected')
+    this.cancelScheduledReopen()
+    this.lastPing = 0
+    this.emit('disconnected')
 
-      let settled = false
-      const cleanup = () => {
-        if (settled) return
-        settled = true
-        this.off('open', cleanup)
-        if (timeout) clearTimeout(timeout as any)
-        delete this.reopenPromise
-        delete this.settleReopen
-        resolve()
-      }
+    const wait = new BoundedWait<void>(this.config.timeout, () => wait.resolve(undefined))
+    const onOpen = () => wait.resolve(undefined)
 
-      this.settleReopen = cleanup
-      this.once('open', cleanup)
-
-      this.createConnection().catch(() => {})
-
-      const timeout = setTimeout(() => cleanup(), this.config.timeout)
+    wait.release(() => {
+      this.off('open', onOpen)
+      delete this.reopenPromise
+      delete this.settleReopen
     })
+
+    this.settleReopen = onOpen
+    this.once('open', onOpen)
+    this.reopenPromise = wait.promise
+
+    this.createConnection().catch(() => {})
 
     return this.reopenPromise
   }
@@ -420,39 +410,24 @@ export class Socket extends SDKEventEmitter {
    * the socket is open and the server answers the ping within the deadline.
    */
   probe = (deadlineMs = socketDeadlineMs): Promise<boolean> => {
-    return new Promise<boolean>(resolve => {
-      const connection = this.connection
-      if (!connection || connection.readyState !== socketOpen) {
-        return resolve(false)
-      }
+    const connection = this.connection
+    if (!connection || connection.readyState !== socketOpen) {
+      return Promise.resolve(false)
+    }
 
-      let settled = false
-      const cleanup = () => {
-        if (settled) return
-        settled = true
-        this.off('pong', onPong)
-        if (timeout) clearTimeout(timeout as any)
-      }
+    const wait = new BoundedWait<boolean>(deadlineMs, () => wait.resolve(false))
+    const onPong = () => wait.resolve(true)
 
-      const onPong = () => {
-        cleanup()
-        resolve(true)
-      }
+    wait.release(() => this.off('pong', onPong))
+    this.once('pong', onPong)
 
-      this.once('pong', onPong)
+    try {
+      connection.send(JSON.stringify({ msg: 'ping' }))
+    } catch {
+      wait.resolve(false)
+    }
 
-      const timeout = setTimeout(() => {
-        cleanup()
-        resolve(false)
-      }, deadlineMs)
-
-      try {
-        connection.send(JSON.stringify({ msg: 'ping' }))
-      } catch {
-        cleanup()
-        resolve(false)
-      }
-    })
+    return wait.promise
   }
 
   get transportOpen () {
@@ -477,24 +452,16 @@ export class Socket extends SDKEventEmitter {
    * expires as the reconnect begins and every send issued at a drop fails.
    */
   private waitForOpen = (deadlineMs = this.config.reopen * 2): Promise<void> => {
-    return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        this.off('open', onOpen)
-        clearTimeout(timeout as any)
-      }
+    const wait = new BoundedWait<void>(
+      deadlineMs,
+      () => wait.reject(new Error('[ddp] timed out waiting for the connection to open'))
+    )
+    const onOpen = () => wait.resolve(undefined)
 
-      const onOpen = () => {
-        cleanup()
-        resolve()
-      }
+    wait.release(() => this.off('open', onOpen))
+    this.once('open', onOpen)
 
-      this.once('open', onOpen)
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        reject(new Error('[ddp] timed out waiting for the connection to open'))
-      }, deadlineMs)
-    })
+    return wait.promise
   }
 
   /**
@@ -526,54 +493,53 @@ export class Socket extends SDKEventEmitter {
       if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
     }
 
-    return new Promise<any>((resolve, reject) => {
-      const id = obj.id || `ddp-${ this.sent }`
-      this.sent += 1
-      const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
-      const stringdata = JSON.stringify(data)
-      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
-      this.logger.debug(`[ddp] sending message: ${stringdata}`)
+    const wait = new BoundedWait<any>()
+    const id = obj.id || `ddp-${ this.sent }`
+    this.sent += 1
+    const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
+    const stringdata = JSON.stringify(data)
+    const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
+    this.logger.debug(`[ddp] sending message: ${stringdata}`)
 
-      try {
-        connection.send(stringdata)
-      } catch (err) {
-        this.logger.error(`[ddp] the transport failed to write the message: ${stringdata}`);
-        return reject(err)
-      }
+    try {
+      connection.send(stringdata)
+    } catch (err) {
+      this.logger.error(`[ddp] the transport failed to write the message: ${stringdata}`);
+      wait.reject(err)
+      return wait.promise
+    }
 
-      // Before any listener is attached: a DDP message with no response to wait for —
-      // `pong` — would otherwise strand a `disconnected` listener forever.
-      if (!listener) {
-        return resolve(undefined)
-      }
+    // Before any listener is attached: a DDP message with no response to wait for —
+    // `pong` — would otherwise strand a `disconnected` listener forever.
+    if (!listener) {
+      wait.resolve(undefined)
+      return wait.promise
+    }
 
-      // The DDP response can only arrive on the connection this message went out
-      // on, so every event that ends that connection ends this wait.
-      const abandonListeners = [
-        { event: 'disconnected', message: abandonedByReopen },
-        { event: 'connecting', message: abandonedByReopen },
-        { event: 'close', message: abandonedByClose }
-      ].map(({ event, message }) => ({
-        event,
-        onAbandon: () => {
-          removeListeners()
-          reject(new AbandonedRequest(id, message))
-        }
-      }))
+    // The DDP response can only arrive on the connection this message went out
+    // on, so every event that ends that connection ends this wait.
+    const abandonListeners = [
+      { event: 'disconnected', message: abandonedByReopen },
+      { event: 'connecting', message: abandonedByReopen },
+      { event: 'close', message: abandonedByClose }
+    ].map(({ event, message }) => ({
+      event,
+      onAbandon: () => wait.reject(new AbandonedRequest(id, message))
+    }))
 
-      const removeListeners = () => {
-        this.off(listener, onResponse)
-        abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
-      }
+    const onResponse = (result: any) => (result.error
+      ? wait.reject(toError(result.error))
+      : wait.resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
 
-      const onResponse = (result: any) => {
-        removeListeners()
-        return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
-      }
-
-      abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
-      this.once(listener, onResponse)
+    wait.release(() => {
+      this.off(listener, onResponse)
+      abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
     })
+
+    abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
+    this.once(listener, onResponse)
+
+    return wait.promise
   }
 
   /** Send ping, record time, re-open if nothing comes back, repeat */
@@ -585,18 +551,15 @@ export class Socket extends SDKEventEmitter {
       // sends, and without a deadline of its own the chain stops here and
       // `reopen` is never reached. The deadline lives in `ping` rather than in
       // `send`, so no other caller inherits a reply timeout.
-      let deadline: NodeJS.Timer | number | undefined
-      const answered = new Promise<void>((_, expire) => {
-        deadline = setTimeout(
-          () => expire(new Error('[ddp] ping went unanswered')),
-          this.config.ping
-        )
-      })
+      const answered = new BoundedWait<void>(
+        this.config.ping,
+        () => answered.reject(new Error('[ddp] ping went unanswered'))
+      )
 
-      Promise.race([this.send({ msg: 'ping' }), answered])
+      Promise.race([this.send({ msg: 'ping' }), answered.promise])
         .then(() => this.ping())
         .catch(this.reopenUnlessAbandoned)
-        .finally(() => clearTimeout(deadline as any))
+        .finally(() => answered.cancel())
     }, this.config.ping)
   }
 
