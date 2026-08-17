@@ -163,62 +163,20 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
    * socket and resolve when the server acks them with `ready`. This gives the app
    * an observable readiness signal after a forced reconnect.
    *
-   * If the subscriptions are not yet present (e.g. immediately after reopenNow),
-   * it polls the socket subscription map until they appear or the deadline expires.
+   * The socket owns both the waiting and the re-sending: the re-send goes out under
+   * the ids the streams were first sent with, which this driver's own `subscribe`
+   * would drop.
    */
   waitForNotifyUserMediaSubs = (timeoutMs = this.ddp.config.timeout): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
     }
     const topic = 'stream-notify-user'
-    const names = ['media-signal', 'media-calls']
     const userId = this.userId
-    const findSubs = () => names.reduce(
-      (subs: ISubscription[], name) => subs.concat(
-        this.ddp.findSubscriptions({ name: topic, params: [`${userId}/${name}`] })
-      ),
-      []
+    return this.ddp.resubscribeWhenPresent(
+      ['media-signal', 'media-calls'].map(name => ({ name: topic, params: [`${userId}/${name}`] })),
+      timeoutMs
     )
-    // Go through the raw socket: the driver's subscribe() wrapper reshapes its
-    // arguments and would drop the subscription id, making the server treat the
-    // resubscribe as a brand new subscription.
-    const resubscribe = (subs: any[]) => Promise.all(
-      subs.map((sub: any) => this.ddp.subscribe(topic, sub.params, undefined, sub.id))
-    )
-      .then(results => {
-        const unacknowledged = subs.filter((_: any, index: number) => !results[index])
-        unacknowledged.forEach((sub: any) => this.logger.error(
-          `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
-        ))
-        return unacknowledged.length === 0
-      })
-      .catch(() => false)
-    return new Promise<boolean>(resolve => {
-      let settled = false
-      let inFlight = false
-      const finish = (value: boolean) => {
-        if (settled) return
-        settled = true
-        clearInterval(poll)
-        clearTimeout(deadline)
-        resolve(value)
-      }
-      const attempt = () => {
-        if (inFlight) return
-        const subs = findSubs()
-        const allPresent = names.every(name => subs.some((sub: any) => sub.params?.[0] === `${userId}/${name}`))
-        if (allPresent) {
-          inFlight = true
-          resubscribe(subs).then(value => {
-            inFlight = false
-            finish(value)
-          })
-        }
-      }
-      const deadline = setTimeout(() => finish(false), timeoutMs)
-      const poll = setInterval(attempt, 100)
-      attempt()
-    })
   }
 
   subscribeRoom = (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> => {

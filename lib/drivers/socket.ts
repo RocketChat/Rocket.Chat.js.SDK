@@ -773,6 +773,59 @@ export class Socket extends SDKEventEmitter {
         params.every((param, index) => sub.params?.[index] === param)
       ))
 
+  /**
+   * Re-send the given streams on the current connection under the ids they were
+   * first sent with, and resolve on whether the server acked every one of them.
+   *
+   * A stream is only re-sent once a DDP subscription for it is recorded here, so
+   * a caller reaching for one that has not been established yet — immediately
+   * after a Reopen, say — waits for it: every stream asked for has to be recorded
+   * before anything goes out, or the deadline expires and this resolves false.
+   */
+  resubscribeWhenPresent = (
+    streams: { name: string, params: any[] }[],
+    timeoutMs = this.config.timeout
+  ): Promise<boolean> => {
+    const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
+    const resubscribe = (subs: ISubscription[]) => Promise.all(
+      subs.map((sub) => this.subscribe(sub.name, sub.params, undefined, sub.id))
+    )
+      .then((results) => {
+        const unacknowledged = subs.filter((_, index) => !results[index])
+        unacknowledged.forEach((sub) => this.logger.error(
+          `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
+        ))
+        return unacknowledged.length === 0
+      })
+      .catch(() => false)
+
+    return new Promise<boolean>((resolve) => {
+      let settled = false
+      let inFlight = false
+      const finish = (value: boolean) => {
+        if (settled) return
+        settled = true
+        clearInterval(poll)
+        clearTimeout(deadline)
+        resolve(value)
+      }
+      const attempt = () => {
+        if (inFlight) return
+        const perStream = recordedPerStream()
+        if (!perStream.every((subs) => subs.length > 0)) return
+        inFlight = true
+        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as ISubscription[])
+        resubscribe(recorded).then((value) => {
+          inFlight = false
+          finish(value)
+        })
+      }
+      const deadline = setTimeout(() => finish(false), timeoutMs)
+      const poll = setInterval(attempt, 100)
+      attempt()
+    })
+  }
+
   /** Subscribe to all pre-configured streams (e.g. on login resume) */
   subscribeAll = () => {
     const subscriptions = Object.keys(this.subscriptions || {}).map((key) => {

@@ -124,6 +124,76 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
+  describe('resubscribing once the streams asked for are present', () => {
+    const streams = [
+      { name: 'stream-notify-user', params: ['uid/media-signal'] },
+      { name: 'stream-notify-user', params: ['uid/media-calls'] }
+    ]
+
+    it('waits for every stream, then re-sends each under its own id', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal'])
+
+      const waiting = socket.resubscribeWhenPresent(streams)
+      let resolved: boolean | undefined
+      waiting.then((value) => { resolved = value })
+
+      // One of the two is not enough to start.
+      await jest.advanceTimersByTimeAsync(100)
+      expect(resolved).toBeUndefined()
+
+      await subscribe('stream-notify-user', ['uid/media-calls'])
+      const sentBefore = transport.sent.length
+      await jest.advanceTimersByTimeAsync(100)
+
+      expect(transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame))).toEqual([
+        { msg: 'sub', id: 'ddp-1', name: 'stream-notify-user', params: ['uid/media-signal'] },
+        { msg: 'sub', id: 'ddp-2', name: 'stream-notify-user', params: ['uid/media-calls'] }
+      ])
+
+      // Readiness is the server's ack, not the send.
+      expect(resolved).toBeUndefined()
+      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+      transport.receive({ msg: 'ready', subs: ['ddp-2'] })
+
+      await expect(waiting).resolves.toBe(true)
+    })
+
+    it('resolves false on its deadline, and stops polling', async () => {
+      const waiting = socket.resubscribeWhenPresent(streams, 500)
+      const timersBefore = jest.getTimerCount()
+
+      await jest.advanceTimersByTimeAsync(500)
+
+      await expect(waiting).resolves.toBe(false)
+      // Both the deadline and the poll interval are gone — a leaked interval
+      // would keep resubscribing for the life of the process.
+      expect(jest.getTimerCount()).toBe(timersBefore - 2)
+    })
+
+    it('takes its deadline from the configured timeout when given none', async () => {
+      const waiting = socket.resubscribeWhenPresent(streams)
+      let resolved: boolean | undefined
+      waiting.then((value) => { resolved = value })
+
+      await jest.advanceTimersByTimeAsync(socket.config.timeout - 1)
+      expect(resolved).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(1)
+      await expect(waiting).resolves.toBe(false)
+    })
+
+    it('resolves false when the server refuses one of the resubscribes', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal'])
+      await subscribe('stream-notify-user', ['uid/media-calls'])
+
+      const waiting = socket.resubscribeWhenPresent(streams)
+      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+      transport.receive({ msg: 'nosub', id: 'ddp-2' })
+
+      await expect(waiting).resolves.toBe(false)
+    })
+  })
+
   describe('a subscription a reopen abandoned', () => {
     it('is kept under the id it was sent with', async () => {
       // The `sub` reached the wire and the server never answered it, so the
