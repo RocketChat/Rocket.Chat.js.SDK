@@ -455,16 +455,12 @@ describe('Socket connection lifecycle', () => {
       await socket.close()
       expect(socket.openTimeout).toBeUndefined()
 
-      // A reopen still arms on the next connection: the field being left set
-      // would read as "already scheduled" to every reopen from here on.
       const reopened = await openFakeConnection(socket)
       reopened.close(1006)
       expect(socket.openTimeout).toBeDefined()
     })
 
     it('does not let a reopen armed during the wait survive it', async () => {
-      // The close arrives by hand below with a code that is not 4000, which
-      // arms a reopen.
       transport.answersClose = false
       const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
       await jest.advanceTimersByTimeAsync(0)
@@ -488,8 +484,6 @@ describe('Socket connection lifecycle', () => {
       await driveToHandshake(replacement)
       await reopening
 
-      // The replacement's own close is none of this wait's business: only the
-      // socket close() asked to close can end it.
       replacement.close(INTENTIONAL_CLOSE)
       await jest.advanceTimersByTimeAsync(0)
       expect(settled).not.toHaveBeenCalled()
