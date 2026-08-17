@@ -6,7 +6,7 @@
 import { SDKEventEmitter } from '../emitter'
 import { logger as Logger } from '../log'
 import { Socket } from './socket'
-import type { ISocket, IDriver } from './definitions'
+import type { ISocket, IDriver, IStream } from './definitions'
 
 import {
   ISocketOptions,
@@ -173,7 +173,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     }
     const topic = 'stream-notify-user'
     const userId = this.userId
-    return this.ddp.resubscribeWhenPresent(
+    return this.ddp.resubscribeWhenRecorded(
       ['media-signal', 'media-calls'].map(name => ({ name: topic, params: [`${userId}/${name}`] })),
       timeoutMs
     )
@@ -207,6 +207,11 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
 	/** Unsubscribe from Meteor stream. Proxy for socket unsubscribe. */
   unsubscribe = (subscription: ISubscription) => {
     return this.ddp.unsubscribe(subscription.id)
+  }
+
+	/** Proxy for socket resubscribeWhenRecorded */
+  resubscribeWhenRecorded = (streams: IStream[], timeoutMs?: number): Promise<boolean> => {
+    return this.ddp.resubscribeWhenRecorded(streams, timeoutMs)
   }
 
 	/** Unsubscribe from all subscriptions. Proxy for socket unsubscribeAll */

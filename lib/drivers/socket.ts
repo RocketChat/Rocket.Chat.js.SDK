@@ -27,6 +27,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
+import { IStream } from './definitions'
 import { DDPError, toError } from './ddpError'
 import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
@@ -764,7 +765,7 @@ export class Socket extends SDKEventEmitter {
    * params given. `subscriptions` is keyed by DDP subscription id, so a caller
    * that knows a stream by name and params reads it through here.
    */
-  findSubscriptions = ({ name, params = [] }: { name: string, params?: any[] }): ISubscription[] =>
+  findSubscriptions = ({ name, params = [] }: IStream): ISubscription[] =>
     Object.keys(this.subscriptions || {})
       .map((id) => this.subscriptions[id])
       .filter((sub) => (
@@ -777,13 +778,11 @@ export class Socket extends SDKEventEmitter {
    * Re-send the given streams on the current connection under the ids they were
    * first sent with, and resolve on whether the server acked every one of them.
    *
-   * A stream is only re-sent once a DDP subscription for it is recorded here, so
-   * a caller reaching for one that has not been established yet — immediately
-   * after a Reopen, say — waits for it: every stream asked for has to be recorded
-   * before anything goes out, or the deadline expires and this resolves false.
+   * Nothing goes out until every stream asked for is recorded here, so the
+   * deadline expiring first resolves false.
    */
-  resubscribeWhenPresent = (
-    streams: { name: string, params: any[] }[],
+  resubscribeWhenRecorded = (
+    streams: IStream[],
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
     const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))

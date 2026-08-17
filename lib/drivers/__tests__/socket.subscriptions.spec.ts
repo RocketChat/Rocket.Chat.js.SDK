@@ -133,7 +133,7 @@ describe('Socket subscription bookkeeping', () => {
     it('waits for every stream, then re-sends each under its own id', async () => {
       await subscribe('stream-notify-user', ['uid/media-signal'])
 
-      const waiting = socket.resubscribeWhenPresent(streams)
+      const waiting = socket.resubscribeWhenRecorded(streams)
       let resolved: boolean | undefined
       waiting.then((value) => { resolved = value })
 
@@ -159,7 +159,7 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('resolves false on its deadline, and stops polling', async () => {
-      const waiting = socket.resubscribeWhenPresent(streams, 500)
+      const waiting = socket.resubscribeWhenRecorded(streams, 500)
       const timersBefore = jest.getTimerCount()
 
       await jest.advanceTimersByTimeAsync(500)
@@ -171,7 +171,7 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('takes its deadline from the configured timeout when given none', async () => {
-      const waiting = socket.resubscribeWhenPresent(streams)
+      const waiting = socket.resubscribeWhenRecorded(streams)
       let resolved: boolean | undefined
       waiting.then((value) => { resolved = value })
 
@@ -186,7 +186,7 @@ describe('Socket subscription bookkeeping', () => {
       await subscribe('stream-notify-user', ['uid/media-signal'])
       await subscribe('stream-notify-user', ['uid/media-calls'])
 
-      const waiting = socket.resubscribeWhenPresent(streams)
+      const waiting = socket.resubscribeWhenRecorded(streams)
       transport.receive({ msg: 'ready', subs: ['ddp-1'] })
       transport.receive({ msg: 'nosub', id: 'ddp-2' })
 
