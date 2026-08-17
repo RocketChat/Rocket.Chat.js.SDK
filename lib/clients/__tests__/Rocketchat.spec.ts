@@ -32,7 +32,16 @@ describe('client.ddp', () => {
     expect(subscribeRoom).toHaveBeenCalledWith('GENERAL')
   })
 
-  it('is the only name the client holds the Driver under', () => {
+  it('receives subscriptions made on the client, with the arguments in order', async () => {
+    const client = createClient()
+    const subscribe = jest.spyOn(client.ddp, 'subscribe').mockResolvedValue(undefined)
+
+    await client.subscribe('stream-room-messages', 'GENERAL', false)
+
+    expect(subscribe).toHaveBeenCalledWith('stream-room-messages', 'GENERAL', false)
+  })
+
+  it('replaces the socket field the client used to hold', () => {
     expect('socket' in createClient()).toBe(false)
   })
 })
