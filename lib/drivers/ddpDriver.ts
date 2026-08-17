@@ -6,7 +6,7 @@
 import { SDKEventEmitter } from '../emitter'
 import { logger as Logger } from '../log'
 import { Socket } from './ddp'
-import type { ISocket, IDriver } from './index'
+import type { ISocket, IDriver } from './definitions'
 
 import {
   ISocketOptions,
@@ -20,15 +20,6 @@ import {
 export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   logger: ILogger
   config: ISocketOptions
-	/**
-	 * Event Emitter for listening to connection (echoes selection of DDP events)
-	 * @example
-	 *  import { driver } from '@rocket.chat/sdk'
-	 *  driver.connect()
-	 *  driver.events.on('connected', () => console.log('driver connected'))
-	 */
-	// events = new EventEmitter()
-
 	/**
 	 * An Websocket instance for interacting with Rocket.Chat.
 	 * Variable not initialised until `connect` called.
@@ -44,19 +35,13 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
 	/** Array of joined room IDs (for reactive queries) */
   joinedIds: string[] = []
 
-  // `integrationId` is destructured only to keep it out of `...moreConfigs`,
-  // which is spread into `this.config`.
-  constructor ({ host = 'localhost:3000', integrationId: _integrationId, config, logger = Logger, ...moreConfigs }: any = {}) {
+  constructor ({ host = 'localhost:3000', config, logger = Logger, ...moreConfigs }: any = {}) {
     super()
 
     const options = {
       ...config,
       ...moreConfigs,
       host: host.replace(/(^\w+:|^)\/\//, '')
-			// reopen: number
-			// ping: number
-			// close: number
-			// integration: string
     }
     this.ddp = new Socket({ ...options, logger })
     this.ddp.on('open', () => this.emit('connected'))

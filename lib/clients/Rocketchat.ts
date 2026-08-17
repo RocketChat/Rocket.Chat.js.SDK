@@ -1,4 +1,5 @@
-import { ISocket, IDriver, DDPDriver } from '../drivers'
+import type { ISocket, IDriver } from '../drivers/definitions'
+import { DDPDriver } from '../drivers/ddpDriver'
 import ClientRest from '../api/RocketChat'
 import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
@@ -8,7 +9,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   socket: Promise<ISocket | IDriver>
   ddp?: any
 
-  constructor ({ logger, allPublic: _allPublic, rooms: _rooms, integrationId: _integrationId, protocol: _protocol, ...config }: any) {
+  constructor ({ logger, ...config }: any) {
     super({ ...config, logger })
     this.logger = logger
     this.ddp = new DDPDriver({ ...config, logger })

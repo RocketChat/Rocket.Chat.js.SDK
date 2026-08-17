@@ -1,4 +1,4 @@
-import { DDPDriver } from '../index'
+import { DDPDriver } from '../ddpDriver'
 import { ISocketOptions } from '../../../interfaces'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
