@@ -59,7 +59,7 @@ The error field of a failed DDP response, as the server sent it. What the SDK ra
 _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 
 **DDP subscription**:
-A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry.
+A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry. A recorded DDP subscription does not prove the server confirmed it — see Abandoned sub and ADR-0006.
 _Avoid_: Sub, subscription (unqualified), the map, the collection (that is a field on an incoming DDP message)
 
 **Abandoned sub**:

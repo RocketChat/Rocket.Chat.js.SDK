@@ -102,6 +102,28 @@ describe('Socket subscription bookkeeping', () => {
     transport.receive({ msg: 'ready', subs: ['ddp-1'] })
   })
 
+  describe('finding a subscription by name and params', () => {
+    it('matches on the stream name and the params given', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal', false])
+      await subscribe('stream-notify-user', ['uid/media-calls', false])
+      await subscribe('stream-room-messages', ['GENERAL'])
+
+      expect(socket.findSubscriptions({ name: 'stream-notify-user', params: ['uid/media-signal'] }))
+        .toMatchObject([{ id: 'ddp-1', params: ['uid/media-signal', false] }])
+      expect(socket.findSubscriptions({ name: 'stream-notify-user' })).toHaveLength(2)
+      expect(socket.findSubscriptions({ name: 'stream-notify-user', params: ['uid/media-video'] })).toEqual([])
+      expect(socket.findSubscriptions({ name: 'stream-room-messages' })).toHaveLength(1)
+    })
+
+    it('finds nothing while the subscription is still in flight', () => {
+      socket.subscribe('stream-notify-user', ['uid/media-signal', false])
+
+      expect(socket.findSubscriptions({ name: 'stream-notify-user' })).toEqual([])
+
+      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    })
+  })
+
   describe('a subscription a reopen abandoned', () => {
     it('is kept under the id it was sent with', async () => {
       // The `sub` reached the wire and the server never answered it, so the

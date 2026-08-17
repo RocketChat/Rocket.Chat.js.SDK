@@ -767,6 +767,20 @@ export class Socket extends SDKEventEmitter {
     return subscription
   }
 
+  /**
+   * The DDP subscriptions on this Socket for one stream name, matched on the
+   * params given. `subscriptions` is keyed by DDP subscription id, so a caller
+   * that knows a stream by name and params reads it through here.
+   */
+  findSubscriptions = ({ name, params = [] }: { name: string, params?: any[] }): ISubscription[] =>
+    Object.keys(this.subscriptions || {})
+      .map((id) => this.subscriptions[id])
+      .filter((sub) => (
+        sub &&
+        sub.name === name &&
+        params.every((param, index) => sub.params?.[index] === param)
+      ))
+
   /** Subscribe to all pre-configured streams (e.g. on login resume) */
   subscribeAll = () => {
     const subscriptions = Object.keys(this.subscriptions || {}).map((key) => {
@@ -818,13 +832,6 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
 	 */
   ddp: Socket
 
-	/**
-	 * Websocket subscriptions, exported for direct polling by adapters
-	 * Variable not initialised until `prepMeteorSubscriptions` called.
-	 * @deprecated Use `ddp.Socket` instance subscriptions instead.
-	 */
-  subscriptions: { [id: string]: ISubscription } = {}
-
 	/** Save messages subscription to ensure only one created */
   messages: ISubscription | undefined
 
@@ -871,7 +878,6 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     }
     return new Promise((resolve, reject) => {
       this.logger.info('[driver] Connecting', { ...this.config, ...c })
-      this.subscriptions = this.ddp.subscriptions
 
       const onConnected = () => {
         this.logger.info('[driver] Connected')
@@ -983,13 +989,12 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     const topic = 'stream-notify-user'
     const names = ['media-signal', 'media-calls']
     const userId = this.userId
-    const findSubs = () => Object.keys(this.ddp.subscriptions || {})
-      .map(id => this.ddp.subscriptions[id])
-      .filter((sub: any) => (
-        sub &&
-        sub.name === topic &&
-        names.some(name => sub.params?.[0] === `${userId}/${name}`)
-      ))
+    const findSubs = () => names.reduce(
+      (subs: ISubscription[], name) => subs.concat(
+        this.ddp.findSubscriptions({ name: topic, params: [`${userId}/${name}`] })
+      ),
+      []
+    )
     // Go through the raw socket: the driver's subscribe() wrapper reshapes its
     // arguments and would drop the subscription id, making the server treat the
     // resubscribe as a brand new subscription.
