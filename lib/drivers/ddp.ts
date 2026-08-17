@@ -37,7 +37,7 @@ const userDisconnectCloseCode = 4000;
 const socketOpen = 1;
 const socketClosed = 3;
 
-const defaultSocketDeadline = 2000;
+const socketDeadlineMs = 2000;
 
 const abandonedByReopen = '[ddp] connection reopened before the response arrived'
 const abandonedByClose = '[ddp] connection closed before the response arrived'
@@ -236,8 +236,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Unhook every handler from a socket, so nothing it does afterwards reaches
-   * this driver. Closing it is a separate obligation, left to the caller.
+   * Closing the socket is a separate obligation, left to the caller.
    *
    * An open of this socket that is still pending is abandoned on a microtask,
    * so a handshake rejection already in flight settles it first.
@@ -256,10 +255,6 @@ export class Socket extends SDKEventEmitter {
     this.connection !== undefined && this.connection !== connection
 
   /**
-   * Ask the transport to close and wait for that socket's own close event, up
-   * to `deadlineMs`. Past that, or when the transport refuses to close at all,
-   * the driver answers the question itself.
-   *
    * The wait ends on this socket's `onclose` rather than on the driver's
    * `close` event: a close emitted for the connection that replaced this one
    * says nothing about the socket being closed here.
@@ -317,7 +312,7 @@ export class Socket extends SDKEventEmitter {
     const connection = this.connection
 
     if (connection && connection.readyState !== socketClosed) {
-      await this.waitForClose(connection, defaultSocketDeadline)
+      await this.waitForClose(connection, socketDeadlineMs)
     }
 
     if (this.replaced(connection)) return
@@ -425,7 +420,7 @@ export class Socket extends SDKEventEmitter {
    * Bounded liveness check for a socket in the gray zone. Returns true only if
    * the socket is open and the server answers the ping within the deadline.
    */
-  probe = (deadlineMs = defaultSocketDeadline): Promise<boolean> => {
+  probe = (deadlineMs = socketDeadlineMs): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
       const connection = this.connection
       if (!connection || connection.readyState !== socketOpen) {
