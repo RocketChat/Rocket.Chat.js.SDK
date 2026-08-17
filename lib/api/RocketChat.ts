@@ -21,22 +21,20 @@ export const userFields = { name: 1, username: 1, status: 1, type: 1 }
 export default class ApiRocketChat extends ApiBase {
 
   get users (): any {
-    const self = this
     return {
-      all (fields: any = userFields) { return self.get('users.list', { fields }).then((r: any) => r.users) },
-      allNames () { return self.get('users.list', { fields: { 'username': 1 } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)) },
-      allIDs () { return self.get('users.list', { fields: { '_id': 1 } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)) },
-      online (fields: any = userFields) { return self.get('users.list', { fields, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users) },
-      onlineNames () { return self.get('users.list', { fields: { 'username': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)) },
-      onlineIds () { return self.get('users.list', { fields: { '_id': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)) },
-      async info (username: string): Promise<IUserAPI> { return (await self.get('users.info', { username }, true)).user }
+      all: (fields: any = userFields) => this.get('users.list', { fields }).then((r: any) => r.users),
+      allNames: () => this.get('users.list', { fields: { 'username': 1 } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)),
+      allIDs: () => this.get('users.list', { fields: { '_id': 1 } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)),
+      online: (fields: any = userFields) => this.get('users.list', { fields, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users),
+      onlineNames: () => this.get('users.list', { fields: { 'username': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)),
+      onlineIds: () => this.get('users.list', { fields: { '_id': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)),
+      info: async (username: string): Promise<IUserAPI> => (await this.get('users.info', { username }, true)).user
     }
   }
 
   get rooms (): any {
-    const self = this
     return {
-      info ({ rid }: any) { return self.get('rooms.info', { rid }, true) }
+      info: ({ rid }: any) => this.get('rooms.info', { rid }, true)
     }
   }
 

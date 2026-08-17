@@ -1,48 +1,24 @@
 {
-	// Lint runs in CI and gates on errors only, so oxlint's exit code blocks new
-	// violations without the pre-existing warning debt blocking this branch. There
-	// is deliberately no warning-count threshold: the counter would need updating
-	// on every change and would gate on a number rather than on a rule.
+	// Lint runs in CI and gates on errors only. Every rule with no violations left
+	// is at "error", so it blocks that shape coming back. The two rules still at
+	// "warn" each have exactly one violation that is correct as written:
 	//
-	// No source file is edited to satisfy the linter, and there are no inline
-	// suppressions. The reasoning lives here instead, one entry per group.
-	//
-	// Debt — clears as behaviour fixes land, since each fix rewrites a runtime
-	// expression. There is no single "behaviour PR": each known defect is one issue
-	// and one PR, so this debt clears a piece at a time and most PRs clear none.
-	//
-	//   no-this-alias                  2  lib/api/RocketChat.ts
-	//
-	//     No issue owns these two. Nothing on the
-	//     tracker will clear them as a side effect — they need their own change.
-	//
-	// Not debt — correct as written, do not "fix":
-	//
-	//   triple-slash-reference         1  lib/drivers/socket.ts
+	//   triple-slash-reference         lib/drivers/socket.ts
 	//     NEVER FIX. It points at an ambient module declaration, and ambient
 	//     modules are not importable. It is also the only thing pulling that
 	//     declaration into the *app's* compile — the app's config will never glob
 	//     this repo's declaration directory. Deleting it breaks the app with an
 	//     implicit-any error that this repo's CI cannot observe.
 	//
-	//   no-unsafe-declaration-merging  1  lib/message.ts
+	//   no-unsafe-declaration-merging  lib/message.ts
 	//     A documented workaround for a long-standing TypeScript issue.
 	//
-	// Total: 4 warnings, 0 errors.
-	//
-	// Every warning above is shipped-source debt. Specs and test helpers lint under
-	// these same rules — there are no test-file overrides and no rule changes for
-	// them — and test code stays at zero warnings. So the count above is also the
-	// budget: if it grows, the growth came from test code and is a real regression.
-	//
-	// A rule reaches "error" once its entry above is cleared, and every rule still
-	// at "warn" carries violations.
-	//
-	// `no-async-promise-executor` has no violations left, so it gates at "error":
-	// an async executor swallows throws, and a plain async method does the same job.
+	// There are no inline suppressions and no test-file overrides; specs lint under
+	// these same rules. So those two are the whole warning budget — any other
+	// warning is new and should be fixed rather than added here.
 	"rules": {
 		"no-unused-expressions": "error",
-		"no-this-alias": "warn",
+		"no-this-alias": "error",
 		"no-async-promise-executor": "error",
 		"triple-slash-reference": "warn",
 		"no-unsafe-declaration-merging": "warn",
