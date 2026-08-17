@@ -1,16 +1,14 @@
 import type { ISocket } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
 import ClientRest from '../api/RocketChat'
-import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
+import { ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
-  logger: ILogger = Logger
   ddp: Driver
 
-  constructor ({ logger, ...config }: any) {
+  constructor ({ logger = Logger, ...config }: any) {
     super({ ...config, logger })
-    this.logger = logger
     this.ddp = new Driver({ ...config, logger })
   }
 
