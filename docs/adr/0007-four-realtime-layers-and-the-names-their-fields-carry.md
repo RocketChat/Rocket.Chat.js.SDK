@@ -81,4 +81,18 @@ and an `/** @internal */` tag alone, which enforces nothing.
   vocabulary is not carried into the code; renaming it is not part of this
   decision.
 - Until the app moves, the documentation is ahead of the code: CONTEXT.md
-  reserves `ddp` as a qualifier while `Driver.ddp` still exists.
+  reserves `ddp` as a qualifier while `Driver.ddp` still exists. Issue #338
+  stays open until the renames land.
+
+## Migration
+
+The renames land in one SDK pull request, paired with one in the app, merged in
+this order:
+
+1. This SDK PR renames `Driver.ddp` to a private `socket`, `RocketChatClient.ddp`
+   to `driver`, and drops `implements ISocket` from the Client.
+2. The app PR pins that SDK commit and updates its readers in the same change —
+   `sdk.current?.ddp` becomes `sdk.current?.driver`, and its integration tests
+   move to `driver['socket']`.
+3. Neither merges alone. Since the app types this SDK loosely, a half-landed
+   rename fails at runtime as `undefined` rather than at compile time.
