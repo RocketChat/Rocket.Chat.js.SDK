@@ -191,18 +191,28 @@ an Error that the SDK writes.
   may be one the transport never called open at all — a still-connecting socket is
   closed and waited on the same way, and letting it go settles that open as an
   Abandoned wait rather than leaving it pending — and a stale ping cannot vouch for
-  any of them, so the close frame may never be answered. That is the liveness
+  any of them, so the close may never be answered. That is the liveness
   question `probe` asks, not the patience question `timeout` asks, and binding a
   logout's exit to `timeout` would make the app that raised it slowest to leave.
   On the Deadline the Socket becomes a Detached socket rather than one the driver
   keeps waiting on: a socket the peer never releases costs less than a caller — a
   logout, a teardown, a Reopen — that never returns.
   This Deadline settles the wait rather than rejecting it, because `close` promises
-  only that the driver has let the connection go, which is true either way. The
-  driver emits `close` itself when the Deadline wins, carrying the user-disconnect
-  code, so an in-flight `send` learns its connection ended on the same event the
-  transport would have used and no Reopen follows — the driver standing in for the
-  transport's event, on the same rule as the Connected echo.
+  only that the driver has let the connection go, which is true either way.
+  When the transport neither answers nor accepts the close, the driver answers
+  itself by feeding a close event with the user-disconnect code through `onClose`,
+  rather than emitting `close` directly. `onClose` therefore stays the sole owner
+  of the identity guard, the emit, the Reopen decision — code 4000 skips the
+  Reopen — and the log line, and an in-flight `send` learns its connection ended
+  on the same event the transport would have used.
+  `close` does not unsubscribe. Closing the connection ends every stream on the
+  server, so `close` forgets its DDP subscriptions locally and sends no `unsub`.
+  `logout` is the deliberate exception: it stays on the same connection, so it
+  awaits its own `unsubscribeAll`.
+  The reject of a not-yet-open Socket is held per Socket, because a detach can run
+  on an old Socket while a newer open is still pending, and a single field would
+  settle the wrong wait. It is settled on a microtask, so a handshake rejection
+  already in flight settles that wait first.
 - **Third amendment.** The second amendment says a send waiting on a connection
   that stays open and merely quiet is unaffected, and that its Deadline still
   bounds it. Neither holds now. Whether `send` waits at all is decided on the
