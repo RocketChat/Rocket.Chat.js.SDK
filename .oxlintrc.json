@@ -11,10 +11,9 @@
 	// expression. There is no single "behaviour PR": each known defect is one issue
 	// and one PR, so this debt clears a piece at a time and most PRs clear none.
 	//
-	//   no-unused-expressions          4  lib/api/api.ts (3), lib/drivers/socket.ts (1)
 	//   no-this-alias                  2  lib/api/RocketChat.ts
 	//
-	//     No issue owns these six. Nothing on the
+	//     No issue owns these two. Nothing on the
 	//     tracker will clear them as a side effect — they need their own change.
 	//
 	// Not debt — correct as written, do not "fix":
@@ -29,7 +28,7 @@
 	//   no-unsafe-declaration-merging  1  lib/message.ts
 	//     A documented workaround for a long-standing TypeScript issue.
 	//
-	// Total: 8 warnings, 0 errors.
+	// Total: 4 warnings, 0 errors.
 	//
 	// Every warning above is shipped-source debt. Specs and test helpers lint under
 	// these same rules — there are no test-file overrides and no rule changes for
@@ -42,7 +41,7 @@
 	// `no-async-promise-executor` has no violations left, so it gates at "error":
 	// an async executor swallows throws, and a plain async method does the same job.
 	"rules": {
-		"no-unused-expressions": "warn",
+		"no-unused-expressions": "error",
 		"no-this-alias": "warn",
 		"no-async-promise-executor": "error",
 		"triple-slash-reference": "warn",
