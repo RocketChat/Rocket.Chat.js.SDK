@@ -207,7 +207,7 @@ export default class Api extends SDKEventEmitter {
   }
 
   loggedIn () {
-    return Object.keys(this.currentLogin || {} as any).every((e: any) => e)
+    return this.currentLogin !== null
   }
 /**
 	* Do a request to an API endpoint.
@@ -230,7 +230,7 @@ export default class Api extends SDKEventEmitter {
     this.logger?.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
       if (auth && !this.loggedIn()) {
-        throw new Error('')
+        throw new Error(`API ${ method } ${ endpoint } requires a login`)
       }
 
       const { signal } = this.controller;
@@ -283,7 +283,7 @@ export default class Api extends SDKEventEmitter {
   }
 
   async login (credentials: ICredentials, args?: any): Promise<any> {
-    const { data } = await this.post('login', { ...credentials, ...args })
+    const { data } = await this.post('login', { ...credentials, ...args }, false)
     this.userId = data.userId
     this.currentLogin = {
       username: data.me.username,
