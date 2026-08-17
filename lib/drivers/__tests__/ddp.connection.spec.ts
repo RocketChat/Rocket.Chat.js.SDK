@@ -463,8 +463,8 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('does not let a reopen armed during the wait survive it', async () => {
-      // The peer answers the close with its own code rather than echoing 4000,
-      // which real sockets do — and a code that is not 4000 arms a reopen.
+      // The close arrives by hand below with a code that is not 4000, which
+      // arms a reopen.
       transport.answersClose = false
       const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
       await jest.advanceTimersByTimeAsync(0)

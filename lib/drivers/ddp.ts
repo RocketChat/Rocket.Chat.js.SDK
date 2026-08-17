@@ -199,7 +199,7 @@ export class Socket extends SDKEventEmitter {
       if (e?.code !== userDisconnectCloseCode) {
         this.reopen()
       }
-      this.logger.info(`[ddp] Close (${e?.code})`)
+      this.logger.info(`[ddp] Close (${e?.code})${e?.reason ? `: ${e.reason}` : ''}`)
     } catch (error) {
       this.logger.error(error)
     }
@@ -286,10 +286,7 @@ export class Socket extends SDKEventEmitter {
 
       const answerOurselves = (reason: string) => {
         if (connection.onclose === onTransportClose) connection.onclose = driverOnClose
-        if (!this.replaced(connection)) {
-          this.logger.info(`[ddp] Close (${userDisconnectCloseCode}) announced by the driver: ${reason}`)
-          this.emit('close', { code: userDisconnectCloseCode, reason, wasClean: false })
-        }
+        this.onClose({ code: userDisconnectCloseCode, reason, wasClean: false }, connection)
         settle()
       }
 
