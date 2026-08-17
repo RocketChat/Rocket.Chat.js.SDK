@@ -308,10 +308,9 @@ export class Socket extends SDKEventEmitter {
    * close ends them on the server, so no `unsub` is sent. A reopen during the
    * wait that installed a different connection over this one supersedes the
    * close: that socket and the subscriptions it filled are left as they are.
-   * Resolves false in that case, true when the connection was let go.
    * See ADR-0003.
    */
-  close = async (deadlineMs = defaultSocketDeadline): Promise<boolean> => {
+  close = async (deadlineMs = defaultSocketDeadline): Promise<void> => {
     this.settleReopen?.()
 
     const connection = this.connection
@@ -320,7 +319,7 @@ export class Socket extends SDKEventEmitter {
       await this.waitForClose(connection, deadlineMs)
     }
 
-    if (this.replaced(connection)) return false
+    if (this.replaced(connection)) return
 
     this.cancelScheduledReopen()
     if (this.pingTimeout) {
@@ -334,7 +333,6 @@ export class Socket extends SDKEventEmitter {
     }
 
     this.forgetAllSubscriptions()
-    return true
   }
 
   /** Drop one DDP subscription. */

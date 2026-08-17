@@ -298,6 +298,27 @@ describe('Socket connection lifecycle', () => {
       expect(socket.subscriptions).toEqual({})
     })
 
+    it('resolves with undefined on both the normal and the already-replaced path', async () => {
+      await expect(socket.close()).resolves.toBeUndefined()
+      await jest.advanceTimersByTimeAsync(0)
+
+      const reopened = await openFakeConnection(socket)
+      reopened.answersClose = false
+      const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+      await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE - 1)
+
+      const reopening = socket.reopenNow()
+      const replacement = fakeSockets[fakeSockets.length - 1]
+      await driveToHandshake(replacement)
+      await reopening
+
+      await jest.advanceTimersByTimeAsync(1)
+      await expect(closing).resolves.toBeUndefined()
+
+      replacement.close(INTENTIONAL_CLOSE)
+      await jest.advanceTimersByTimeAsync(0)
+    })
+
     describe('when the peer never answers', () => {
       beforeEach(() => {
         transport.answersClose = false
