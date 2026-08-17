@@ -71,7 +71,7 @@ describe('Driver.subscribe', () => {
     // arguments are buried under `args`.
     //
     // The id is dropped on the way through — the socket's `subscribe` takes one,
-    // the driver's does not and never passes it — so the frame carries a fresh
+    // the Driver's does not and never passes it — so the frame carries a fresh
     // send-time id instead. Resubscribing through this method therefore cannot
     // reuse an existing subscription's id; `waitForNotifyUserMediaSubs` goes
     // through the Socket for exactly that reason.

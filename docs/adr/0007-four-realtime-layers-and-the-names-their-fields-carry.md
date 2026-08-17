@@ -86,10 +86,17 @@ and an `/** @internal */` tag alone, which enforces nothing.
 
 ## Migration
 
-The renames land in one SDK pull request, paired with one in the app, merged in
-this order:
+Only one of the three renames breaks the app's production code: `RocketChatClient.ddp`
+to `driver`, which `sdk.current?.ddp` reads by name. Making `Driver.ddp` private
+breaks only the app's integration tests, and dropping `implements ISocket` breaks
+nothing there, since the app types this SDK through a loose module declaration.
+They still land together, so the vocabulary arrives in one piece rather than in
+three states nobody can name.
 
-1. This SDK PR renames `Driver.ddp` to a private `socket`, `RocketChatClient.ddp`
+The renames land in a follow-up SDK pull request, paired with one in the app,
+merged in this order:
+
+1. The SDK PR renames `Driver.ddp` to a private `socket`, `RocketChatClient.ddp`
    to `driver`, and drops `implements ISocket` from the Client.
 2. The app PR pins that SDK commit and updates its readers in the same change —
    `sdk.current?.ddp` becomes `sdk.current?.driver`, and its integration tests

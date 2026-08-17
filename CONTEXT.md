@@ -40,11 +40,11 @@ _Avoid_: SDK instance, connection
 
 **Driver**:
 The realtime layer behind a Client, speaking one wire protocol to the server. Not something a consuming app talks to directly.
-_Avoid_: Socket (that is the DDP layer inside a Driver), transport (that is the layer two below), adapter
+_Avoid_: Socket (that is the DDP layer inside a Driver), Transport (that is the layer two below), adapter
 
 **Socket**:
 The DDP layer inside a Driver — it performs the DDP handshake, runs the Liveness chain, holds the DDP subscriptions, and owns one Transport. A Driver owns a Socket and mirrors part of its surface, but is a layer above it.
-_Avoid_: Websocket, Transport (that is the layer below), ddp
+_Avoid_: Websocket (a Socket is not one; the Transport it owns is), Transport (that is the layer below), ddp
 
 **Transport**:
 The raw websocket a Socket owns and writes its DDP messages to. The layer below a Socket, and the only one with no DDP vocabulary of its own.

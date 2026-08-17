@@ -204,17 +204,14 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     }
 
   }
-	/** Unsubscribe from Meteor stream. Proxy for Socket unsubscribe. */
   unsubscribe = (subscription: ISubscription) => {
     return this.ddp.unsubscribe(subscription.id)
   }
 
-	/** Proxy for Socket resubscribeWhenRecorded */
   resubscribeWhenRecorded = (streams: IStream[], timeoutMs?: number): Promise<boolean> => {
     return this.ddp.resubscribeWhenRecorded(streams, timeoutMs)
   }
 
-	/** Unsubscribe from all subscriptions. Proxy for Socket unsubscribeAll */
   unsubscribeAll = (): Promise<void> => {
     return this.ddp.unsubscribeAll()
   }
