@@ -294,10 +294,16 @@ export default class Api extends SDKEventEmitter {
   }
 
   resumeLogin ({ userId, authToken }: { userId: string, authToken: string }) {
-    if (this.currentLogin && this.currentLogin.userId === userId) {
+    const sameUser = this.currentLogin && this.currentLogin.userId === userId
+    if (sameUser && this.currentLogin!.authToken === authToken) {
       return
     }
-    this.setLogin({ username: null, userId, authToken, result: null })
+    this.setLogin({
+      username: sameUser ? this.currentLogin!.username : null,
+      userId,
+      authToken,
+      result: sameUser ? this.currentLogin!.result : null
+    })
   }
 
   private setLogin (login: NonNullable<Api['currentLogin']>) {

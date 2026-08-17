@@ -66,7 +66,7 @@ describe('client.resume', () => {
     })
   })
 
-  const loggedIn = async () => {
+  const loggedInClient = async () => {
     const rest = new FakeClient()
     const client = new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client: rest })
     jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
@@ -81,16 +81,25 @@ describe('client.resume', () => {
     return client
   }
 
-  it('leaves an existing login for the same user untouched', async () => {
-    const client = await loggedIn()
+  it('leaves an existing login with the same credentials untouched', async () => {
+    const client = await loggedInClient()
 
-    await client.resume({ token: 'other-token' })
+    await client.resume({ token: 'token' })
 
     expect(client.currentLogin).toMatchObject({ username: 'user', authToken: 'token' })
   })
 
+  it('replaces the login when the token has rotated', async () => {
+    const client = await loggedInClient()
+    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'rotated' } as any)
+
+    await client.resume({ token: 'rotated' })
+
+    expect(client.currentLogin).toMatchObject({ userId: 'id', authToken: 'rotated', username: 'user' })
+  })
+
   it('replaces the login when resuming as another user', async () => {
-    const client = await loggedIn()
+    const client = await loggedInClient()
     jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'other-id', token: 'other-token' } as any)
 
     await client.resume({ token: 'other-token' })
