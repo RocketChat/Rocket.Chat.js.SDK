@@ -155,8 +155,6 @@ export class Socket extends SDKEventEmitter {
 
     if (this.reopenPromise) {
       await this.reopenPromise
-      // A close can settle the forced reconnect and tear its socket down; open
-      // what is missing rather than resolve with nothing.
       if (!this.connected) {
         await this.createConnection()
       }
@@ -190,9 +188,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   onClose = (e: any, closedConnection?: WebSocket) => {
-    // Only the current connection's close may flip app state or arm a reopen: a
-    // detached socket's late close would clobber the live connection and the app
-    // would falsely show "Waiting for network".
+    // A detached socket's late close would clobber the live connection.
     if (closedConnection && closedConnection !== this.connection) {
       return
     }
@@ -316,8 +312,6 @@ export class Socket extends SDKEventEmitter {
    * See ADR-0003.
    */
   close = async (deadlineMs = defaultSocketDeadline): Promise<boolean> => {
-    // A forced reconnect still pending loses to the disconnect: settle it, and
-    // close the socket it built like any other.
     this.settleReopen?.()
 
     const connection = this.connection
@@ -328,7 +322,6 @@ export class Socket extends SDKEventEmitter {
 
     if (this.replaced(connection)) return false
 
-    // After the wait, not before: a reopen armed during it must not survive it.
     this.cancelScheduledReopen()
     if (this.pingTimeout) {
       clearTimeout(this.pingTimeout as any)
