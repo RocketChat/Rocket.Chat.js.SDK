@@ -1,4 +1,4 @@
-import { DDPDriver } from '../ddp'
+import { Driver } from '../driver'
 import { ISocketOptions } from '../../../interfaces'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
@@ -19,7 +19,7 @@ useFakeClockAndSocketRegistry()
 // Typed rather than `object`: the option names have to typecheck, or the pin on
 // the discarded timeout would go green against a typo.
 const createDriver = (options: ISocketOptions = {}) =>
-  new DDPDriver({ host: 'localhost:3000', logger: createSilentLogger(), ...options })
+  new Driver({ host: 'localhost:3000', logger: createSilentLogger(), ...options })
 
 /**
  * Accepted gaps, on the record rather than silently skipped:
@@ -35,7 +35,7 @@ const createDriver = (options: ISocketOptions = {}) =>
  *   that a line of code exists.
  */
 
-describe('new DDPDriver', () => {
+describe('new Driver', () => {
   it('strips the protocol from the host it was given', () => {
     const driver = createDriver({ host: 'https://open.rocket.chat' })
 
@@ -59,7 +59,7 @@ describe('new DDPDriver', () => {
   })
 })
 
-describe('DDPDriver.subscribe', () => {
+describe('Driver.subscribe', () => {
   it('reshapes its arguments and drops the id on the way through', async () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver.ddp)
@@ -95,12 +95,12 @@ describe('DDPDriver.subscribe', () => {
   })
 })
 
-describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
+describe('Driver.waitForNotifyUserMediaSubs', () => {
   const userId = 'user-id'
   const topic = 'stream-notify-user'
 
   /** Register a media subscription on the socket, as a successful sub would. */
-  const addMediaSub = async (driver: DDPDriver, transport: FakeWebSocket, name: string) => {
+  const addMediaSub = async (driver: Driver, transport: FakeWebSocket, name: string) => {
     const id = `sub-${name}`
     // Through the raw socket, with an explicit id: this is the shape the
     // readiness poll looks for — `name` the topic, `params[0]` the user event.
@@ -315,7 +315,7 @@ describe('DDPDriver.waitForNotifyUserMediaSubs', () => {
   })
 })
 
-describe('DDPDriver.connect', () => {
+describe('Driver.connect', () => {
   it('keeps echoing open after a send has waited on it', async () => {
     // The driver holds a long-lived `open` listener that echoes the socket's
     // open as its own `connected`. A send that waits on open registers a `once`

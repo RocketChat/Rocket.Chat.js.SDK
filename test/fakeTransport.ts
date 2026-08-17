@@ -1,6 +1,6 @@
 import type WebSocketClient from 'universal-websocket-client'
 
-import type { Socket } from '../lib/drivers/ddp'
+import type { Socket } from '../lib/drivers/socket'
 
 /**
  * The one and only way a spec gets a websocket: the transport module is mocked

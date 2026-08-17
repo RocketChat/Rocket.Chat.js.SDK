@@ -51,9 +51,9 @@ case. A consuming app also adds its own listeners to the same emitter through
 - A listener that a caller removes during an emit still runs in that emit,
   because `emit` reads a copy. This result is what lets the cleanup of
   `waitForOpen` remove its own `once` and leave the `open` event for the listener
-  that `DDPDriver.connect` registers and keeps. Before this change, one send that
+  that `Driver.connect` registers and keeps. Before this change, one send that
   waited for `open` made the Driver permanently silent about each later Reopen.
-- A consuming app sees the correction, not only the SDK. `DDPDriver.onStreamData`
+- A consuming app sees the correction, not only the SDK. `Driver.onStreamData`
   gives the app a `stop` function, and `stop` calls `off` with the listener of the
   app. Two calls to `stop`, or one call after the listener was already gone,
   removed a different listener on the same event. `stop` now removes only the

@@ -1,8 +1,3 @@
-/**
- * @module Socket
- * Provides high-level helpers for DDP connection, method calls, subscriptions.
- */
-
 import { EventEmitter } from 'tiny-events'
 import {
   ILogger,
@@ -50,9 +45,4 @@ export interface IDriver {
   notifyVisitorTyping (rid: string, username: string, typing: boolean, token: string): Promise<any>
 
   methodCall (method: string, ...args: any[]): Promise<any>
-}
-
-export enum Protocols {
-	MQTT = 'mqtt',
-	DDP = 'ddp'
 }

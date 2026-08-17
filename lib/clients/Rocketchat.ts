@@ -1,4 +1,5 @@
-import { ISocket, IDriver, Protocols } from '../drivers'
+import type { ISocket, IDriver } from '../drivers/definitions'
+import { Driver } from '../drivers/driver'
 import ClientRest from '../api/RocketChat'
 import { ILogger, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
@@ -6,23 +7,13 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
   logger: ILogger = Logger
   socket: Promise<ISocket | IDriver>
-  ddp?: any
+  ddp: Driver
 
-  // `allPublic`, `rooms` and `integrationId` are destructured only to keep them
-  // out of `...config`, which is forwarded to `super` and to `DDPDriver`.
-  constructor ({ logger, allPublic: _allPublic, rooms: _rooms, integrationId: _integrationId, protocol = Protocols.DDP, ...config }: any) {
+  constructor ({ logger, ...config }: any) {
     super({ ...config, logger })
     this.logger = logger
-    switch (protocol) {
-      case Protocols.DDP:
-        this.socket = import(/* webpackChunkName: 'ddp' */ '../drivers/ddp').then(({ DDPDriver }) => {
-          this.ddp = new DDPDriver({ ...config, logger })
-          return this.ddp
-        })
-        break
-      default:
-        throw new Error(`Invalid Protocol: ${protocol}, valids: ${Object.keys(Protocols).join()}`)
-    }
+    this.ddp = new Driver({ ...config, logger })
+    this.socket = Promise.resolve(this.ddp)
   }
 
   async resume ({ token }: { token: string }) {
