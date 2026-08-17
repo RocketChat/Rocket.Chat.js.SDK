@@ -527,16 +527,11 @@ describe('Socket connection lifecycle', () => {
       await expect(opening).resolves.toBe(rebuilt)
     })
 
-    it('never writes its unsubscribes to a replacement installed during the wait', async () => {
-      // The unsub close fires queues behind this resubscribe on the same id, so
-      // it only runs after the reopen below has installed the replacement.
+    it('writes nothing of its own to a replacement installed during the wait', async () => {
       const id = 'sub-1'
-      const first = socket.subscribe('stream-room-messages', ['GENERAL'], undefined, id)
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'], undefined, id)
       transport.receive({ msg: 'ready', subs: [id] })
-      await first
-
-      const resubscribing = socket.subscribe('stream-room-messages', ['GENERAL'], undefined, id)
-      expect(transport.lastSent()).toMatchObject({ msg: 'sub', id })
+      await subscribing
 
       transport.answersClose = false
       const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
@@ -546,13 +541,13 @@ describe('Socket connection lifecycle', () => {
       const replacement = fakeSockets[1]
       await driveToHandshake(replacement)
       await reopening
-      await resubscribing
+
+      const before = [...replacement.sent]
 
       await jest.advanceTimersByTimeAsync(OVERRIDDEN_CLOSE_DEADLINE)
       await closing
 
-      const messagesOnReplacement = replacement.sent.map((data) => JSON.parse(data))
-      expect(messagesOnReplacement.filter((data) => data.msg === 'unsub')).toEqual([])
+      expect(replacement.sent).toEqual(before)
     })
   })
 

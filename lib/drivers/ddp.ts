@@ -308,10 +308,11 @@ export class Socket extends SDKEventEmitter {
     })
 
   /**
-   * Disconnect the DDP from server and clear all subscriptions, unless a reopen
-   * during the wait installed a different connection over this one: that socket
-   * and the subscriptions it filled are left as they are. Resolves false when a
-   * reopen superseded the close that way, true when the connection was let go.
+   * Disconnect the DDP from server and forget every subscription locally: the
+   * close ends them on the server, so no `unsub` is sent. A reopen during the
+   * wait that installed a different connection over this one supersedes the
+   * close: that socket and the subscriptions it filled are left as they are.
+   * Resolves false in that case, true when the connection was let go.
    * See ADR-0003.
    */
   close = async (deadlineMs = defaultSocketDeadline): Promise<boolean> => {
@@ -320,7 +321,6 @@ export class Socket extends SDKEventEmitter {
     this.settleReopen?.()
 
     const connection = this.connection
-    this.unsubscribeAll(connection).catch(e => this.logger.debug(e))
 
     if (connection && connection.readyState !== socketClosed) {
       await this.waitForClose(connection, deadlineMs)
@@ -523,19 +523,15 @@ export class Socket extends SDKEventEmitter {
    * @param msg       The `data.msg` value to wait for in response
    * @param errorMsg  An alternate `data.msg` value indicating an error response
    */
-  send = async (obj: any, pinnedConnection?: WebSocket): Promise<any> => {
+  send = async (obj: any): Promise<any> => {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
-    const connection = pinnedConnection || this.connection
-    if (!connection) throw new Error('[ddp] sending without open connection')
+    if (!this.connection) throw new Error('[ddp] sending without open connection')
     // A message belongs to the connection that was current when it was sent. It
     // is never written to a successor: the DDP session, and any Login on it, is
     // the old connection's.
-    if (pinnedConnection) {
-      // A send pinned to one connection writes to it now or not at all —
-      // waiting would land the message on whatever replaced it.
-      if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
-    } else if (!this.transportOpen) {
+    const connection = this.connection
+    if (!this.transportOpen) {
       await this.waitForOpen()
       if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)
       // The wait resolves a microtask before the listeners below are attached, so
@@ -759,7 +755,9 @@ export class Socket extends SDKEventEmitter {
   /**
    * Write the entry that instructs `subscribeAll` to establish this stream.
    * A stream only belongs to an installed connection, so with none there is
-   * nothing for a later login to re-establish.
+   * nothing for a later login to re-establish. A close forgets these entries
+   * locally and sends no `unsub`: closing the connection ends the streams on
+   * the server.
    */
   private rememberSubscription = (
     id: string,
@@ -786,9 +784,9 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Unsubscribe to server stream, resolve with unsubscribe request result */
-  unsubscribe = (id: any, connection?: WebSocket) => {
+  unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
-    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }, connection))
+    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((data: any) => {
         this.forgetSubscription(id)
         return data.result || data.subs
@@ -800,14 +798,10 @@ export class Socket extends SDKEventEmitter {
       })
   }
 
-  /**
-   * Unsubscribe from all active subscriptions, ignoring any the server refuses.
-   * Given a connection, the unsub messages are pinned to it, so a close's
-   * unsubscribes can never land on the socket that replaced the closing one.
-   */
-  unsubscribeAll = (connection?: WebSocket) => {
+  /** Unsubscribe from all active subscriptions, ignoring any the server refuses */
+  unsubscribeAll = () => {
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
-      return this.unsubscribe(id, connection).catch(() => undefined)
+      return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })
     return Promise.all(unsubAll).then(() => undefined)
   }
