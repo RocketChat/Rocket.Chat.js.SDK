@@ -3,6 +3,7 @@ import type { IClient } from '../lib/api/api'
 export interface FakeRequest {
   method: 'get' | 'post' | 'put' | 'delete'
   url: string
+  data: any
   options?: any
   apiVersion?: string
 }
@@ -19,17 +20,17 @@ export class FakeClient implements IClient {
     this.replies[method].push(response)
   }
 
-  get (url: string, _data: any, options?: any, apiVersion?: string): Promise<any> {
-    return this.recordAndReply('get', url, options, apiVersion)
+  get (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.recordAndReply('get', url, data, options, apiVersion)
   }
-  post (url: string, _data: any, options?: any, apiVersion?: string): Promise<any> {
-    return this.recordAndReply('post', url, options, apiVersion)
+  post (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.recordAndReply('post', url, data, options, apiVersion)
   }
-  put (url: string, _data: any, options?: any, apiVersion?: string): Promise<any> {
-    return this.recordAndReply('put', url, options, apiVersion)
+  put (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.recordAndReply('put', url, data, options, apiVersion)
   }
-  delete (url: string, _data: any, options?: any, apiVersion?: string): Promise<any> {
-    return this.recordAndReply('delete', url, options, apiVersion)
+  delete (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.recordAndReply('delete', url, data, options, apiVersion)
   }
 
   lastRequest (): FakeRequest {
@@ -39,10 +40,11 @@ export class FakeClient implements IClient {
   private async recordAndReply (
     method: FakeRequest['method'],
     url: string,
+    data: any,
     options?: any,
     apiVersion?: string
   ): Promise<any> {
-    this.requests.push({ method, url, options, apiVersion })
+    this.requests.push({ method, url, data, options, apiVersion })
     const queued = this.replies[method]
     return queued && queued.length ? queued.shift() : { status: 200, data: {} }
   }

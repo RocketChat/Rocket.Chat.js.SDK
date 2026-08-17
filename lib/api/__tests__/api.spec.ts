@@ -1,20 +1,13 @@
 import Api from '../api'
+import { logger as moduleLogger } from '../../log'
 import { createSilentLogger } from '../../../test/createSilentLogger'
-import { FakeClient, loginResponse } from '../../../test/fakeClient'
-
-const newApi = (client: FakeClient) => new Api({ client })
-
-const loggedInApi = async (client: FakeClient, api = newApi(client)) => {
-  client.reply('post', loginResponse())
-  await api.login({ username: 'user', password: 'pass' })
-  return api
-}
+import { FakeClient } from '../../../test/fakeClient'
+import { apiWithFakeClient, loggedInApiWithFakeClient } from '../../../test/loggedInApi'
 
 describe('api', () => {
   describe('login', () => {
     it('installs the auth headers the following requests need', async () => {
-      const client = new FakeClient()
-      await loggedInApi(client)
+      const { client } = await loggedInApiWithFakeClient()
 
       expect(client.headers).toEqual({
         'X-Auth-Token': 'fake-token',
@@ -23,7 +16,7 @@ describe('api', () => {
     })
 
     it('records the identity the login answered with', async () => {
-      const api = await loggedInApi(new FakeClient())
+      const { api } = await loggedInApiWithFakeClient()
 
       expect(api.userId).toBe('fake-user-id')
       expect(api.username).toBe('fake-username')
@@ -34,15 +27,14 @@ describe('api', () => {
   describe('logout', () => {
     it('answers nothing without asking the server when there is no login', async () => {
       const client = new FakeClient()
-      const api = newApi(client)
+      const api = apiWithFakeClient(client)
 
       await expect(api.logout()).resolves.toBeNull()
       expect(client.requests).toHaveLength(0)
     })
 
     it('clears the identity once the server has answered', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
 
       await api.logout()
 
@@ -55,7 +47,7 @@ describe('api', () => {
   describe('request', () => {
     it('reaches the client for an authenticated request even with no login', async () => {
       const client = new FakeClient()
-      const api = newApi(client)
+      const api = apiWithFakeClient(client)
 
       await api.get('me', {})
 
@@ -65,16 +57,18 @@ describe('api', () => {
 
     it('reaches the client for an unauthenticated request when logged out', async () => {
       const client = new FakeClient()
-      const api = newApi(client)
+      const api = apiWithFakeClient(client)
 
       await api.post('login', { username: 'user' }, false)
 
-      expect(client.lastRequest().method).toBe('post')
+      expect(client.lastRequest()).toMatchObject({
+        method: 'post',
+        data: { username: 'user' }
+      })
     })
 
     it('routes each method to its own client call', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
 
       await api.get('a', {})
       await api.post('b', {})
@@ -90,9 +84,18 @@ describe('api', () => {
       ])
     })
 
+    it('passes the body the caller asked for through to the client', async () => {
+      const { api, client } = await loggedInApiWithFakeClient()
+
+      await api.post('chat.postMessage', { msg: 'hello' })
+      expect(client.lastRequest().data).toEqual({ msg: 'hello' })
+
+      await api.put('chat.update', { msg: 'edited' })
+      expect(client.lastRequest().data).toEqual({ msg: 'edited' })
+    })
+
     it('passes the api version through to the client', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
 
       await api.get('rooms.info', {}, true, undefined, {}, 'v2')
 
@@ -100,8 +103,7 @@ describe('api', () => {
     })
 
     it('carries the abort signal on every request', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
 
       await api.get('me', {})
 
@@ -109,16 +111,14 @@ describe('api', () => {
     })
 
     it('answers with the body of the result', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
       client.reply('get', { status: 200, data: { success: true } })
 
       await expect(api.get('me', {})).resolves.toEqual({ success: true })
     })
 
     it('throws the result itself when the status is a failure', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
       const failed = { status: 400, data: { error: 'nope' } }
       client.reply('get', failed)
 
@@ -126,24 +126,21 @@ describe('api', () => {
     })
 
     it('accepts a failure status the caller asked to ignore', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
       client.reply('get', { status: 400, data: { error: 'nope' } })
 
       await expect(api.get('me', {}, true, /400/)).resolves.toEqual({ error: 'nope' })
     })
 
     it('throws when the client answers nothing at all', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
       client.reply('get', undefined)
 
       await expect(api.get('me', {})).rejects.toThrow('API GET me result undefined')
     })
 
     it('answers a DELETE with the whole result when it carries no body', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
       const result = { status: 200, data: undefined }
       client.reply('delete', result)
 
@@ -151,8 +148,7 @@ describe('api', () => {
     })
 
     it('answers a DELETE with the body when it carries one', async () => {
-      const client = new FakeClient()
-      const api = await loggedInApi(client)
+      const { api, client } = await loggedInApiWithFakeClient()
       client.reply('delete', { status: 200, data: { success: true } })
 
       await expect(api.del('rooms.delete', {})).resolves.toEqual({ success: true })
@@ -160,7 +156,11 @@ describe('api', () => {
   })
 
   describe('success', () => {
-    const api = new Api({ client: new FakeClient() })
+    let api: Api
+
+    beforeEach(() => {
+      api = apiWithFakeClient(new FakeClient())
+    })
 
     it('accepts a 2xx and a 3xx status', () => {
       expect(api.success({ status: 200 })).toBe(true)
@@ -180,8 +180,7 @@ describe('api', () => {
   describe('logger', () => {
     it('logs to the logger it was handed', async () => {
       const logger = createSilentLogger()
-      const client = new FakeClient()
-      const api = await loggedInApi(client, new Api({ client, logger }))
+      const { api } = await loggedInApiWithFakeClient((client) => new Api({ client, logger }))
 
       await api.get('me', {})
 
@@ -190,8 +189,7 @@ describe('api', () => {
 
     it('logs the failure to the logger it was handed', async () => {
       const logger = createSilentLogger()
-      const client = new FakeClient()
-      const api = await loggedInApi(client, new Api({ client, logger }))
+      const { api, client } = await loggedInApiWithFakeClient((client) => new Api({ client, logger }))
       client.reply('get', { status: 400, data: {} })
 
       await expect(api.get('me', {})).rejects.toBeDefined()
@@ -200,7 +198,7 @@ describe('api', () => {
     })
 
     it('falls back to the module logger when handed none', () => {
-      expect(newApi(new FakeClient()).logger).toBeDefined()
+      expect(apiWithFakeClient(new FakeClient()).logger).toBe(moduleLogger)
     })
   })
 })

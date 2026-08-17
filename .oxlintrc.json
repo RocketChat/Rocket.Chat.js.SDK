@@ -1,26 +1,11 @@
 {
-	// Lint runs in CI and gates on errors only. Every rule with no violations left
-	// is at "error", so it blocks that shape coming back. The two rules still at
-	// "warn" each have exactly one violation that is correct as written:
-	//
-	//   triple-slash-reference         lib/drivers/socket.ts
-	//     NEVER FIX. It points at an ambient module declaration, and ambient
-	//     modules are not importable. It is also the only thing pulling that
-	//     declaration into the *app's* compile — the app's config will never glob
-	//     this repo's declaration directory. Deleting it breaks the app with an
-	//     implicit-any error that this repo's CI cannot observe.
-	//
-	//   no-unsafe-declaration-merging  lib/message.ts
-	//     A documented workaround for a long-standing TypeScript issue.
-	//
-	// There are no inline suppressions and no test-file overrides; specs lint under
-	// these same rules. So those two are the whole warning budget — any other
-	// warning is new and should be fixed rather than added here.
 	"rules": {
 		"no-unused-expressions": "error",
 		"no-this-alias": "error",
 		"no-async-promise-executor": "error",
+		// docs/adr/0007-the-websocket-reference-directive-stays.md
 		"triple-slash-reference": "warn",
+		// https://github.com/Microsoft/TypeScript/issues/340
 		"no-unsafe-declaration-merging": "warn",
 		"no-unused-vars": "error"
 	}
