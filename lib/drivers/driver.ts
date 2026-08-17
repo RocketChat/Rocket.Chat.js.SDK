@@ -204,6 +204,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     }
 
   }
+
   unsubscribe = (subscription: ISubscription) => {
     return this.ddp.unsubscribe(subscription.id)
   }

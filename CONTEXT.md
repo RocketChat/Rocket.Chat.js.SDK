@@ -94,7 +94,7 @@ The Driver re-emitting its Socket's open as a single `connected` event. One open
 _Avoid_: Connect event, ready
 
 **Transport open**:
-What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its transport reports it open — not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive.
+What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its Transport reports it open — not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive.
 _Avoid_: Open (unqualified), ready, readyState
 
 **Liveness chain**:
@@ -106,7 +106,7 @@ A single bounded liveness check on a Socket that looks open, asked for on demand
 _Avoid_: Health check, ping (that is one message of the chain)
 
 **Detached socket**:
-A Socket the Driver has dropped its reference to and unhooked every handler from, without the transport having confirmed the close. It may still be open to the peer, and may still revive; nothing it does afterwards reaches the Driver.
+A Socket the Driver has dropped its reference to and unhooked every handler from, without the Transport having confirmed the close. It may still be open to the peer, and may still revive; nothing it does afterwards reaches the Driver.
 _Avoid_: Orphan, zombie, abandoned socket — abandoning belongs to waits, leaked socket
 
 **Deadline**:

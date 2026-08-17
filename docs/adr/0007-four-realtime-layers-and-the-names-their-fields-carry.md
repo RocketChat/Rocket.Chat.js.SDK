@@ -80,26 +80,25 @@ and an `/** @internal */` tag alone, which enforces nothing.
   glossary term and the field name differ, which is the one place the four-layer
   vocabulary is not carried into the code; renaming it is not part of this
   decision.
+- Deleting the `clients/Rocketchat.ts` re-export removes the deep-import path
+  `@rocket.chat/sdk/clients/Rocketchat`. Nothing in this repo or in
+  Rocket.Chat.ReactNative uses it, and it carried no default export, so the
+  root import is unaffected.
 - Until the app moves, the documentation is ahead of the code: CONTEXT.md
   reserves `ddp` as a qualifier while `Driver.ddp` still exists. Issue #338
   stays open until the renames land.
 
 ## Migration
 
-Only one of the three renames breaks the app's production code: `RocketChatClient.ddp`
-to `driver`, which `sdk.current?.ddp` reads by name. Making `Driver.ddp` private
-breaks only the app's integration tests, and dropping `implements ISocket` breaks
-nothing there, since the app types this SDK through a loose module declaration.
-They still land together, so the vocabulary arrives in one piece rather than in
-three states nobody can name.
+Of the three renames, only `RocketChatClient.ddp` to `driver` reaches the app's
+production code. Making `Driver.ddp` private reaches only its integration tests,
+and dropping `implements ISocket` reaches nothing there. They land together
+anyway, so the vocabulary arrives in one piece.
 
-The renames land in a follow-up SDK pull request, paired with one in the app,
-merged in this order:
+A follow-up SDK pull request carries all three, paired with one in the app:
 
-1. The SDK PR renames `Driver.ddp` to a private `socket`, `RocketChatClient.ddp`
-   to `driver`, and drops `implements ISocket` from the Client.
+1. The SDK PR renames both fields and drops `implements ISocket`.
 2. The app PR pins that SDK commit and updates its readers in the same change —
    `sdk.current?.ddp` becomes `sdk.current?.driver`, and its integration tests
    move to `driver['socket']`.
-3. Neither merges alone. Since the app types this SDK loosely, a half-landed
-   rename fails at runtime as `undefined` rather than at compile time.
+3. Neither merges alone, for the reason Consequences gives.
