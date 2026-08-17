@@ -188,10 +188,10 @@ export default class Api extends SDKEventEmitter {
   logger: ILogger
   client: IClient
   currentLogin: {
-    username: string,
+    username: string | null,
     userId: string,
     authToken: string,
-    result: ILoginResultAPI
+    result: ILoginResultAPI | null
   } | null = null
   controller: AbortController
 
@@ -293,7 +293,14 @@ export default class Api extends SDKEventEmitter {
     return data
   }
 
-  setLogin (login: NonNullable<Api['currentLogin']>) {
+  resumeLogin ({ userId, authToken }: { userId: string, authToken: string }) {
+    if (this.currentLogin) {
+      return
+    }
+    this.setLogin({ username: null, userId, authToken, result: null })
+  }
+
+  private setLogin (login: NonNullable<Api['currentLogin']>) {
     this.userId = login.userId
     this.currentLogin = login
     this.client.headers = {

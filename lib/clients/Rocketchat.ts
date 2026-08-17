@@ -16,12 +16,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
 
   async resume ({ token }: { token: string }) {
     const login: ILoginResult = await this.ddp.login({ token } as any, {})
-    this.setLogin({
-      username: this.username || '',
-      userId: login.id,
-      authToken: login.token,
-      result: { status: 'success', data: { authToken: login.token, userId: login.id } }
-    })
+    this.resumeLogin({ userId: login.id, authToken: login.token })
     return login
   }
 

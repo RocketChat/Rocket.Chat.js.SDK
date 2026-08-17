@@ -64,6 +64,17 @@ describe('client.resume', () => {
       'X-User-Id': 'id'
     })
   })
+
+  it('leaves an existing login untouched', async () => {
+    const client = createClient()
+    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
+    const login = { username: 'user', userId: 'id', authToken: 'token', result: null }
+    client.currentLogin = login
+
+    await client.resume({ token: 'token' })
+
+    expect(client.currentLogin).toBe(login)
+  })
 })
 
 describe('client.url', () => {
