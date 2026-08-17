@@ -5,8 +5,8 @@ import { FakeClient } from '../../../test/fakeClient'
 
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
-const createClient = () =>
-  new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger() })
+const createClient = (client?: FakeClient) =>
+  new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client })
 
 describe('client.ddp', () => {
   it('is the Driver', () => {
@@ -68,7 +68,7 @@ describe('client.resume', () => {
 
   const loggedInClient = async () => {
     const rest = new FakeClient()
-    const client = new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client: rest })
+    const client = createClient(rest)
     jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
 
     const pending = client.login({ username: 'user', password: 'pass' })
@@ -98,6 +98,15 @@ describe('client.resume', () => {
     expect(client.currentLogin).toMatchObject({ userId: 'id', authToken: 'rotated', username: 'user' })
   })
 
+  it('drops the login result holding the superseded token', async () => {
+    const client = await loggedInClient()
+    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'rotated' } as any)
+
+    await client.resume({ token: 'rotated' })
+
+    expect(client.currentLogin!.result).toBeNull()
+  })
+
   it('replaces the login when resuming as another user', async () => {
     const client = await loggedInClient()
     jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'other-id', token: 'other-token' } as any)
@@ -111,7 +120,7 @@ describe('client.resume', () => {
 describe('client.logout', () => {
   it('clears the REST auth headers', async () => {
     const rest = new FakeClient()
-    const client = new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client: rest })
+    const client = createClient(rest)
     client.resumeLogin({ userId: 'id', authToken: 'token' })
 
     const pending = client.logout()
