@@ -46,8 +46,8 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/**
-	 * Initialise socket instance with given options or defaults.
-	 * Proxies the DDP module socket connection. Resolves with socket when open.
+	 * Initialise the Socket with given options or defaults.
+	 * Resolves with the Socket once it is open.
 	 * Accepts callback following error-first-pattern.
 	 * Error returned or promise rejected on timeout.
 	 * @example <caption>Using promise</caption>
@@ -160,11 +160,11 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
 
   /**
    * Re-send the user's media-signal and media-calls subscriptions on the current
-   * socket and resolve when the server acks them with `ready`. This gives the app
+   * Socket and resolve when the server acks them with `ready`. This gives the app
    * an observable readiness signal after a forced reconnect.
    *
    * If the subscriptions are not yet present (e.g. immediately after reopenNow),
-   * it polls the socket subscription map until they appear or the deadline expires.
+   * it polls the Socket's DDP subscriptions until they appear or the deadline expires.
    */
   waitForNotifyUserMediaSubs = (timeoutMs = this.ddp.config.timeout): Promise<boolean> => {
     if (!this.userId) {
@@ -179,7 +179,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
       ),
       []
     )
-    // Go through the raw socket: the driver's subscribe() wrapper reshapes its
+    // Go through the Socket: the Driver's subscribe() wrapper reshapes its
     // arguments and would drop the subscription id, making the server treat the
     // resubscribe as a brand new subscription.
     const resubscribe = (subs: any[]) => Promise.all(
