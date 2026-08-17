@@ -3,6 +3,7 @@ import { ILogger } from '../../../interfaces'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   CLOSED,
+  CONNECTING,
   driveToHandshake,
   FakeWebSocket,
   fakeSockets,
@@ -34,6 +35,9 @@ const REOPEN_DELAY = 3000
  */
 const REOPEN_NOW_DEADLINE = 7000
 
+/** Mirrors the bound `close` waits on the transport's close event. */
+const CLOSE_DEADLINE = 2000
+
 /**
  * The ping interval is pushed far beyond every advance in this file on purpose:
  * a ping firing mid-test would move `lastPing` and send frames that none of the
@@ -58,7 +62,7 @@ const createSocket = (logger: ILogger) => new Socket({
  * asserted against a value the test itself wrote. A real socket reporting OPEN
  * over a dead pipe — the grey zone `probe` exists for — is unreachable through
  * this seam. The replacement test below therefore proves the identity
- * comparison in `onClose`, not that a real zombie socket behaves the way that
+ * comparison in `onClose`, not that a real replaced socket behaves the way that
  * guard assumes.
  */
 describe('Socket connection lifecycle', () => {
@@ -142,7 +146,7 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('replaces the predecessor even when tearing it down throws', async () => {
-      transport.close = () => { throw new Error('teardown boom') }
+      transport.closeError = new Error('teardown boom')
 
       const debug = logger.debug as jest.Mock
 
@@ -247,6 +251,349 @@ describe('Socket connection lifecycle', () => {
 
       expect(error).toHaveBeenCalledWith(failure)
       expect(fakeSockets).toHaveLength(1)
+    })
+  })
+
+  describe('close', () => {
+    it('resolves on the close event itself, without waiting out the deadline', async () => {
+      const settled = jest.fn()
+
+      socket.close().then(settled)
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
+      expect(settled).toHaveBeenCalled()
+      expect(socket.connection).toBeUndefined()
+    })
+
+    it('settles without waiting when the transport refuses to close', async () => {
+      transport.closeError = new Error('already gone')
+      const closeSeen = jest.fn()
+      socket.on('close', closeSeen)
+
+      const settled = jest.fn()
+      socket.close().then(settled)
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(settled).toHaveBeenCalled()
+      expect(closeSeen).toHaveBeenCalledWith({
+        code: INTENTIONAL_CLOSE,
+        reason: 'the transport refused to close',
+        wasClean: false
+      })
+      expect(socket.connection).toBeUndefined()
+    })
+
+    it('leaves no subscription behind for a sub it abandoned', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+
+      await socket.close()
+      await subscribing
+
+      expect(socket.connection).toBeUndefined()
+      expect(socket.subscriptions).toEqual({})
+    })
+
+    it('resolves with undefined on both the normal and the already-replaced path', async () => {
+      await expect(socket.close()).resolves.toBeUndefined()
+      await jest.advanceTimersByTimeAsync(0)
+
+      const reopened = await openFakeConnection(socket)
+      reopened.answersClose = false
+      const closing = socket.close()
+      await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+
+      const reopening = socket.reopenNow()
+      const replacement = fakeSockets[fakeSockets.length - 1]
+      await driveToHandshake(replacement)
+      await reopening
+
+      await jest.advanceTimersByTimeAsync(1)
+      await expect(closing).resolves.toBeUndefined()
+
+      replacement.close(INTENTIONAL_CLOSE)
+      await jest.advanceTimersByTimeAsync(0)
+    })
+
+    describe('when the peer never answers', () => {
+      beforeEach(() => {
+        transport.answersClose = false
+      })
+
+      it('settles on its deadline instead of waiting for a close that never arrives', async () => {
+        const settled = jest.fn()
+
+        socket.close().then(settled)
+
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        expect(settled).not.toHaveBeenCalled()
+
+        await jest.advanceTimersByTimeAsync(1)
+        expect(settled).toHaveBeenCalled()
+      })
+
+      it('drops the socket, so a second close waits for nothing', async () => {
+        const closing = socket.close()
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        await closing
+        expect(socket.connection).toBeUndefined()
+
+        const settled = jest.fn()
+        socket.close().then(settled)
+        await jest.advanceTimersByTimeAsync(0)
+
+        expect(settled).toHaveBeenCalled()
+        expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
+      })
+
+      it('detaches the socket, so a peer that revives reaches nothing', async () => {
+        const closing = socket.close()
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        await closing
+
+        expect(transport.onopen).toBeNull()
+        expect(transport.onmessage).toBeNull()
+        expect(transport.onerror).toBeNull()
+        expect(transport.onclose).toBeNull()
+      })
+
+      it('announces the close it never got, so a wait on this connection ends', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+
+        const closing = socket.close()
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        await closing
+
+        expect(closeSeen).toHaveBeenCalledWith({
+          code: INTENTIONAL_CLOSE,
+          reason: 'the transport did not answer the close',
+          wasClean: false
+        })
+      })
+
+      it('ignores a late transport close that lands after the deadline answered for it', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+
+        const closing = socket.close()
+        // The sync advance fires the deadline — the driver answers itself —
+        // without draining the microtask continuation that detaches the
+        // socket. That is the window a transport's trailing close event lands
+        // in; the async advance would close it before the event could arrive.
+        jest.advanceTimersByTime(CLOSE_DEADLINE)
+        transport.onclose?.({ code: 1006 })
+
+        expect(closeSeen).toHaveBeenCalledTimes(1)
+        expect(closeSeen).toHaveBeenCalledWith({
+          code: INTENTIONAL_CLOSE,
+          reason: 'the transport did not answer the close',
+          wasClean: false
+        })
+        expect(socket.openTimeout).toBeUndefined()
+
+        await closing
+        expect(socket.connection).toBeUndefined()
+      })
+
+      it('leaves a connection installed during the wait wired and held', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+
+        const closing = socket.close()
+
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        const reopening = socket.reopenNow()
+        const replacement = fakeSockets[1]
+        await driveToHandshake(replacement)
+        await reopening
+
+        await jest.advanceTimersByTimeAsync(1)
+        await closing
+
+        expect(socket.connection).toBe(replacement)
+        expect(replacement.onclose).not.toBeNull()
+        expect(replacement.onmessage).not.toBeNull()
+        expect(closeSeen).not.toHaveBeenCalled()
+      })
+
+      it('announces no close for a connection it did not close, so sends on the replacement survive', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+
+        const closing = socket.close()
+
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        const reopening = socket.reopenNow()
+        const replacement = fakeSockets[1]
+        await driveToHandshake(replacement)
+        await reopening
+
+        const calling = socket.call('getRoomByTypeAndName')
+        const { id } = replacement.lastSent()
+
+        await jest.advanceTimersByTimeAsync(1)
+        await closing
+
+        replacement.receive({ msg: 'result', id, result: 'answered' })
+
+        await expect(calling).resolves.toBe('answered')
+        expect(closeSeen).not.toHaveBeenCalled()
+      })
+
+      it('leaves the subscriptions of a connection installed during the wait alone', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+
+        const closing = socket.close()
+
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
+        const reopening = socket.reopenNow()
+        const replacement = fakeSockets[1]
+        await driveToHandshake(replacement)
+        await reopening
+
+        const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+        const { id } = replacement.lastSent()
+        replacement.receive({ msg: 'ready', subs: [id] })
+        await subscribing
+
+        await jest.advanceTimersByTimeAsync(1)
+        await closing
+
+        expect(Object.keys(socket.subscriptions)).toEqual([id])
+        expect(closeSeen).not.toHaveBeenCalled()
+      })
+
+      it('is not kept alive by a revived peer it has already detached', async () => {
+        const messageSeen = jest.fn()
+        socket.on('updated', messageSeen)
+
+        const closing = socket.close()
+        await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+        await closing
+
+        transport.receive({ msg: 'updated' })
+
+        expect(messageSeen).not.toHaveBeenCalled()
+        expect(socket.lastPing).toBe(0)
+      })
+    })
+  })
+
+  /**
+   * A close shares the driver with the reopen machinery, and each of these pins
+   * one way that interplay goes wrong: a reopen the close should have cancelled
+   * surviving it, a close ending on the wrong socket's event, and an open left
+   * hanging by the teardown.
+   */
+  describe('close racing a reopen', () => {
+    it('deletes the pending reopen it cancels, so a later close can schedule one again', async () => {
+      transport.close(1006)
+      expect(socket.openTimeout).toBeDefined()
+
+      await socket.close()
+      expect(socket.openTimeout).toBeUndefined()
+
+      const reopened = await openFakeConnection(socket)
+      reopened.close(1006)
+      expect(socket.openTimeout).toBeDefined()
+    })
+
+    it('does not let a reopen armed during the wait survive it', async () => {
+      transport.answersClose = false
+      const closing = socket.close()
+      await jest.advanceTimersByTimeAsync(0)
+
+      transport.onclose?.({ code: 1006 })
+      await closing
+
+      expect(socket.openTimeout).toBeUndefined()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      expect(fakeSockets).toHaveLength(1)
+    })
+
+    it('is not ended by a different socket closing', async () => {
+      transport.answersClose = false
+      const settled = jest.fn()
+      const closing = socket.close().then(settled)
+      await jest.advanceTimersByTimeAsync(0)
+
+      const reopening = socket.reopenNow()
+      const replacement = fakeSockets[1]
+      await driveToHandshake(replacement)
+      await reopening
+
+      replacement.close(INTENTIONAL_CLOSE)
+      await jest.advanceTimersByTimeAsync(0)
+      expect(settled).not.toHaveBeenCalled()
+
+      await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+      await closing
+      expect(settled).toHaveBeenCalled()
+    })
+
+    it('settles a reopen that never got its open, so its awaiter is not left hanging', async () => {
+      const reopening = socket.reopenNow()
+      const replacement = fakeSockets[1]
+      expect(replacement.readyState).toBe(CONNECTING)
+
+      await socket.close()
+
+      await expect(reopening).resolves.toBeUndefined()
+      expect(socket.connected).toBe(false)
+      expect(socket.connection).toBeUndefined()
+    })
+
+    it('rejects a pending open rather than hanging it when the connecting socket is closed', async () => {
+      transport.readyState = CLOSED
+      const opening = socket.open()
+      const connecting = fakeSockets[1]
+      expect(connecting.readyState).toBe(CONNECTING)
+
+      await socket.close()
+
+      await expect(opening).rejects.toThrow('[ddp] connection closed before it opened')
+      expect(socket.connection).toBeUndefined()
+    })
+
+    it('leaves the next open free to build a socket when it interrupted a forced reconnect', async () => {
+      const reopening = socket.reopenNow()
+      const closing = socket.close()
+      await jest.advanceTimersByTimeAsync(0)
+      await closing
+
+      const opening = socket.open()
+      await jest.advanceTimersByTimeAsync(REOPEN_NOW_DEADLINE)
+      await reopening
+
+      const rebuilt = fakeSockets[2]
+      expect(rebuilt).toBeDefined()
+      await driveToHandshake(rebuilt)
+      await expect(opening).resolves.toBe(rebuilt)
+    })
+
+    it('writes nothing of its own to a replacement installed during the wait', async () => {
+      const id = 'sub-1'
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'], undefined, id)
+      transport.receive({ msg: 'ready', subs: [id] })
+      await subscribing
+
+      transport.answersClose = false
+      const closing = socket.close()
+      await jest.advanceTimersByTimeAsync(0)
+
+      const reopening = socket.reopenNow()
+      const replacement = fakeSockets[1]
+      await driveToHandshake(replacement)
+      await reopening
+
+      const before = [...replacement.sent]
+
+      await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+      await closing
+
+      expect(replacement.sent).toEqual(before)
     })
   })
 

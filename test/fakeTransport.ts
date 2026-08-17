@@ -73,11 +73,21 @@ export class FakeWebSocket {
   }
 
   /**
+   * Set to false for a socket whose peer is gone: `close` is recorded, but no
+   * close event ever comes back and the state stays as it was.
+   */
+  answersClose: boolean = true
+
+  closeError: Error | null = null
+
+  /**
    * Closes and fires the close handler with the code it was given — code 4000
    * versus anything else is a live branch in `onClose`.
    */
   close (code?: number): void {
+    if (this.closeError) throw this.closeError
     this.closedWith.push(code)
+    if (!this.answersClose) return
     this.readyState = CLOSED
     this.onclose?.({ code })
   }
