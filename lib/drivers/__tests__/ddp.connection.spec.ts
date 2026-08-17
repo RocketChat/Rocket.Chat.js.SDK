@@ -466,7 +466,6 @@ describe('Socket connection lifecycle', () => {
       })
 
       it('is not kept alive by a revived peer it has already detached', async () => {
-        const stampAtClose = socket.lastPing
         const messageSeen = jest.fn()
         socket.on('updated', messageSeen)
 

@@ -322,6 +322,7 @@ export class Socket extends SDKEventEmitter {
       clearTimeout(this.pingTimeout as any)
       delete this.pingTimeout
     }
+    this.lastPing = 0
 
     if (connection) {
       this.detach(connection)
