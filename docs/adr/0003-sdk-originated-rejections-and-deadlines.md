@@ -186,8 +186,11 @@ an Error that the SDK writes.
   answer, and `probe` asks how long is too long to still call the connection
   alive. `probe` takes its bound as an argument, so a caller that wants a
   different one passes it, and no option is needed to reach it.
-- **Amendment.** `close` joins `probe` as a Deadline no option moves, and takes its
-  bound the same way — an argument with a default of 2000ms. The socket it waits on
+- **Amendment.** `close` joins `probe` as a Deadline no option moves, and holds the
+  same 2000ms bound. Unlike `probe` it does not take that bound as an argument: no
+  caller reaches `close` through a signature that accepts one, and `close` settles
+  either way, so there is no answer for a caller to vary its patience on. The
+  bound is a module constant the two share. The socket it waits on
   may be one the transport never called open at all — a still-connecting socket is
   closed and waited on the same way, and letting it go settles that open as an
   Abandoned wait rather than leaving it pending — and a stale ping cannot vouch for

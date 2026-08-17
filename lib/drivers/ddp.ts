@@ -311,13 +311,13 @@ export class Socket extends SDKEventEmitter {
    * close: that socket and the subscriptions it filled are left as they are.
    * See ADR-0003.
    */
-  close = async (deadlineMs = defaultSocketDeadline): Promise<void> => {
+  close = async (): Promise<void> => {
     this.settleReopen?.()
 
     const connection = this.connection
 
     if (connection && connection.readyState !== socketClosed) {
-      await this.waitForClose(connection, deadlineMs)
+      await this.waitForClose(connection, defaultSocketDeadline)
     }
 
     if (this.replaced(connection)) return
@@ -358,7 +358,6 @@ export class Socket extends SDKEventEmitter {
     if (!(err instanceof AbandonedWait)) this.reopen()
   }
 
-  /** Cancel a reopen waiting on its interval, if one is armed. */
   private cancelScheduledReopen = () => {
     if (!this.openTimeout) return
     clearTimeout(this.openTimeout as any)
