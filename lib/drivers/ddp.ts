@@ -283,15 +283,18 @@ export class Socket extends SDKEventEmitter {
         settle()
       }
 
-      const answerOurselves = (reason: string) => {
-        if (connection.onclose === onTransportClose) connection.onclose = driverOnClose
+      const answerCloseOurselves = (reason: string) => {
+        // Null rather than restore: a transport close that lands after this
+        // would otherwise re-enter onClose, emit a second close and arm a
+        // reopen for a socket the driver is already letting go.
+        if (connection.onclose === onTransportClose) connection.onclose = null as any
         this.onClose({ code: userDisconnectCloseCode, reason, wasClean: false }, connection)
         settle()
       }
 
       connection.onclose = onTransportClose
       const deadline = setTimeout(
-        () => answerOurselves('the transport did not answer the close'),
+        () => answerCloseOurselves('the transport did not answer the close'),
         deadlineMs
       )
 
@@ -299,7 +302,7 @@ export class Socket extends SDKEventEmitter {
         connection.close(userDisconnectCloseCode)
       } catch (err) {
         this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
-        answerOurselves('the transport refused to close')
+        answerCloseOurselves('the transport refused to close')
       }
     })
 

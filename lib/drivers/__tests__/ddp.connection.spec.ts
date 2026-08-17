@@ -355,6 +355,30 @@ describe('Socket connection lifecycle', () => {
         })
       })
 
+      it('ignores a late transport close that lands after the deadline answered for it', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+
+        const closing = socket.close(OVERRIDDEN_CLOSE_DEADLINE)
+        // The sync advance fires the deadline — the driver answers itself —
+        // without draining the microtask continuation that detaches the
+        // socket. That is the window a transport's trailing close event lands
+        // in; the async advance would close it before the event could arrive.
+        jest.advanceTimersByTime(OVERRIDDEN_CLOSE_DEADLINE)
+        transport.onclose?.({ code: 1006 })
+
+        expect(closeSeen).toHaveBeenCalledTimes(1)
+        expect(closeSeen).toHaveBeenCalledWith({
+          code: INTENTIONAL_CLOSE,
+          reason: 'the transport did not answer the close',
+          wasClean: false
+        })
+        expect(socket.openTimeout).toBeUndefined()
+
+        await closing
+        expect(socket.connection).toBeUndefined()
+      })
+
       it('leaves a connection installed during the wait wired and held', async () => {
         const closeSeen = jest.fn()
         socket.on('close', closeSeen)
