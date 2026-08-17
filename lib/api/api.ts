@@ -207,7 +207,7 @@ export default class Api extends SDKEventEmitter {
   }
 
   loggedIn () {
-    return Object.keys(this.currentLogin || {} as any).every((e: any) => e)
+    return Object.keys(this.currentLogin || {}).every((e: any) => e)
   }
 /**
 	* Do a request to an API endpoint.

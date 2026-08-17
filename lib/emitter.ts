@@ -11,8 +11,8 @@ import { EventEmitter } from 'tiny-events'
  * own `off` follows to identify one. Unwrap it so a removed `once` listener is
  * reported as the function that was handed in, not the internal wrapper.
  */
-const registeredListener = (listener: Function): Function =>
-  (listener as any).listener || listener
+const registeredListener = (listener: Function & { listener?: Function }): Function =>
+  listener.listener || listener
 
 /**
  * `tiny-events` has no `removeAllListeners`, but `ISocket` advertises one. This

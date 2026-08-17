@@ -86,12 +86,12 @@ export default class ApiRocketChat extends ApiBase {
   }
 
 	/** Get information about a public group */
-  async channelInfo (query: { roomName?: string, roomId?: string }) {
-    return (await this.get('channels.info', query, true)).channel as Promise<IChannelAPI>
+  async channelInfo (query: { roomName?: string, roomId?: string }): Promise<IChannelAPI> {
+    return (await this.get('channels.info', query, true)).channel
   }
 
 	/** Get information about a private group */
-  async privateInfo (query: { roomName?: string, roomId?: string }) {
-    return (await this.get('groups.info', query, true)).group as Promise<IGroupAPI>
+  async privateInfo (query: { roomName?: string, roomId?: string }): Promise<IGroupAPI> {
+    return (await this.get('groups.info', query, true)).group
   }
 }

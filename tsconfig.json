@@ -17,5 +17,7 @@
 	// them out of this program keeps jest's globals out of it too, so a stray
 	// `describe` in shipped source fails `npm run typecheck` here rather than in
 	// the consuming app.
-	"exclude": ["node_modules", "test", "**/*.spec.ts"]
+	// `tools` is vendored tooling, not shipped source: it runs under oxlint's own
+	// TypeScript loader and never reaches a consumer's compile.
+	"exclude": ["node_modules", "test", "tools", "**/*.spec.ts"]
 }

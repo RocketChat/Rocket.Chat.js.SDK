@@ -5,7 +5,7 @@ import { logger as Logger } from '../log'
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
   logger: ILogger = Logger
-  socket: Promise<ISocket | IDriver>
+  socket: Promise<ISocket & IDriver>
   ddp?: any
 
   // `allPublic`, `rooms` and `integrationId` are destructured only to keep them
@@ -26,7 +26,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   }
 
   async resume ({ token }: { token: string }) {
-    return (await this.socket as IDriver).login({ token } as any, {})
+    return (await this.socket).login({ token }, {})
   }
 
   async login (credentials: ICredentials) {
@@ -34,24 +34,24 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }
 
-  async connect (options: ISocketOptions): Promise<any> { return (await this.socket as ISocket).connect(options) }
-  async disconnect (): Promise<any> { return (await this.socket as ISocket).disconnect() }
-  async checkAndReopen (): Promise<void> { return (await this.socket as ISocket).checkAndReopen() }
-  async onStreamData (event: string, cb: ICallback): Promise<any> { return (await this.socket as ISocket).onStreamData(event, cb) }
-  async subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined> { return (await this.socket as ISocket).subscribe(topic, ...args) }
-  async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return (await this.socket as ISocket).subscribeRaw(...args) }
-  async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket as ISocket).unsubscribe(subscription) }
-  async unsubscribeAll (): Promise<any> { return (await this.socket as ISocket).unsubscribeAll() }
-  async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return (await this.socket as IDriver).subscribeRoom(rid, ...args) }
-  async subscribeNotifyAll (): Promise<any> { return (await this.socket as IDriver).subscribeNotifyAll() }
-  async subscribeLoggedNotify (): Promise<any> { return (await this.socket as IDriver).subscribeLoggedNotify() }
-  async subscribeNotifyUser (): Promise<any> { return (await this.socket as IDriver).subscribeNotifyUser() }
+  async connect (options: ISocketOptions): Promise<any> { return (await this.socket).connect(options) }
+  async disconnect (): Promise<any> { return (await this.socket).disconnect() }
+  async checkAndReopen (): Promise<void> { return (await this.socket).checkAndReopen() }
+  async onStreamData (event: string, cb: ICallback): Promise<any> { return (await this.socket).onStreamData(event, cb) }
+  async subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined> { return (await this.socket).subscribe(topic, ...args) }
+  async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return (await this.socket).subscribeRaw(...args) }
+  async unsubscribe (subscription: ISubscription): Promise<any> { return (await this.socket).unsubscribe(subscription) }
+  async unsubscribeAll (): Promise<any> { return (await this.socket).unsubscribeAll() }
+  async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return (await this.socket).subscribeRoom(rid, ...args) }
+  async subscribeNotifyAll (): Promise<any> { return (await this.socket).subscribeNotifyAll() }
+  async subscribeLoggedNotify (): Promise<any> { return (await this.socket).subscribeLoggedNotify() }
+  async subscribeNotifyUser (): Promise<any> { return (await this.socket).subscribeNotifyUser() }
   get url () {
-    return this.socket.then((socket) => (socket as IDriver).config.host)
+    return this.socket.then((socket) => socket.config.host)
   }
   async onMessage (cb: ICallback): Promise<any> {
-    return (await this.socket as IDriver).onMessage(cb)
+    return (await this.socket).onMessage(cb)
   }
-  async methodCall (method: string, ...args: any[]): Promise<ISubscription> { return (await this.socket as IDriver).methodCall(method, ...args) }
+  async methodCall (method: string, ...args: any[]): Promise<ISubscription> { return (await this.socket).methodCall(method, ...args) }
 
 }

@@ -118,16 +118,27 @@ export interface IAPIRequest {
  * Response from login method (called by websocket)
  * @todo make test to inspect websocket login result interface
  */
-export interface ILoginResult {
+export interface ICredentialsResume {
+  token: string
+}
+
+export interface ILoginResult extends ICredentialsResume {
   id: string, // userId
-  token: string,
   createCipher: { '$date': number }
 }
 
 /** Password login credential type guard */
-export function isLoginResult (params: any): params is ILoginResult {
+export function isLoginResult (params: any): params is ICredentialsResume {
   return (params.token !== undefined)
 }
+
+/** Every credential shape `loginParams` knows how to convert */
+export type ILoginCredentials =
+  ICredentialsPass |
+  ICredentialsOAuth |
+  ICredentialsAuthenticated |
+  ICredentialsResume |
+  ICredentials
 
 /** Credentials for logging into API */
 export interface ICredentialsAPI {

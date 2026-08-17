@@ -4,8 +4,8 @@
 	// is deliberately no warning-count threshold: the counter would need updating
 	// on every change and would gate on a number rather than on a rule.
 	//
-	// No source file is edited to satisfy the linter, and there are no inline
-	// suppressions. The reasoning lives here instead, one entry per group.
+	// There are no inline suppressions. The reasoning lives here instead, one
+	// entry per group.
 	//
 	// Debt — clears as behaviour fixes land, since each fix rewrites a runtime
 	// expression. There is no single "behaviour PR": each known defect is one issue
@@ -29,12 +29,45 @@
 	//   no-unsafe-declaration-merging  1  lib/message.ts
 	//     A documented workaround for a long-standing TypeScript issue.
 	//
-	// Total: 11 warnings, 0 errors.
+	// The `anti-slop` plugin in `tools/oxlint/anti-slop` is a periodic audit, not a
+	// gate — every rule it carries is at "warn", and its findings are read by a
+	// human rather than cleared to a number. Its first sweep is what removed the
+	// `ISocket | IDriver` union in `lib/clients/Rocketchat.ts`, the timer and
+	// null-handler casts in `lib/drivers/ddp.ts`, and the `Promise<IChannelAPI>`
+	// return annotations on already-awaited values in `lib/api/RocketChat.ts`.
 	//
-	// Every warning above is shipped-source debt. Specs and test helpers lint under
-	// these same rules — there are no test-file overrides and no rule changes for
-	// them — and test code stays at zero warnings. So the count above is also the
-	// budget: if it grows, the growth came from test code and is a real regression.
+	//   require-safety-comment-for-type-assertion  13
+	//     Wants a `SAFETY:` comment above each assertion. This repo removes the
+	//     assertion instead where it can, and leaves the rest — the comment it asks
+	//     for restates what the line already says.
+	//
+	//   no-unknown-parameters                       4
+	//     Reports `errorMessage` in `lib/util.ts`, whose whole job is to take the
+	//     `unknown` that `catch` produces. Judge each one; the rule cannot tell a
+	//     boundary parser from an unparsed input.
+	//
+	//   no-unsafe-dictionary-type                   3
+	//     `ISubscription` and `IDDPError` are open server payloads by design, and
+	//     they are exported. Narrowing them is a breaking change.
+	//
+	//   no-object-parameters                        1
+	//
+	// Two of its rules are off rather than "warn":
+	//
+	//   no-runtime-typeof   Fired five times, wrong five times. Two of those narrow
+	//                       a real union (`string | IMessage`, an optional param)
+	//                       and three parse at an I/O boundary, which is the thing
+	//                       the rule asks for.
+	//
+	//   no-module-mocking   The websocket seam *is* `universal-websocket-client`,
+	//                       and CLAUDE.md requires mocking the module rather than
+	//                       assigning a socket onto the driver. The rule forbids the
+	//                       repo's documented testing approach.
+	//
+	// Total: 32 warnings, 0 errors — 11 from the rules above, 21 from `anti-slop`.
+	//
+	// Specs and test helpers lint under these same rules; there are no test-file
+	// overrides. Ten of the 32 are in test code, all of them `anti-slop` findings.
 	//
 	// A rule reaches "error" once its entry above is cleared, and every rule still
 	// at "warn" carries violations.
@@ -43,7 +76,39 @@
 	// executors are gone — `send`'s dropped its guard's `throw` on the floor, and
 	// `open`'s was a wrapper a plain async method does the same job as. The rule is
 	// now the thing that stops that shape coming back, rather than a note about it.
+	"ignorePatterns": [
+		".agent/**",
+		".agents/**",
+		".claude/**",
+		".codex/**",
+		".continue/**",
+		".cursor/**",
+		".gemini/**",
+		".opencode/**",
+		".pi/**",
+		".roo/**",
+		".windsurf/**",
+		"tools/oxlint/anti-slop/**"
+	],
+	"jsPlugins": [
+		{ "name": "anti-slop", "specifier": "./tools/oxlint/anti-slop/index.ts" }
+	],
 	"rules": {
+		"anti-slop/no-chained-type-assertions": "warn",
+		"anti-slop/no-conditional-empty-object-spread": "warn",
+		"anti-slop/no-known-value-widening": "warn",
+		"anti-slop/no-module-mocking": "off",
+		"anti-slop/no-object-parameters": "warn",
+		"anti-slop/no-reflect-apply": "warn",
+		"anti-slop/no-reflect-get": "warn",
+		"anti-slop/no-runtime-typeof": "off",
+		"anti-slop/no-shape-in-symbol-names": "warn",
+		"anti-slop/no-unknown-parameters": "warn",
+		"anti-slop/no-unknown-returns": "warn",
+		"anti-slop/no-unknown-type-aliases": "warn",
+		"anti-slop/no-unsafe-dictionary-type": "warn",
+		"anti-slop/no-widen-then-assert": "warn",
+		"anti-slop/require-safety-comment-for-type-assertion": "warn",
 		"no-unused-expressions": "warn",
 		"no-this-alias": "warn",
 		"no-async-promise-executor": "error",

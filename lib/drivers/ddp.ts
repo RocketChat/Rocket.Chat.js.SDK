@@ -15,13 +15,12 @@ import {
   ISocketOptions,
   ISocketConfig,
   ISubscription,
-  ICredentials,
   ILoginResult,
+  ILoginCredentials,
   ICredentialsPass,
   isLoginPass,
-  ICredentialsOAuth,
-  isLoginOAuth,
   ICredentialsAuthenticated,
+  isLoginOAuth,
   isLoginAuthenticated,
   isLoginResult,
   ISocketMessageCallback,
@@ -30,7 +29,7 @@ import {
 } from '../../interfaces'
 
 import { DDPError, toError } from './ddpError'
-import { hostToWS } from '../util'
+import { hostToWS, errorMessage } from '../util'
 import { sha256 } from 'js-sha256'
 
 const userDisconnectCloseCode = 4000;
@@ -66,8 +65,8 @@ export class Socket extends SDKEventEmitter {
   lastPing = Date.now()
   subscriptions: { [id: string]: ISubscription } = {}
   config: ISocketConfig
-  openTimeout?: NodeJS.Timer | number
-  pingTimeout?: NodeJS.Timer | number
+  openTimeout?: ReturnType<typeof setTimeout>
+  pingTimeout?: ReturnType<typeof setTimeout>
   connection?: WebSocket
   session?: string
   logger: ILogger
@@ -122,13 +121,13 @@ export class Socket extends SDKEventEmitter {
       // socket from later firing onClose and clobbering the live connection.
       if (this.connection) {
         try {
-          this.connection.onopen = null as any
-          this.connection.onmessage = null as any
-          this.connection.onerror = null as any
-          this.connection.onclose = null as any
+          this.connection.onopen = null
+          this.connection.onmessage = null
+          this.connection.onerror = null
+          this.connection.onclose = null
           this.connection.close(userDisconnectCloseCode)
         } catch (err) {
-          this.logger.debug(`[ddp] open: previous connection teardown failed: ${(err as Error).message}`)
+          this.logger.debug(`[ddp] open: previous connection teardown failed: ${errorMessage(err)}`)
         }
       }
       this.connection = connection
@@ -171,7 +170,7 @@ export class Socket extends SDKEventEmitter {
         support: ['1', 'pre2', 'pre1']
       })
     } catch (err) {
-      this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
+      this.logger.error(`[ddp] the handshake did not complete: ${errorMessage(err)}`)
       return reject(err)
     }
     this.session = connected.session
@@ -216,7 +215,7 @@ export class Socket extends SDKEventEmitter {
       data = JSON.parse(e.data)
     } catch (err) {
       return this.logger.error(
-        `[ddp] JSON parse error on frame: ${e.data} — ${(err as Error).message}`
+        `[ddp] JSON parse error on frame: ${e.data} — ${errorMessage(err)}`
       )
     }
 
@@ -237,8 +236,8 @@ export class Socket extends SDKEventEmitter {
   close = async () => {
     this.unsubscribeAll().catch(e => this.logger.debug(e))
 
-    this.openTimeout && clearTimeout(this.openTimeout as any)
-    this.pingTimeout && clearTimeout(this.pingTimeout as any)
+    this.openTimeout && clearTimeout(this.openTimeout)
+    this.pingTimeout && clearTimeout(this.pingTimeout)
 
     if (this.connection && this.connection.readyState !== socketClosed) {
       const connection = this.connection
@@ -268,10 +267,10 @@ export class Socket extends SDKEventEmitter {
   checkAndReopen = () => {
     if (!this.connected) {
       if (this.openTimeout) {
-        clearTimeout(this.openTimeout as any)
+        clearTimeout(this.openTimeout)
         delete this.openTimeout
       }
-      this.open().catch((err) => this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`))
+      this.open().catch((err) => this.logger.error(`[ddp] Reopen error: ${errorMessage(err)}`))
     }
   }
 
@@ -288,7 +287,7 @@ export class Socket extends SDKEventEmitter {
       try {
         await this.open()
       } catch (err) {
-        this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
+        this.logger.error(`[ddp] Reopen error: ${errorMessage(err)}`);
         this.reopenUnlessAbandoned(err);
       }
     }, this.config.reopen);
@@ -310,7 +309,7 @@ export class Socket extends SDKEventEmitter {
     }
 
     this.reopenPromise = new Promise<void>(resolve => {
-      this.openTimeout && clearTimeout(this.openTimeout as any)
+      this.openTimeout && clearTimeout(this.openTimeout)
       this.lastPing = 0
       this.emit('disconnected')
 
@@ -319,7 +318,7 @@ export class Socket extends SDKEventEmitter {
         if (settled) return
         settled = true
         this.off('open', cleanup)
-        if (timeout) clearTimeout(timeout as any)
+        if (timeout) clearTimeout(timeout)
         delete this.reopenPromise
         resolve()
       }
@@ -350,7 +349,7 @@ export class Socket extends SDKEventEmitter {
         if (settled) return
         settled = true
         this.off('pong', onPong)
-        if (timeout) clearTimeout(timeout as any)
+        if (timeout) clearTimeout(timeout)
       }
 
       const onPong = () => {
@@ -399,7 +398,7 @@ export class Socket extends SDKEventEmitter {
     return new Promise<void>((resolve, reject) => {
       const cleanup = () => {
         this.off('open', onOpen)
-        clearTimeout(timeout as any)
+        clearTimeout(timeout)
       }
 
       const onOpen = () => {
@@ -448,7 +447,9 @@ export class Socket extends SDKEventEmitter {
     return new Promise<any>((resolve, reject) => {
       const id = obj.id || `ddp-${ this.sent }`
       this.sent += 1
-      const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
+      const carriesId = !/connect|ping|pong/.test(obj.msg)
+      const data = { ...obj }
+      if (carriesId) data.id = id
       const stringdata = JSON.stringify(data)
       const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
       this.logger.debug(`[ddp] sending message: ${stringdata}`)
@@ -487,7 +488,8 @@ export class Socket extends SDKEventEmitter {
 
       const onResponse = (result: any) => {
         removeListeners()
-        return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
+        if (result.error) return reject(toError(result.error))
+        return resolve(carriesId ? { id, ...result } : { ...result })
       }
 
       abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
@@ -497,14 +499,14 @@ export class Socket extends SDKEventEmitter {
 
   /** Send ping, record time, re-open if nothing comes back, repeat */
   ping = async () => {
-    this.pingTimeout && clearTimeout(this.pingTimeout as any)
+    this.pingTimeout && clearTimeout(this.pingTimeout)
     this.pingTimeout = setTimeout(() => {
       // The ping goes out on an open socket, so its send never waits on
       // `open` — it waits on a pong reply that a dead socket never
       // sends, and without a deadline of its own the chain stops here and
       // `reopen` is never reached. The deadline lives in `ping` rather than in
       // `send`, so no other caller inherits a reply timeout.
-      let deadline: NodeJS.Timer | number | undefined
+      let deadline: ReturnType<typeof setTimeout> | undefined
       const answered = new Promise<void>((_, expire) => {
         deadline = setTimeout(
           () => expire(new Error('[ddp] ping went unanswered')),
@@ -515,7 +517,7 @@ export class Socket extends SDKEventEmitter {
       Promise.race([this.send({ msg: 'ping' }), answered])
         .then(() => this.ping())
         .catch(this.reopenUnlessAbandoned)
-        .finally(() => clearTimeout(deadline as any))
+        .finally(() => clearTimeout(deadline))
     }, this.config.ping)
   }
 
@@ -553,14 +555,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Take variety of login credentials object types for accepted params */
-  loginParams = (
-    credentials:
-      ICredentialsPass |
-      ICredentialsOAuth |
-      ICredentialsAuthenticated |
-      ILoginResult |
-      ICredentials
-  ) => {
+  loginParams = (credentials: ILoginCredentials) => {
     if (
       isLoginPass(credentials) ||
       isLoginOAuth(credentials) ||
@@ -950,7 +945,7 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/** Login to Rocket.Chat via DDP */
-  login = async (credentials: ICredentials, _args: any): Promise<any> => {
+  login = async (credentials: ILoginCredentials, _args: any): Promise<any> => {
     if (!this.ddp || !this.ddp.connected) {
       await this.connect()
     }

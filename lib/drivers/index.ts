@@ -9,7 +9,7 @@ import {
   ISocketOptions,
   ICallback,
   ISubscription,
-  ICredentials
+  ILoginCredentials
 } from '../../interfaces'
 
 export interface ISocket {
@@ -33,7 +33,7 @@ export interface ISocket {
 
 export interface IDriver {
   config: any
-  login (credentials: ICredentials, args: any): Promise<any>
+  login (credentials: ILoginCredentials, args: any): Promise<any>
 
   subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]>
 
