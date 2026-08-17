@@ -39,12 +39,12 @@ The object a consuming app holds to reach a server — the SDK's entry point, co
 _Avoid_: SDK instance, connection
 
 **Driver**:
-The realtime transport behind a Client, speaking one wire protocol to the server. Not something a consuming app talks to directly.
-_Avoid_: Socket (that is the DDP connection inside a Driver), adapter
+The realtime layer behind a Client, speaking one wire protocol to the server. Not something a consuming app talks to directly.
+_Avoid_: Socket (that is the DDP layer inside a Driver), transport (that is the layer two below), adapter
 
 **Socket**:
-The DDP connection inside a Driver — it performs the DDP handshake, answers the Liveness chain, holds the DDP subscriptions, and owns one Transport. A Driver owns a Socket; it is not one.
-_Avoid_: Websocket, transport (that is the raw connection a Socket owns), ddp
+The DDP layer inside a Driver — it performs the DDP handshake, runs the Liveness chain, holds the DDP subscriptions, and owns one Transport. A Driver owns a Socket and mirrors part of its surface, but is a layer above it.
+_Avoid_: Websocket, Transport (that is the layer below), ddp
 
 **Transport**:
 The raw websocket a Socket owns and writes its DDP messages to. The layer below a Socket, and the only one with no DDP vocabulary of its own.

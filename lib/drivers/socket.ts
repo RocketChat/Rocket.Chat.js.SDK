@@ -1,7 +1,7 @@
 /// <reference path="../../types/websocket.d.ts" />
 /**
  * @module Socket
- * The DDP connection inside a Driver: it owns the Transport, performs the DDP
+ * The DDP layer inside a Driver: it owns the Transport, performs the DDP
  * handshake, runs the Liveness chain and holds the DDP subscriptions.
  */
 
@@ -61,7 +61,6 @@ class AbandonedRequest extends AbandonedWait {
   }
 }
 
-/** Speaks DDP over the Transport it owns, and holds the DDP subscriptions. */
 export class Socket extends SDKEventEmitter {
   sent = 0
   host: string
