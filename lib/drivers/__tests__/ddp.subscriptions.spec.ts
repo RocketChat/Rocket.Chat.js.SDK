@@ -343,8 +343,6 @@ describe('Socket subscription bookkeeping', () => {
 
   describe('closing the connection', () => {
     it('forgets every subscription locally without sending an unsubscribe', async () => {
-      // Closing the connection ends the streams on the server, so `close` sends
-      // no `unsub` at all and clears the map itself.
       await subscribe('stream-room-messages', ['GENERAL'])
       await subscribe('stream-notify-user', ['alice/message'])
 

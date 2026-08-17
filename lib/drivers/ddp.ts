@@ -37,7 +37,6 @@ const userDisconnectCloseCode = 4000;
 const socketOpen = 1;
 const socketClosed = 3;
 
-/** How long probe and close wait on the peer before the SDK answers itself. */
 const defaultSocketDeadline = 2000;
 
 const abandonedByReopen = '[ddp] connection reopened before the response arrived'
@@ -253,7 +252,6 @@ export class Socket extends SDKEventEmitter {
     connection.onclose = null as any
   }
 
-  /** Whether a different connection now stands where this one did; none installed counts as not replaced. */
   private replaced = (connection?: WebSocket) =>
     this.connection !== undefined && this.connection !== connection
 
@@ -311,7 +309,6 @@ export class Socket extends SDKEventEmitter {
    * close ends them on the server, so no `unsub` is sent. A reopen during the
    * wait that installed a different connection over this one supersedes the
    * close: that socket and the subscriptions it filled are left as they are.
-   * Resolves false in that case, true when the connection was let go.
    * See ADR-0003.
    */
   close = async (deadlineMs = defaultSocketDeadline): Promise<boolean> => {
@@ -430,7 +427,7 @@ export class Socket extends SDKEventEmitter {
    * Bounded liveness check for a socket in the gray zone. Returns true only if
    * the socket is open and the server answers the ping within the deadline.
    */
-  probe = (timeoutMs = defaultSocketDeadline): Promise<boolean> => {
+  probe = (deadlineMs = defaultSocketDeadline): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
       const connection = this.connection
       if (!connection || connection.readyState !== socketOpen) {
@@ -455,7 +452,7 @@ export class Socket extends SDKEventEmitter {
       const timeout = setTimeout(() => {
         cleanup()
         resolve(false)
-      }, timeoutMs)
+      }, deadlineMs)
 
       try {
         connection.send(JSON.stringify({ msg: 'ping' }))
@@ -487,7 +484,7 @@ export class Socket extends SDKEventEmitter {
    * *schedules* the retry at that interval, so a deadline of exactly `reopen`
    * expires as the reconnect begins and every send issued at a drop fails.
    */
-  private waitForOpen = (timeoutMs = this.config.reopen * 2): Promise<void> => {
+  private waitForOpen = (deadlineMs = this.config.reopen * 2): Promise<void> => {
     return new Promise<void>((resolve, reject) => {
       const cleanup = () => {
         this.off('open', onOpen)
@@ -504,7 +501,7 @@ export class Socket extends SDKEventEmitter {
       const timeout = setTimeout(() => {
         cleanup()
         reject(new Error('[ddp] timed out waiting for the connection to open'))
-      }, timeoutMs)
+      }, deadlineMs)
     })
   }
 
@@ -913,8 +910,8 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     return this.ddp.reopenNow()
   }
 
-  probe = (timeoutMs?: number): Promise<boolean> => {
-    return this.ddp.probe(timeoutMs)
+  probe = (deadlineMs?: number): Promise<boolean> => {
+    return this.ddp.probe(deadlineMs)
   }
 
   get lastPing (): number {

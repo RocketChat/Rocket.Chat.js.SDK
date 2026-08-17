@@ -78,9 +78,6 @@ export class FakeWebSocket {
    */
   answersClose: boolean = true
 
-  /**
-   * Set to make `close` throw instead of recording the code.
-   */
   closeError: Error | null = null
 
   /**
