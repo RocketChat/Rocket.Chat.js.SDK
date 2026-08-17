@@ -113,8 +113,8 @@ export class DDPDriver extends SDKEventEmitter implements ISocket, IDriver {
     return this.ddp.reopenNow()
   }
 
-  probe = (timeoutMs?: number): Promise<boolean> => {
-    return this.ddp.probe(timeoutMs)
+  probe = (deadlineMs?: number): Promise<boolean> => {
+    return this.ddp.probe(deadlineMs)
   }
 
   get lastPing (): number {
