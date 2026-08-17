@@ -1,19 +1,11 @@
 {
-	"compilerOptions": {
-		"target": "esnext",
-		"module": "esnext",
-		"moduleResolution": "bundler",
-		"noEmit": true,
-		"strict": true,
-		"types": ["node"],
-		"allowSyntheticDefaultImports": true,
-		"esModuleInterop": true,
-		"skipLibCheck": false,
-		"forceConsistentCasingInFileNames": true
-	},
 	// Reaches the shipped source only by following imports from the entry point,
-	// the way a consuming app does. `tsconfig.json` has no `include`, so its
-	// default glob sweeps `types/*.d.ts` into the program and hides a missing
-	// `/// <reference>` on an untyped dependency. This program does not.
+	// the way a consuming app does, so a missing `/// <reference>` on an untyped
+	// dependency fails here.
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noUnusedLocals": false,
+		"noUnusedParameters": false
+	},
 	"files": ["index.ts"]
 }
