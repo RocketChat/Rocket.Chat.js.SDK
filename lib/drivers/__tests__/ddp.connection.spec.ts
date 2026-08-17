@@ -476,7 +476,7 @@ describe('Socket connection lifecycle', () => {
         transport.receive({ msg: 'updated' })
 
         expect(messageSeen).not.toHaveBeenCalled()
-        expect(socket.lastPing).toBe(stampAtClose)
+        expect(socket.lastPing).toBe(0)
       })
     })
   })
@@ -531,6 +531,18 @@ describe('Socket connection lifecycle', () => {
       await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
       await closing
       expect(settled).toHaveBeenCalled()
+    })
+
+    it('settles a reopen that never got its open, so its awaiter is not left hanging', async () => {
+      const reopening = socket.reopenNow()
+      const replacement = fakeSockets[1]
+      expect(replacement.readyState).toBe(CONNECTING)
+
+      await socket.close()
+
+      await expect(reopening).resolves.toBeUndefined()
+      expect(socket.connected).toBe(false)
+      expect(socket.connection).toBeUndefined()
     })
 
     it('rejects a pending open rather than hanging it when the connecting socket is closed', async () => {
