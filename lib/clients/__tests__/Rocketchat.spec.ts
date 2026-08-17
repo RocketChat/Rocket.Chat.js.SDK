@@ -1,6 +1,7 @@
 import RocketChatClient from '../Rocketchat'
 import { Driver } from '../../drivers/driver'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { FakeClient } from '../../../test/fakeClient'
 
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
@@ -65,15 +66,50 @@ describe('client.resume', () => {
     })
   })
 
-  it('leaves an existing login untouched', async () => {
-    const client = createClient()
+  const loggedIn = async () => {
+    const rest = new FakeClient()
+    const client = new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client: rest })
     jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
-    const login = { username: 'user', userId: 'id', authToken: 'token', result: null }
-    client.currentLogin = login
 
-    await client.resume({ token: 'token' })
+    const pending = client.login({ username: 'user', password: 'pass' })
+    rest.lastRequest().resolve({
+      status: 200,
+      data: { data: { userId: 'id', authToken: 'token', me: { username: 'user' } } }
+    })
+    await pending
 
-    expect(client.currentLogin).toBe(login)
+    return client
+  }
+
+  it('leaves an existing login for the same user untouched', async () => {
+    const client = await loggedIn()
+
+    await client.resume({ token: 'other-token' })
+
+    expect(client.currentLogin).toMatchObject({ username: 'user', authToken: 'token' })
+  })
+
+  it('replaces the login when resuming as another user', async () => {
+    const client = await loggedIn()
+    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'other-id', token: 'other-token' } as any)
+
+    await client.resume({ token: 'other-token' })
+
+    expect(client.currentLogin).toMatchObject({ userId: 'other-id', authToken: 'other-token' })
+  })
+})
+
+describe('client.logout', () => {
+  it('clears the REST auth headers', async () => {
+    const rest = new FakeClient()
+    const client = new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client: rest })
+    client.resumeLogin({ userId: 'id', authToken: 'token' })
+
+    const pending = client.logout()
+    rest.lastRequest().resolve({ status: 200, data: {} })
+    await pending
+
+    expect(client.client.headers).not.toHaveProperty('X-Auth-Token')
   })
 })
 

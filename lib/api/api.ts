@@ -294,7 +294,7 @@ export default class Api extends SDKEventEmitter {
   }
 
   resumeLogin ({ userId, authToken }: { userId: string, authToken: string }) {
-    if (this.currentLogin) {
+    if (this.currentLogin && this.currentLogin.userId === userId) {
       return
     }
     this.setLogin({ username: null, userId, authToken, result: null })
@@ -308,13 +308,19 @@ export default class Api extends SDKEventEmitter {
       'X-User-Id': login.userId
     }
   }
+
+  private clearLogin () {
+    this.userId = ''
+    this.currentLogin = null
+    this.client.headers = {}
+  }
+
   async logout () {
     if (!this.currentLogin) {
       return null
     }
     const result = await this.post('logout', {}, true)
-    this.userId = ''
-    this.currentLogin = null
+    this.clearLogin()
     return result
   }
 /**
