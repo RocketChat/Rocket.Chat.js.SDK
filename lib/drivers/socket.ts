@@ -578,7 +578,7 @@ export class Socket extends SDKEventEmitter {
 
   /** Send ping, record time, re-open if nothing comes back, repeat */
   ping = async () => {
-    this.pingTimeout && clearTimeout(this.pingTimeout as any)
+    if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
       // The ping goes out on an open socket, so its send never waits on
       // `open` — it waits on a pong reply that a dead socket never

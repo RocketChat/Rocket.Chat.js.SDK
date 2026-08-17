@@ -19,16 +19,16 @@ export class FakeClient implements IClient {
     this.replies[method].push(response)
   }
 
-  get (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+  get (url: string, _data: any, options?: any, apiVersion?: string): Promise<any> {
     return this.recordAndReply('get', url, options, apiVersion)
   }
-  post (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+  post (url: string, _data: any, options?: any, apiVersion?: string): Promise<any> {
     return this.recordAndReply('post', url, options, apiVersion)
   }
-  put (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+  put (url: string, _data: any, options?: any, apiVersion?: string): Promise<any> {
     return this.recordAndReply('put', url, options, apiVersion)
   }
-  delete (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+  delete (url: string, _data: any, options?: any, apiVersion?: string): Promise<any> {
     return this.recordAndReply('delete', url, options, apiVersion)
   }
 
