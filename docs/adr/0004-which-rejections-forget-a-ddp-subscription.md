@@ -69,7 +69,7 @@ entry is written on the same terms.
   is expressed by the absence of any removal on that path.
 - The removals are `forgetSubscription(id)` and `forgetAllSubscriptions()` on
   `Socket`. `forgetAllSubscriptions` removes one key at a time from the same
-  object. `Driver.subscriptions` is assigned `this.ddp.subscriptions` in
+  object. `Driver.subscriptions` is assigned `this.socket.subscriptions` in
   `connect`, so the Driver and the Socket hold one object between them. Putting a
   fresh object in place of the old one would leave the Driver reading every entry
   the clear was meant to drop.

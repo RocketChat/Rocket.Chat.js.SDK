@@ -10,16 +10,16 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 const createClient = (client?: FakeClient) =>
   new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client })
 
-describe('client.ddp', () => {
+describe('client.driver', () => {
   it('is the Driver', () => {
     const client = createClient()
 
-    expect(client.ddp).toBeInstanceOf(Driver)
+    expect(client.driver).toBeInstanceOf(Driver)
   })
 
   it('receives method calls made on the client', async () => {
     const client = createClient()
-    const methodCall = jest.spyOn(client.ddp, 'methodCall').mockResolvedValue(undefined as any)
+    const methodCall = jest.spyOn(client.driver, 'methodCall').mockResolvedValue(undefined as any)
 
     await client.methodCall('getRoomIdByNameOrId', 'general')
 
@@ -28,7 +28,7 @@ describe('client.ddp', () => {
 
   it('receives room subscriptions made on the client', async () => {
     const client = createClient()
-    const subscribeRoom = jest.spyOn(client.ddp, 'subscribeRoom').mockResolvedValue([])
+    const subscribeRoom = jest.spyOn(client.driver, 'subscribeRoom').mockResolvedValue([])
 
     await client.subscribeRoom('GENERAL')
 
@@ -37,7 +37,7 @@ describe('client.ddp', () => {
 
   it('receives subscriptions made on the client, with the arguments in order', async () => {
     const client = createClient()
-    const subscribe = jest.spyOn(client.ddp, 'subscribe').mockResolvedValue(undefined)
+    const subscribe = jest.spyOn(client.driver, 'subscribe').mockResolvedValue(undefined)
 
     await client.subscribe('stream-room-messages', 'GENERAL', false)
 
@@ -52,7 +52,7 @@ describe('client.ddp', () => {
 describe('client.resume', () => {
   const resumed = async () => {
     const client = createClient()
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
+    jest.spyOn(client.driver, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
     await client.resume({ token: 'token' })
     return client
   }
@@ -71,7 +71,7 @@ describe('client.resume', () => {
   const loggedInClient = async () => {
     const rest = new FakeClient()
     const client = createClient(rest)
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
+    jest.spyOn(client.driver, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
 
     const pending = client.login({ username: 'user', password: 'pass' })
     rest.lastRequest().resolve(loginResponse())
@@ -90,7 +90,7 @@ describe('client.resume', () => {
 
   it('replaces the login when the token has rotated', async () => {
     const client = await loggedInClient()
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'rotated' } as any)
+    jest.spyOn(client.driver, 'login').mockResolvedValue({ id: 'id', token: 'rotated' } as any)
 
     await client.resume({ token: 'rotated' })
 
@@ -99,7 +99,7 @@ describe('client.resume', () => {
 
   it('drops the login result holding the superseded token', async () => {
     const client = await loggedInClient()
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'rotated' } as any)
+    jest.spyOn(client.driver, 'login').mockResolvedValue({ id: 'id', token: 'rotated' } as any)
 
     await client.resume({ token: 'rotated' })
 
@@ -108,7 +108,7 @@ describe('client.resume', () => {
 
   it('replaces the login when resuming as another user', async () => {
     const client = await loggedInClient()
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'other-id', token: 'other-token' } as any)
+    jest.spyOn(client.driver, 'login').mockResolvedValue({ id: 'other-id', token: 'other-token' } as any)
 
     await client.resume({ token: 'other-token' })
 
