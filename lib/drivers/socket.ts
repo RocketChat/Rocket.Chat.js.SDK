@@ -43,6 +43,7 @@ const abandonedByReopen = '[ddp] connection reopened before the response arrived
 const abandonedByClose = '[ddp] connection closed before the response arrived'
 const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
+const deadlineExpired = '[ddp] no response arrived before the deadline'
 
 class AbandonedWait extends Error {
   constructor (message?: string) {
@@ -62,10 +63,9 @@ class AbandonedRequest extends AbandonedWait {
   }
 }
 
-/** See ADR-0003. */
 class ExpiredRequest extends Error {
   constructor (public id: string) {
-    super('[ddp] no response arrived before the deadline')
+    super(deadlineExpired)
     Object.setPrototypeOf(this, ExpiredRequest.prototype)
   }
 }
@@ -572,10 +572,13 @@ export class Socket extends SDKEventEmitter {
         }
       }))
 
-      let deadline: NodeJS.Timer | number | undefined
+      const deadlineTimer = setTimeout(() => {
+        removeListeners()
+        reject(new ExpiredRequest(id))
+      }, deadlineMs)
 
       const removeListeners = () => {
-        clearTimeout(deadline as any)
+        clearTimeout(deadlineTimer as any)
         this.off(listener, onResponse)
         abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
       }
@@ -584,13 +587,6 @@ export class Socket extends SDKEventEmitter {
         removeListeners()
         return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       }
-
-      // No connection event ends the wait when the connection stays up and the
-      // server simply never answers, so the response has a Deadline of its own.
-      deadline = setTimeout(() => {
-        removeListeners()
-        reject(new ExpiredRequest(id))
-      }, deadlineMs)
 
       abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
       this.once(listener, onResponse)
@@ -738,7 +734,6 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        // See ADR-0006.
         if (err instanceof AbandonedRequest || err instanceof ExpiredRequest) {
           this.rememberSubscription(err.id, name, params, callback)
         } else if (id && err instanceof DDPError) {

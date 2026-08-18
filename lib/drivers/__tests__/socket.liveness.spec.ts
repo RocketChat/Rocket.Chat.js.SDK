@@ -224,7 +224,6 @@ describe('Socket liveness', () => {
       })
       const impatientTransport = await openFakeConnection(impatient)
 
-      // One interval to the ping, one more to its deadline.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL)
       expect(impatientTransport.lastSent()).toEqual({ msg: 'ping' })
 
