@@ -29,3 +29,7 @@ The five canonical triage labels, used verbatim. See `docs/agents/triage-labels.
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Coding standards
+
+`CODING_STANDARDS.md` at the repo root. Read it before writing code.

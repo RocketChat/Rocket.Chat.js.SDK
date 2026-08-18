@@ -157,3 +157,7 @@ _Avoid_: Timeout — that is a config option, and several Deadlines are derived 
 **Abandoned wait**:
 A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline — no clock decides it, the connection does. A DDP message waiting to be written is abandoned on the same rule: it belongs to the connection it was issued on and is never written to the one that replaces it.
 _Avoid_: Cancelled, timed out
+
+**Expired wait**:
+A wait the SDK ends because its Deadline rang — a clock decides it, not the connection. Not an Abandoned wait — no connection went away, and what it waited for may still arrive, too late to answer the caller; the Socket stays Transport open, and whether the connection itself is dead stays with the Liveness chain. A DDP subscription whose wait expires keeps its entry on the same rule as an abandoned one: its `sub` reached the wire, and the server may still have acted on it.
+_Avoid_: Expired request (the term names the wait, not the rejection), timed out

@@ -91,6 +91,32 @@ describe('Socket subscription bookkeeping', () => {
     expect(transport.sent).toHaveLength(framesBefore)
   })
 
+  describe('a resubscribe under an existing id', () => {
+    it('forgets the entry, so it is not re-requested at the next login', async () => {
+      await subscribe('stream-room-messages', ['GENERAL'])
+
+      const resubscribing = socket.subscribeAll()
+      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
+      await resubscribing
+
+      expect(socket.subscriptions).toEqual({})
+
+      const framesBefore = transport.sent.length
+      await socket.subscribeAll()
+      expect(transport.sent).toHaveLength(framesBefore)
+    })
+
+    it('keeps the entry when a reopen abandons the wait, since the server may still be streaming', async () => {
+      await subscribe('stream-room-messages', ['GENERAL'])
+
+      const resubscribing = socket.subscribeAll()
+      socket.reopenNow()
+      await resubscribing
+
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+    })
+  })
+
   it('holds nothing while a subscription is still in flight', async () => {
     // The other half of the same change: the map is written on the server's
     // acknowledgement, so an unanswered `sub` is not in it yet.
@@ -267,6 +293,22 @@ describe('Socket subscription bookkeeping', () => {
       id: 'ddp-1',
       name: 'stream-room-messages',
       params: ['GENERAL']
+    })
+  })
+
+  describe('a subscription the server never answered', () => {
+    it('is kept under the id it was sent with when the deadline expires', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+      await jest.advanceTimersByTimeAsync(socket.config.timeout)
+      await expect(subscribing).resolves.toBeUndefined()
+
+      expect(socket.subscriptions['ddp-1']).toMatchObject({
+        id: 'ddp-1',
+        name: 'stream-room-messages',
+        params: ['GENERAL']
+      })
     })
   })
 
