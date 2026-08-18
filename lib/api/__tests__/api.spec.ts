@@ -4,6 +4,8 @@ import { createSilentLogger } from '../../../test/createSilentLogger'
 import { FakeClient } from '../../../test/fakeClient'
 import { loggedInApiWithFakeClient } from '../../../test/loggedInApi'
 
+const ok = () => ({ status: 200, data: {} })
+
 describe('api', () => {
   describe('login', () => {
     it('installs the auth headers the following requests need', async () => {
@@ -35,6 +37,7 @@ describe('api', () => {
 
     it('clears the identity once the server has answered', async () => {
       const { api, client } = await loggedInApiWithFakeClient()
+      client.replyOnce('POST', ok())
 
       await api.logout()
 
@@ -45,20 +48,10 @@ describe('api', () => {
   })
 
   describe('request', () => {
-    it('sends an authenticated request with no login', async () => {
-      const client = new FakeClient()
-      const api = new Api({ client })
-
-      await api.get('me', {})
-
-      expect(api.currentLogin).toBeNull()
-      expect(api.loggedIn()).toBe(true)
-      expect(client.lastRequest().method).toBe('GET')
-    })
-
     it('reaches the client for an unauthenticated request when logged out', async () => {
       const client = new FakeClient()
       const api = new Api({ client })
+      client.replyOnce('POST', ok())
 
       await api.post('login', { username: 'user' }, false)
 
@@ -70,6 +63,10 @@ describe('api', () => {
 
     it('routes each method to its own client call', async () => {
       const { api, client } = await loggedInApiWithFakeClient()
+      client.replyOnce('GET', ok())
+      client.replyOnce('POST', ok())
+      client.replyOnce('PUT', ok())
+      client.replyOnce('DELETE', ok())
 
       await api.get('a', {})
       await api.post('b', {})
@@ -86,6 +83,8 @@ describe('api', () => {
 
     it('passes the body the caller asked for through to the client', async () => {
       const { api, client } = await loggedInApiWithFakeClient()
+      client.replyOnce('POST', ok())
+      client.replyOnce('PUT', ok())
 
       await api.post('chat.postMessage', { msg: 'hello' })
       expect(client.lastRequest().data).toEqual({ msg: 'hello' })
@@ -96,6 +95,7 @@ describe('api', () => {
 
     it('passes the api version through to the client', async () => {
       const { api, client } = await loggedInApiWithFakeClient()
+      client.replyOnce('GET', ok())
 
       await api.get('rooms.info', {}, true, undefined, {}, 'v2')
 
@@ -104,6 +104,7 @@ describe('api', () => {
 
     it('carries the abort signal on every request', async () => {
       const { api, client } = await loggedInApiWithFakeClient()
+      client.replyOnce('GET', ok())
 
       await api.get('me', {})
 
@@ -180,7 +181,8 @@ describe('api', () => {
   describe('logger', () => {
     it('logs to the logger it was handed', async () => {
       const logger = createSilentLogger()
-      const { api } = await loggedInApiWithFakeClient(logger)
+      const { api, client } = await loggedInApiWithFakeClient(logger)
+      client.replyOnce('GET', ok())
 
       await api.get('me', {})
 

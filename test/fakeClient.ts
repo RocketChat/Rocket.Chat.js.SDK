@@ -21,13 +21,7 @@ export class FakeClient implements IClient {
 
   headers: any = {}
 
-  private readonly autoRespond: boolean
-
   private readonly replies: { [method: string]: any[] } = {}
-
-  constructor ({ autoRespond = true }: { autoRespond?: boolean } = {}) {
-    this.autoRespond = autoRespond
-  }
 
   replyOnce (method: FakeRequest['method'], response: any): void {
     this.replies[method] = [...(this.replies[method] || []), response]
@@ -65,8 +59,7 @@ export class FakeClient implements IClient {
       signal?.addEventListener('abort', () => reject(abortError()))
 
       const queued = this.replies[method]
-      if (queued?.length) return resolve(queued.shift())
-      if (this.autoRespond) resolve({ status: 200, data: {} })
+      if (queued?.length) resolve(queued.shift())
     })
   }
 }

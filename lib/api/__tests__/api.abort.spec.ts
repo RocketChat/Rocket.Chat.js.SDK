@@ -1,8 +1,8 @@
-import { loggedInApiWithPendingClient } from '../../../test/loggedInApi'
+import { loggedInApiWithFakeClient } from '../../../test/loggedInApi'
 
 describe('Api abort', () => {
   it('rejects the request that was in flight', async () => {
-    const { api } = await loggedInApiWithPendingClient()
+    const { api } = await loggedInApiWithFakeClient()
 
     const pending = api.get('channels.list', {})
     api.abort()
@@ -11,7 +11,7 @@ describe('Api abort', () => {
   })
 
   it('leaves every in-flight request aborted, not only the last one', async () => {
-    const { api } = await loggedInApiWithPendingClient()
+    const { api } = await loggedInApiWithFakeClient()
 
     const first = api.get('channels.list', {})
     const second = api.post('chat.sendMessage', {})
@@ -22,7 +22,7 @@ describe('Api abort', () => {
   })
 
   it('lets a request made after an abort succeed', async () => {
-    const { api, client } = await loggedInApiWithPendingClient()
+    const { api, client } = await loggedInApiWithFakeClient()
 
     const aborted = api.get('channels.list', {})
     api.abort()
@@ -35,7 +35,7 @@ describe('Api abort', () => {
   })
 
   it('gives a request made after an abort a signal that is not already aborted', async () => {
-    const { api, client } = await loggedInApiWithPendingClient()
+    const { api, client } = await loggedInApiWithFakeClient()
 
     api.get('channels.list', {}).catch(() => undefined)
     const beforeAbort = client.lastRequest()
@@ -47,7 +47,7 @@ describe('Api abort', () => {
   })
 
   it('stays usable across repeated aborts', async () => {
-    const { api, client } = await loggedInApiWithPendingClient()
+    const { api, client } = await loggedInApiWithFakeClient()
 
     const first = api.get('channels.list', {})
     api.abort()
