@@ -379,5 +379,24 @@ describe('Socket liveness', () => {
 
       expect(jest.getTimerCount()).toBe(0)
     })
+
+    it('keeps pinging when the reopen it asked for finds the socket healthy again', async () => {
+      // The ping goes out, its reply deadline expires, and a reopen is scheduled.
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
+      const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
+      expect(pingCount()).toBe(1)
+
+      // Any frame stamps lastPing, so the scheduled reopen finds the socket
+      // connected and returns without building anything.
+      await jest.advanceTimersByTimeAsync(9997)
+      transport.receive({ msg: 'updated' })
+      await jest.advanceTimersByTimeAsync(2)
+
+      expect(fakeSockets).toHaveLength(1)
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 3)
+      expect(pingCount()).toBeGreaterThan(1)
+    })
+
   })
 })
