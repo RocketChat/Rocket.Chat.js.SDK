@@ -176,13 +176,13 @@ an Error that the SDK writes.
   stranded send for a stranded `open()`. `open` can reject, so `checkAndReopen`,
   which opens without awaiting, handles that rejection rather than raising it to
   the global handler of the app.
-- A failed write of a `sub` DDP message leaves an entry in the subscription map.
-  `send` writes that map before `send` writes to the Socket, and the write can
-  reject, so the map can hold an entry for a DDP subscription that the server
-  never received. This fault in the bookkeeping is not new, because `send` writes
-  the map ahead of the answer of the server in each case, and a failed write is
-  one more way to reach it. A separate issue tracks the fault, and this ADR does
-  not correct it.
+- A failed write of a `sub` DDP message leaves nothing in the subscription map.
+  `send` never writes that map; `subscribe` is its only writer, and it writes an
+  entry on the confirmed `ready` id or on the two rejection types ADR-0006 names.
+  The error the Transport threw is neither of those, so the map holds no entry for
+  a DDP subscription the server never received. That is the rule ADR-0006 draws
+  and not an accident of ordering: a `sub` that never reached the wire cannot have
+  been acted on, so there is nothing for a later Login to re-establish.
 - Results do not cross a Reopen; the caller receives a rejection. `subscribe`
   turns each rejection into `undefined`, and what `unsubscribeAll` does with one
   is settled by ADR-0004, so the DDP subscription paths do not change for a
