@@ -236,6 +236,31 @@ describe('Socket liveness', () => {
       await impatient.close()
     })
 
+    it('starts the pong wait only once the ping is written, not when it fires on a dropped socket', async () => {
+      transport.readyState = CLOSED
+
+      await jest.advanceTimersToNextTimerAsync()
+
+      expect(transport.sent).toHaveLength(1)
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL)
+
+      expect(transport.sent).toHaveLength(1)
+      expect(socket.openTimeout).toBeUndefined()
+
+      transport.readyState = OPEN
+      socket.emit('open')
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
+      expect(socket.openTimeout).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(1)
+      expect(socket.openTimeout).toBeDefined()
+    })
+
     it('reconnects when one pong is withheld', async () => {
       // This test used to pin the opposite: the chain died for good, because the
       // ping's send went out while `connected` was still true, waited forever on
