@@ -388,15 +388,28 @@ describe('Socket liveness', () => {
 
       // Any frame stamps lastPing, so the scheduled reopen finds the socket
       // connected and returns without building anything.
-      await jest.advanceTimersByTimeAsync(9997)
+      // The reopen was scheduled one millisecond ago, so this lands a tick short
+      // of it.
+      await jest.advanceTimersByTimeAsync(socket.config.reopen - 2)
       transport.receive({ msg: 'updated' })
-      await jest.advanceTimersByTimeAsync(2)
+      await jest.advanceTimersByTimeAsync(1)
 
       expect(fakeSockets).toHaveLength(1)
 
+      const pingsBeforeIdle = pingCount()
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 3)
-      expect(pingCount()).toBeGreaterThan(1)
+      expect(pingCount()).toBeGreaterThan(pingsBeforeIdle)
     })
 
+    it('keeps pinging when the ping is abandoned and no reopen is asked for', async () => {
+      // A transport that went away without a close event: the ping's write finds
+      // it shut, so the wait is abandoned and `reopenUnlessAbandoned` declines.
+      transport.readyState = CLOSED
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
+
+      expect(socket.openTimeout).toBeUndefined()
+      expect(socket.pingTimeout).toBeDefined()
+    })
   })
 })

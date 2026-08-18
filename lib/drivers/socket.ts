@@ -599,25 +599,18 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
-  /**
-   * Send ping, record time, re-open if nothing comes back, repeat.
-   *
-   * A failed ping re-arms the chain as well as asking for a reopen: a reopen the
-   * socket declines, or one that finds the socket healthy again and returns
-   * early, would otherwise leave nothing watching the connection and nothing to
-   * end a send still waiting for its DDP response. `ping` clears the pending
-   * timer, so the reopen's own re-arm never doubles this one. A closed socket has
-   * no connection, and its chain stays stopped.
-   */
+  private reopenAndKeepPinging = (err: unknown) => {
+    this.reopenUnlessAbandoned(err)
+    if (this.connection) this.ping()
+  }
+
+  /** Send ping, record time, re-open if nothing comes back, repeat */
   ping = async () => {
     if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.ping())
-        .catch((err) => {
-          this.reopenUnlessAbandoned(err)
-          if (this.connection) this.ping()
-        })
+        .catch(this.reopenAndKeepPinging)
     }, this.config.ping)
   }
 
