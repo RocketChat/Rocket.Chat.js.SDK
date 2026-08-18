@@ -62,8 +62,9 @@ refuses leaves none.
   entry, and `unsubscribeAll` catches each failure so one refusal cannot stop the
   rest, or stop the Method call that `logout` makes after it.
 - What a close does to the entries is settled by ADR-0009: `close` sends no
-  `unsub` and forgets every DDP subscription, so no DDP response can arrive and
-  no per-entry decision can run. A Socket the consuming app closed keeps no
+  `unsub`, and forgets every DDP subscription unless a replacement connection
+  superseded the close, so no DDP response can arrive and no per-entry decision
+  can run. A Socket the consuming app closed keeps no
   instruction to re-establish anything.
 - A Reopen forgets nothing. Every entry survives, and that is what lets
   `subscribeAll` restore the streams after the next Login. This half of the rule

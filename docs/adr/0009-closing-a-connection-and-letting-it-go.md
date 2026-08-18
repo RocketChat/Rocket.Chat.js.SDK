@@ -46,7 +46,9 @@ The driver bounds the close, and answers it itself when the transport does not.
   Reopen — and the log line, and an in-flight `send` learns its connection ended
   on the same event the transport would have used.
 - `close` does not unsubscribe. Closing the connection ends every stream on the
-  server, so `close` forgets its DDP subscriptions locally and sends no `unsub`.
+  server, so `close` forgets its DDP subscriptions locally and sends no `unsub`,
+  unless a replacement connection landed during the wait, in which case the close
+  is superseded and the entries that connection filled are left as they are.
   `logout` is the deliberate exception: it stays on the same connection, so it
   awaits its own `unsubscribeAll`.
 - The reject of a not-yet-open Socket is held per Socket, because a detach can run
