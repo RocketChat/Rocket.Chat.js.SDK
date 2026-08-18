@@ -39,8 +39,16 @@ The object a consuming app holds to reach a server — the SDK's entry point, co
 _Avoid_: SDK instance, connection
 
 **Driver**:
-The realtime transport behind a Client, speaking one wire protocol to the server. Not something a consuming app talks to directly.
-_Avoid_: Socket (that is the raw websocket inside a driver), adapter
+The realtime layer behind a Client, speaking one wire protocol to the server. Not something a consuming app talks to directly.
+_Avoid_: Socket (that is the DDP layer inside a Driver), Transport (that is the layer two below), adapter
+
+**Socket**:
+The DDP layer inside a Driver — it performs the DDP handshake, runs the Liveness chain, holds the DDP subscriptions, and owns one Transport. A Driver owns a Socket and mirrors part of its surface, but is a layer above it.
+_Avoid_: Websocket (a Socket is not one; the Transport it owns is), Transport (that is the layer below), ddp
+
+**Transport**:
+The raw websocket a Socket owns and writes its DDP messages to. The layer below a Socket, and the only one with no DDP vocabulary of its own.
+_Avoid_: Socket (that is the layer above), wire
 
 **Stream**:
 A named server-side feed a client asks to receive events from, such as room messages or user notifications.
@@ -86,7 +94,7 @@ The Driver re-emitting its Socket's open as a single `connected` event. One open
 _Avoid_: Connect event, ready
 
 **Transport open**:
-What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its transport reports it open — not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive.
+What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its Transport reports it open — not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive.
 _Avoid_: Open (unqualified), ready, readyState
 
 **Liveness chain**:
@@ -98,7 +106,7 @@ A single bounded liveness check on a Socket that looks open, asked for on demand
 _Avoid_: Health check, ping (that is one message of the chain)
 
 **Detached socket**:
-A Socket the Driver has dropped its reference to and unhooked every handler from, without the transport having confirmed the close. It may still be open to the peer, and may still revive; nothing it does afterwards reaches the Driver.
+A Socket the Driver has dropped its reference to and unhooked every handler from, without the Transport having confirmed the close. It may still be open to the peer, and may still revive; nothing it does afterwards reaches the Driver.
 _Avoid_: Orphan, zombie, abandoned socket — abandoning belongs to waits, leaked socket
 
 **Deadline**:

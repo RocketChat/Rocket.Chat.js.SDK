@@ -1,16 +1,14 @@
-import type { ISocket } from '../drivers/definitions'
+import type { ISocket, IStream } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
 import ClientRest from '../api/RocketChat'
-import { ILogger, ILoginResult, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
+import { ILoginResult, ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
-  logger: ILogger = Logger
   ddp: Driver
 
-  constructor ({ logger, ...config }: any) {
+  constructor ({ logger = Logger, ...config }: any) {
     super({ ...config, logger })
-    this.logger = logger
     this.ddp = new Driver({ ...config, logger })
   }
 
@@ -33,6 +31,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return this.ddp.subscribeRaw(...args) }
   async unsubscribe (subscription: ISubscription): Promise<any> { return this.ddp.unsubscribe(subscription) }
   async unsubscribeAll (): Promise<any> { return this.ddp.unsubscribeAll() }
+  async resubscribeWhenRecorded (streams: IStream[], timeoutMs?: number): Promise<boolean> { return this.ddp.resubscribeWhenRecorded(streams, timeoutMs) }
   async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return this.ddp.subscribeRoom(rid, ...args) }
   async subscribeNotifyAll (): Promise<any> { return this.ddp.subscribeNotifyAll() }
   async subscribeLoggedNotify (): Promise<any> { return this.ddp.subscribeLoggedNotify() }

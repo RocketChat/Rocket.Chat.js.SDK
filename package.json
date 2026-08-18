@@ -27,7 +27,7 @@
   ],
   "scripts": {
     "lint": "oxlint",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json && tsc -p tsconfig.consumer.json",
     "test": "TZ=UTC jest",
     "test:watch": "TZ=UTC jest --watch",
     "test:coverage": "TZ=UTC jest --coverage"

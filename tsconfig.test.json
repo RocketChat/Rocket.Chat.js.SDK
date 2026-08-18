@@ -6,9 +6,6 @@
 	"compilerOptions": {
 		"types": ["node", "jest"]
 	},
-	// `types` carries the ambient module declarations the sources depend on
-	// (`tiny-events`, the websocket client); the base program picks them up by
-	// globbing everything, this one has to name them.
-	"include": ["test", "types", "**/*.spec.ts"],
+	"include": ["test", "**/*.spec.ts"],
 	"exclude": ["node_modules"]
 }
