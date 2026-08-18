@@ -8,8 +8,6 @@ import {
 	ICredentials
 } from '../../interfaces'
 
-import { Message } from '../message'
-
 import { SDKEventEmitter } from '../emitter'
 import * as settings from '../settings';
 
@@ -345,7 +343,14 @@ export default class Api extends SDKEventEmitter {
 	content: string | IMessage,
 	rid?: string,
 	args?: any
-): Message {
-    return new Message(content, { rid, roomId: rid, ...args })
+): IMessage {
+    const { integrationId, ...others } = { rid, roomId: rid, ...args }
+    const message: IMessage = typeof content === 'string'
+      ? { msg: content, ...others }
+      : { ...content, ...others }
+    if (integrationId) {
+      message.bot = { i: integrationId }
+    }
+    return message
   }
 }

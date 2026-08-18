@@ -30,8 +30,12 @@ import {
 
 import { IStream } from './definitions'
 import { DDPError, toError } from './ddpError'
-import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
+
+function hostToWS (host: string, ssl = false) {
+  host = host.replace(/^(https?:\/\/)?/, '')
+  return `ws${ssl ? 's' : ''}://${host}`
+}
 
 const userDisconnectCloseCode = 4000;
 const socketOpen = 1;
