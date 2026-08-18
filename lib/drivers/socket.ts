@@ -418,7 +418,10 @@ export class Socket extends SDKEventEmitter {
 
       this.createConnection().catch(() => {})
 
-      const timeout = setTimeout(() => cleanup(), this.config.timeout)
+      const timeout = setTimeout(() => {
+        cleanup()
+        this.reopen()
+      }, this.config.timeout)
     })
 
     return this.reopenPromise
