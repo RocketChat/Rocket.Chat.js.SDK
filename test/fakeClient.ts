@@ -70,11 +70,3 @@ export class FakeClient implements IClient {
     })
   }
 }
-
-export const loginResponse = () => ({
-  status: 200,
-  data: {
-    success: true,
-    data: { authToken: 'fake-token', userId: 'fake-user-id', me: { username: 'fake-username' } }
-  }
-})

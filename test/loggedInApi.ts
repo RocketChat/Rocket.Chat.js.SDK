@@ -1,12 +1,20 @@
 import Api from '../lib/api/api'
 import { ILogger } from '../interfaces'
-import { FakeClient, loginResponse } from './fakeClient'
+import { FakeClient } from './fakeClient'
 import { answerFetchWith } from './stubbedFetch'
+
+const loginResponse = () => ({
+  status: 200,
+  data: {
+    success: true,
+    data: { authToken: 'fake-token', userId: 'fake-user-id', me: { username: 'fake-username' } }
+  }
+})
 
 const logIn = async (api: Api, client: FakeClient) => {
   client.replyOnce('POST', loginResponse())
   await api.login({ username: 'user', password: 'pass' })
-  client.requests.length = 0
+  client.requests = []
   return api
 }
 
@@ -27,5 +35,5 @@ export const loggedInApiWithStubbedFetch = async (host?: string) => {
   answerFetchWith(loginResponse().data)
   await api.login({ username: 'user', password: 'pass' })
   answerFetchWith({})
-  return { api }
+  return { api, client: api.client }
 }

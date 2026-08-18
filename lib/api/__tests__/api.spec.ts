@@ -45,7 +45,7 @@ describe('api', () => {
   })
 
   describe('request', () => {
-    it('sends an authenticated request with no login, because loggedIn() answers true with no current login', async () => {
+    it('sends an authenticated request with no login', async () => {
       const client = new FakeClient()
       const api = new Api({ client })
 

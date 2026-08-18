@@ -67,7 +67,8 @@ _Avoid_: Client interface (ambiguous with the entry point)
 
 **Current login**:
 The authenticated identity Api holds after a Login — username, user id and auth
-token. Set on login, cleared on logout, and what `loggedIn()` reports on.
+token. Set on login and cleared on logout, though `loggedIn()` answers true even when it
+is null.
 _Avoid_: Session, credentials (those are what a Login is given, not what it
 yields), user
 
