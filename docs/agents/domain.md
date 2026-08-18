@@ -50,7 +50,25 @@ An ADR always reads as the current decision. When a decision evolves, rewrite th
 
 The one exception is a reversal. When a decision is reversed, don't rewrite the old ADR: write a new one that supersedes it, and flip the old ADR's status line to `**Status:** Superseded by ADR-NNNN` (zero-padded, matching the ADR titles). Nothing else in the old file changes.
 
+A rewrite is a reversal when its new text makes false a claim that another in-force ADR states. Anything else is an evolution, however much of the file changes.
+
 Don't confuse this with the `**Succeeds:** ADR-NNNN` line some ADRs carry. `Succeeds` chains ADRs that build on each other while both stay in force; `Superseded by` marks a decision that no longer applies. A superseding ADR can also carry a `Succeeds` line pointing at the one it replaces.
+
+### Before rewriting, find who cites you
+
+Grep `docs/adr/` for the ADR's own number before you rewrite it. Every ADR that cites it is in scope of the same change: re-read each one against the new text, and rewrite the ones the change made stale in the same commit. This is also how you answer the reversal question above — if a citing ADR's claim is now false, you owe a new ADR rather than a rewrite.
+
+```
+grep -rn "ADR-0003" docs/adr/
+```
+
+### Two statuses, and no others
+
+`**Status:** Accepted` and `**Status:** Superseded by ADR-NNNN` are the whole vocabulary. Don't invent `Proposed`, `Draft` or `Deprecated` — a decision that isn't accepted yet isn't an ADR yet.
+
+### Decisions, not rollouts
+
+An ADR records the decision and what it costs. Sequencing — which PR lands first, what pins move when — is state, and stale state inside a document that reads as current is the fault this convention exists to prevent. Rollout plans live in the issue or the PR. If the sequencing is itself decided, one sentence in Consequences carries it.
 
 ## Flag ADR conflicts
 

@@ -87,19 +87,3 @@ and an `/** @internal */` tag alone, which enforces nothing.
 - Until the app moves, the documentation is ahead of the code: CONTEXT.md
   reserves `ddp` as a qualifier while `Driver.ddp` still exists. Issue #338
   stays open until the renames land.
-
-## Migration
-
-Of the three renames, only `RocketChatClient.ddp` to `driver` reaches the app's
-production code. Making `Driver.ddp` private reaches only its integration tests,
-and dropping `implements ISocket` reaches nothing there. They land together
-anyway, so the vocabulary arrives in one piece.
-
-A follow-up SDK pull request carries all three, paired with one in the app:
-
-1. The SDK PR renames both fields and drops `implements ISocket`.
-2. The app PR pins that SDK commit and updates its readers in the same change —
-   `sdk.current?.ddp` becomes `sdk.current?.driver`, and its integration tests
-   move to `driver['socket']`.
-3. The app's pin does not move to the renamed SDK until its own PR is ready,
-   for the reason Consequences gives.
