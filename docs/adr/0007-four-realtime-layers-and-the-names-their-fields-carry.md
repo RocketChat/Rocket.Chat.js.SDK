@@ -84,5 +84,5 @@ and an `/** @internal */` tag alone, which enforces nothing.
   `@rocket.chat/sdk/clients/Rocketchat`. Nothing in this repo or in
   Rocket.Chat.ReactNative uses it, and it carried no default export, so the
   root import is unaffected.
-- The three renames land together in a single SDK PR so the vocabulary arrives in
-  one piece, and the app's pin moves in its own PR.
+- The three renames land together in a single SDK PR, and the app's pin moves
+  in its own.
