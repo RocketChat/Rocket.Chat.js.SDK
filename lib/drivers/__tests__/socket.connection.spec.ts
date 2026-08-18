@@ -163,15 +163,15 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('rejects the replaced open as an abandoned wait rather than leaving it pending', async () => {
-      const neverOpened = createSocket(logger)
-      const abandoned = neverOpened.open()
+      const stillConnecting = createSocket(logger)
+      const abandoned = stillConnecting.open()
       const socketsBeforeReplacement = fakeSockets.length
 
-      const opening = neverOpened.reopenNow()
+      const opening = stillConnecting.reopenNow()
       const replacement = fakeSockets[socketsBeforeReplacement]
 
       await expect(abandoned).rejects.toThrow('[ddp] connection closed before it opened')
-      expect(neverOpened.openTimeout).toBeUndefined()
+      expect(stillConnecting.openTimeout).toBeUndefined()
 
       await driveToHandshake(replacement)
       await opening
