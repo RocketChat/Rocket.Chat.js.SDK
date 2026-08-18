@@ -1,7 +1,6 @@
 import { EventEmitter } from 'tiny-events'
 import {
   ILogger,
-  ISocketOptions,
   ICallback,
   ISubscription,
   ICredentials
@@ -14,7 +13,7 @@ export interface IStream {
 
 export interface ISocket {
   logger: ILogger
-  connect (options: ISocketOptions): Promise<IDriver>
+  connect (): Promise<IDriver>
   disconnect (): Promise<ISocket>
   checkAndReopen (): void
   subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined>

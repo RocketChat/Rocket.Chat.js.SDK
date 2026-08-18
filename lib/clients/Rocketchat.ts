@@ -21,7 +21,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }
 
-  async connect (options: ISocketOptions): Promise<any> { return this.ddp.connect(options) }
+  async connect (_options?: ISocketOptions): Promise<any> { return this.ddp.connect() }
   async disconnect (): Promise<any> { return this.ddp.disconnect() }
   async checkAndReopen (): Promise<void> { return this.ddp.checkAndReopen() }
   async onStreamData (event: string, cb: ICallback): Promise<any> { return this.ddp.onStreamData(event, cb) }

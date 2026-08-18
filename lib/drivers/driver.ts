@@ -53,11 +53,11 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
 	 *    .then(() => console.log('connected'))
 	 *    .catch((err) => console.error(err))
 	 */
-  connect = async (options: any = {}): Promise<any> => {
+  connect = async (): Promise<any> => {
     if (this.connected) {
       return this
     }
-    this.logger.info('[driver] Connecting', { ...this.config, ...options })
+    this.logger.info('[driver] Connecting', { ...this.config })
     try {
       await this.ddp.open()
     } catch (err) {
