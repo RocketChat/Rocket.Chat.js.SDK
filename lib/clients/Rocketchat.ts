@@ -1,9 +1,9 @@
 import type { ISocket, IStream } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
-import ClientRest from '../api/RocketChat'
+import ApiRocketChat from '../api/RocketChat'
 import { ILoginResult, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
-export default class RocketChatClient extends ClientRest implements ISocket {
+export default class RocketChatClient extends ApiRocketChat implements ISocket {
   userId: string = ''
   ddp: Driver
 

@@ -2,7 +2,7 @@ import { logger as Logger } from '../log'
 
 import {
 	ILogger,
-	IRestLogin,
+	ICurrentLogin,
 	IAPIRequest,
 	IMessage,
 	ICredentials
@@ -80,10 +80,10 @@ import * as settings from '../settings';
 export interface IClient {
   host: string
   headers: any
-  get (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  post (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  put (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  delete (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  get (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  post (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  put (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  delete (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any>
 }
 
 class Client implements IClient {
@@ -99,17 +99,17 @@ class Client implements IClient {
     this._headers = obj
   }
   get headers (): any {
-    return {
-      'Content-Type': 'application/json',
-      ...settings.customHeaders,
-      ...this._headers
-    }
+    return this._headers
   }
 
   getHeaders (options?: any) {
     return options && options.customHeaders ?
       options.customHeaders :
-      this.headers
+      {
+        'Content-Type': 'application/json',
+        ...settings.customHeaders,
+        ...this._headers
+      }
   }
 
   getBody (data: any) {
@@ -122,23 +122,23 @@ class Client implements IClient {
     return options && options.signal;
   }
 
-  get (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}?${this.getParams(data)}`, {
+  get (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}?${this.getParams(data)}`, {
       method: 'GET',
       headers: this.getHeaders(options),
       signal: this.getSignal(options)
     }).then(this.handle)
   }
-  post (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
+  post (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
       method: 'POST',
       body: this.getBody(data),
       headers: this.getHeaders(options),
       signal: this.getSignal(options)
     }).then(this.handle)
   }
-  put (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
+  put (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
       method: 'PUT',
       body: this.getBody(data),
       headers: this.getHeaders(options),
@@ -146,8 +146,8 @@ class Client implements IClient {
     }).then(this.handle)
   }
 
-  delete (url: string, data?: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
+  delete (endpoint: string, data?: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
       method: 'DELETE',
       body: this.getBody(data),
       headers: this.getHeaders(options),
@@ -185,6 +185,9 @@ export interface IApiOptions {
 
 export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
 
+const authTokenHeader = 'X-Auth-Token'
+const userIdHeader = 'X-User-Id'
+
 /**
 	* @module API
 	* Provides a base client for handling requests with generic Rocket.Chat's REST API
@@ -194,7 +197,7 @@ export default class Api extends SDKEventEmitter {
   userId: string = ''
   logger: ILogger
   client: IClient
-  currentLogin: IRestLogin | null = null
+  currentLogin: ICurrentLogin | null = null
   controller: AbortController
 
   constructor ({ client, host, logger = Logger }: IApiOptions) {
@@ -251,7 +254,7 @@ export default class Api extends SDKEventEmitter {
       const hasDataInsideResult = result && !result.data
       return (method === 'DELETE') && hasDataInsideResult ? result : result.data
     } catch (err) {
-      this.logger?.error(`[API] POST error(${ endpoint }): ${ JSON.stringify(err) }`)
+      this.logger?.error(`[API] ${ method } error(${ endpoint }): ${ JSON.stringify(err) }`)
       throw err
     }
   }
@@ -294,32 +297,36 @@ export default class Api extends SDKEventEmitter {
     return data
   }
 
-  resumeLogin ({ userId, authToken }: Pick<IRestLogin, 'userId' | 'authToken'>) {
+  resumeLogin ({ userId, authToken }: Pick<ICurrentLogin, 'userId' | 'authToken'>) {
     const previous = this.currentLogin?.userId === userId ? this.currentLogin : null
     if (previous?.authToken === authToken) {
       return
     }
     this.setLogin({
-      username: previous ? previous.username : null,
+      username: previous?.username ?? null,
       userId,
       authToken,
       result: null
     })
   }
 
-  private setLogin (login: IRestLogin) {
+  private setLogin (login: ICurrentLogin) {
     this.userId = login.userId
     this.currentLogin = login
     this.client.headers = {
-      'X-Auth-Token': login.authToken,
-      'X-User-Id': login.userId
+      ...this.client.headers,
+      [authTokenHeader]: login.authToken,
+      [userIdHeader]: login.userId
     }
   }
 
   private clearLogin () {
     this.userId = ''
     this.currentLogin = null
-    this.client.headers = {}
+    const headers = { ...this.client.headers }
+    delete headers[authTokenHeader]
+    delete headers[userIdHeader]
+    this.client.headers = headers
   }
 
   async logout () {
