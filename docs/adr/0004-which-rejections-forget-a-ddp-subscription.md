@@ -91,9 +91,8 @@ entry is written on the same terms.
   resubscribe is forgotten and later Logins do not re-request it. `subscribe`
   still swallows its own failure and resolves `undefined` rather than re-throwing.
   A separate issue tracks that.
-- Whether a `sub` may be sent for an id whose `unsub` is still in flight is not
-  settled here, and the behaviour of the server in that case is not known. A
-  separate issue tracks the question.
+- Whether a `sub` may be sent for an id whose `unsub` is still in flight, and
+  what the server does when it is, is settled by ADR-0005.
 - Applying the rule to the write reopens, on the `sub` path, the case the Context
   describes for `unsubscribe`. A Reopen rejects a `sub` that is still in flight,
   under ADR-0003, while the server may already be streaming. Which side to prefer
