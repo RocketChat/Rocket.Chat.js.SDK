@@ -46,15 +46,19 @@ an Error that the SDK writes.
 - The default Deadline of `waitForOpen` is `config.reopen * 2`. This Deadline
   outlasts the Reopen that the send waits for: at exactly `config.reopen`, no
   Reopen can meet the Deadline.
-- `ping` races its send against a Deadline of `config.ping`. If the Deadline wins,
-  `ping` calls `reopen()`. A `pong` that does not arrive therefore causes the
-  reconnect that it always had to cause.
-- That Deadline is in `ping`, not in `send`. A Deadline on the DDP response of
-  `send` applies to each Method call and each DDP subscription of the consuming
-  app. The correct bound for a Login, or for the history of a Room, is not the
-  ping interval. That bound is also not for the SDK to choose. `ping` is the one
-  caller that knows both what it waits for and what to do when the answer does
-  not arrive.
+- Every send has a Deadline on the DDP response, and its default is
+  `config.timeout` — the option that already means how long a caller is willing to
+  wait for an answer, so an app that wants a different bound moves the option it
+  already has. The only other public surface is an optional per-send bound. The
+  Deadline starts after the write, not at the call, so a send issued while the
+  Socket is not Transport open first waits out the wait on `open` — up to
+  `config.reopen * 2` — and only then its own bound.
+- `ping` is the one caller that names its own bound, and it names `config.ping`.
+  If the Deadline wins, `ping` calls `reopen()`. A `pong` that does not arrive
+  therefore causes the reconnect that it always had to cause. The bound on the
+  pong is the ping interval, so an app patient with a Method call is not thereby
+  slower to notice a dead pipe. A `pong` itself waits for nothing and arms no
+  Deadline.
 - A rejection that the SDK decides on is a plain `new Error` with a fixed message.
   An expired Deadline and an abandoned Reopen are of this type. Such a rejection
   does not go through `toError`, because the work of `toError` is to turn a server
@@ -155,10 +159,29 @@ an Error that the SDK writes.
 - The Deadline of `ping` is `config.ping`. A consuming app that lowers that option
   for the Liveness chain therefore also lowers the bound on the wait for the
   `pong`. The documentation of the option says this at `interfaces/index.ts`.
-- `send` has **no** Deadline for the DDP response, and this ADR does not give
-  `send` one. A Method call on a Socket that is open and dead does not wait on a
-  timer. Something else must end that wait: a close, or the Liveness chain. Nothing
-  here bounds a Method call on a connection that stays up and stays silent.
+- The connection ending is still what ends a wait first; the Deadline answers the
+  one case no connection event reaches, where the connection stays up and the
+  server simply never answers. `alive()` is refreshed by any readable frame, so a
+  Socket carrying other traffic never Reopens on account of it.
+- An expired Deadline rejects with a plain Error under the rule at the top of this
+  ADR — `'[ddp] no response arrived before the deadline'`. It is deliberately
+  **not** an Abandoned wait: no connection went away, so nobody has answered the
+  fault, and `ping` and the retry inside `reopen` do Reopen on it. For every other
+  caller the rejection is the whole answer: the Socket stays Transport open, and
+  nothing rebuilds it on account of one unanswered call. Deciding that a
+  connection is dead stays with the Liveness chain, which is the only thing that
+  asks the question. The Deadline ends a wait; it does not diagnose a connection.
+  It carries the id, for the reason ADR-0006 gives: the DDP message was written to
+  the transport and no answer came, so a `sub` that expires keeps its entry exactly
+  as an abandoned one does. The type is unexported and sets no `name`, so a caller
+  sees an ordinary Error and the message above.
+- The Deadline covers each send that waits for a DDP response, the handshake
+  included — an `open()` against a server that accepts the socket and never answers
+  the handshake rejects rather than hanging. The rejection is the whole answer for
+  a consumer that called `open()` itself: the transport stays open with no DDP
+  session behind it and nothing schedules a Reopen. Only the retry inside
+  `reopen()`, which routes the rejection through `reopenUnlessAbandoned`, retries
+  on the schedule `config.reopen` sets.
 - Rejections reach the two places that Reopen on a failure — `ping` and the retry
   inside `reopen`. A close would rebuild the Socket the caller had just closed,
   and a Reopen would queue a second Reopen behind the one already under way. An
@@ -193,3 +216,4 @@ an Error that the SDK writes.
   that ADR-0001 established. The spec asserts that the value is an `Error`, and
   the spec asserts the message that a caller reads. A later change therefore
   cannot return to a rejection with a bare value.
+

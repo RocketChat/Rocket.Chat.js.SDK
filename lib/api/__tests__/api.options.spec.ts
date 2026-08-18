@@ -18,6 +18,14 @@ describe('Api options', () => {
     expect(api.logger).toBe(moduleLogger)
   })
 
+  it('exposes the host on the client it built', () => {
+    const api = new Api({ host: 'http://localhost:3000' })
+
+    const host: string = api.client.host
+
+    expect(host).toBe('http://localhost:3000')
+  })
+
   it('rejects an unrecognized option, which only typecheck can fail on', () => {
     // @ts-expect-error
     const api = new Api({ client: new FakeClient(), loggr: createSilentLogger() })

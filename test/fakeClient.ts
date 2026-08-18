@@ -23,6 +23,7 @@ const abortError = (): Error => {
 }
 
 export class FakeClient implements IClient {
+  host: string = ''
   headers: any = {}
 
   requests: FakeRequest[] = []
