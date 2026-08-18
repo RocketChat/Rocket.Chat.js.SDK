@@ -1,68 +1,61 @@
-import Api from '../api'
-import ClientRest from '../RocketChat'
-import { FakeClient } from '../../../test/fakeClient'
 import { loginResponse } from '../../../test/loginResponse'
+import { anonymousApiWithFakeClient, anonymousApiRocketChatWithFakeClient } from '../../../test/apiFixtures'
 
-const anonymousApi = () => {
-  const client = new FakeClient()
-  return { api: new Api({ client }), client }
-}
+const infoResponse = () => ({ status: 200, data: { info: { version: '6.0.0' } } })
 
 describe('Api auth guard', () => {
   it('reports not logged in with no login', () => {
-    const { api } = anonymousApi()
+    const { api } = anonymousApiWithFakeClient()
 
     expect(api.loggedIn()).toBe(false)
   })
 
   it('refuses an authenticated request with no login', async () => {
-    const { api, client } = anonymousApi()
+    const { api, restClient } = anonymousApiWithFakeClient()
 
     await expect(api.get('me', {})).rejects.toThrow(/requires a login/)
-    expect(client.requests).toHaveLength(0)
+    expect(restClient.requests).toHaveLength(0)
   })
 
   it('allows an unauthenticated request with no login', async () => {
-    const { api, client } = anonymousApi()
+    const { api, restClient } = anonymousApiWithFakeClient()
 
     const pending = api.get('settings.public', {}, false)
-    client.lastRequest().resolve({ status: 200, data: { settings: [] } })
+    restClient.lastRequest().resolve({ status: 200, data: { settings: [] } })
 
     await expect(pending).resolves.toEqual({ settings: [] })
   })
 
   it('logs in with no prior login', async () => {
-    const { api, client } = anonymousApi()
+    const { api, restClient } = anonymousApiWithFakeClient()
 
     const pending = api.login({ username: 'user', password: 'pass' })
-    client.lastRequest().resolve(loginResponse())
+    restClient.lastRequest().resolve(loginResponse())
 
-    await expect(pending).resolves.toMatchObject({ userId: 'id' })
+    await expect(pending).resolves.toMatchObject({ userId: 'fake-user-id' })
     expect(api.loggedIn()).toBe(true)
   })
 
   it('allows info() with no login', async () => {
-    const client = new FakeClient()
-    const rest = new ClientRest({ client })
+    const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
-    const pending = rest.info()
-    client.lastRequest().resolve({ status: 200, data: { info: { version: '6.0.0' } } })
+    const pending = api.info()
+    restClient.lastRequest().resolve(infoResponse())
 
     await expect(pending).resolves.toEqual({ version: '6.0.0' })
   })
 
   it('sends info() authenticated once logged in', async () => {
-    const client = new FakeClient()
-    const rest = new ClientRest({ client })
+    const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
-    const login = rest.login({ username: 'user', password: 'pass' })
-    client.lastRequest().resolve(loginResponse())
+    const login = api.login({ username: 'user', password: 'pass' })
+    restClient.lastRequest().resolve(loginResponse())
     await login
 
-    const pending = rest.info()
-    client.lastRequest().resolve({ status: 200, data: { info: { version: '6.0.0' } } })
+    const pending = api.info()
+    restClient.lastRequest().resolve(infoResponse())
     await pending
 
-    expect(client.headers).toMatchObject({ 'X-Auth-Token': 'token', 'X-User-Id': 'id' })
+    expect(restClient.headers).toMatchObject({ 'X-Auth-Token': 'fake-token', 'X-User-Id': 'fake-user-id' })
   })
 })

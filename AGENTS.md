@@ -8,7 +8,7 @@ Node/TypeScript SDK for Rocket.Chat. Ships as TypeScript source (`main` is `inde
 
 Config spreads into the REST base, `Driver` and `Socket`. Only `Socket` re-picks the keys it knows; `Driver` keeps the whole spread on its public `config`, so an unrecognized option silently reaches the driver — check that when adding one.
 
-`lib/settings.ts` reads `process.env` at import time.
+`lib/settings.ts` only exports `customHeaders`, a mutable module global read by the socket and REST layers.
 
 ## Tests
 
@@ -29,3 +29,7 @@ The five canonical triage labels, used verbatim. See `docs/agents/triage-labels.
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## Coding standards
+
+`CODING_STANDARDS.md` at the repo root. Read it before writing code.
