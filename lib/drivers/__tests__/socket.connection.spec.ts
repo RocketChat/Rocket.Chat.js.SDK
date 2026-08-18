@@ -194,6 +194,19 @@ describe('Socket connection lifecycle', () => {
       await expect(reopening).resolves.toBeUndefined()
       expect(socket.reopenPromise).toBeUndefined()
     })
+
+    it('schedules a reopen when no open ever arrives', async () => {
+      const reopening = socket.reopenNow()
+
+      await jest.advanceTimersByTimeAsync(REOPEN_NOW_DEADLINE)
+      await reopening
+
+      expect(socket.connected).toBe(false)
+      expect(socket.openTimeout).toBeDefined()
+
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      expect(fakeSockets).toHaveLength(3)
+    })
   })
 
   describe('an open abandoned by a close mid-handshake', () => {

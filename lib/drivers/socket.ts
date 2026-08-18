@@ -382,7 +382,9 @@ export class Socket extends SDKEventEmitter {
    * via the open/timeout paths.
    *
    * Past the deadline the promise resolves and `reopenPromise` is cleared even
-   * though the connection may still be down.
+   * though the connection may still be down, so the deadline also schedules a
+   * `reopen` — nothing else would rebuild the socket, since the Liveness chain
+   * only restarts from `onOpen`.
    */
   reopenNow = (): Promise<void> => {
     if (this.reopenPromise) {
@@ -410,7 +412,10 @@ export class Socket extends SDKEventEmitter {
 
       this.createConnection().catch(() => {})
 
-      const timeout = setTimeout(() => cleanup(), this.config.timeout)
+      const timeout = setTimeout(() => {
+        cleanup()
+        this.reopen()
+      }, this.config.timeout)
     })
 
     return this.reopenPromise
