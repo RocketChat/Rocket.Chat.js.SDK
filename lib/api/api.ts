@@ -78,6 +78,7 @@ import * as settings from '../settings';
 // }
 
 export interface IClient {
+  host: string
   headers: any
   get (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
   post (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
