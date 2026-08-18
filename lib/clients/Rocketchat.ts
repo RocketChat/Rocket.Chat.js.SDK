@@ -1,7 +1,7 @@
 import type { ISocket, IStream } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
 import ClientRest from '../api/RocketChat'
-import { ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
+import { ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
 export default class RocketChatClient extends ClientRest implements ISocket {
   userId: string = ''
@@ -21,7 +21,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }
 
-  async connect (_options?: ISocketOptions): Promise<any> { return this.ddp.connect() }
+  async connect (): Promise<any> { return this.ddp.connect() }
   async disconnect (): Promise<any> { return this.ddp.disconnect() }
   async checkAndReopen (): Promise<void> { return this.ddp.checkAndReopen() }
   async onStreamData (event: string, cb: ICallback): Promise<any> { return this.ddp.onStreamData(event, cb) }
