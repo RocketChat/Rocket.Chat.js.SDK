@@ -74,6 +74,14 @@ _Avoid_: Sub, subscription (unqualified), the map, the collection (that is a fie
 A DDP subscription whose `sub` reached the wire but whose DDP response the connection ended before delivering. The server may have acted on it, so its entry is kept and re-established rather than forgotten.
 _Avoid_: Lost subscription, orphaned stream, phantom
 
+**Confirmed sub**:
+A DDP subscription whose `ready` DDP response arrived on the current connection. Confirmation belongs to the connection it arrived on: a Reopen makes every sub Unconfirmed, however the previous connection ended.
+_Avoid_: Active subscription, live sub
+
+**Unconfirmed sub**:
+A recorded DDP subscription that is not a Confirmed sub — its `ready` never arrived, or arrived on an earlier connection. The record is an instruction to establish the stream, not a claim the server holds it.
+_Avoid_: Pending subscription, stale sub
+
 **Method call**:
 A named server procedure invoked over the realtime connection, as opposed to a REST request.
 _Avoid_: RPC, command

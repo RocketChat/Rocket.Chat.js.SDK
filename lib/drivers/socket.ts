@@ -89,6 +89,8 @@ export class Socket extends SDKEventEmitter {
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
+  private connectionGeneration = 0
+  private readonly subscriptionConfirmedEvent = 'subscription:confirmed'
 
   /** Create a websocket handler */
   constructor (
@@ -133,6 +135,7 @@ export class Socket extends SDKEventEmitter {
         this.logger.error(err)
         return reject(err)
       }
+      this.connectionGeneration += 1
       // Tear down the previous connection before replacing it.
       // Callers only reach here when the existing socket isn't healthy, so
       // detaching its handlers and closing it stops a stale or still-connecting
@@ -736,7 +739,7 @@ export class Socket extends SDKEventEmitter {
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
         const confirmedId = (result.subs) ? result.subs[0] : undefined
-        if (confirmedId) return this.rememberSubscription(confirmedId, name, params, callback)
+        if (confirmedId) return this.rememberSubscription(confirmedId, name, params, callback, true)
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
@@ -760,14 +763,24 @@ export class Socket extends SDKEventEmitter {
     id: string,
     name: string,
     params: any[],
-    callback?: ISocketMessageCallback
+    callback?: ISocketMessageCallback,
+    confirmed?: boolean
   ) => {
     if (!this.connection) return
     const unsubscribe = this.unsubscribe.bind(this, id)
     const onEvent = this.onEvent.bind(this, name)
-    const subscription = { id, name, params, unsubscribe, onEvent }
+    const existing = this.subscriptions[id]
+    const confirmedOnGeneration = confirmed
+      ? this.connectionGeneration
+      : existing?.confirmedOnGeneration === this.connectionGeneration
+        ? this.connectionGeneration
+        : undefined
+    const subscription = { id, name, params, unsubscribe, onEvent, confirmedOnGeneration }
     if (callback) subscription.onEvent(callback)
     this.subscriptions[id] = subscription
+    if (confirmedOnGeneration === this.connectionGeneration) {
+      this.emit(this.subscriptionConfirmedEvent, subscription)
+    }
     return subscription
   }
 
@@ -786,53 +799,47 @@ export class Socket extends SDKEventEmitter {
       ))
 
   /**
-   * Re-send the given streams on the current connection under the ids they were
-   * first sent with, and resolve on whether the server acked every one of them.
-   *
-   * Nothing goes out until every stream asked for is recorded here, so the
-   * deadline expiring first resolves false.
+   * The DDP subscriptions on this Socket for one stream name, matched exactly on
+   * the params given: same length and element-wise `===`. Prefix matching lives
+   * in `findSubscriptions` for its existing callers and is not used here.
    */
-  resubscribeWhenRecorded = (
+  private findConfirmedSubscription = ({ name, params = [] }: IStream): ISubscription | undefined =>
+    Object.keys(this.subscriptions || {})
+      .map((id) => this.subscriptions[id])
+      .find((sub) => (
+        sub &&
+        sub.name === name &&
+        sub.confirmedOnGeneration === this.connectionGeneration &&
+        sub.params?.length === params.length &&
+        params.every((param, index) => sub.params[index] === param)
+      ))
+
+  /**
+   * Resolve when every stream asked for has a Confirmed sub on the current
+   * generation, or `false` when the Deadline rings first. Sends no `sub` of its
+   * own: it is a query over the recorded state. See ADR-0009.
+   */
+  whenReady = (
     streams: IStream[],
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
-    const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
-    const resubscribe = (subs: ISubscription[]) => Promise.all(
-      subs.map((sub) => this.subscribe(sub.name, sub.params, undefined, sub.id))
-    )
-      .then((results) => {
-        const unacknowledged = subs.filter((_, index) => !results[index])
-        unacknowledged.forEach((sub) => this.logger.error(
-          `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
-        ))
-        return unacknowledged.length === 0
-      })
-      .catch(() => false)
-
     return new Promise<boolean>((resolve) => {
       let settled = false
-      let inFlight = false
       const finish = (value: boolean) => {
         if (settled) return
         settled = true
-        clearInterval(poll)
         clearTimeout(deadline)
+        this.off(this.subscriptionConfirmedEvent, check)
         resolve(value)
       }
-      const attempt = () => {
-        if (inFlight) return
-        const perStream = recordedPerStream()
-        if (!perStream.every((subs) => subs.length > 0)) return
-        inFlight = true
-        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as ISubscription[])
-        resubscribe(recorded).then((value) => {
-          inFlight = false
-          finish(value)
-        })
+      const check = () => {
+        if (streams.every((stream) => this.findConfirmedSubscription(stream))) {
+          finish(true)
+        }
       }
       const deadline = setTimeout(() => finish(false), timeoutMs)
-      const poll = setInterval(attempt, 100)
-      attempt()
+      this.on(this.subscriptionConfirmedEvent, check)
+      check()
     })
   }
 

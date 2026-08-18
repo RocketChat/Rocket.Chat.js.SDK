@@ -31,7 +31,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return this.ddp.subscribeRaw(...args) }
   async unsubscribe (subscription: ISubscription): Promise<any> { return this.ddp.unsubscribe(subscription) }
   async unsubscribeAll (): Promise<any> { return this.ddp.unsubscribeAll() }
-  async resubscribeWhenRecorded (streams: IStream[], timeoutMs?: number): Promise<boolean> { return this.ddp.resubscribeWhenRecorded(streams, timeoutMs) }
+  async whenReady (streams: IStream[], timeoutMs?: number): Promise<boolean> { return this.ddp.whenReady(streams, timeoutMs) }
   async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return this.ddp.subscribeRoom(rid, ...args) }
   async subscribeNotifyAll (): Promise<any> { return this.ddp.subscribeNotifyAll() }
   async subscribeLoggedNotify (): Promise<any> { return this.ddp.subscribeLoggedNotify() }
