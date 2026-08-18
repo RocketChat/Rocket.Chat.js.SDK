@@ -192,6 +192,8 @@ describe('Socket liveness', () => {
      * the pong resolves. Running all timers is worse still — a self-rescheduling
      * chain hits the runner's timer-count abort.
      */
+    const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
+
     const tick = async (deliver?: () => void) => {
       await jest.advanceTimersToNextTimerAsync()
       deliver?.()
@@ -383,12 +385,10 @@ describe('Socket liveness', () => {
     it('keeps pinging when the reopen it asked for finds the socket healthy again', async () => {
       // The ping goes out, its reply deadline expires, and a reopen is scheduled.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
-      const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
       expect(pingCount()).toBe(1)
       expect(socket.openTimeout).toBeDefined()
 
-      // Any frame stamps lastPing, so the scheduled reopen finds the socket
-      // connected and returns without building anything.
+      // A frame arriving late enough leaves the reopen nothing to build.
       await jest.advanceTimersByTimeAsync(socket.config.reopen - 1)
       transport.receive({ msg: 'updated' })
       await jest.advanceTimersByTimeAsync(1)
@@ -402,7 +402,6 @@ describe('Socket liveness', () => {
 
     it('keeps pinging when the ping is abandoned and no reopen is asked for', async () => {
       await jest.advanceTimersToNextTimerAsync()
-      const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
       expect(pingCount()).toBe(1)
 
       // The event abandons the ping's wait, so `reopenUnlessAbandoned` declines
