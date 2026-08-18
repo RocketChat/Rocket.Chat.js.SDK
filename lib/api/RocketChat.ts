@@ -41,7 +41,7 @@ export default class ApiRocketChat extends ApiBase {
 	// editMessage(message: IMessage) chat.update
   joinRoom ({ rid }: any) { return this.post('channels.join', { roomId: rid }, true) }
 
-  async info () { return (await this.get('info', {}, true)).info }
+  async info () { return (await this.get('info', {}, this.loggedIn())).info }
 	/**
 	 * Send a prepared message object (with pre-defined room ID).
 	 * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
