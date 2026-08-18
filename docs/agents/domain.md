@@ -44,6 +44,12 @@ When your output names a domain concept (in an issue title, a refactor proposal,
 
 If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
 
+## ADRs are rewritten in place
+
+An ADR always reads as the current decision. When a decision evolves, rewrite the ADR itself — no amendment or changelog sections. Git history is the amendment log.
+
+The one exception is a reversal. When a decision is reversed, don't rewrite the old ADR: write a new one that supersedes it, and flip the old ADR's status line to `Superseded by ADR-XXXX`. Nothing else in the old file changes.
+
 ## Flag ADR conflicts
 
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
