@@ -54,11 +54,11 @@ The server's answer decides; silence keeps the instruction.
   `rememberSubscription` returns early when it holds none, because an entry is an
   instruction to a later Login on this Socket, and a Socket with no connection has
   nothing to instruct.
-- A `sub` that was never written to the transport leaves nothing behind. A failed
+- A `sub` that was never written to the Transport leaves nothing behind. A failed
   write, and a send that expired waiting for the connection to open, are both
   cases where the server cannot have acted on the request. The entry is written
-  only when the DDP message was written to the transport and no answer came.
-- Written to the transport is not the same as delivered. A send on a Socket that
+  only when the DDP message was written to the Transport and no answer came.
+- Written to the Transport is not the same as delivered. A send on a Socket that
   is Transport open while the Liveness chain has lapsed writes a DDP message the
   peer may never read, and that write keeps an entry. The entry is an
   instruction to establish the stream, not a claim the server holds it, so a
@@ -120,7 +120,7 @@ The server's answer decides; silence keeps the instruction.
 - A Deadline that expires also carries an id: the one ADR-0003 gives the DDP
   response, which ends the wait when the connection stays up and the server
   never answers. It falls on the same side of the line as an abandoned one — the
-  DDP message was written to the transport and no answer came — so a `sub` that
+  DDP message was written to the Transport and no answer came — so a `sub` that
   expires keeps its entry, and `subscribe` tests for it as positively as it tests
   for an `AbandonedRequest`. It is an `ExpiredWait`, not an `AbandonedWait`,
   because no connection went away — but `subscribe` asks nothing for a Reopen

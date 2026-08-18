@@ -90,7 +90,7 @@ an Error that the SDK writes.
   announced to nobody, and a guard at that point abandons the wait instead. The
   guard reads `readyState`, not `connected`: `connected` is bookkeeping the SDK
   updates when the events land, and in this window they have not landed, so only
-  the transport knows whether the connection went away. Reading `connected` there
+  the Transport knows whether the connection went away. Reading `connected` there
   also folds in `alive()`, which would abandon a send on a socket that is open and
   merely quiet — and, because an abandoned wait suppresses the Reopen, would
   suppress it for the one connection with nobody rebuilding it.
@@ -104,7 +104,7 @@ an Error that the SDK writes.
   abandoned wait carries, so `ping` and the retry inside `reopen` do not Reopen
   for it: the connection was replaced by `createConnection`, and the replacement
   starts its own Liveness chain in `onOpen`.
-- Whether `send` waits for the connection to open is decided on the transport's
+- Whether `send` waits for the connection to open is decided on the Transport's
   own state. A send on a Transport open Socket does not wait: it is written to
   that connection at once, and `waitForOpen` — the only Deadline before the
   write — is not reached. A send on a Socket that is not Transport open waits
@@ -156,7 +156,7 @@ an Error that the SDK writes.
 - The Deadline covers each send that waits for a DDP response, the handshake
   included — an `open()` against a server that accepts the socket and never answers
   the handshake rejects rather than hanging. The rejection is the whole answer for
-  a consumer that called `open()` itself: the transport stays open with no DDP
+  a consumer that called `open()` itself: the Transport stays open with no DDP
   session behind it and nothing schedules a Reopen. Only the retry inside
   `reopen()`, which routes the rejection through `reopenUnlessAbandoned`, retries
   on the schedule `config.reopen` sets.

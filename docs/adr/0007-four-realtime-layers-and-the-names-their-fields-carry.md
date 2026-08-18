@@ -24,7 +24,7 @@ websocket inside a driver", which the class is not: `Socket` performs the DDP
 handshake, answers pings, holds `subscriptions` and `lastPing`, and *owns* a raw
 websocket as `connection`. The rest of CONTEXT.md already read the other way —
 *Transport open*, *Liveness chain*, *Probe*, *Detached socket*, *Connected echo*
-and *Reopen* all treat a Socket as the DDP layer that owns a transport. One
+and *Reopen* all treat a Socket as the DDP layer that owns a Transport. One
 parenthetical disagreed with five entries and with the code.
 
 The layers behave very differently. A Driver reconnects, tracks DDP
