@@ -106,9 +106,7 @@ describe('Socket subscription bookkeeping', () => {
       expect(transport.sent).toHaveLength(framesBefore)
     })
 
-    it('keeps the entry when the rejection is the SDK\'s own, not the server\'s', async () => {
-      // A reopen abandons the wait while the server may still be streaming, so
-      // the instruction to re-establish has to survive. See ADR-0004.
+    it('keeps the entry when a reopen abandons the wait, since the server may still be streaming', async () => {
       await subscribe('stream-room-messages', ['GENERAL'])
 
       const resubscribing = socket.subscribeAll()

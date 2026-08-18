@@ -49,7 +49,11 @@ entry is written on the same terms.
 - `subscribe` writes its entry when the server has answered. It is the only
   writer, and it writes on the `ready` DDP response, under the id the server
   confirmed. A `sub` the server refuses, and a `sub` whose response never
-  arrives, leave nothing behind.
+  arrives, leave nothing behind. A `sub` sent under an existing id that the
+  server refuses forgets that entry: the server has answered, and nothing is
+  streaming, so there is no stream for a later Login to re-establish. A
+  rejection the SDK originates keeps the entry, because the server may still be
+  streaming.
 - `unsubscribe` forgets its DDP subscription on a DDP response, whether that
   response succeeded or carried a DDP error. It keeps its DDP subscription on
   any other rejection. It re-throws in both cases. The rejection a caller
@@ -84,9 +88,8 @@ entry is written on the same terms.
   compiles this SDK from TypeScript source with its own toolchain, and a
   toolchain that downlevels classes breaks `instanceof` for a subclass of `Error`
   without it.
-- The rule now governs the writing of an entry as well as its removal, and a
-  `sub` sent under an existing id that the server refuses forgets that entry, so
-  a refused resubscribe is no longer re-requested at every Login. `subscribe`
+- The rule now governs the writing of an entry as well as its removal, so a
+  refused resubscribe is no longer re-requested at every Login. `subscribe`
   still swallows its own failure and resolves `undefined` rather than
   re-throwing. A separate issue tracks that.
 - Whether a `sub` may be sent for an id whose `unsub` is still in flight is not
