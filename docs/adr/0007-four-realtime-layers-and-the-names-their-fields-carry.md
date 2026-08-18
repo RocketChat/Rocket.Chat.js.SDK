@@ -55,7 +55,8 @@ each one is a defined term with a field named after it.
   No `IClient` until something needs to type against one.
 - **`ISocket` keeps its name.** A Driver presenting the same realtime surface by
   delegation is ordinary delegation, not a reason to rename the interface.
-- **No deprecation alias.**
+- **No deprecation alias.** An alias would keep `ddp` naming an object, which
+  the first decision above forbids.
 - **Transport is named.** The raw websocket a Socket owns gets a term of its own,
   so the layer below the Socket can be discussed without borrowing the word
   above it.
