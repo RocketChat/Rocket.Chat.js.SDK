@@ -1,4 +1,4 @@
-import type { ISocket, IStream } from '../drivers/definitions'
+import type { IStream } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
 import ClientRest from '../api/RocketChat'
 import { ILoginResult, ICallback, ISubscription, ICredentials } from '../../interfaces'
@@ -27,7 +27,7 @@ export default class RocketChatClient extends ClientRest {
   async disconnect (): Promise<any> { return this.driver.disconnect() }
   async checkAndReopen (): Promise<void> { return this.driver.checkAndReopen() }
   async onStreamData (event: string, cb: ICallback): Promise<any> { return this.driver.onStreamData(event, cb) }
-  async subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined> { return (this.driver as ISocket).subscribe(topic, ...args) }
+  async subscribe (topic: string, eventname: string, ...args: any[]): Promise<ISubscription | undefined> { return this.driver.subscribe(topic, eventname, ...args) }
   async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return this.driver.subscribeRaw(...args) }
   async unsubscribe (subscription: ISubscription): Promise<any> { return this.driver.unsubscribe(subscription) }
   async unsubscribeAll (): Promise<any> { return this.driver.unsubscribeAll() }
