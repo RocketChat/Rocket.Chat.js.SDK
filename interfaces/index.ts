@@ -12,8 +12,10 @@ export interface ILogger {
  * @param host        Host URL:PORT, converted to websocket protocol
  * @param useSsl      Use SSL (https/wss) to connect
  * @param timeout     How long to wait (ms) before abandoning connection, and
- *                    the value several other deadlines are derived from — each
- *                    is documented where it is used
+ *                    also how long a Method call or subscription waits for its
+ *                    reply before it is rejected. The value several other
+ *                    deadlines are derived from — each is documented where it
+ *                    is used
  * @param reopen      ms interval before attempting reopens on disconnect. Twice
  *                    this is also how long a send waits for the connection to
  *                    open before it is rejected, so the deadline outlasts the

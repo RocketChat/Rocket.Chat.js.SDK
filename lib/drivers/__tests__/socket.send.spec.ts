@@ -499,4 +499,82 @@ describe('Socket.send with several listeners on one event', () => {
 
     await rejected
   })
+
+  describe('when the connection stays up and stays silent', () => {
+    const SILENT_MESSAGE = '[ddp] no response arrived before the deadline'
+    const TIMEOUT = 10000
+
+    it('ends the wait at the timeout, and no sooner', async () => {
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+      const settled = jest.fn()
+      sending.then(settled, settled)
+
+      // Other traffic keeps arriving, so the socket stays alive and no reopen is
+      // scheduled — the case nothing but this deadline ends.
+      await jest.advanceTimersByTimeAsync(TIMEOUT - 1)
+      transport.receive({ msg: 'changed', collection: 'stream-room-messages' })
+      expect(settled).not.toHaveBeenCalled()
+
+      const rejected = Promise.all([
+        expect(sending).rejects.toBeInstanceOf(Error),
+        expect(sending).rejects.toThrow(SILENT_MESSAGE)
+      ])
+      await jest.advanceTimersByTimeAsync(1)
+
+      expect(fakeSockets).toHaveLength(1)
+      await rejected
+    })
+
+    it('takes its bound from the timeout option', async () => {
+      const patient = new Socket({
+        host: 'localhost:3000',
+        logger: createSilentLogger(),
+        reopen: REOPEN_DELAY,
+        ping: 10 * 60 * 1000,
+        timeout: TIMEOUT * 3
+      })
+      await openFakeConnection(patient)
+
+      const sending = patient.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+      const settled = jest.fn()
+      sending.then(settled, settled)
+
+      await jest.advanceTimersByTimeAsync(TIMEOUT)
+      expect(settled).not.toHaveBeenCalled()
+
+      const rejected = expect(sending).rejects.toThrow(SILENT_MESSAGE)
+      await jest.advanceTimersByTimeAsync(TIMEOUT * 2)
+
+      await rejected
+    })
+
+    it('leaves no listener and no timer behind for a send it ended', async () => {
+      const before = jest.getTimerCount()
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+      const rejected = expect(sending).rejects.toThrow(SILENT_MESSAGE)
+      await jest.advanceTimersByTimeAsync(TIMEOUT)
+      await rejected
+
+      expect(jest.getTimerCount()).toBe(before)
+    })
+
+    it('arms no deadline for a send with no response to wait for', async () => {
+      const before = jest.getTimerCount()
+
+      await expect(socket.send({ msg: 'pong' })).resolves.toBeUndefined()
+
+      expect(jest.getTimerCount()).toBe(before)
+    })
+
+    it('clears the deadline when the response arrives in time', async () => {
+      const before = jest.getTimerCount()
+
+      const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+      transport.receive({ msg: 'result', id: 'ddp-1', result: 'ok' })
+
+      await expect(sending).resolves.toMatchObject({ result: 'ok' })
+      expect(jest.getTimerCount()).toBe(before)
+    })
+  })
 })

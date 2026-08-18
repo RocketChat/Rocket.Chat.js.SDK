@@ -43,6 +43,19 @@ const abandonedByReopen = '[ddp] connection reopened before the response arrived
 const abandonedByClose = '[ddp] connection closed before the response arrived'
 const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
+const silentResponse = '[ddp] no response arrived before the deadline'
+
+/**
+ * The DDP response never came, on a connection that stayed up. Carries the id
+ * for the same reason `AbandonedRequest` does, and is deliberately not an
+ * `AbandonedWait`: no connection went away, so nobody has answered the fault.
+ */
+class SilentRequest extends Error {
+  constructor (public id: string) {
+    super(silentResponse)
+    Object.setPrototypeOf(this, SilentRequest.prototype)
+  }
+}
 
 class AbandonedWait extends Error {
   constructor (message?: string) {
@@ -505,11 +518,10 @@ export class Socket extends SDKEventEmitter {
    * some responses don't return the ID fallback to just matching on event name.
    * Data often includes an error attribute if something went wrong, but certain
    * types of calls send back a different `msg` value instead, e.g. `nosub`.
-   * @param obj       Object to be sent
-   * @param msg       The `data.msg` value to wait for in response
-   * @param errorMsg  An alternate `data.msg` value indicating an error response
+   * @param obj        Object to be sent
+   * @param deadlineMs How long to wait for the DDP response before rejecting
    */
-  send = async (obj: any): Promise<any> => {
+  send = async (obj: any, deadlineMs = this.config.timeout): Promise<any> => {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
@@ -562,7 +574,10 @@ export class Socket extends SDKEventEmitter {
         }
       }))
 
+      let deadline: NodeJS.Timer | number | undefined
+
       const removeListeners = () => {
+        clearTimeout(deadline as any)
         this.off(listener, onResponse)
         abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
       }
@@ -571,6 +586,14 @@ export class Socket extends SDKEventEmitter {
         removeListeners()
         return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
       }
+
+      // No connection event ends the wait when the connection stays up and the
+      // server simply never answers, so the response has a Deadline of its own.
+      // `ping` passes its own bound; every other caller takes `config.timeout`.
+      deadline = setTimeout(() => {
+        removeListeners()
+        reject(new SilentRequest(id))
+      }, deadlineMs)
 
       abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
       this.once(listener, onResponse)
@@ -581,23 +604,11 @@ export class Socket extends SDKEventEmitter {
   ping = async () => {
     if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
-      // The ping goes out on an open socket, so its send never waits on
-      // `open` — it waits on a pong reply that a dead socket never
-      // sends, and without a deadline of its own the chain stops here and
-      // `reopen` is never reached. The deadline lives in `ping` rather than in
-      // `send`, so no other caller inherits a reply timeout.
-      let deadline: NodeJS.Timer | number | undefined
-      const answered = new Promise<void>((_, expire) => {
-        deadline = setTimeout(
-          () => expire(new Error('[ddp] ping went unanswered')),
-          this.config.ping
-        )
-      })
-
-      Promise.race([this.send({ msg: 'ping' }), answered])
+      // The chain's bound on the pong is `config.ping`, not the patience for a
+      // Method call that `config.timeout` sets, so the ping names its own.
+      this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.ping())
         .catch(this.reopenUnlessAbandoned)
-        .finally(() => clearTimeout(deadline as any))
     }, this.config.ping)
   }
 
@@ -731,7 +742,9 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        if (err instanceof AbandonedRequest) {
+        // The `sub` reached the wire and the server did not refuse it, so it
+        // may have acted on it. See ADR-0006.
+        if (err instanceof AbandonedRequest || err instanceof SilentRequest) {
           this.rememberSubscription(err.id, name, params, callback)
         }
         return undefined

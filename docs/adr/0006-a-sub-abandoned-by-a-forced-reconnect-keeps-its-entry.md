@@ -113,3 +113,12 @@ The server's answer decides; silence keeps the instruction.
 - The consequence ADR-0004 records about `subscribe` never removing a stale
   entry is also untouched. `subscribe` remains a pure writer, so an entry that a
   successful `sub` wrote survives a later refusal.
+
+- **Amendment.** A third rejection carries an id: the Deadline ADR-0003 gives the
+  DDP response, which ends the wait when the connection stays up and the server
+  never answers. It falls on the same side of the line as an abandoned one — the
+  DDP message was written to the transport and no answer came — so a `sub` that
+  expires keeps its entry, and `subscribe` tests for it as positively as it tests
+  for an `AbandonedRequest`. It is not an `AbandonedWait`, because no connection
+  went away, so unlike an abandoned one it does ask `reopenUnlessAbandoned` for a
+  Reopen where that decision is being made.
