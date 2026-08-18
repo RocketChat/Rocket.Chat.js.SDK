@@ -3,6 +3,7 @@ import { Driver } from '../../drivers/driver'
 import { logger as moduleLogger } from '../../log'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import { FakeClient } from '../../../test/fakeClient'
+import { loginResponse } from '../../../test/loginResponse'
 
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
@@ -73,10 +74,7 @@ describe('client.resume', () => {
     jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
 
     const pending = client.login({ username: 'user', password: 'pass' })
-    rest.lastRequest().resolve({
-      status: 200,
-      data: { data: { userId: 'id', authToken: 'token', me: { username: 'user' } } }
-    })
+    rest.lastRequest().resolve(loginResponse())
     await pending
 
     return client
@@ -119,7 +117,7 @@ describe('client.resume', () => {
 })
 
 describe('client.logout', () => {
-  it('clears the REST auth headers', async () => {
+  const loggedOutClient = async () => {
     const rest = new FakeClient()
     const client = createClient(rest)
     client.resumeLogin({ userId: 'id', authToken: 'token' })
@@ -128,7 +126,18 @@ describe('client.logout', () => {
     rest.lastRequest().resolve({ status: 200, data: {} })
     await pending
 
-    expect(client.client.headers).not.toHaveProperty('X-Auth-Token')
+    return client
+  }
+
+  it('clears the REST auth headers', async () => {
+    expect((await loggedOutClient()).client.headers).not.toHaveProperty('X-Auth-Token')
+  })
+
+  it('leaves the guard refusing an authenticated request', async () => {
+    const client = await loggedOutClient()
+
+    expect(client.loggedIn()).toBe(false)
+    await expect(client.get('me', {})).rejects.toThrow(/requires a login/)
   })
 })
 

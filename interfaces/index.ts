@@ -150,6 +150,22 @@ export interface ILoginResultAPI {
   }
 }
 
+/**
+ * The REST side's record of who is logged in.
+ * A credential login knows the username and keeps the server's result; a login
+ * resumed from a token knows neither.
+ * @param username   Username of the logged-in user, null when resumed from a token
+ * @param userId     ID of the logged-in user
+ * @param authToken  Token the REST auth headers carry
+ * @param result     The login response, null when resumed from a token
+ */
+export interface IRestLogin {
+  username: string | null
+  userId: string
+  authToken: string
+  result: ILoginResultAPI | null
+}
+
 /** Error-first callback param type */
 export interface ICallback {
   (error: Error | null, ...args: any[]): void

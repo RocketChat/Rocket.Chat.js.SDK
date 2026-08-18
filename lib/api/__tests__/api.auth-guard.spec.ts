@@ -1,6 +1,7 @@
 import Api from '../api'
 import ClientRest from '../RocketChat'
 import { FakeClient } from '../../../test/fakeClient'
+import { loginResponse } from '../../../test/loginResponse'
 
 const anonymousApi = () => {
   const client = new FakeClient()
@@ -34,10 +35,7 @@ describe('Api auth guard', () => {
     const { api, client } = anonymousApi()
 
     const pending = api.login({ username: 'user', password: 'pass' })
-    client.lastRequest().resolve({
-      status: 200,
-      data: { data: { userId: 'id', authToken: 'token', me: { username: 'user' } } }
-    })
+    client.lastRequest().resolve(loginResponse())
 
     await expect(pending).resolves.toMatchObject({ userId: 'id' })
     expect(api.loggedIn()).toBe(true)
@@ -51,5 +49,20 @@ describe('Api auth guard', () => {
     client.lastRequest().resolve({ status: 200, data: { info: { version: '6.0.0' } } })
 
     await expect(pending).resolves.toEqual({ version: '6.0.0' })
+  })
+
+  it('sends info() authenticated once logged in', async () => {
+    const client = new FakeClient()
+    const rest = new ClientRest({ client })
+
+    const login = rest.login({ username: 'user', password: 'pass' })
+    client.lastRequest().resolve(loginResponse())
+    await login
+
+    const pending = rest.info()
+    client.lastRequest().resolve({ status: 200, data: { info: { version: '6.0.0' } } })
+    await pending
+
+    expect(client.headers).toMatchObject({ 'X-Auth-Token': 'token', 'X-User-Id': 'id' })
   })
 })

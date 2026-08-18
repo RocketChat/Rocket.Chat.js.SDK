@@ -2,7 +2,7 @@ import { logger as Logger } from '../log'
 
 import {
 	ILogger,
-	ILoginResultAPI,
+	IRestLogin,
 	IAPIRequest,
 	IMessage,
 	ICredentials
@@ -193,12 +193,7 @@ export default class Api extends SDKEventEmitter {
   userId: string = ''
   logger: ILogger
   client: IClient
-  currentLogin: {
-    username: string | null,
-    userId: string,
-    authToken: string,
-    result: ILoginResultAPI | null
-  } | null = null
+  currentLogin: IRestLogin | null = null
   controller: AbortController
 
   constructor ({ client, host, logger = Logger }: IApiOptions) {
@@ -217,7 +212,6 @@ export default class Api extends SDKEventEmitter {
   }
 /**
 	* Do a request to an API endpoint.
-	* If it needs a token, login first (with defaults) to set auth headers.
 	* @param method   Request method GET | POST | PUT | DEL
 	* @param endpoint The API endpoint (including version) e.g. `chat.update`
 	* @param data     Payload for POST request to endpoint
@@ -299,7 +293,7 @@ export default class Api extends SDKEventEmitter {
     return data
   }
 
-  resumeLogin ({ userId, authToken }: { userId: string, authToken: string }) {
+  resumeLogin ({ userId, authToken }: Pick<IRestLogin, 'userId' | 'authToken'>) {
     const previous = this.currentLogin?.userId === userId ? this.currentLogin : null
     if (previous?.authToken === authToken) {
       return
@@ -312,7 +306,7 @@ export default class Api extends SDKEventEmitter {
     })
   }
 
-  private setLogin (login: NonNullable<Api['currentLogin']>) {
+  private setLogin (login: IRestLogin) {
     this.userId = login.userId
     this.currentLogin = login
     this.client.headers = {
