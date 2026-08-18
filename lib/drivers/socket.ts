@@ -307,6 +307,10 @@ export class Socket extends SDKEventEmitter {
    */
   close = async (): Promise<void> => {
     this.settleReopen?.()
+    // Before the wait, not after: settling the reopen above arms one, and a
+    // `reopen` delay shorter than the close deadline would let it fire during
+    // the wait and rebuild the connection this close is letting go.
+    this.cancelScheduledReopen()
 
     const connection = this.connection
 
@@ -316,6 +320,8 @@ export class Socket extends SDKEventEmitter {
 
     if (this.replaced(connection)) return
 
+    // A transport close carrying any other code reaches `onClose` during the
+    // wait and arms another one.
     this.cancelScheduledReopen()
     if (this.pingTimeout) {
       clearTimeout(this.pingTimeout as any)
@@ -359,25 +365,24 @@ export class Socket extends SDKEventEmitter {
     delete this.openTimeout
   }
 
-  /** Clear connection and try to connect again. */
   reopen = () => {
     if (this.openTimeout) return
-    this.openTimeout = setTimeout(async() => {
-      delete this.openTimeout
+    this.openTimeout = setTimeout(this.replaceConnectionNow, this.config.reopen)
+  }
 
-      // The failed ping that scheduled this reopen stopped the Liveness chain,
-      // and a socket that reads as connected again is one `open` would decline
-      // to replace. Re-arming here is the only thing left to end a send still
-      // waiting on this connection.
-      if (this.connected) return this.ping()
-
-      try {
-        await this.open()
-      } catch (err) {
-        this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
-        this.reopenUnlessAbandoned(err);
-      }
-    }, this.config.reopen);
+  /**
+   * A scheduled Reopen replaces the connection, whatever the socket reads as.
+   * `reopenNow` owns the re-arm, and swallows a creation error, so there is
+   * nothing here to branch on. See ADR-0003.
+   *
+   * The fired timer is deleted here rather than in `reopenNow`, which returns
+   * early while a reopen is already in flight and so never reaches its
+   * `cancelScheduledReopen`. An undeleted `openTimeout` would leave `reopen`'s
+   * guard permanently closed.
+   */
+  private replaceConnectionNow = () => {
+    delete this.openTimeout
+    this.reopenNow()
   }
 
   /**
@@ -398,7 +403,11 @@ export class Socket extends SDKEventEmitter {
     this.reopenPromise = new Promise<void>(resolve => {
       this.cancelScheduledReopen()
       this.lastPing = 0
-      this.emit('disconnected')
+      try {
+        this.emit('disconnected')
+      } catch (err) {
+        this.logger.error(`[ddp] Disconnected listener error: ${(err as Error).message}`)
+      }
 
       let settled = false
       const cleanup = () => {
@@ -408,6 +417,10 @@ export class Socket extends SDKEventEmitter {
         if (timeout) clearTimeout(timeout as any)
         delete this.reopenPromise
         delete this.settleReopen
+        // The one owner of the re-arm: a rebuild whose handshake completed has
+        // armed the next ping, and one that settled with nothing scheduled gets
+        // the next Reopen. See ADR-0003.
+        if (!this.pingTimeout) this.reopen()
         resolve()
       }
 
@@ -585,8 +598,16 @@ export class Socket extends SDKEventEmitter {
 
   /** Send ping, record time, re-open if nothing comes back, repeat */
   ping = async () => {
+    // Only a completed handshake or a pong arms the chain, which is the answer a
+    // scheduled Reopen was waiting for. See ADR-0003.
+    this.cancelScheduledReopen()
+
     if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
+      // Deleted as the timer fires, so `pingTimeout` never reads as a scheduled
+      // ping when none is left. See ADR-0003.
+      delete this.pingTimeout
+
       // The ping goes out on an open socket, so its send never waits on
       // `open` — it waits on a pong reply that a dead socket never
       // sends, and without a deadline of its own the chain stops here and

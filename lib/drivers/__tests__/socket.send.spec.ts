@@ -397,6 +397,10 @@ describe('Socket.send with several listeners on one event', () => {
       await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
       await rejections
 
+      // The reopen holds one `open` listener until the replacement lands, so the
+      // count is only back to where it started once that rebuild has settled.
+      await driveToHandshake(fakeSockets[1])
+
       expect(listenerCounts()).toEqual(before)
     })
 
