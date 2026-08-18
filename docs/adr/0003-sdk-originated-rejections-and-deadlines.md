@@ -106,9 +106,9 @@ an Error that the SDK writes.
   starts its own Liveness chain in `onOpen`.
 - Whether `send` waits for the connection to open is decided on the transport's
   own state. A send on a Transport open Socket does not wait: it is written to
-  that connection at once, and `waitForOpen` — the only Deadline in this path —
-  is not reached. A send on a Socket that is not Transport open waits for the
-  same connection to open, and its Deadline bounds it. Either way, the
+  that connection at once, and `waitForOpen` — the only Deadline before the
+  write — is not reached. A send on a Socket that is not Transport open waits
+  for the same connection to open, and its Deadline bounds it. Either way, the
   connection is read before the write.
 - `reopenNow` and `waitForNotifyUserMediaSubs` take their Deadline from
   `config.timeout`. `probe` keeps a default of 2000ms that no option derives. This
@@ -160,8 +160,9 @@ an Error that the SDK writes.
 - What a caller gets from an immediate reconnect is an Error, not `undefined`.
   Callers read `err.message` in their `catch` blocks, and that read needs an
   Error to reach.
-- A consuming app that lowers `config.ping` for the Liveness chain therefore also
-  lowers the bound on the wait for the `pong`. The documentation of the option
+- The Deadline of `ping` is `config.ping`, so a consuming app that lowers that
+  option for the Liveness chain also lowers the bound on the wait for the
+  `pong`. The documentation of the option
   says this at `interfaces/index.ts`.
 - The connection ending is still what ends a wait first; the Deadline answers the
   one case no connection event reaches, where the connection stays up and the
@@ -207,9 +208,9 @@ an Error that the SDK writes.
   `send` writes that map before `send` writes to the Socket, and the write can
   reject, so the map can hold an entry for a DDP subscription that the server
   never received. This fault in the bookkeeping is not new, because `send` writes
-  the map ahead of the answer of the server in each case. But the failed write is
-  a new way to reach the fault. A separate issue tracks the fault, and this ADR
-  does not correct it.
+  the map ahead of the answer of the server in each case, and a failed write is
+  one more way to reach it. A separate issue tracks the fault, and this ADR does
+  not correct it.
 - Results do not cross a Reopen; the caller receives a rejection. `subscribe`
   turns each rejection into `undefined` and `unsubscribeAll` ignores each one, so
   the DDP subscription paths do not change for a caller. A Method call issued in
