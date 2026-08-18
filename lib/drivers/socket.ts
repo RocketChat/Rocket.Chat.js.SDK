@@ -315,7 +315,7 @@ export class Socket extends SDKEventEmitter {
    * close ends them on the server, so no `unsub` is sent. A reopen during the
    * wait that installed a different connection over this one supersedes the
    * close: that socket and the subscriptions it filled are left as they are.
-   * See ADR-0003.
+   * See ADR-0009.
    */
   close = async (): Promise<void> => {
     this.settleReopen?.()
