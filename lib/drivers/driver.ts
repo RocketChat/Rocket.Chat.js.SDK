@@ -1,6 +1,6 @@
 /**
  * @module Driver
- * The realtime transport behind a Client, speaking DDP over the Socket it owns.
+ * The realtime layer behind a Client, speaking DDP over the Socket it owns.
  */
 
 import { SDKEventEmitter } from '../emitter'
@@ -46,8 +46,8 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/**
-	 * Initialise socket instance with given options or defaults.
-	 * Proxies the DDP module socket connection. Resolves with socket when open.
+	 * Initialise the Socket with given options or defaults.
+	 * Resolves with the Socket once it is open.
 	 * Accepts callback following error-first-pattern.
 	 * Error returned or promise rejected on timeout.
 	 * @example <caption>Using promise</caption>
@@ -160,11 +160,11 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
 
   /**
    * Re-send the user's media-signal and media-calls subscriptions on the current
-   * socket and resolve when the server acks them with `ready`. This gives the app
+   * Socket and resolve when the server acks them with `ready`. This gives the app
    * an observable readiness signal after a forced reconnect.
    *
-   * The socket owns both the waiting and the re-sending: the re-send goes out under
-   * the ids the streams were first sent with, which this driver's own `subscribe`
+   * The Socket owns both the waiting and the re-sending: the re-send goes out under
+   * the ids the streams were first sent with, which this Driver's own `subscribe`
    * would drop.
    */
   waitForNotifyUserMediaSubs = (timeoutMs = this.ddp.config.timeout): Promise<boolean> => {
@@ -204,17 +204,15 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     }
 
   }
-	/** Unsubscribe from Meteor stream. Proxy for socket unsubscribe. */
+
   unsubscribe = (subscription: ISubscription) => {
     return this.ddp.unsubscribe(subscription.id)
   }
 
-	/** Proxy for socket resubscribeWhenRecorded */
   resubscribeWhenRecorded = (streams: IStream[], timeoutMs?: number): Promise<boolean> => {
     return this.ddp.resubscribeWhenRecorded(streams, timeoutMs)
   }
 
-	/** Unsubscribe from all subscriptions. Proxy for socket unsubscribeAll */
   unsubscribeAll = (): Promise<void> => {
     return this.ddp.unsubscribeAll()
   }

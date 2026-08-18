@@ -71,10 +71,10 @@ describe('Driver.subscribe', () => {
     // arguments are buried under `args`.
     //
     // The id is dropped on the way through — the socket's `subscribe` takes one,
-    // the driver's does not and never passes it — so the frame carries a fresh
+    // the Driver's does not and never passes it — so the frame carries a fresh
     // send-time id instead. Resubscribing through this method therefore cannot
     // reuse an existing subscription's id; `waitForNotifyUserMediaSubs` goes
-    // through the raw socket for exactly that reason.
+    // through the Socket for exactly that reason.
     expect(transport.lastSent()).toEqual({
       msg: 'sub',
       id: 'ddp-1',
@@ -99,16 +99,16 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   const userId = 'user-id'
   const topic = 'stream-notify-user'
 
-  /** Register a subscription on the socket under a given id, as a successful sub would. */
+  /** Register a subscription on the Socket under a given id, as a successful sub would. */
   const addSub = async (driver: Driver, transport: FakeWebSocket, event: string, id: string) => {
-    // Through the raw socket, with an explicit id: this is the shape the
+    // Through the Socket, with an explicit id: this is the shape the
     // readiness poll looks for — `name` the topic, `params[0]` the user event.
     const subscribing = driver.ddp.subscribe(topic, [event], undefined, id)
     transport.receive({ msg: 'ready', subs: [id] })
     await subscribing
   }
 
-  /** Register a media subscription on the socket, as a successful sub would. */
+  /** Register a media subscription on the Socket, as a successful sub would. */
   const addMediaSub = (driver: Driver, transport: FakeWebSocket, name: string) =>
     addSub(driver, transport, `${userId}/${name}`, `sub-${name}`)
 
