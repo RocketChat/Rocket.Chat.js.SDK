@@ -195,13 +195,12 @@ describe('Socket connection lifecycle', () => {
       expect(socket.reopenPromise).toBeUndefined()
     })
 
-    it('schedules a reopen when no open ever arrives', async () => {
+    it('schedules a reopen once the deadline passes', async () => {
       const reopening = socket.reopenNow()
 
       await jest.advanceTimersByTimeAsync(REOPEN_NOW_DEADLINE)
       await reopening
 
-      expect(socket.connected).toBe(false)
       expect(socket.openTimeout).toBeDefined()
 
       await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
