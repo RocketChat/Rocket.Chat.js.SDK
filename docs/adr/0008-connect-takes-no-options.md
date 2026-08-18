@@ -10,11 +10,12 @@ in the body was spread into the `[driver] Connecting` log line. A caller could
 pass `connect({ timeout: 1000 })` and get the constructor's timeout, with the
 log line claiming otherwise.
 
-It was not always inert. Before the Socket took ownership of its own open
-timeout, the merged config drove connect's rejection timeout, so the argument
-did something and the signature made sense. Once the Socket owned that wait,
-the parameter kept its shape and lost its effect — the worst state for an API
-surface, because the type checker endorses a call that does nothing.
+It was not always inert. Before the Socket took ownership of the Deadline on
+its own open, the merged `config.timeout` drove the Deadline connect rejected
+on, so the argument did something and the signature made sense. Once the
+Socket owned that wait, the parameter kept its shape and lost its effect — the
+worst state for an API surface, because the type checker endorses a call that
+does nothing.
 
 `Client.connect(options)` has the same shape one layer up and keeps it: the
 Client is a public convenience wrapper, and removing its parameter was
