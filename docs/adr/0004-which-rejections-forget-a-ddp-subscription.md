@@ -97,9 +97,6 @@ entry is written on the same terms.
   separate issue tracks the question.
 - Applying the rule to the write reopens, on the `sub` path, the case the Context
   describes for `unsubscribe`. A Reopen rejects a `sub` that is still in flight,
-  under ADR-0003, while the server may already be streaming. `subscribe`
-  swallows that rejection and writes nothing, so the SDK holds no name for a
-  stream that exists and `subscribeAll` cannot restore it at the next Login. The
-  Socket accepts that in exchange for never holding an entry the server never
-  confirmed. Which side to prefer when a `sub` response is abandoned rather than
-  refused is not settled here. A separate issue tracks the question.
+  under ADR-0003, while the server may already be streaming. Which side to prefer
+  when a `sub` response is abandoned rather than refused is not settled here.
+  ADR-0006 settles it: such a `sub` keeps its entry.
