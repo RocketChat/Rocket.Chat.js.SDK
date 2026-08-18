@@ -29,11 +29,11 @@ const INTENTIONAL_CLOSE = 4000
 const REOPEN_DELAY = 3000
 
 /**
- * How long `reopenNow` waits for the new socket's `open` before resolving
- * anyway, read from the `timeout` option. Deliberately neither the 10000 default
- * nor `REOPEN_DELAY`, so the assertion below distinguishes all three.
+ * The `timeout` option: the bound `reopenNow` waits on the new socket's `open`,
+ * and the bound a send waits on its DDP response. Deliberately neither the
+ * 10000 default nor `REOPEN_DELAY`, so the assertions distinguish all three.
  */
-const REOPEN_NOW_DEADLINE = 7000
+const TIMEOUT = 7000
 
 /** Mirrors the bound `close` waits on the transport's close event. */
 const CLOSE_DEADLINE = 2000
@@ -48,7 +48,7 @@ const createSocket = (logger: ILogger) => new Socket({
   host: 'localhost:3000',
   logger,
   reopen: REOPEN_DELAY,
-  timeout: REOPEN_NOW_DEADLINE,
+  timeout: TIMEOUT,
   ping: 10 * 60 * 1000
 })
 
@@ -186,7 +186,7 @@ describe('Socket connection lifecycle', () => {
     it('resolves on the configured timeout when no open ever arrives', async () => {
       const reopening = socket.reopenNow()
 
-      await jest.advanceTimersByTimeAsync(REOPEN_NOW_DEADLINE - 1)
+      await jest.advanceTimersByTimeAsync(TIMEOUT - 1)
       expect(socket.reopenPromise).toBe(reopening)
 
       await jest.advanceTimersByTimeAsync(1)
@@ -229,6 +229,37 @@ describe('Socket connection lifecycle', () => {
 
       expect(error).toHaveBeenCalledWith(
         '[ddp] Reopen error: [ddp] connection closed before the response arrived'
+      )
+    })
+  })
+
+  describe('a handshake the server never answers', () => {
+    it('rejects the open on its deadline rather than hanging it', async () => {
+      transport.readyState = CLOSED
+
+      const opening = socket.open()
+      expect(fakeSockets).toHaveLength(2)
+      const replacement = fakeSockets[1]
+      replacement.readyState = OPEN
+      replacement.onopen?.({})
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(replacement.lastSent()).toMatchObject({ msg: 'connect' })
+
+      const settled = jest.fn()
+      opening.then(settled, settled)
+
+      await jest.advanceTimersByTimeAsync(TIMEOUT - 1)
+      expect(settled).not.toHaveBeenCalled()
+
+      const rejected = expect(opening).rejects.toThrow(
+        '[ddp] no response arrived before the deadline'
+      )
+      await jest.advanceTimersByTimeAsync(1)
+      await rejected
+
+      expect(logger.error).toHaveBeenCalledWith(
+        '[ddp] the handshake did not complete: [ddp] no response arrived before the deadline'
       )
     })
   })
@@ -564,7 +595,7 @@ describe('Socket connection lifecycle', () => {
       await closing
 
       const opening = socket.open()
-      await jest.advanceTimersByTimeAsync(REOPEN_NOW_DEADLINE)
+      await jest.advanceTimersByTimeAsync(TIMEOUT)
       await reopening
 
       const rebuilt = fakeSockets[2]

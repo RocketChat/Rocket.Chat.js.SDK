@@ -501,23 +501,21 @@ describe('Socket.send with several listeners on one event', () => {
   })
 
   describe('when the connection stays up and stays silent', () => {
-    const SILENT_MESSAGE = '[ddp] no response arrived before the deadline'
-    const TIMEOUT = 10000
+    const EXPIRED_MESSAGE = '[ddp] no response arrived before the deadline'
+    const PATIENT_TIMEOUT = 30000
 
     it('ends the wait at the timeout, and no sooner', async () => {
       const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
       const settled = jest.fn()
       sending.then(settled, settled)
 
-      // Other traffic keeps arriving, so the socket stays alive and no reopen is
-      // scheduled — the case nothing but this deadline ends.
-      await jest.advanceTimersByTimeAsync(TIMEOUT - 1)
+      await jest.advanceTimersByTimeAsync(socket.config.timeout - 1)
       transport.receive({ msg: 'changed', collection: 'stream-room-messages' })
       expect(settled).not.toHaveBeenCalled()
 
       const rejected = Promise.all([
         expect(sending).rejects.toBeInstanceOf(Error),
-        expect(sending).rejects.toThrow(SILENT_MESSAGE)
+        expect(sending).rejects.toThrow(EXPIRED_MESSAGE)
       ])
       await jest.advanceTimersByTimeAsync(1)
 
@@ -531,7 +529,7 @@ describe('Socket.send with several listeners on one event', () => {
         logger: createSilentLogger(),
         reopen: REOPEN_DELAY,
         ping: 10 * 60 * 1000,
-        timeout: TIMEOUT * 3
+        timeout: PATIENT_TIMEOUT
       })
       await openFakeConnection(patient)
 
@@ -539,11 +537,11 @@ describe('Socket.send with several listeners on one event', () => {
       const settled = jest.fn()
       sending.then(settled, settled)
 
-      await jest.advanceTimersByTimeAsync(TIMEOUT)
+      await jest.advanceTimersByTimeAsync(PATIENT_TIMEOUT - 1)
       expect(settled).not.toHaveBeenCalled()
 
-      const rejected = expect(sending).rejects.toThrow(SILENT_MESSAGE)
-      await jest.advanceTimersByTimeAsync(TIMEOUT * 2)
+      const rejected = expect(sending).rejects.toThrow(EXPIRED_MESSAGE)
+      await jest.advanceTimersByTimeAsync(1)
 
       await rejected
     })
@@ -552,8 +550,8 @@ describe('Socket.send with several listeners on one event', () => {
       const before = jest.getTimerCount()
 
       const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
-      const rejected = expect(sending).rejects.toThrow(SILENT_MESSAGE)
-      await jest.advanceTimersByTimeAsync(TIMEOUT)
+      const rejected = expect(sending).rejects.toThrow(EXPIRED_MESSAGE)
+      await jest.advanceTimersByTimeAsync(socket.config.timeout)
       await rejected
 
       expect(jest.getTimerCount()).toBe(before)

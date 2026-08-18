@@ -216,9 +216,6 @@ describe('Socket liveness', () => {
     })
 
     it('bounds the wait for the pong by the ping interval, not the timeout', async () => {
-      // The ping names its own bound where every other caller takes
-      // `config.timeout`, so an app patient with a Method call is not thereby
-      // slower to notice a dead pipe.
       const impatient = new Socket({
         host: 'localhost:3000',
         logger: createSilentLogger(),
@@ -227,13 +224,17 @@ describe('Socket liveness', () => {
       })
       const impatientTransport = await openFakeConnection(impatient)
 
-      // One interval to the ping, one more to its unanswered deadline.
+      // One interval to the ping, one more to its deadline.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL)
       expect(impatientTransport.lastSent()).toEqual({ msg: 'ping' })
 
-      await jest.advanceTimersByTimeAsync(PING_INTERVAL)
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
+      expect(impatient.openTimeout).toBeUndefined()
 
+      await jest.advanceTimersByTimeAsync(1)
       expect(impatient.openTimeout).toBeDefined()
+
+      await impatient.close()
     })
 
     it('reconnects when one pong is withheld', async () => {

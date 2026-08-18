@@ -67,11 +67,13 @@ The server's answer decides; silence keeps the instruction.
   `AbandonedRequest`. Only the second kind carries an id, so only the second kind
   can leave an entry. A forced reconnect is the common case; a socket that closes
   under an unanswered `sub` is the same loss and keeps its entry too.
-- The rejection carries the id the request was sent under. `send` mints that id
-  inside its promise executor, after the wait on `open`, so no caller can compute
-  it in advance without racing another send for the same number. Carrying it on
-  the rejection is what lets `subscribe` name a request the server never
-  answered.
+- The rejection carries the id `send` minted for the wait. `send` mints it inside
+  its promise executor, after the wait on `open`, so no caller can compute it in
+  advance without racing another send for the same number. It names the request
+  only for the sends whose frame carries an id — `method` and `sub`; a `connect`
+  or a `ping` is minted an id too, but its frame goes out without one and no
+  caller reads it. `subscribe` is the only reader, and it reads it to name a `sub`
+  the server never answered.
 - `AbandonedRequest` marks provenance in the value, as ADR-0004 has `DDPError`
   do, and `subscribe` tests for it positively with `instanceof`. Testing instead
   for the absence of a `DDPError` plus the presence of an `id` would write an
@@ -120,5 +122,7 @@ The server's answer decides; silence keeps the instruction.
   DDP message was written to the transport and no answer came — so a `sub` that
   expires keeps its entry, and `subscribe` tests for it as positively as it tests
   for an `AbandonedRequest`. It is not an `AbandonedWait`, because no connection
-  went away, so unlike an abandoned one it does ask `reopenUnlessAbandoned` for a
-  Reopen where that decision is being made.
+  went away — but `subscribe` asks nothing for a Reopen either way: it swallows
+  the rejection to `undefined`. Where that decision is being made, in `ping` and
+  in the retry inside `reopen`, an expired wait does Reopen and an abandoned one
+  does not.

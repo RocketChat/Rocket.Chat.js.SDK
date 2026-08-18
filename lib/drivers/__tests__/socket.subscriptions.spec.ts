@@ -272,9 +272,6 @@ describe('Socket subscription bookkeeping', () => {
 
   describe('a subscription the server never answered', () => {
     it('is kept under the id it was sent with when the deadline expires', async () => {
-      // The connection stays up throughout, so no event ends the wait and only
-      // the deadline does — and the `sub` still reached the wire, so ADR-0006
-      // keeps the entry for `subscribeAll` to re-establish.
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
       expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
 

@@ -43,19 +43,6 @@ const abandonedByReopen = '[ddp] connection reopened before the response arrived
 const abandonedByClose = '[ddp] connection closed before the response arrived'
 const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
-const silentResponse = '[ddp] no response arrived before the deadline'
-
-/**
- * The DDP response never came, on a connection that stayed up. Carries the id
- * for the same reason `AbandonedRequest` does, and is deliberately not an
- * `AbandonedWait`: no connection went away, so nobody has answered the fault.
- */
-class SilentRequest extends Error {
-  constructor (public id: string) {
-    super(silentResponse)
-    Object.setPrototypeOf(this, SilentRequest.prototype)
-  }
-}
 
 class AbandonedWait extends Error {
   constructor (message?: string) {
@@ -72,6 +59,14 @@ class AbandonedRequest extends AbandonedWait {
   constructor (public id: string, message: string) {
     super(message)
     Object.setPrototypeOf(this, AbandonedRequest.prototype)
+  }
+}
+
+/** See ADR-0003. */
+class ExpiredRequest extends Error {
+  constructor (public id: string) {
+    super('[ddp] no response arrived before the deadline')
+    Object.setPrototypeOf(this, ExpiredRequest.prototype)
   }
 }
 
@@ -589,10 +584,9 @@ export class Socket extends SDKEventEmitter {
 
       // No connection event ends the wait when the connection stays up and the
       // server simply never answers, so the response has a Deadline of its own.
-      // `ping` passes its own bound; every other caller takes `config.timeout`.
       deadline = setTimeout(() => {
         removeListeners()
-        reject(new SilentRequest(id))
+        reject(new ExpiredRequest(id))
       }, deadlineMs)
 
       abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
@@ -604,8 +598,6 @@ export class Socket extends SDKEventEmitter {
   ping = async () => {
     if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
-      // The chain's bound on the pong is `config.ping`, not the patience for a
-      // Method call that `config.timeout` sets, so the ping names its own.
       this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.ping())
         .catch(this.reopenUnlessAbandoned)
@@ -701,8 +693,8 @@ export class Socket extends SDKEventEmitter {
    * a session at a time and answers in that order, so waiting for the response
    * is enough to keep one request per id on the wire.
    *
-   * Nothing bounds the wait but the request before it. A send that loses its
-   * connection is abandoned rather than left pending, so a chain always drains.
+   * The wait is bounded by the request before it, which each send bounds in
+   * turn with its own deadline, so a chain always drains.
    */
   private queueSubscriptionRequest = <T>(id: string | undefined, request: () => Promise<T>): Promise<T> => {
     if (!id) return request()
@@ -742,9 +734,8 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        // The `sub` reached the wire and the server did not refuse it, so it
-        // may have acted on it. See ADR-0006.
-        if (err instanceof AbandonedRequest || err instanceof SilentRequest) {
+        // See ADR-0006.
+        if (err instanceof AbandonedRequest || err instanceof ExpiredRequest) {
           this.rememberSubscription(err.id, name, params, callback)
         }
         return undefined
