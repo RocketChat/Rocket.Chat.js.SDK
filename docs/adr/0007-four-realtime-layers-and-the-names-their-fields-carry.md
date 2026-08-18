@@ -16,7 +16,8 @@ thing CONTEXT.md says a Client is not.
 DDP is the odd word of the three. In CONTEXT.md it is only ever a qualifier on
 wire vocabulary — DDP message, DDP response, DDP error, DDP subscription — and
 never a name for an object. In the code it names two objects, neither of which
-is the protocol.
+is the protocol: CONTEXT.md reserves `ddp` as a qualifier while `Driver.ddp`
+still exists.
 
 Underneath that, the glossary was one layer short. It defined Socket as "the raw
 websocket inside a driver", which the class is not: `Socket` performs the DDP
