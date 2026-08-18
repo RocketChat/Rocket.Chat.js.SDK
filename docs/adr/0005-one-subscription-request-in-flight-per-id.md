@@ -100,5 +100,4 @@ the first to have its DDP response before its own frame is written.
 - No single place on `Socket` owns what happens to work in flight when the
   connection changes. That knowledge is in the abandon listeners of `send`, in
   `waitForOpen`, and in `reopenUnlessAbandoned`. This ADR removes one of the
-  places that held a piece of it. Whether the rest belongs together is open, and
-  is not a question for a correction of this fault.
+  places that held a piece of it.
