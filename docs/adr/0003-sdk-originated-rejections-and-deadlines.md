@@ -43,9 +43,10 @@ Each wait that the SDK can hold has a Deadline. An expired Deadline rejects with
 an Error that the SDK writes.
 
 - A failed write rejects. The log line stays. The silent return does not.
-- The default Deadline of `waitForOpen` is `config.reopen * 2`. This Deadline
-  outlasts the Reopen that the send waits for: at exactly `config.reopen`, no
-  Reopen can meet the Deadline.
+- The default Deadline of `waitForOpen` is `config.reopen * 2`. A measurement
+  gives the multiplier of 2; it is not a margin for comfort. The Deadline has to
+  outlast the Reopen that the send waits for, and at exactly `config.reopen` no
+  Reopen can meet it.
 - Every send has a Deadline on the DDP response, and its default is
   `config.timeout` — the option that already means how long a caller is willing to
   wait for an answer, so an app that wants a different bound moves the option it
@@ -99,13 +100,16 @@ an Error that the SDK writes.
   belongs to the connection that carries it. The replacement has a session of its
   own, and no Login on it yet, so a Method call moved to it is sent under an
   identity the caller did not ask for. A `sub` moved to it is worse: it is written
-  under an id from a session that has ended.
+  under an id from a session that has ended. The rejection carries the type an
+  abandoned wait carries, so `ping` and the retry inside `reopen` do not Reopen
+  for it: the connection was replaced by `createConnection`, and the replacement
+  starts its own Liveness chain in `onOpen`.
 - Whether `send` waits for the connection to open is decided on the transport's
   own state. A send on a Transport open Socket does not wait: it is written to
-  that connection at once, and `waitForOpen` — the only Deadline in this path — is
-  not reached. A send on a Socket that is not Transport open waits for the same
-  connection to open, and its Deadline bounds it. Either way, the connection is
-  read before the write.
+  that connection at once, and `waitForOpen` — the only Deadline in this path —
+  is not reached. A send on a Socket that is not Transport open waits for the
+  same connection to open, and its Deadline bounds it. Either way, the
+  connection is read before the write.
 - `reopenNow` and `waitForNotifyUserMediaSubs` take their Deadline from
   `config.timeout`. `probe` keeps a default of 2000ms that no option derives. This
   is deliberate, and it is the one Deadline in the driver that no option moves.
@@ -154,11 +158,11 @@ an Error that the SDK writes.
   settle, so code that handles only the success path gets rejections it has never
   seen.
 - What a caller gets from an immediate reconnect is an Error, not `undefined`.
-  This is deliberate and visible. Callers already read `err.message` in
-  their `catch` blocks, and that read threw when the rejection was `undefined`.
-- The Deadline of `ping` is `config.ping`. A consuming app that lowers that option
-  for the Liveness chain therefore also lowers the bound on the wait for the
-  `pong`. The documentation of the option says this at `interfaces/index.ts`.
+  Callers read `err.message` in their `catch` blocks, and that read needs an
+  Error to reach.
+- A consuming app that lowers `config.ping` for the Liveness chain therefore also
+  lowers the bound on the wait for the `pong`. The documentation of the option
+  says this at `interfaces/index.ts`.
 - The connection ending is still what ends a wait first; the Deadline answers the
   one case no connection event reaches, where the connection stays up and the
   server simply never answers. `alive()` is refreshed by any readable frame, so a
@@ -173,8 +177,7 @@ an Error that the SDK writes.
   asks the question. The Deadline ends a wait; it does not diagnose a connection.
   It carries the id, for the reason ADR-0006 gives: the DDP message was written to
   the transport and no answer came, so a `sub` that expires keeps its entry exactly
-  as an abandoned one does. The type is unexported and sets no `name`, so a caller
-  sees an ordinary Error and the message above.
+  as an abandoned one does.
 - The Deadline covers each send that waits for a DDP response, the handshake
   included — an `open()` against a server that accepts the socket and never answers
   the handshake rejects rather than hanging. The rejection is the whole answer for
@@ -216,4 +219,3 @@ an Error that the SDK writes.
   that ADR-0001 established. The spec asserts that the value is an `Error`, and
   the spec asserts the message that a caller reads. A later change therefore
   cannot return to a rejection with a bare value.
-

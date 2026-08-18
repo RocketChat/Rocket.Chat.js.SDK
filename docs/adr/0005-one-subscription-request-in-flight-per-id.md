@@ -61,10 +61,11 @@ the first to have its DDP response before its own frame is written.
 - The wait ends on the response, whether it succeeded or carried a DDP error.
   Neither outcome is examined here — what a rejection does to the entry stays
   with ADR-0004.
-- Nothing bounds the wait but the request before it. There is no Deadline and no
-  bookkeeping about the connection. ADR-0003 gives the reason: a send cannot
-  outlive the connection it was issued on, so every request settles, and a chain
-  always drains.
+- Nothing here bounds the wait but the request before it. The chain adds no
+  Deadline and no bookkeeping about the connection of its own: a subscription
+  request is a send, so it carries the Deadline ADR-0003 gives every send, and a
+  send cannot outlive the connection it was issued on. Every request settles, and
+  a chain always drains.
 - A request registers itself when it is queued, not when its frame is written. A
   third request must find the second and wait behind it. If the entry were
   written only at the moment the frame goes out, the second and the third would
