@@ -734,8 +734,9 @@ export class Socket extends SDKEventEmitter {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
         if (err instanceof AbandonedRequest) {
           this.rememberSubscription(err.id, name, params, callback)
+        } else if (id && err instanceof DDPError) {
+          this.forgetSubscription(id)
         }
-        if (id && err instanceof DDPError) this.forgetSubscription(id)
         return undefined
       })
   }

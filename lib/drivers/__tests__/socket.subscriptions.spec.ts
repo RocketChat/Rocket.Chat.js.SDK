@@ -91,7 +91,7 @@ describe('Socket subscription bookkeeping', () => {
     expect(transport.sent).toHaveLength(framesBefore)
   })
 
-  describe('a resubscribe the server now refuses', () => {
+  describe('a resubscribe under an existing id', () => {
     it('forgets the entry, so it is not re-requested at the next login', async () => {
       await subscribe('stream-room-messages', ['GENERAL'])
 

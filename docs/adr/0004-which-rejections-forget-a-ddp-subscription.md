@@ -48,12 +48,11 @@ entry is written on the same terms.
   `Error` and is therefore not a `DDPError`.
 - `subscribe` writes its entry when the server has answered. It is the only
   writer, and it writes on the `ready` DDP response, under the id the server
-  confirmed. A `sub` the server refuses, and a `sub` whose response never
-  arrives, leave nothing behind. A `sub` sent under an existing id that the
-  server refuses forgets that entry: the server has answered, and nothing is
-  streaming, so there is no stream for a later Login to re-establish. A
-  rejection the SDK originates keeps the entry, because the server may still be
-  streaming.
+  confirmed. A `sub` the server refuses leaves nothing behind, and a `sub` sent
+  under an existing id that the server refuses forgets that entry: the server has
+  answered, and nothing is streaming, so there is no stream for a later Login to
+  re-establish. A `sub` whose response never arrives is settled by ADR-0006,
+  which keeps the entry because the server may still be streaming.
 - `unsubscribe` forgets its DDP subscription on a DDP response, whether that
   response succeeded or carried a DDP error. It keeps its DDP subscription on
   any other rejection. It re-throws in both cases. The rejection a caller
@@ -98,5 +97,4 @@ entry is written on the same terms.
 - Applying the rule to the write reopens, on the `sub` path, the case the Context
   describes for `unsubscribe`. A Reopen rejects a `sub` that is still in flight,
   under ADR-0003, while the server may already be streaming. Which side to prefer
-  when a `sub` response is abandoned rather than refused is not settled here.
-  ADR-0006 settles it: such a `sub` keeps its entry.
+  when a `sub` response is abandoned rather than refused is settled by ADR-0006.
