@@ -39,7 +39,7 @@ point where the decision has to be made.
 
 An entry is forgotten when the server has answered, and kept when it has not.
 `subscribe` writes its entry on the server's `ready`, and a `sub` the server
-refuses leaves none.
+refuses leaves none; the answer that never came is ADR-0006's.
 
 - `toError` returns a `DDPError`. Every value it produces is a `DDPError`,
   including the one it builds from a DDP error that arrived as a bare string.
@@ -47,13 +47,14 @@ refuses leaves none.
   ADR-0001, so the type marks provenance in the value itself, and a caller reads
   it with `instanceof`. A rejection the SDK originates under ADR-0003 is a plain
   `Error` and is therefore not a `DDPError`.
-- `subscribe` writes its entry when the server has answered. It is the only
-  writer, and it writes on the `ready` DDP response, under the id the server
-  confirmed. A `sub` the server refuses leaves nothing behind, and a `sub` sent
-  under an existing id that the server refuses forgets that entry: the server has
-  answered, and nothing is streaming, so there is no stream for a later Login to
-  re-establish. A `sub` whose response never arrives is settled by ADR-0006,
-  which keeps the entry because the server may still be streaming.
+- `subscribe` is the only writer of an entry, and where the server answers it
+  writes on the `ready` DDP response, under the id the server confirmed. A `sub`
+  the server refuses leaves nothing behind, and a `sub` sent under an existing id
+  that the server refuses forgets that entry: the server has answered, and
+  nothing is streaming, so there is no stream for a later Login to re-establish.
+  A `sub` whose response never arrives is settled by ADR-0006, which has
+  `subscribe` write an entry the `ready` never arrived to write, because the
+  server may still be streaming.
 - `unsubscribe` forgets its DDP subscription on a DDP response, whether that
   response succeeded or carried a DDP error. It keeps its DDP subscription on
   any other rejection. It re-throws in both cases. The rejection a caller
