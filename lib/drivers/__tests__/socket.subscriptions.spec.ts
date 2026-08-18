@@ -296,6 +296,22 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
+  describe('a subscription the server never answered', () => {
+    it('is kept under the id it was sent with when the deadline expires', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+
+      await jest.advanceTimersByTimeAsync(socket.config.timeout)
+      await expect(subscribing).resolves.toBeUndefined()
+
+      expect(socket.subscriptions['ddp-1']).toMatchObject({
+        id: 'ddp-1',
+        name: 'stream-room-messages',
+        params: ['GENERAL']
+      })
+    })
+  })
+
   describe('a subscription that never reached the wire', () => {
     // Three ways a `sub` fails without the server seeing it. None can leave a
     // stream behind, so none may leave an entry — only a connection that ends

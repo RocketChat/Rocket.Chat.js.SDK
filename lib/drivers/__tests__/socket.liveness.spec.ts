@@ -215,6 +215,52 @@ describe('Socket liveness', () => {
       }
     })
 
+    it('bounds the wait for the pong by the ping interval, not the timeout', async () => {
+      const impatient = new Socket({
+        host: 'localhost:3000',
+        logger: createSilentLogger(),
+        ping: PING_INTERVAL,
+        timeout: PING_INTERVAL * 10
+      })
+      const impatientTransport = await openFakeConnection(impatient)
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL)
+      expect(impatientTransport.lastSent()).toEqual({ msg: 'ping' })
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
+      expect(impatient.openTimeout).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(1)
+      expect(impatient.openTimeout).toBeDefined()
+
+      await impatient.close()
+    })
+
+    it('starts the pong wait only once the ping is written, not when it fires on a dropped socket', async () => {
+      transport.readyState = CLOSED
+
+      await jest.advanceTimersToNextTimerAsync()
+
+      expect(transport.sent).toHaveLength(1)
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL)
+
+      expect(transport.sent).toHaveLength(1)
+      expect(socket.openTimeout).toBeUndefined()
+
+      transport.readyState = OPEN
+      socket.emit('open')
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
+      expect(socket.openTimeout).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(1)
+      expect(socket.openTimeout).toBeDefined()
+    })
+
     it('reconnects when one pong is withheld', async () => {
       // This test used to pin the opposite: the chain died for good, because the
       // ping's send went out while `connected` was still true, waited forever on
@@ -226,7 +272,7 @@ describe('Socket liveness', () => {
 
       await tickWithoutPong()
 
-      // The ping's own deadline, the one timer the unanswered send leaves behind.
+      // The deadline the ping gave its send, the one timer it leaves behind.
       expect(jest.getTimerCount()).toBe(1)
 
       // One millisecond past the deadline, which is also one past the aliveness
