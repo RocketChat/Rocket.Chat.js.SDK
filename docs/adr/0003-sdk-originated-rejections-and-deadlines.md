@@ -112,7 +112,8 @@ an Error that the SDK writes.
   connection is read before the write.
 - `reopenNow` and `waitForNotifyUserMediaSubs` take their Deadline from
   `config.timeout`. `probe` keeps a default of 2000ms that no option derives. This
-  is deliberate, and it is the one Deadline in the driver that no option moves.
+  is deliberate: it is a bound no option moves, and `close` shares the same
+  module constant under ADR-0009.
   `probe` answers whether a Socket in the gray zone still has a server behind it,
   and the caller acts on the answer — a `false` from `probe` is what decides on a
   Reopen. So `probe` has to settle faster than the wait it exists to diagnose. A
