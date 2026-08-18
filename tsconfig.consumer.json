@@ -3,9 +3,5 @@
 	// the way a consuming app does, so a missing `/// <reference>` on an untyped
 	// dependency fails here.
 	"extends": "./tsconfig.json",
-	"compilerOptions": {
-		"noUnusedLocals": false,
-		"noUnusedParameters": false
-	},
 	"files": ["index.ts"]
 }
