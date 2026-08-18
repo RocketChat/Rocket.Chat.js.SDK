@@ -46,7 +46,6 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/**
-	 * Initialise the Socket with given options or defaults.
 	 * Resolves with the Driver once its Socket is open.
 	 * @example <caption>Using promise</caption>
 	 *  import { driver } from '@rocket.chat/sdk'
