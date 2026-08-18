@@ -95,9 +95,9 @@ The server's answer decides; silence keeps the instruction.
   abandoned the wait before the server read the frame. `subscribeAll` re-sends it
   and the entry becomes real. This is the phantom the question weighed, and it
   costs one redundant `sub` frame at the next Login.
-- `unsubscribeAll` and `close` act on these entries, and send `unsub` frames for
-  them. Both already tolerate a server that refuses: `unsubscribeAll` catches
-  each failure, and `close` forgets everything regardless.
+- `unsubscribeAll` acts on these entries and sends `unsub` frames for them,
+  catching each failure so a server that refuses one cannot stop the rest. A
+  close forgets them all and sends nothing, under ADR-0009.
 - `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
   polls `subscriptions` for the two media entries, and an entry written on an
   abandoned `sub` ends that poll instead of keeping it waiting. Readiness itself

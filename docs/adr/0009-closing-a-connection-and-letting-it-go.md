@@ -20,13 +20,13 @@ wait, or a caller that never returns.
 
 The driver bounds the close, and answers it itself when the transport does not.
 
-- `close` joins `probe` as a Deadline no option moves, and holds the same 2000ms
-  bound. The bound is a module constant the two share. Unlike `probe` it does not
-  take that bound as an argument: no caller reaches `close` through a signature
-  that accepts one, and `close` settles either way, so there is no answer for a
-  caller to vary its patience on.
-- The bound answers the liveness question `probe` asks, not the patience question
-  `timeout` asks. The socket `close` waits on may be one the transport never
+- `close` joins `probe` on the 2000ms bound ADR-0003 keeps out of reach of any
+  option, from the module constant the two share. Unlike `probe` it does not take
+  that bound as an argument: no caller reaches `close` through a signature that
+  accepts one, and `close` settles either way, so there is no answer for a caller
+  to vary its patience on.
+- The close is bounded on the liveness question rather than the patience one for a
+  reason of its own. The socket `close` waits on may be one the transport never
   called open at all — a still-connecting socket is closed and waited on the same
   way, and letting it go settles that open as an Abandoned wait rather than
   leaving it pending — and a stale ping cannot vouch for any of them, so the close
@@ -61,7 +61,8 @@ The driver bounds the close, and answers it itself when the transport does not.
 - Every close is announced once and through one path. A consumer sees the same
   `close` event, the same log line and the same Reopen decision whether the
   transport answered or the driver answered for it.
-- What a close does to the subscription map is settled by ADR-0004, which forgets
-  every entry on this path because no DDP response can arrive to decide one.
+- A Socket the consuming app closed keeps no instruction to re-establish
+  anything, and the per-entry rule ADR-0004 draws never runs on this path,
+  because no DDP response can arrive to decide one.
 - A send in flight on a closing connection is ended by the close event under
   ADR-0003, with the message that names a close rather than a Reopen.
