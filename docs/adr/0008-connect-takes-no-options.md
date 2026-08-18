@@ -28,7 +28,7 @@ arguments, and `ISocket.connect()` in `lib/drivers/definitions.ts` declares
 none. If a caller wants different connection settings, it constructs a Driver
 with them.
 
-`Client.connect(options)` keeps its parameter and ignores it, forwarding as
+`Client.connect(options)` keeps its parameter, now optional and ignored, forwarding as
 `this.ddp.connect()`.
 
 ## Consequences
