@@ -63,10 +63,14 @@ class AbandonedRequest extends AbandonedWait {
   }
 }
 
-class ExpiredRequest extends Error {
+/**
+ * The wait for a DDP response ended by its Deadline, carrying the id so a caller
+ * can name what the server may still have acted on. See ADR-0003 and ADR-0006.
+ */
+class ExpiredWait extends Error {
   constructor (public id: string) {
     super(deadlineExpired)
-    Object.setPrototypeOf(this, ExpiredRequest.prototype)
+    Object.setPrototypeOf(this, ExpiredWait.prototype)
   }
 }
 
@@ -572,16 +576,18 @@ export class Socket extends SDKEventEmitter {
         }
       }))
 
-      const deadlineTimer = setTimeout(() => {
-        removeListeners()
-        reject(new ExpiredRequest(id))
-      }, deadlineMs)
+      let deadlineTimer: any
 
       const removeListeners = () => {
-        clearTimeout(deadlineTimer as any)
+        clearTimeout(deadlineTimer)
         this.off(listener, onResponse)
         abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
       }
+
+      deadlineTimer = setTimeout(() => {
+        removeListeners()
+        reject(new ExpiredWait(id))
+      }, deadlineMs)
 
       const onResponse = (result: any) => {
         removeListeners()
@@ -734,7 +740,7 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        if (err instanceof AbandonedRequest || err instanceof ExpiredRequest) {
+        if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
           this.rememberSubscription(err.id, name, params, callback)
         } else if (id && err instanceof DDPError) {
           this.forgetSubscription(id)

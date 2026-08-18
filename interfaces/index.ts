@@ -13,7 +13,7 @@ export interface ILogger {
  * @param useSsl      Use SSL (https/wss) to connect
  * @param timeout     How long to wait (ms) before abandoning connection, and
  *                    also how long any send that waits for a DDP response waits
- *                    for it before it is rejected. The value several other
+ *                    for it once the message is written. The value several other
  *                    deadlines are derived from — each is documented where it
  *                    is used
  * @param reopen      ms interval before attempting reopens on disconnect. Twice

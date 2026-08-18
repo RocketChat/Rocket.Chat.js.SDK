@@ -121,8 +121,8 @@ The server's answer decides; silence keeps the instruction.
   never answers. It falls on the same side of the line as an abandoned one — the
   DDP message was written to the transport and no answer came — so a `sub` that
   expires keeps its entry, and `subscribe` tests for it as positively as it tests
-  for an `AbandonedRequest`. It is not an `AbandonedWait`, because no connection
-  went away — but `subscribe` asks nothing for a Reopen either way: it swallows
+  for an `AbandonedRequest`. It is an `ExpiredWait`, not an `AbandonedWait`,
+  because no connection went away — but `subscribe` asks nothing for a Reopen either way: it swallows
   the rejection to `undefined`. Where that decision is being made, in `ping` and
   in the retry inside `reopen`, an expired wait does Reopen and an abandoned one
   does not.
