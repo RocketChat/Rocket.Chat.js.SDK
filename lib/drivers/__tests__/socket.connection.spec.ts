@@ -53,10 +53,10 @@ const createSocket = (logger: ILogger) => new Socket({
 })
 
 /**
- * Connecting and reconnecting. Every test starts from a real open connection
- * built through `openFakeConnection`, which asserts the mocked transport
- * constructor actually ran — so no assertion below can pass against a socket
- * the driver never built.
+ * Connecting and reconnecting. Unless a test needs a connection that never
+ * opened, it starts from a real open one built through `openFakeConnection`,
+ * which asserts the mocked transport constructor actually ran — so no assertion
+ * below can pass against a socket the driver never built.
  *
  * Accepted gap: the fake's `readyState` is driven by hand, so "is connected" is
  * asserted against a value the test itself wrote. A real socket reporting OPEN
