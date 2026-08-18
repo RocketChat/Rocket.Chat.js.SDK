@@ -181,8 +181,8 @@ an Error that the SDK writes.
   entry on the confirmed `ready` id or on the two rejection types ADR-0006 names.
   The error the Transport threw is neither of those, so the map holds no entry for
   a DDP subscription the server never received. That is the rule ADR-0006 draws
-  and not an accident of ordering: a `sub` that never reached the wire cannot have
-  been acted on, so there is nothing for a later Login to re-establish.
+  and not an accident of ordering: there is nothing for a later Login to
+  re-establish.
 - Results do not cross a Reopen; the caller receives a rejection. `subscribe`
   turns each rejection into `undefined`, and what `unsubscribeAll` does with one
   is settled by ADR-0004, so the DDP subscription paths do not change for a
