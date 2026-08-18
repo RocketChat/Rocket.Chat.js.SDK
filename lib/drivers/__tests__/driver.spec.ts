@@ -461,6 +461,18 @@ describe('Driver.connect', () => {
     expect(connectedSeen).toHaveBeenCalledTimes(1)
   })
 
+  it('rejects the connect whose socket was replaced mid-open', async () => {
+    const driver = createDriver()
+
+    const replaced = driver.connect()
+    const replacing = driver.connect()
+
+    await expect(replaced).rejects.toThrow('[ddp] connection closed before it opened')
+
+    await driveToHandshake(fakeSockets[1])
+    await replacing
+  })
+
   const failConnects = async (driver: Driver, attempts: number) => {
     for (let attempt = 0; attempt < attempts; attempt++) {
       const failing = driver.connect()
