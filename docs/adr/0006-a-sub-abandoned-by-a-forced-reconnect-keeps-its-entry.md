@@ -50,6 +50,10 @@ The server's answer decides; silence keeps the instruction.
   server confirmed, and also when the connection ended before the answer came,
   under the id the request was sent with. A `sub` the server refused with a
   `nosub` carrying a DDP error still leaves nothing behind.
+- Either write is conditional on the Socket still holding a connection.
+  `rememberSubscription` returns early when it holds none, because an entry is an
+  instruction to a later Login on this Socket, and a Socket with no connection has
+  nothing to instruct.
 - A `sub` that was never written to the transport leaves nothing behind. A failed
   write, and a send that expired waiting for the connection to open, are both
   cases where the server cannot have acted on the request. The entry is written
@@ -64,9 +68,10 @@ The server's answer decides; silence keeps the instruction.
   the connection. `send` abandons a wait in two places: before the frame is
   written, where it throws a bare `AbandonedWait`, and after, from the listeners
   on `disconnected`, `connecting` and `close`, where it rejects with an
-  `AbandonedRequest`. Only the second kind carries an id, so only the second kind
-  can leave an entry. A forced reconnect is the common case; a socket that closes
-  under an unanswered `sub` is the same loss and keeps its entry too.
+  `AbandonedRequest`. A forced reconnect is the common case, and it installs the
+  replacement connection, so the entry is written. A close is the same loss and
+  keeps nothing: it drops the connection and forgets every entry as it goes, so
+  the guard above finds no connection to instruct. ADR-0009 settles that path.
 - The rejection carries the id `send` minted for the wait. `send` mints it inside
   its promise executor, after the wait on `open`, so no caller can compute it in
   advance without racing another send for the same number. It names the request
