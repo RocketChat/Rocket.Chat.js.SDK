@@ -48,9 +48,9 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 
 An ADR always reads as the current decision. When a decision evolves, rewrite the ADR itself — no amendment or changelog sections. Git history is the amendment log.
 
-The one exception is a reversal. When a decision is reversed, don't rewrite the old ADR: write a new one that supersedes it, and flip the old ADR's status line to `Superseded by ADR-0007` (zero-padded, matching the ADR titles). Nothing else in the old file changes.
+The one exception is a reversal. When a decision is reversed, don't rewrite the old ADR: write a new one that supersedes it, and flip the old ADR's status line to `**Status:** Superseded by ADR-0007` (zero-padded, matching the ADR titles). Nothing else in the old file changes.
 
-Don't confuse this with the `**Succeeds:** ADR-0003` line some ADRs carry. `Succeeds` chains ADRs that build on each other while both stay in force; `Superseded by` marks a decision that no longer applies. A superseding ADR can carry both.
+Don't confuse this with the `**Succeeds:** ADR-0003` line some ADRs carry. `Succeeds` chains ADRs that build on each other while both stay in force; `Superseded by` marks a decision that no longer applies. A superseding ADR can also carry a `Succeeds` line pointing at the one it replaces.
 
 ## Flag ADR conflicts
 
