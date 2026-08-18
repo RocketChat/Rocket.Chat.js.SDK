@@ -1,5 +1,6 @@
 import RocketChatClient from '../Rocketchat'
 import { Driver } from '../../drivers/driver'
+import { logger as moduleLogger } from '../../log'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
@@ -43,6 +44,18 @@ describe('client.ddp', () => {
 
   it('is not exposed on the client under a socket field', () => {
     expect('socket' in createClient()).toBe(false)
+  })
+})
+
+describe('client.logger', () => {
+  it('is the logger the client was handed', () => {
+    const logger = createSilentLogger()
+
+    expect(new RocketChatClient({ host: 'localhost:3000', logger }).logger).toBe(logger)
+  })
+
+  it('falls back to the module logger when the client is handed none', () => {
+    expect(new RocketChatClient({ host: 'localhost:3000' }).logger).toBe(moduleLogger)
   })
 })
 

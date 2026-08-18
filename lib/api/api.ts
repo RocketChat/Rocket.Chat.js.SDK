@@ -90,7 +90,7 @@ class Client implements IClient {
 
   _headers: any = {}
 
-  constructor ({ host = 'http://localhost:3000' }: any) {
+  constructor ({ host = 'http://localhost:3000' }: { host?: string }) {
     this.host = host
   }
 
@@ -176,6 +176,12 @@ class Client implements IClient {
   }
 }
 
+export interface IApiOptions {
+  client?: IClient
+  host?: string
+  logger?: ILogger
+}
+
 export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
 
 /**
@@ -195,10 +201,10 @@ export default class Api extends SDKEventEmitter {
   } | null = null
   controller: AbortController
 
-  constructor ({ client, host, logger }: any) {
+  constructor ({ client, host, logger = Logger }: IApiOptions) {
     super()
-    this.client = client || new Client({ host } as any)
-    this.logger = logger || Logger
+    this.client = client || new Client({ host })
+    this.logger = logger
     this.controller = new AbortController();
   }
 

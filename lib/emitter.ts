@@ -1,3 +1,4 @@
+/// <reference path="../types/events.d.ts" />
 /**
  * @module emitter
  * The event emitter every SDK class inherits from.
