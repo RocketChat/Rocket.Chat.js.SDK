@@ -78,8 +78,8 @@ entry is written on the same terms.
 
 - A DDP subscription the server refuses to end is forgotten, so later Logins do
   not re-request it for the life of the Socket. In practice a Rocket.Chat server
-  answers `unsub` with a bare `nosub` and no DDP error, so the corrected path is
-  rare. What changes is which behaviour the specs certify as correct.
+  answers `unsub` with a bare `nosub` and no DDP error, so this path is rare. The
+  specs certify this behaviour as the correct one.
 - A caller that reads only `err.message` sees no difference. The `DDPError` type
   adds a distinction; it removes nothing. `name` stays `Error`, so nothing that
   matches on the name changes.
@@ -91,8 +91,8 @@ entry is written on the same terms.
   resubscribe is forgotten and later Logins do not re-request it. `subscribe`
   still swallows its own failure and resolves `undefined` rather than re-throwing.
   A separate issue tracks that.
-- Whether a `sub` may be sent for an id whose `unsub` is still in flight, and
-  what the server does when it is, is settled by ADR-0005.
+- Whether a `sub` may be sent for an id whose `unsub` is still in flight is
+  settled by ADR-0005.
 - Applying the rule to the write reopens, on the `sub` path, the case the Context
   describes for `unsubscribe`. A Reopen rejects a `sub` that is still in flight,
   under ADR-0003, while the server may already be streaming. Which side to prefer

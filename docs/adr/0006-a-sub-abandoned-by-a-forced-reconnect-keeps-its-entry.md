@@ -95,22 +95,19 @@ The server's answer decides; silence keeps the instruction.
   abandoned the wait before the server read the frame. `subscribeAll` re-sends it
   and the entry becomes real. This is the phantom the question weighed, and it
   costs one redundant `sub` frame at the next Login.
-- `unsubscribeAll` and `close` have entries to act on that they did not have
-  before, and send `unsub` frames for them. Both already tolerate a server that
-  refuses: `unsubscribeAll` catches each failure, and `close` forgets everything
-  regardless.
+- `unsubscribeAll` and `close` act on these entries, and send `unsub` frames for
+  them. Both already tolerate a server that refuses: `unsubscribeAll` catches
+  each failure, and `close` forgets everything regardless.
 - `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
   polls `subscriptions` for the two media entries, and an entry written on an
   abandoned `sub` ends that poll instead of keeping it waiting. Readiness itself
   is unchanged: the poll only decides when to re-send, and the gate resolves on
   whether that resubscribe was acknowledged. An abandoned one resolves
   `undefined`, which the gate counts as unacknowledged.
-- Whether a `sub` may be sent for an id whose `unsub` is still in flight is
-  answered by ADR-0005. This ADR makes the case more frequent: `unsubscribe`
-  already keeps its entry on the same class of rejection, so a forced reconnect
-  that abandons an `unsub` and a `sub` together leaves both, and `subscribeAll`
-  re-sends the `sub` at the next Login under an id whose `unsub` never got an
-  answer.
+- `unsubscribe` already keeps its entry on the same class of rejection, so a
+  forced reconnect that abandons an `unsub` and a `sub` together leaves both, and
+  `subscribeAll` re-sends the `sub` at the next Login under an id whose `unsub`
+  never got an answer.
 - Under ADR-0004 `subscribe` forgets an entry whose resubscribe the server
   refuses, so an entry a successful `sub` wrote does not survive a later
   refusal.

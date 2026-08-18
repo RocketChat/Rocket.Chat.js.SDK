@@ -58,8 +58,9 @@ case. A consuming app also adds its own listeners to the same emitter through
   app. Two calls to `stop`, or one call after the listener was already gone,
   removed a different listener on the same event. `stop` removes only the
   listener that the app gave it.
-- Rejections that `emit` stepped over run. An immediate reconnect rejects each
-  send in flight, not approximately one half of them. For this reason the value
+- Every rejection reaches its listener, including the ones `emit` stepped over.
+  An immediate reconnect rejects each send in flight, not approximately one half
+  of them. For this reason the value
   of those rejections must be a true Error. Refer to ADR-0003.
 - Read this ADR again if a person replaces or upgrades `tiny-events`. Both
   replacements exist only because of the behaviour of that package. A different

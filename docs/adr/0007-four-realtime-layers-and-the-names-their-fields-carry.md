@@ -86,4 +86,6 @@ and an `/** @internal */` tag alone, which enforces nothing.
   root import is unaffected.
 - Until the app moves, the documentation is ahead of the code: CONTEXT.md
   reserves `ddp` as a qualifier while `Driver.ddp` still exists. Issue #338
-  stays open until the renames land.
+  stays open until the renames land. The three renames land together in a single
+  SDK PR so the vocabulary arrives in one piece, and the app's pin moves in its
+  own PR.
