@@ -49,10 +49,10 @@ an Error that the SDK writes.
 - Every send has a Deadline on the DDP response, and its default is
   `config.timeout` — the option that already means how long a caller is willing to
   wait for an answer, so an app that wants a different bound moves the option it
-  already has. The only other public surface is an optional per-send bound. The
-  Deadline starts after the write, not at the call, so a send issued while the
-  Socket is not Transport open first waits out the wait on `open` — up to
-  `config.reopen * 2` — and only then its own bound.
+  already has. The only other public surface is an optional per-send bound,
+  which `ping` uses. The Deadline starts after the write, not at the call, so a
+  send issued while the Socket is not Transport open first waits out the wait
+  on `open` — up to `config.reopen * 2` — and only then its own bound.
 - `ping` is the one caller that names its own bound, and it names `config.ping`.
   If the Deadline wins, `ping` calls `reopen()`. A `pong` that does not arrive
   therefore causes the reconnect that it always had to cause. The bound on the
@@ -154,7 +154,7 @@ an Error that the SDK writes.
   settle, so code that handles only the success path gets rejections it has never
   seen.
 - What a caller gets from an immediate reconnect is an Error, not `undefined`.
-  This change is deliberate and visible. Callers already read `err.message` in
+  This is deliberate and visible. Callers already read `err.message` in
   their `catch` blocks, and that read threw when the rejection was `undefined`.
 - The Deadline of `ping` is `config.ping`. A consuming app that lowers that option
   for the Liveness chain therefore also lowers the bound on the wait for the

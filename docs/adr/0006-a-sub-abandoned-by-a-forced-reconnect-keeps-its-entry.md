@@ -115,14 +115,13 @@ The server's answer decides; silence keeps the instruction.
 - `subscribe` writes and forgets entries. Under ADR-0004 it forgets an entry
   whose resubscribe the server refuses, so an entry a successful `sub` wrote does
   not survive a later refusal.
-
-- **Amendment.** A third rejection carries an id: the Deadline ADR-0003 gives the
-  DDP response, which ends the wait when the connection stays up and the server
+- A third rejection carries an id: the Deadline ADR-0003 gives the DDP
+  response, which ends the wait when the connection stays up and the server
   never answers. It falls on the same side of the line as an abandoned one — the
   DDP message was written to the transport and no answer came — so a `sub` that
   expires keeps its entry, and `subscribe` tests for it as positively as it tests
   for an `AbandonedRequest`. It is an `ExpiredWait`, not an `AbandonedWait`,
   because no connection went away — but `subscribe` asks nothing for a Reopen
-  either way: it swallows the rejection to `undefined`. Where that decision is being made, in `ping` and
-  in the retry inside `reopen`, an expired wait does Reopen and an abandoned one
-  does not.
+  either way: it swallows the rejection to `undefined`. Where that decision is
+  made, in `ping` and in the retry inside `reopen`, an expired wait does Reopen
+  and an abandoned one does not.
