@@ -65,7 +65,7 @@ describe('client.ddp', () => {
 })
 
 describe('client.resume', () => {
-  const resumed = async () => {
+  const resumedClient = async () => {
     const client = createClient()
     answerDdpLoginWith(client, { id: 'id', token: 'token' })
     await client.resume({ token: 'token' })
@@ -73,11 +73,11 @@ describe('client.resume', () => {
   }
 
   it('leaves the client logged in for REST', async () => {
-    expect((await resumed()).loggedIn()).toBe(true)
+    expect((await resumedClient()).loggedIn()).toBe(true)
   })
 
   it('sets the REST auth headers', async () => {
-    expect((await resumed()).client.headers).toMatchObject({
+    expect((await resumedClient()).client.headers).toMatchObject({
       'X-Auth-Token': 'token',
       'X-User-Id': 'id'
     })
@@ -110,7 +110,7 @@ describe('client.resume', () => {
   })
 
   it('knows neither the username nor the result when there was no previous login', async () => {
-    const client = await resumed()
+    const client = await resumedClient()
 
     expect(client.currentLogin).toMatchObject({ username: null, result: null })
   })
