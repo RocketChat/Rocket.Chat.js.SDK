@@ -186,8 +186,8 @@ an Error that the SDK writes.
 - Results do not cross a Reopen; the caller receives a rejection. `subscribe`
   turns each rejection into `undefined`, and what `unsubscribeAll` does with one
   is settled by ADR-0004, so the DDP subscription paths do not change for a
-  caller. A Method call issued in
-  the window between a drop and the next open fails: the consuming app decides
+  caller. A Method call issued in the window between a drop and the next open
+  fails: the consuming app decides
   whether to call again. Without the rejection, it has no basis for that
   decision.
 - A spec that asserts a rejection of this type asserts both halves, in the way
