@@ -238,7 +238,8 @@ an Error that the SDK writes.
   caller is willing to wait for an answer, so an app that wants a different one
   moves the option it already has. The only new public surface is an optional
   per-send bound, which `ping` uses. The refusal above said the correct bound for
-  a Login is not the ping interval; it is not, and this Deadline is not the ping interval.
+  a Login is not the ping interval; it is not, and this Deadline is not the ping
+  interval.
   `ping` is the one caller that names its own, and it still names `config.ping`,
   so the consequence above holds on the Transport open path: the bound on the pong
   is the ping interval there, and an app patient with a Method call is not thereby
