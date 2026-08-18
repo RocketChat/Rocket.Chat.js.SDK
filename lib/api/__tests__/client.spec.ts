@@ -1,21 +1,21 @@
 import * as settings from '../../settings'
 import Api, { IClient } from '../api'
-import { loggedInApiWithStubbedFetch } from '../../../test/apiFixtures'
-import { answerFetchWith, answerFetchWithUnparsableBody, installFreshFetchMock, lastFetchCall } from '../../../test/stubbedFetch'
+import { loggedInApiWithFakeFetch } from '../../../test/apiFixtures'
+import { answerFetchWith, answerFetchWithUnparsableBody, installFakeFetch, lastFetchCall } from '../../../test/fakeFetch'
 
 describe('REST client', () => {
   let api: Api
   let restClient: IClient
 
-  beforeEach(installFreshFetchMock)
+  beforeEach(installFakeFetch)
 
   beforeEach(async () => {
-    ({ api, restClient } = await loggedInApiWithStubbedFetch('http://localhost:3000'))
+    ({ api, restClient } = await loggedInApiWithFakeFetch('http://localhost:3000'))
   })
 
   describe('request url', () => {
     it('addresses the host, api version and endpoint', async () => {
-      const { api: apiOnAnotherHost } = await loggedInApiWithStubbedFetch('https://chat.example.com')
+      const { api: apiOnAnotherHost } = await loggedInApiWithFakeFetch('https://chat.example.com')
 
       await apiOnAnotherHost.get('me', {})
 
@@ -26,7 +26,7 @@ describe('REST client', () => {
     })
 
     it('addresses localhost when the caller named no host', async () => {
-      const { api: apiOnDefaultHost } = await loggedInApiWithStubbedFetch()
+      const { api: apiOnDefaultHost } = await loggedInApiWithFakeFetch()
 
       await apiOnDefaultHost.get('me', {})
 

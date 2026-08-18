@@ -73,15 +73,12 @@ describe('api', () => {
 
     it('routes each method to its own restClient call', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())
 
-      await api.get('a', {})
-      await api.post('b', {})
-      await api.put('c', {})
-      await api.del('d', {})
+      await api.get('chat.getMessage', {})
+      await api.post('chat.postMessage', {})
+      await api.put('chat.update', {})
+      await api.del('chat.delete', {})
 
       expect(restClient.requests.map((request) => request.method)).toEqual([
         'GET',
@@ -93,8 +90,7 @@ describe('api', () => {
 
     it('passes the body the caller asked for through to the restClient', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess(), emptySuccess())
 
       await api.post('chat.postMessage', { msg: 'hello' })
       expect(restClient.lastRequest().data).toEqual({ msg: 'hello' })
@@ -105,15 +101,12 @@ describe('api', () => {
 
     it('passes the api version through to the restClient on every method', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())
 
-      await api.get('a', {}, true, undefined, {}, 'v2')
-      await api.post('b', {}, true, undefined, {}, 'v2')
-      await api.put('c', {}, true, undefined, {}, 'v2')
-      await api.del('d', {}, true, undefined, {}, 'v2')
+      await api.get('chat.getMessage', {}, true, undefined, {}, 'v2')
+      await api.post('chat.postMessage', {}, true, undefined, {}, 'v2')
+      await api.put('chat.update', {}, true, undefined, {}, 'v2')
+      await api.del('chat.delete', {}, true, undefined, {}, 'v2')
 
       expect(restClient.requests.map((request) => request.apiVersion)).toEqual([
         'v2', 'v2', 'v2', 'v2'
@@ -122,15 +115,12 @@ describe('api', () => {
 
     it('carries the abort signal on every request', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
-      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())
 
-      await api.get('a', {})
-      await api.post('b', {})
-      await api.put('c', {})
-      await api.del('d', {})
+      await api.get('chat.getMessage', {})
+      await api.post('chat.postMessage', {})
+      await api.put('chat.update', {})
+      await api.del('chat.delete', {})
 
       for (const request of restClient.requests) {
         expect(request.options.signal).toBe(api.controller.signal)

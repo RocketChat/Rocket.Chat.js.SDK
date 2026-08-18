@@ -23,8 +23,8 @@ export class FakeClient implements IClient {
 
   private readonly replies: any[] = []
 
-  enqueueReply (response: any): void {
-    this.replies.push(response)
+  enqueueReply (...replies: any[]): void {
+    this.replies.push(...replies)
   }
 
   get (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any> {
