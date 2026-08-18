@@ -56,26 +56,19 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
 	 *    .then(() => console.log('connected'))
 	 *    .catch((err) => console.error(err))
 	 */
-  connect = (c: any = {}): Promise<any> => {
+  connect = async (c: any = {}): Promise<any> => {
     if (this.connected) {
-      return Promise.resolve(this)
+      return this
     }
-    return new Promise((resolve, reject) => {
-      this.logger.info('[driver] Connecting', { ...this.config, ...c })
-
-      const onConnected = () => {
-        this.logger.info('[driver] Connected')
-        resolve(this as IDriver)
-      }
-
-      this.ddp.open().catch((err: Error) => {
-        this.logger.error(`[driver] Failed to connect: ${err.message}`)
-        this.off('connected', onConnected)
-        reject(err)
-      })
-
-      this.once('connected', onConnected)
-    })
+    this.logger.info('[driver] Connecting', { ...this.config, ...c })
+    try {
+      await this.ddp.open()
+    } catch (err) {
+      this.logger.error(`[driver] Failed to connect: ${(err as Error).message}`)
+      throw err
+    }
+    this.logger.info('[driver] Connected')
+    return this as IDriver
   }
 
   get connected (): boolean {
