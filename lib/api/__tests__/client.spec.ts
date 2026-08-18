@@ -1,10 +1,12 @@
 import * as settings from '../../settings'
 import Api from '../api'
 import { loggedInApiWithStubbedFetch } from '../../../test/loggedInApi'
-import { answerFetchWith, answerFetchWithUnparsableBody, lastFetchCall } from '../../../test/stubbedFetch'
+import { answerFetchWith, answerFetchWithUnparsableBody, installFreshFetchMock, lastFetchCall } from '../../../test/stubbedFetch'
 
 describe('api client', () => {
   let api: Api
+
+  beforeEach(installFreshFetchMock)
 
   beforeEach(async () => {
     ({ api } = await loggedInApiWithStubbedFetch('http://localhost:3000'))

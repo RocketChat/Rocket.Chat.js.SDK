@@ -3,14 +3,10 @@ import { ILogger } from '../interfaces'
 import { FakeClient, loginResponse } from './fakeClient'
 import { answerFetchWith } from './stubbedFetch'
 
-const forgetLoginRequest = (client: FakeClient) => {
-  client.requests.length = 0
-}
-
 const logIn = async (api: Api, client: FakeClient) => {
   client.replyOnce('POST', loginResponse())
   await api.login({ username: 'user', password: 'pass' })
-  forgetLoginRequest(client)
+  client.requests.length = 0
   return api
 }
 
@@ -28,7 +24,7 @@ export const loggedInApiWithPendingClient = async () => {
 
 export const loggedInApiWithStubbedFetch = async (host?: string) => {
   const api = new Api({ host })
-  answerFetchWith({ data: { authToken: 'fake-token', userId: 'fake-user-id', me: { username: 'fake-username' } } })
+  answerFetchWith(loginResponse().data)
   await api.login({ username: 'user', password: 'pass' })
   answerFetchWith({})
   return { api }
