@@ -3,7 +3,6 @@
 		"no-unused-expressions": "error",
 		"no-this-alias": "error",
 		"no-async-promise-executor": "error",
-		// docs/adr/0007-the-websocket-reference-directive-stays.md
 		"triple-slash-reference": "warn",
 		// https://github.com/Microsoft/TypeScript/issues/340
 		"no-unsafe-declaration-merging": "warn",

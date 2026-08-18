@@ -1,31 +1,35 @@
 import Api from '../lib/api/api'
+import { ILogger } from '../interfaces'
 import { FakeClient, loginResponse } from './fakeClient'
+import { answerFetchWith } from './stubbedFetch'
 
-export const apiWithFakeClient = (client: FakeClient) => new Api({ client })
-
-export const loggedInApiWithFakeClient = async (
-  makeApi: (client: FakeClient) => Api = apiWithFakeClient
-) => {
-  const client = new FakeClient()
-  const api = makeApi(client)
-  client.reply('post', loginResponse())
-  await api.login({ username: 'user', password: 'pass' })
-  return { api, client }
+const forgetLoginRequest = (client: FakeClient) => {
+  client.requests.length = 0
 }
 
-export const fetchAnswering = (body: any, status = 200) =>
-  jest.fn().mockResolvedValue({ status, json: async () => body })
-
-export const loggedInApiWithStubbedFetch = async (host = 'http://localhost:3000') => {
-  const api = new Api({ host })
-  global.fetch = fetchAnswering({ data: { authToken: 't', userId: 'u', me: { username: 'n' } } }) as any
+const logIn = async (api: Api, client: FakeClient) => {
+  client.replyOnce('POST', loginResponse())
   await api.login({ username: 'user', password: 'pass' })
-  global.fetch = fetchAnswering({}) as any
+  forgetLoginRequest(client)
   return api
 }
 
-export const lastFetchCall = (): { url: string, init: any } => {
-  const calls = (global.fetch as jest.Mock).mock.calls
-  const [url, init] = calls[calls.length - 1]
-  return { url, init }
+export const loggedInApiWithFakeClient = async (logger?: ILogger) => {
+  const client = new FakeClient()
+  const api = await logIn(new Api({ client, logger }), client)
+  return { api, client }
+}
+
+export const loggedInApiWithPendingClient = async () => {
+  const client = new FakeClient({ autoRespond: false })
+  const api = await logIn(new Api({ client }), client)
+  return { api, client }
+}
+
+export const loggedInApiWithStubbedFetch = async (host?: string) => {
+  const api = new Api({ host })
+  answerFetchWith({ data: { authToken: 'fake-token', userId: 'fake-user-id', me: { username: 'fake-username' } } })
+  await api.login({ username: 'user', password: 'pass' })
+  answerFetchWith({})
+  return { api }
 }

@@ -1,21 +1,8 @@
-import Api from '../api'
-import { FakeClient } from '../../../test/fakeClient'
-
-const loggedInApi = () => {
-  const client = new FakeClient(false)
-  const api = new Api({ client })
-  api.currentLogin = {
-    username: 'user',
-    userId: 'id',
-    authToken: 'token',
-    result: {} as any
-  }
-  return { api, client }
-}
+import { loggedInApiWithPendingClient } from '../../../test/loggedInApi'
 
 describe('Api abort', () => {
   it('rejects the request that was in flight', async () => {
-    const { api } = loggedInApi()
+    const { api } = await loggedInApiWithPendingClient()
 
     const pending = api.get('channels.list', {})
     api.abort()
@@ -24,7 +11,7 @@ describe('Api abort', () => {
   })
 
   it('leaves every in-flight request aborted, not only the last one', async () => {
-    const { api } = loggedInApi()
+    const { api } = await loggedInApiWithPendingClient()
 
     const first = api.get('channels.list', {})
     const second = api.post('chat.sendMessage', {})
@@ -35,7 +22,7 @@ describe('Api abort', () => {
   })
 
   it('lets a request made after an abort succeed', async () => {
-    const { api, client } = loggedInApi()
+    const { api, client } = await loggedInApiWithPendingClient()
 
     const aborted = api.get('channels.list', {})
     api.abort()
@@ -48,18 +35,19 @@ describe('Api abort', () => {
   })
 
   it('gives a request made after an abort a signal that is not already aborted', async () => {
-    const { api, client } = loggedInApi()
+    const { api, client } = await loggedInApiWithPendingClient()
 
     api.get('channels.list', {}).catch(() => undefined)
+    const beforeAbort = client.lastRequest()
     api.abort()
     api.get('channels.list', {}).catch(() => undefined)
 
-    expect(client.requests[0].options.signal?.aborted).toBe(true)
+    expect(beforeAbort.options.signal?.aborted).toBe(true)
     expect(client.lastRequest().options.signal?.aborted).toBe(false)
   })
 
   it('stays usable across repeated aborts', async () => {
-    const { api, client } = loggedInApi()
+    const { api, client } = await loggedInApiWithPendingClient()
 
     const first = api.get('channels.list', {})
     api.abort()

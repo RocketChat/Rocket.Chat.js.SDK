@@ -1,4 +1,5 @@
 import * as settings from '../lib/settings'
+import { installFreshFetchMock } from './stubbedFetch'
 
 // `settings.customHeaders` is a mutable module global the driver reads when it
 // constructs a socket, so a test that sets headers would otherwise leak into the
@@ -12,3 +13,5 @@ import * as settings from '../lib/settings'
 beforeEach(() => {
   jest.replaceProperty(settings, 'customHeaders', {})
 })
+
+beforeEach(installFreshFetchMock)
