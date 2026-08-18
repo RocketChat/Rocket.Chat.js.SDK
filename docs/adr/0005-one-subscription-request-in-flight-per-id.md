@@ -62,9 +62,9 @@ the first to have its DDP response before its own frame is written.
   Neither outcome is examined here — what a rejection does to the entry stays
   with ADR-0004.
 - Nothing bounds the wait but the request before it. There is no Deadline and no
-  bookkeeping about the connection. The amendment to ADR-0003 gives the reason: a
-  send cannot outlive the connection it was issued on, so every request settles,
-  and a chain always drains.
+  bookkeeping about the connection. ADR-0003 gives the reason: a send cannot
+  outlive the connection it was issued on, so every request settles, and a chain
+  always drains.
 - A request registers itself when it is queued, not when its frame is written. A
   third request must find the second and wait behind it. If the entry were
   written only at the moment the frame goes out, the second and the third would
@@ -81,7 +81,7 @@ the first to have its DDP response before its own frame is written.
 - Two `sub`s under one id, and two `unsub`s under one id, serialise on the same
   rule. Neither was known to lose data, but both left a second response with no
   listener.
-- A Login that runs while an `unsub` is in flight now re-establishes that stream
+- A Login that runs while an `unsub` is in flight re-establishes that stream
   after the server has ended it, rather than racing it. The end state is the one
   the entry describes.
 - `send` still correlates by id alone, and a listener stranded by a scheduled

@@ -49,18 +49,18 @@ case. A consuming app also adds its own listeners to the same emitter through
 ## Consequences
 
 - A listener that a caller removes during an emit still runs in that emit,
-  because `emit` reads a copy. This result is what lets the cleanup of
-  `waitForOpen` remove its own `once` and leave the `open` event for the listener
-  that `Driver.connect` registers and keeps. Before this change, one send that
-  waited for `open` made the Driver permanently silent about each later Reopen.
+  because `emit` reads a copy. This result lets the cleanup of `waitForOpen`
+  remove its own `once` and leave the `open` event for the listener that
+  `Driver.connect` registers and keeps. A send that waits for `open` therefore
+  does not silence the Driver about later Reopens.
 - A consuming app sees the correction, not only the SDK. `Driver.onStreamData`
   gives the app a `stop` function, and `stop` calls `off` with the listener of the
   app. Two calls to `stop`, or one call after the listener was already gone,
-  removed a different listener on the same event. `stop` now removes only the
+  removed a different listener on the same event. `stop` removes only the
   listener that the app gave it.
-- Rejections that `emit` stepped over now run. An immediate reconnect rejects
-  each send in flight, not approximately one half of them. For this reason the
-  value of those rejections must be a true Error. Refer to ADR-0003.
+- Rejections that `emit` stepped over run. An immediate reconnect rejects each
+  send in flight, not approximately one half of them. For this reason the value
+  of those rejections must be a true Error. Refer to ADR-0003.
 - Read this ADR again if a person replaces or upgrades `tiny-events`. Both
   replacements exist only because of the behaviour of that package. A different
   package without that behaviour makes both replacements dead weight.

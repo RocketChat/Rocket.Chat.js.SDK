@@ -13,10 +13,10 @@ phantom.
 
 The question was posed on the assumption that the reconnect leaves the previous
 socket open, so an abandoned `sub` the server had already processed would go on
-streaming under a name the SDK no longer held. That assumption no longer
-holds on the ordinary path. `createConnection` detaches the previous socket's
-four handlers and closes it with the user-disconnect code before it installs
-the replacement, and a DDP subscription lives on its connection.
+streaming under a name the SDK did not hold. That assumption does not hold on
+the ordinary path. `createConnection` detaches the previous socket's four
+handlers and closes it with the user-disconnect code before it installs the
+replacement, and a DDP subscription lives on its connection.
 
 It is not unconditional. The teardown sits after the `new WebSocket(...)` call,
 so a constructor that throws returns early and leaves the previous socket
@@ -89,27 +89,27 @@ The server's answer decides; silence keeps the instruction.
 - A stream abandoned by a forced reconnect is re-established at the next Login,
   under the id it was first sent with, so the server is never asked for the same
   stream twice under two names.
-- An entry may now name a `sub` the server never received — if the forced
-  reconnect abandoned the wait before the server read the frame.
-  `subscribeAll` re-sends it and the entry becomes real. This is the phantom the
-  question weighed, and it costs one redundant `sub` frame at the next Login.
-- `unsubscribeAll` and `close` now have entries to act on that they did not have
+- An entry may name a `sub` the server never received — if the forced reconnect
+  abandoned the wait before the server read the frame. `subscribeAll` re-sends it
+  and the entry becomes real. This is the phantom the question weighed, and it
+  costs one redundant `sub` frame at the next Login.
+- `unsubscribeAll` and `close` have entries to act on that they did not have
   before, and send `unsub` frames for them. Both already tolerate a server that
   refuses: `unsubscribeAll` catches each failure, and `close` forgets everything
   regardless.
 - `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
   polls `subscriptions` for the two media entries, and an entry written on an
-  abandoned `sub` now ends that poll where it would previously have kept waiting.
-  Readiness itself is unchanged: the poll only decides when to re-send, and the
-  gate resolves on whether that resubscribe was acknowledged. An abandoned one
-  resolves `undefined`, which the gate counts as unacknowledged.
+  abandoned `sub` ends that poll instead of keeping it waiting. Readiness itself
+  is unchanged: the poll only decides when to re-send, and the gate resolves on
+  whether that resubscribe was acknowledged. An abandoned one resolves
+  `undefined`, which the gate counts as unacknowledged.
 - ADR-0004's remaining open question is untouched: whether a `sub` may be sent
   for an id whose `unsub` is still in flight is still not settled, and the
   behaviour of the server in that case is still not known. This ADR does make
   the case more frequent. `unsubscribe` already keeps its entry on the same
   class of rejection, so a forced reconnect that abandons an `unsub` and a `sub`
-  together now leaves both, and `subscribeAll` re-sends the `sub` at the next
+  together leaves both, and `subscribeAll` re-sends the `sub` at the next
   Login under an id whose `unsub` never got an answer.
-- `subscribe` is no longer a pure writer. Under ADR-0004 it forgets an entry
+- `subscribe` writes and forgets entries. Under ADR-0004 it forgets an entry
   whose resubscribe the server refuses, so an entry a successful `sub` wrote does
   not survive a later refusal.

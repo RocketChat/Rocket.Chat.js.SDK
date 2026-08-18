@@ -17,11 +17,11 @@ The Socket holds its DDP subscriptions in `Socket.subscriptions`, keyed by id.
 instruction to re-establish that stream at the next Login.
 
 `unsubscribe` removed its entry before it sent the `unsub` DDP message. A DDP
-subscription that the server refused to end was then a stream the SDK could no
-longer name, and could neither retry nor re-establish. Moving the removal into
-the DDP response corrected that case and created the opposite one: every
-rejection kept the entry, including the rejection that says the server does not
-have the DDP subscription at all.
+subscription that the server refused to end was then a stream the SDK could not
+name, and could neither retry nor re-establish. Moving the removal into the DDP
+response corrected that case and created the opposite one: every rejection kept
+the entry, including the rejection that says the server does not have the DDP
+subscription at all.
 
 The two rejections are opposite in what they report.
 
@@ -76,10 +76,10 @@ entry is written on the same terms.
 
 ## Consequences
 
-- A DDP subscription the server refuses to end is no longer re-requested at every
-  Login for the life of the Socket. In practice a Rocket.Chat server answers
-  `unsub` with a bare `nosub` and no DDP error, so the corrected path is rare.
-  What changes is which behaviour the specs certify as correct.
+- A DDP subscription the server refuses to end is forgotten, so later Logins do
+  not re-request it for the life of the Socket. In practice a Rocket.Chat server
+  answers `unsub` with a bare `nosub` and no DDP error, so the corrected path is
+  rare. What changes is which behaviour the specs certify as correct.
 - A caller that reads only `err.message` sees no difference. The `DDPError` type
   adds a distinction; it removes nothing. `name` stays `Error`, so nothing that
   matches on the name changes.
@@ -87,10 +87,10 @@ entry is written on the same terms.
   compiles this SDK from TypeScript source with its own toolchain, and a
   toolchain that downlevels classes breaks `instanceof` for a subclass of `Error`
   without it.
-- The rule now governs the writing of an entry as well as its removal, so a
-  refused resubscribe is no longer re-requested at every Login. `subscribe`
-  still swallows its own failure and resolves `undefined` rather than
-  re-throwing. A separate issue tracks that.
+- The rule governs the writing of an entry as well as its removal, so a refused
+  resubscribe is forgotten and later Logins do not re-request it. `subscribe`
+  still swallows its own failure and resolves `undefined` rather than re-throwing.
+  A separate issue tracks that.
 - Whether a `sub` may be sent for an id whose `unsub` is still in flight is not
   settled here, and the behaviour of the server in that case is not known. A
   separate issue tracks the question.

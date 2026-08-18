@@ -32,8 +32,8 @@ A failed DDP response rejects with an `Error`.
 
 ## Consequences
 
-- What callers receive changed. This is deliberate and visible:
-  `lib/drivers/__tests__/ddp.send.spec.ts` now asserts the new behaviour.
+- Callers receive an `Error` instead of a plain object. This is deliberate and
+  visible: `lib/drivers/__tests__/ddp.send.spec.ts` asserts the behaviour.
 - Specs that assert this contract assert both halves — the message *and* the
   preserved fields — so a future refactor cannot drop the copied fields
   silently.

@@ -41,7 +41,7 @@ each one is a defined term with a field named after it.
   protocol qualifies messages, responses, errors and subscriptions; it does not
   name a layer.
 - **`Driver.ddp` becomes `private readonly socket: Socket`.** It holds a
-  `Socket`, which is now a defined domain term. Private because nothing in the
+  `Socket`, which is a defined domain term. Private because nothing in the
   consuming app's production code needs it: the Driver already forwards every
   member that app reaches for — `connected`, `checkAndReopen`, `reopenNow`,
   `probe`, `lastPing`, `pingInterval`, `config` and `waitForNotifyUserMediaSubs`.
