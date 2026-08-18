@@ -107,11 +107,12 @@ The server's answer decides; silence keeps the instruction.
 - `unsubscribe` already keeps its entry on the same class of rejection, so a
   forced reconnect that abandons an `unsub` and a `sub` together leaves both, and
   `subscribeAll` re-sends the `sub` at the next Login under an id whose `unsub`
-  never got an answer.
+  never got an answer. This ADR makes that pairing, the case ADR-0005
+  serialises, more frequent.
 - Under ADR-0004 `subscribe` forgets an entry whose resubscribe the server
   refuses, so an entry a successful `sub` wrote does not survive a later
   refusal.
-- A third rejection carries an id: the Deadline ADR-0003 gives the DDP
+- A Deadline that expires also carries an id: the one ADR-0003 gives the DDP
   response, which ends the wait when the connection stays up and the server
   never answers. It falls on the same side of the line as an abandoned one — the
   DDP message was written to the transport and no answer came — so a `sub` that

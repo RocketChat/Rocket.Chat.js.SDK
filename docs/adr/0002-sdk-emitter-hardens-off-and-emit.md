@@ -60,8 +60,8 @@ case. A consuming app also adds its own listeners to the same emitter through
   listener that the app gave it.
 - Every rejection reaches its listener, including the ones `emit` stepped over.
   An immediate reconnect rejects each send in flight, not approximately one half
-  of them. For this reason the value
-  of those rejections must be a true Error. Refer to ADR-0003.
+  of them. For this reason the value of those rejections must be a true Error.
+  Refer to ADR-0003.
 - Read this ADR again if a person replaces or upgrades `tiny-events`. Both
   replacements exist only because of the behaviour of that package. A different
   package without that behaviour makes both replacements dead weight.

@@ -124,33 +124,36 @@ an Error that the SDK writes.
   alive. `probe` takes its bound as an argument, so a caller that wants a
   different one passes it, and no option is needed to reach it.
 - `close` joins `probe` as a Deadline no option moves, and holds the same 2000ms
-  bound. Unlike `probe` it does not take that bound as an argument: no caller
-  reaches `close` through a signature that accepts one, and `close` settles either
-  way, so there is no answer for a caller to vary its patience on. The bound is a
-  module constant the two share. The socket it waits on may be one the transport
-  never called open at all — a still-connecting socket is closed and waited on the
-  same way, and letting it go settles that open as an Abandoned wait rather than
+  bound. The bound is a module constant the two share. Unlike `probe` it does not
+  take that bound as an argument: no caller reaches `close` through a signature
+  that accepts one, and `close` settles either way, so there is no answer for a
+  caller to vary its patience on.
+- The bound answers the liveness question `probe` asks, not the patience question
+  `timeout` asks. The socket `close` waits on may be one the transport never
+  called open at all — a still-connecting socket is closed and waited on the same
+  way, and letting it go settles that open as an Abandoned wait rather than
   leaving it pending — and a stale ping cannot vouch for any of them, so the close
-  may never be answered. That is the liveness question `probe` asks, not the
-  patience question `timeout` asks, and binding a logout's exit to `timeout` would
-  make the app that raised it slowest to leave. On the Deadline the Socket becomes
-  a Detached socket rather than one the driver keeps waiting on: a socket the peer
-  never releases costs less than a caller — a logout, a teardown, a Reopen — that
-  never returns. This Deadline settles the wait rather than rejecting it, because
-  `close` promises only that the driver has let the connection go, which is true
-  either way. When the transport neither answers nor accepts the close, the driver
-  answers itself by feeding a close event with the user-disconnect code through
-  `onClose`, rather than emitting `close` directly. `onClose` therefore stays the
-  sole owner of the identity guard, the emit, the Reopen decision — code 4000
-  skips the Reopen — and the log line, and an in-flight `send` learns its
-  connection ended on the same event the transport would have used. `close` does
-  not unsubscribe. Closing the connection ends every stream on the server, so
-  `close` forgets its DDP subscriptions locally and sends no `unsub`. `logout` is
-  the deliberate exception: it stays on the same connection, so it awaits its own
-  `unsubscribeAll`. The reject of a not-yet-open Socket is held per Socket, because
-  a detach can run on an old Socket while a newer open is still pending, and a
-  single field would settle the wrong wait. It is settled on a microtask, so a
-  handshake rejection already in flight settles that wait first.
+  may never be answered. Binding a logout's exit to `timeout` would make the app
+  that raised it slowest to leave.
+- On the Deadline the Socket becomes a Detached socket rather than one the driver
+  keeps waiting on: a socket the peer never releases costs less than a caller — a
+  logout, a teardown, a Reopen — that never returns. This Deadline settles the
+  wait rather than rejecting it, because `close` promises only that the driver has
+  let the connection go, which is true either way.
+- When the transport neither answers nor accepts the close, the driver answers
+  itself by feeding a close event with the user-disconnect code through `onClose`,
+  rather than emitting `close` directly. `onClose` therefore stays the sole owner
+  of the identity guard, the emit, the Reopen decision — code 4000 skips the
+  Reopen — and the log line, and an in-flight `send` learns its connection ended
+  on the same event the transport would have used.
+- `close` does not unsubscribe. Closing the connection ends every stream on the
+  server, so `close` forgets its DDP subscriptions locally and sends no `unsub`.
+  `logout` is the deliberate exception: it stays on the same connection, so it
+  awaits its own `unsubscribeAll`.
+- The reject of a not-yet-open Socket is held per Socket, because a detach can run
+  on an old Socket while a newer open is still pending, and a single field would
+  settle the wrong wait. It is settled on a microtask, so a handshake rejection
+  already in flight settles that wait first.
 
 ## Consequences
 
@@ -162,8 +165,7 @@ an Error that the SDK writes.
   Error to reach.
 - The Deadline of `ping` is `config.ping`, so a consuming app that lowers that
   option for the Liveness chain also lowers the bound on the wait for the
-  `pong`. The documentation of the option
-  says this at `interfaces/index.ts`.
+  `pong`. The documentation of the option says this at `interfaces/index.ts`.
 - The connection ending is still what ends a wait first; the Deadline answers the
   one case no connection event reaches, where the connection stays up and the
   server simply never answers. `alive()` is refreshed by any readable frame, so a
@@ -176,9 +178,9 @@ an Error that the SDK writes.
   nothing rebuilds it on account of one unanswered call. Deciding that a
   connection is dead stays with the Liveness chain, which is the only thing that
   asks the question. The Deadline ends a wait; it does not diagnose a connection.
-  It carries the id, and a `sub` that expires keeps its entry, under ADR-0006.
-  Its type is unexported and sets no `name`, so a caller sees an ordinary Error
-  and the message above.
+  It carries the id, and what that leaves behind in the subscription map is
+  settled by ADR-0006. Its type is unexported and sets no `name`, so a caller
+  sees an ordinary Error and the message above.
 - The Deadline covers each send that waits for a DDP response, the handshake
   included — an `open()` against a server that accepts the socket and never answers
   the handshake rejects rather than hanging. The rejection is the whole answer for
@@ -192,11 +194,10 @@ an Error that the SDK writes.
   abandoned wait therefore carries its own Error type, and both places Reopen on
   every rejection except that one: a connection that went away has already been
   answered, by `onClose` or by the replacement itself, and only a failure that
-  leaves nobody rebuilding it asks for a Reopen. The type is unexported and sets
-  no `name`, so a caller that receives one — the rejection does reach callers,
-  through `open()` — sees an ordinary Error and the message above. It adds no
-  public surface because nothing about it is observable, not because it stays
-  inside the driver.
+  leaves nobody rebuilding it asks for a Reopen. Its type is unexported and sets
+  no `name` on the same terms as the expired one above, and the rejection does
+  reach callers, through `open()`. It adds no public surface because nothing about
+  it is observable, not because it stays inside the driver.
 - The handshake is the one send with no caller of its own, and `createConnection`
   waits on it through `onOpen`. Ending its wait therefore has to settle that wait
   too — `onOpen` rejects the connection it was opening, rather than trading a
