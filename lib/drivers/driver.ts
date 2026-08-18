@@ -66,7 +66,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
       throw err
     }
     this.logger.info('[driver] Connected')
-    return this as IDriver
+    return this
   }
 
   get connected (): boolean {
