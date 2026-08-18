@@ -69,9 +69,10 @@ The server's answer decides; silence keeps the instruction.
   written, where it throws a bare `AbandonedWait`, and after, from the listeners
   on `disconnected`, `connecting` and `close`, where it rejects with an
   `AbandonedRequest`. A forced reconnect is the common case, and it installs the
-  replacement connection, so the entry is written. A close is the same loss and
-  keeps nothing: it drops the connection and forgets every entry as it goes, so
-  the guard above finds no connection to instruct. ADR-0009 settles that path.
+  replacement connection, so the entry is written. `Socket.close()` is the same
+  loss and keeps nothing: it drops the Transport and forgets every entry as it
+  goes, so the guard above finds no connection to instruct. ADR-0009 settles that
+  path.
 - The rejection carries the id `send` minted for the wait. `send` mints it inside
   its promise executor, after the wait on `open`, so no caller can compute it in
   advance without racing another send for the same number. It names the request
@@ -101,8 +102,8 @@ The server's answer decides; silence keeps the instruction.
   and the entry becomes real. This is the phantom the question weighed, and it
   costs one redundant `sub` frame at the next Login.
 - `unsubscribeAll` acts on these entries and sends `unsub` frames for them, on
-  the terms ADR-0004 sets. A close forgets them all and sends nothing, under
-  ADR-0009.
+  the terms ADR-0004 sets. `Socket.close()` forgets them all and sends nothing,
+  under ADR-0009.
 - `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
   polls `subscriptions` for the two media entries, and an entry written on an
   abandoned `sub` ends that poll instead of keeping it waiting. Readiness itself
