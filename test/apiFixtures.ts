@@ -1,5 +1,5 @@
 import Api from '../lib/api/api'
-import ClientRest from '../lib/api/RocketChat'
+import ApiRocketChat from '../lib/api/RocketChat'
 import { ILogger } from '../interfaces'
 import { FakeClient } from './fakeClient'
 import { loginResponse } from './loginResponse'
@@ -16,9 +16,9 @@ export const anonymousApiWithFakeClient = () => {
   return { api: new Api({ client: restClient }), restClient }
 }
 
-export const anonymousClientRestWithFakeClient = () => {
+export const anonymousApiRocketChatWithFakeClient = () => {
   const restClient = new FakeClient()
-  return { api: new ClientRest({ client: restClient }), restClient }
+  return { api: new ApiRocketChat({ client: restClient }), restClient }
 }
 
 export const loggedInApiWithFakeClient = async (logger?: ILogger) => {

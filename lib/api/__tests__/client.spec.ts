@@ -3,7 +3,7 @@ import Api, { IClient } from '../api'
 import { loggedInApiWithStubbedFetch } from '../../../test/apiFixtures'
 import { answerFetchWith, answerFetchWithUnparsableBody, installFreshFetchMock, lastFetchCall } from '../../../test/stubbedFetch'
 
-describe('api client', () => {
+describe('REST client', () => {
   let api: Api
   let restClient: IClient
 

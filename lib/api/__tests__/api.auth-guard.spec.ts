@@ -1,5 +1,5 @@
 import { loginResponse } from '../../../test/loginResponse'
-import { anonymousApiWithFakeClient, anonymousClientRestWithFakeClient } from '../../../test/apiFixtures'
+import { anonymousApiWithFakeClient, anonymousApiRocketChatWithFakeClient } from '../../../test/apiFixtures'
 
 const infoResponse = () => ({ status: 200, data: { info: { version: '6.0.0' } } })
 
@@ -37,7 +37,7 @@ describe('Api auth guard', () => {
   })
 
   it('allows info() with no login', async () => {
-    const { api, restClient } = anonymousClientRestWithFakeClient()
+    const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
     const pending = api.info()
     restClient.lastRequest().resolve(infoResponse())
@@ -46,7 +46,7 @@ describe('Api auth guard', () => {
   })
 
   it('sends info() authenticated once logged in', async () => {
-    const { api, restClient } = anonymousClientRestWithFakeClient()
+    const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
     const login = api.login({ username: 'user', password: 'pass' })
     restClient.lastRequest().resolve(loginResponse())

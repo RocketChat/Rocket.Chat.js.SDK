@@ -313,6 +313,7 @@ export default class Api extends SDKEventEmitter {
     this.userId = login.userId
     this.currentLogin = login
     this.client.headers = {
+      ...this.client.headers,
       [authTokenHeader]: login.authToken,
       [userIdHeader]: login.userId
     }
