@@ -318,6 +318,59 @@ describe('Socket liveness', () => {
       expect(fakeSockets).toHaveLength(2)
     })
 
+    it('keeps the chain armed when a scheduled reopen finds the socket alive again', async () => {
+      await tickWithPong()
+
+      // The withheld pong expires the ping's deadline and schedules the reopen.
+      await tickWithoutPong()
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
+      expect(socket.openTimeout).toBeDefined()
+
+      // An unrelated frame lands inside the aliveness window before the reopen
+      // delay elapses, so the stamp moves and the socket reads as connected.
+      await jest.advanceTimersByTimeAsync(socket.config.reopen - PING_INTERVAL)
+      transport.receive({ msg: 'updated', methods: ['1'] })
+      expect(socket.connected).toBe(true)
+
+      // The reopen fires, finds the socket connected and builds nothing.
+      await jest.advanceTimersToNextTimerAsync()
+      expect(fakeSockets).toHaveLength(1)
+      expect(socket.openTimeout).toBeUndefined()
+
+      // The chain must still be running on the socket that was kept: one timer
+      // pending, and it is a ping that reaches the transport.
+      expect(jest.getTimerCount()).toBe(1)
+
+      const pingsBefore = transport.sent.length
+      await tickWithPong()
+
+      expect(transport.sent.length).toBe(pingsBefore + 1)
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+      expect(socket.connected).toBe(true)
+    })
+
+    it('ends a send left pending when a scheduled reopen finds the socket alive again', async () => {
+      const pending = socket.send({ msg: 'method', method: 'anything' })
+      const settled = jest.fn()
+      pending.then(settled, settled)
+
+      await tickWithoutPong()
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
+
+      await jest.advanceTimersByTimeAsync(socket.config.reopen - PING_INTERVAL)
+      transport.receive({ msg: 'updated', methods: ['1'] })
+      await jest.advanceTimersToNextTimerAsync()
+
+      // Nothing has answered the method, and the server stays quiet from here.
+      expect(settled).not.toHaveBeenCalled()
+
+      // The re-armed chain reaches a reopen that actually replaces the
+      // connection, and that is what ends the wait.
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + socket.config.reopen)
+
+      await expect(pending).rejects.toThrow()
+    })
+
     it('clears both the ping and the reopen timer on close', async () => {
       // A close the driver did not ask for schedules a reopen, so both of the
       // socket's timers are pending at once.

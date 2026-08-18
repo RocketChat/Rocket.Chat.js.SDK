@@ -365,6 +365,12 @@ export class Socket extends SDKEventEmitter {
     this.openTimeout = setTimeout(async() => {
       delete this.openTimeout
 
+      // The failed ping that scheduled this reopen stopped the Liveness chain,
+      // and a socket that reads as connected again is one `open` would decline
+      // to replace. Re-arming here is the only thing left to end a send still
+      // waiting on this connection.
+      if (this.connected) return this.ping()
+
       try {
         await this.open()
       } catch (err) {
