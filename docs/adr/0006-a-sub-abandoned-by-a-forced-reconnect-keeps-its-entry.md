@@ -70,9 +70,8 @@ The server's answer decides; silence keeps the instruction.
   on `disconnected`, `connecting` and `close`, where it rejects with an
   `AbandonedRequest`. A forced reconnect is the common case, and it installs the
   replacement connection, so the entry is written. `Socket.close()` is the same
-  loss and keeps nothing: it drops the Transport and forgets every entry as it
-  goes, so the guard above finds no connection to instruct. ADR-0009 settles that
-  path.
+  loss and keeps nothing: it drops the Transport, so the guard above finds no
+  connection to instruct. ADR-0009 settles that path.
 - The rejection carries the id `send` minted for the wait. `send` mints it inside
   its promise executor, after the wait on `open`, so no caller can compute it in
   advance without racing another send for the same number. It names the request
