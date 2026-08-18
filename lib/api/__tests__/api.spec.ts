@@ -44,7 +44,7 @@ describe('api', () => {
 
       expect(api.userId).toBe('')
       expect(api.username).toBeNull()
-      expect(restClient.lastRequest().url).toBe('logout')
+      expect(restClient.lastRequest().endpoint).toBe('logout')
     })
 
     it('removes the auth headers and leaves the others in place', async () => {
@@ -115,10 +115,19 @@ describe('api', () => {
     it('carries the abort signal on every request', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
 
-      await api.get('me', {})
+      await api.get('a', {})
+      await api.post('b', {})
+      await api.put('c', {})
+      await api.del('d', {})
 
-      expect(restClient.lastRequest().options.signal).toBe(api.controller.signal)
+      for (const request of restClient.requests) {
+        expect(request.options.signal).toBe(api.controller.signal)
+      }
+      expect(restClient.requests).toHaveLength(4)
     })
 
     it('answers with the body of the result', async () => {

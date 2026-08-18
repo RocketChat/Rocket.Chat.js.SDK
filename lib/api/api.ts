@@ -79,10 +79,10 @@ import * as settings from '../settings';
 
 export interface IClient {
   headers: any
-  get (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  post (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  put (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
-  delete (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  get (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  post (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  put (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any>
+  delete (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any>
 }
 
 class Client implements IClient {
@@ -121,23 +121,23 @@ class Client implements IClient {
     return options && options.signal;
   }
 
-  get (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}?${this.getParams(data)}`, {
+  get (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}?${this.getParams(data)}`, {
       method: 'GET',
       headers: this.getHeaders(options),
       signal: this.getSignal(options)
     }).then(this.handle)
   }
-  post (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
+  post (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
       method: 'POST',
       body: this.getBody(data),
       headers: this.getHeaders(options),
       signal: this.getSignal(options)
     }).then(this.handle)
   }
-  put (url: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
+  put (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
       method: 'PUT',
       body: this.getBody(data),
       headers: this.getHeaders(options),
@@ -145,8 +145,8 @@ class Client implements IClient {
     }).then(this.handle)
   }
 
-  delete (url: string, data?: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(url)}`, {
+  delete (endpoint: string, data?: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
       method: 'DELETE',
       body: this.getBody(data),
       headers: this.getHeaders(options),
