@@ -55,8 +55,7 @@ each one is a defined term with a field named after it.
   No `IClient` until something needs to type against one.
 - **`ISocket` keeps its name.** A Driver presenting the same realtime surface by
   delegation is ordinary delegation, not a reason to rename the interface.
-- **No deprecation alias.** The renames land alongside the consuming app's
-  update rather than ahead of it.
+- **No deprecation alias.**
 - **Transport is named.** The raw websocket a Socket owns gets a term of its own,
   so the layer below the Socket can be discussed without borrowing the word
   above it.
@@ -74,7 +73,6 @@ and an `/** @internal */` tag alone, which enforces nothing.
   and `driver.ddp.open()` / `.subscriptions` / `.lastPing` / `.send()` in its
   integration tests. That app types this SDK through a loose module declaration,
   so a rename does not fail at compile time; it fails at runtime as `undefined`.
-  Both repos move together.
 - The app's integration tests move to bracket access for the Socket, so the
   rename touches one more file there than the field count suggests.
 - `connection` stays the Socket's field name for the Transport it owns. The
