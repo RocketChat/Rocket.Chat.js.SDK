@@ -84,5 +84,9 @@ and an `/** @internal */` tag alone, which enforces nothing.
   `@rocket.chat/sdk/clients/Rocketchat`. Nothing in this repo or in
   Rocket.Chat.ReactNative uses it, and it carried no default export, so the
   root import is unaffected.
+- The documentation is ahead of the code: CONTEXT.md reserves `ddp` as a
+  qualifier on wire vocabulary, while `Driver.ddp`, `RocketChatClient.ddp` and
+  the `implements ISocket` on both classes are all still in the tree. Issue #338
+  tracks the renames.
 - The three renames land together in a single SDK PR so the vocabulary arrives in
   one piece, and the app's pin moves in its own PR.

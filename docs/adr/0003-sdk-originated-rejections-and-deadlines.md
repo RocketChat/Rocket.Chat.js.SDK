@@ -161,8 +161,8 @@ an Error that the SDK writes.
   settle, so code that handles only the success path gets rejections it has never
   seen.
 - What a caller gets from an immediate reconnect is an Error, not `undefined`.
-  Callers read `err.message` in their `catch` blocks, and that read needs an
-  Error to reach.
+  Callers read `err.message` in their `catch` blocks, and that read only works
+  when what is thrown is an Error.
 - The Deadline of `ping` is `config.ping`, so a consuming app that lowers that
   option for the Liveness chain also lowers the bound on the wait for the
   `pong`. The documentation of the option says this at `interfaces/index.ts`.
