@@ -2,7 +2,7 @@ import { logger as Logger } from '../log'
 
 import {
 	ILogger,
-	ILoginResultAPI,
+	IRestLogin,
 	IAPIRequest,
 	IMessage,
 	ICredentials
@@ -78,6 +78,7 @@ import * as settings from '../settings';
 // }
 
 export interface IClient {
+  host: string
   headers: any
   get (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
   post (url: string, data: any, options?: any, apiVersion?: string): Promise<any>
@@ -193,12 +194,7 @@ export default class Api extends SDKEventEmitter {
   userId: string = ''
   logger: ILogger
   client: IClient
-  currentLogin: {
-    username: string,
-    userId: string,
-    authToken: string,
-    result: ILoginResultAPI
-  } | null = null
+  currentLogin: IRestLogin | null = null
   controller: AbortController
 
   constructor ({ client, host, logger = Logger }: IApiOptions) {
@@ -213,11 +209,10 @@ export default class Api extends SDKEventEmitter {
   }
 
   loggedIn () {
-    return Object.keys(this.currentLogin || {} as any).every((e: any) => e)
+    return this.currentLogin !== null
   }
 /**
 	* Do a request to an API endpoint.
-	* If it needs a token, login first (with defaults) to set auth headers.
 	* @param method   Request method GET | POST | PUT | DEL
 	* @param endpoint The API endpoint (including version) e.g. `chat.update`
 	* @param data     Payload for POST request to endpoint
@@ -236,7 +231,7 @@ export default class Api extends SDKEventEmitter {
     this.logger?.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
       if (auth && !this.loggedIn()) {
-        throw new Error('')
+        throw new Error(`API ${ method } ${ endpoint } requires a login`)
       }
 
       const { signal } = this.controller;
@@ -289,27 +284,50 @@ export default class Api extends SDKEventEmitter {
   }
 
   async login (credentials: ICredentials, args?: any): Promise<any> {
-    const { data } = await this.post('login', { ...credentials, ...args })
-    this.userId = data.userId
-    this.currentLogin = {
+    const { data } = await this.post('login', { ...credentials, ...args }, false)
+    this.setLogin({
       username: data.me.username,
       userId: data.userId,
       authToken: data.authToken,
       result: data
-    }
-    this.client.headers = {
-      'X-Auth-Token': data.authToken,
-      'X-User-Id': data.userId
-    }
+    })
     return data
   }
+
+  resumeLogin ({ userId, authToken }: Pick<IRestLogin, 'userId' | 'authToken'>) {
+    const previous = this.currentLogin?.userId === userId ? this.currentLogin : null
+    if (previous?.authToken === authToken) {
+      return
+    }
+    this.setLogin({
+      username: previous ? previous.username : null,
+      userId,
+      authToken,
+      result: null
+    })
+  }
+
+  private setLogin (login: IRestLogin) {
+    this.userId = login.userId
+    this.currentLogin = login
+    this.client.headers = {
+      'X-Auth-Token': login.authToken,
+      'X-User-Id': login.userId
+    }
+  }
+
+  private clearLogin () {
+    this.userId = ''
+    this.currentLogin = null
+    this.client.headers = {}
+  }
+
   async logout () {
     if (!this.currentLogin) {
       return null
     }
     const result = await this.post('logout', {}, true)
-    this.userId = ''
-    this.currentLogin = null
+    this.clearLogin()
     return result
   }
 /**

@@ -12,8 +12,10 @@ export interface ILogger {
  * @param host        Host URL:PORT, converted to websocket protocol
  * @param useSsl      Use SSL (https/wss) to connect
  * @param timeout     How long to wait (ms) before abandoning connection, and
- *                    the value several other deadlines are derived from — each
- *                    is documented where it is used
+ *                    also how long any send that waits for a DDP response waits
+ *                    for it once the message is written. The value several other
+ *                    deadlines are derived from — each is documented where it
+ *                    is used
  * @param reopen      ms interval before attempting reopens on disconnect. Twice
  *                    this is also how long a send waits for the connection to
  *                    open before it is rejected, so the deadline outlasts the
@@ -148,6 +150,22 @@ export interface ILoginResultAPI {
     authToken: string
     userId: string
   }
+}
+
+/**
+ * The REST side's record of who is logged in.
+ * A credential login knows the username and keeps the server's result; a login
+ * resumed from a token knows neither.
+ * @param username   Username of the logged-in user, null when resumed from a token
+ * @param userId     ID of the logged-in user
+ * @param authToken  Token the REST auth headers carry
+ * @param result     The login response, null when resumed from a token
+ */
+export interface IRestLogin {
+  username: string | null
+  userId: string
+  authToken: string
+  result: ILoginResultAPI | null
 }
 
 /** Error-first callback param type */
