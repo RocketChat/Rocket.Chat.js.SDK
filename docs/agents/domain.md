@@ -46,9 +46,9 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 
 ## ADRs are rewritten in place
 
-An ADR always reads as the current decision. When a decision evolves, rewrite the ADR itself — no amendment or changelog sections. Git history is the amendment log.
+An ADR always reads as the current decision. When a decision evolves, rewrite the ADR itself — no amendment or changelog sections. The PR that changed it is the record of why; a PR that rewrites ADRs names them in `## Proposed changes`.
 
-The one exception is a reversal. When a decision is reversed, don't rewrite the old ADR: write a new one that supersedes it, and flip the old ADR's status line to `**Status:** Superseded by ADR-NNNN` (zero-padded, matching the ADR titles). Nothing else in the old file changes.
+The one exception is a reversal. When a decision is reversed, don't rewrite the old ADR: write a new one that supersedes it, and flip the old ADR's status line to `**Status:** Superseded by ADR-NNNN` (zero-padded, matching the ADR titles). Nothing else in the old file changes. The new ADR and the status flip land in the same PR as the change that prompted them.
 
 A rewrite is a reversal when its new text makes false a claim that another in-force ADR states. Anything else is an evolution, however much of the file changes.
 
@@ -56,7 +56,7 @@ Don't confuse this with the `**Succeeds:** ADR-NNNN` line some ADRs carry. `Succ
 
 ### Before rewriting, find who cites you
 
-Grep `docs/adr/` for the ADR's own number before you rewrite it. Every ADR that cites it is in scope of the same change: re-read each one against the new text, and rewrite the ones the change made stale in the same commit. This is also how you answer the reversal question above — if a citing ADR's claim is now false, you owe a new ADR rather than a rewrite.
+Grep `docs/adr/` for the ADR's own number before you rewrite it. Every ADR that cites it is in scope of the same change: re-read each one against the new text, and rewrite the ones the change made stale in the same PR. This is also how you answer the reversal question above — if a citing ADR's claim is now false, you owe a new ADR rather than a rewrite.
 
 ```
 grep -rn "ADR-0003" docs/adr/
@@ -68,7 +68,7 @@ grep -rn "ADR-0003" docs/adr/
 
 ### Decisions, not rollouts
 
-An ADR records the decision and what it costs. Sequencing — which PR lands first, what pins move when — is state, and stale state inside a document that reads as current is the fault this convention exists to prevent. Rollout plans live in the issue or the PR. If the sequencing is itself decided, one sentence in Consequences carries it.
+An ADR records the decision and what it costs. Sequencing — which PR lands first, what pins move when — is state, and stale state inside a document that reads as current is the fault this convention exists to prevent. Rollout plans and open questions live in the issue or the PR. If the sequencing is itself decided, one sentence in Consequences carries it.
 
 ## Flag ADR conflicts
 
