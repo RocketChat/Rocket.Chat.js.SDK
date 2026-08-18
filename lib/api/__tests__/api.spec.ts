@@ -103,13 +103,21 @@ describe('api', () => {
       expect(restClient.lastRequest().data).toEqual({ msg: 'edited' })
     })
 
-    it('passes the api version through to the restClient', async () => {
+    it('passes the api version through to the restClient on every method', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
 
-      await api.get('rooms.info', {}, true, undefined, {}, 'v2')
+      await api.get('a', {}, true, undefined, {}, 'v2')
+      await api.post('b', {}, true, undefined, {}, 'v2')
+      await api.put('c', {}, true, undefined, {}, 'v2')
+      await api.del('d', {}, true, undefined, {}, 'v2')
 
-      expect(restClient.lastRequest().apiVersion).toBe('v2')
+      expect(restClient.requests.map((request) => request.apiVersion)).toEqual([
+        'v2', 'v2', 'v2', 'v2'
+      ])
     })
 
     it('carries the abort signal on every request', async () => {

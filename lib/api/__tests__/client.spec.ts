@@ -13,7 +13,7 @@ describe('api client', () => {
     ({ api, restClient } = await loggedInApiWithStubbedFetch('http://localhost:3000'))
   })
 
-  describe('url', () => {
+  describe('request url', () => {
     it('addresses the host, api version and endpoint', async () => {
       const { api: apiOnAnotherHost } = await loggedInApiWithStubbedFetch('https://chat.example.com')
 
