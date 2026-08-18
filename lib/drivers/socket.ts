@@ -311,7 +311,7 @@ export class Socket extends SDKEventEmitter {
     })
 
   /**
-   * Disconnect the DDP from server and forget every subscription locally.
+   * Close the Transport and forget every DDP subscription locally.
    * See ADR-0009.
    */
   close = async (): Promise<void> => {
