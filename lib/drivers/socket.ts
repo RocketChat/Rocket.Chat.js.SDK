@@ -599,13 +599,18 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
+  private reopenAndKeepPinging = (err: unknown) => {
+    this.reopenUnlessAbandoned(err)
+    if (this.connection) this.ping()
+  }
+
   /** Send ping, record time, re-open if nothing comes back, repeat */
   ping = async () => {
     if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.ping())
-        .catch(this.reopenUnlessAbandoned)
+        .catch(this.reopenAndKeepPinging)
     }, this.config.ping)
   }
 
