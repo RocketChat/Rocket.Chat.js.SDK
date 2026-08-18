@@ -311,10 +311,7 @@ export class Socket extends SDKEventEmitter {
     })
 
   /**
-   * Disconnect the DDP from server and forget every subscription locally: the
-   * close ends them on the server, so no `unsub` is sent. A reopen during the
-   * wait that installed a different connection over this one supersedes the
-   * close: that socket and the subscriptions it filled are left as they are.
+   * Disconnect the DDP from server and forget every subscription locally.
    * See ADR-0009.
    */
   close = async (): Promise<void> => {
