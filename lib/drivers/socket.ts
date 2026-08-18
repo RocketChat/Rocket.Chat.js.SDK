@@ -576,10 +576,10 @@ export class Socket extends SDKEventEmitter {
         }
       }))
 
-      let deadlineTimer: any
+      let deadlineTimer: NodeJS.Timer | number | undefined
 
       const removeListeners = () => {
-        clearTimeout(deadlineTimer)
+        clearTimeout(deadlineTimer as any)
         this.off(listener, onResponse)
         abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
       }
