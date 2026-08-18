@@ -48,8 +48,11 @@ entry is written on the same terms.
   `Error` and is therefore not a `DDPError`.
 - `subscribe` writes its entry when the server has answered. It is the only
   writer, and it writes on the `ready` DDP response, under the id the server
-  confirmed. A `sub` the server refuses, and a `sub` whose response never
-  arrives, leave nothing behind.
+  confirmed. A `sub` the server refuses leaves nothing behind, and a `sub` sent
+  under an existing id that the server refuses forgets that entry: the server has
+  answered, and nothing is streaming, so there is no stream for a later Login to
+  re-establish. A `sub` whose response never arrives is settled by ADR-0006,
+  which keeps the entry because the server may still be streaming.
 - `unsubscribe` forgets its DDP subscription on a DDP response, whether that
   response succeeded or carried a DDP error. It keeps its DDP subscription on
   any other rejection. It re-throws in both cases. The rejection a caller
@@ -84,20 +87,14 @@ entry is written on the same terms.
   compiles this SDK from TypeScript source with its own toolchain, and a
   toolchain that downlevels classes breaks `instanceof` for a subclass of `Error`
   without it.
-- The rule now governs the writing of an entry as well as its removal, but only
-  the write itself. `subscribe` still swallows its own failure and resolves
-  `undefined` rather than re-throwing, and `subscribeAll` re-sends every entry
-  under its own id without removing one the server now refuses. An entry that a
-  successful `sub` wrote therefore survives a later refusal, and `subscribeAll`
-  re-requests it at every Login. A separate issue tracks it.
+- The rule now governs the writing of an entry as well as its removal, so a
+  refused resubscribe is no longer re-requested at every Login. `subscribe`
+  still swallows its own failure and resolves `undefined` rather than
+  re-throwing. A separate issue tracks that.
 - Whether a `sub` may be sent for an id whose `unsub` is still in flight is not
   settled here, and the behaviour of the server in that case is not known. A
   separate issue tracks the question.
 - Applying the rule to the write reopens, on the `sub` path, the case the Context
   describes for `unsubscribe`. A Reopen rejects a `sub` that is still in flight,
-  under ADR-0003, while the server may already be streaming. `subscribe`
-  swallows that rejection and writes nothing, so the SDK holds no name for a
-  stream that exists and `subscribeAll` cannot restore it at the next Login. The
-  Socket accepts that in exchange for never holding an entry the server never
-  confirmed. Which side to prefer when a `sub` response is abandoned rather than
-  refused is not settled here. A separate issue tracks the question.
+  under ADR-0003, while the server may already be streaming. Which side to prefer
+  when a `sub` response is abandoned rather than refused is settled by ADR-0006.

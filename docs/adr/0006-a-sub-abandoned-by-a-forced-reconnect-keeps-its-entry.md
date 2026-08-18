@@ -110,6 +110,6 @@ The server's answer decides; silence keeps the instruction.
   class of rejection, so a forced reconnect that abandons an `unsub` and a `sub`
   together now leaves both, and `subscribeAll` re-sends the `sub` at the next
   Login under an id whose `unsub` never got an answer.
-- The consequence ADR-0004 records about `subscribe` never removing a stale
-  entry is also untouched. `subscribe` remains a pure writer, so an entry that a
-  successful `sub` wrote survives a later refusal.
+- `subscribe` is no longer a pure writer. Under ADR-0004 it forgets an entry
+  whose resubscribe the server refuses, so an entry a successful `sub` wrote does
+  not survive a later refusal.
