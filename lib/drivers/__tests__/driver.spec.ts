@@ -463,21 +463,19 @@ describe('Driver.connect', () => {
 
   it('accumulates nothing on the driver when connects fail', async () => {
     const driver = createDriver()
+    const failedAttempts = 3
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const connecting = driver.connect()
+    for (let attempt = 0; attempt < failedAttempts; attempt++) {
+      const failing = driver.connect()
       fakeSockets[attempt].onerror?.(new Error('no route to host'))
-      await expect(connecting).rejects.toThrow('no route to host')
+      await expect(failing).rejects.toThrow('no route to host')
     }
 
-    // Failed connects leave nothing behind that a later open could fire: the
-    // echo is registered once at construction, so one open is still one
-    // `connected` however many attempts failed first.
     const connectedSeen = jest.fn()
     driver.on('connected', connectedSeen)
 
     const connecting = driver.connect()
-    await driveToHandshake(fakeSockets[3])
+    await driveToHandshake(fakeSockets[failedAttempts])
     await connecting
 
     expect(connectedSeen).toHaveBeenCalledTimes(1)

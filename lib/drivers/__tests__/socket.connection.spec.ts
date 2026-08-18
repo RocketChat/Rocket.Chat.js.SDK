@@ -163,17 +163,19 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('rejects the replaced open as an abandoned wait rather than leaving it pending', async () => {
-      const replaced = new Socket({ host: 'localhost:3000', logger, ping: 10 * 60 * 1000 })
+      const replaced = createSocket(logger)
       const abandoned = replaced.open()
-      const connecting = fakeSockets[1]
-      connecting.readyState = CONNECTING
 
       const opening = replaced.reopenNow()
 
       await expect(abandoned).rejects.toThrow('[ddp] connection closed before it opened')
+      expect(replaced.openTimeout).toBeUndefined()
 
       await driveToHandshake(fakeSockets[2])
       await opening
+
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      expect(fakeSockets).toHaveLength(3)
     })
   })
 
