@@ -28,9 +28,9 @@ The driver bounds the close, and answers it itself when the transport does not.
   accepts one, and `close` settles either way, so there is no answer for a caller
   to vary its patience on.
 - The close is bounded on the liveness question rather than the patience one for a
-  reason of its own. The socket `close` waits on may be one the transport never
-  called open at all — a still-connecting socket is closed and waited on the same
-  way, and letting it go settles that open as an Abandoned wait rather than
+  reason of its own. The connection `close` waits on may be one that was never
+  Transport open at all — a still-connecting Transport is closed and waited on the
+  same way, and letting it go settles that open as an Abandoned wait rather than
   leaving it pending — and a stale ping cannot vouch for any of them, so the close
   may never be answered. Binding a logout's exit to `timeout` would make the app
   that raised it slowest to leave.
@@ -51,9 +51,9 @@ The driver bounds the close, and answers it itself when the transport does not.
   is superseded and the entries that connection filled are left as they are.
   `logout` is the deliberate exception: it stays on the same connection, so it
   awaits its own `unsubscribeAll`.
-- The reject of a not-yet-open Socket is held per Socket, because a detach can run
-  on an old Socket while a newer open is still pending, and a single field would
-  settle the wrong wait. It is settled on a microtask, so a handshake rejection
+- The reject of an open that has not landed yet is held per Transport, because a
+  detach can run on an old Transport while the open of the one replacing it is
+  still pending, and a single field on the Socket would settle the wrong wait. It is settled on a microtask, so a handshake rejection
   already in flight settles that wait first.
 
 ## Consequences
