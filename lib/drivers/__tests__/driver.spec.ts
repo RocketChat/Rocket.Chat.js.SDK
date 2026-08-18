@@ -471,6 +471,8 @@ describe('Driver.connect', () => {
       await expect(failing).rejects.toThrow('no route to host')
     }
 
+    expect(driver.removeAllListeners('connected')).toHaveLength(0)
+
     const connectedSeen = jest.fn()
     driver.on('connected', connectedSeen)
 
