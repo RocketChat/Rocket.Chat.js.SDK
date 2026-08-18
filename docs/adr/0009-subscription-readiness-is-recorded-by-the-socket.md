@@ -1,4 +1,4 @@
-# ADR-0009: Subscription readiness is recorded on the entry, scoped to a connection
+# ADR-0009: Subscription readiness is recorded by the Socket, scoped to a connection
 
 **Status:** Accepted
 
@@ -43,15 +43,15 @@ and the reason has to be re-established first. It is tracked as #359.
 
 Readiness is recorded state; the query is derived; the query sends nothing.
 
-- Readiness lives on the subscription entry, and the entry is the single
-  source of truth for it. `whenReady` is a thin query over the entries: it
-  resolves `true` when every stream asked for has a Confirmed sub, `false` when
-  the Deadline rings first, and never rejects. It sends no `sub` of its own.
-- Readiness is scoped to a connection by a generation the Socket mints and
-  increments in `createConnection`. The entry stores the generation it was
-  confirmed on, and is a Confirmed sub only while that generation is the
-  current one. A reopen therefore turns every entry Unconfirmed without a pass
-  over `subscriptions` — the comparison does the forgetting.
+- Readiness lives in a private set of confirmed subscription ids the Socket
+  owns, beside the entries; the entry itself stays a stream handle and the
+  public `ISubscription` carries no readiness field. `whenReady` is a thin
+  query over the entries and the set: it resolves `true` when every stream
+  asked for has a Confirmed sub, `false` when the Deadline rings first, and
+  never rejects. It sends no `sub` of its own.
+- Readiness is scoped to a connection: `createConnection` clears the set, so
+  a reopen turns every sub Unconfirmed without a pass over `subscriptions` —
+  the clear does the forgetting.
 - The 100ms poll dies with the mechanism that needed it. The re-send stays
   where it has always belonged: `subscribeAll` on Login. A reopen sends
   nothing, so on an anonymous reopened session the entries survive
@@ -82,8 +82,7 @@ Readiness is recorded state; the query is derived; the query sends nothing.
   answer costs no wire traffic once it is recorded.
 - An entry confirmed on a previous connection reads Unconfirmed the moment a
   new connection is created, however the old one ended.
-- The pinning suite keeps its assertions on `id`, `name` and `params` — they
-  match with `toMatchObject`, so the generation field breaks nothing. Tests
+- The pinning suite keeps its assertions on `id`, `name` and `params`. Tests
   that inferred readiness from a re-send going out are rewritten against the
   recorded state, and the Driver reopen test gains the Login the real app
   performs, plus a sibling pinning that a reopen without a login resolves

@@ -123,7 +123,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     expect(jest.getTimerCount()).toBe(timersBefore)
   })
 
-  it('resolves true when both media streams are confirmed on the current generation', async () => {
+  it('resolves true when both media streams are confirmed on the current connection', async () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver.ddp)
     driver.userId = userId
@@ -226,7 +226,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
       await expect(waiting).resolves.toBe(false)
     })
 
-    it('resolves true after login re-sends and the server confirms on the new generation', async () => {
+    it('resolves true after login re-sends and the server confirms on the new connection', async () => {
       const driver = createDriver()
       const transport = await openFakeConnection(driver.ddp)
       driver.userId = userId

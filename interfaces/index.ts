@@ -184,7 +184,6 @@ export interface ISubscription {
   name?: any
   unsubscribe: () => Promise<any>
   onEvent?: (callback: ISocketMessageCallback) => void
-  confirmedOnGeneration?: number
   [key: string]: any
 }
 

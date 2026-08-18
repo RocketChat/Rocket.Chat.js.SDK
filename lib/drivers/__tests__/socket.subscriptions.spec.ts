@@ -156,7 +156,7 @@ describe('Socket subscription bookkeeping', () => {
       { name: 'stream-notify-user', params: ['uid/media-calls'] }
     ]
 
-    it('resolves true once the streams are confirmed on the current generation', async () => {
+    it('resolves true once the streams are confirmed on the current connection', async () => {
       await subscribe('stream-notify-user', ['uid/media-signal'])
 
       const waiting = socket.whenReady(streams)
@@ -242,7 +242,7 @@ describe('Socket subscription bookkeeping', () => {
         await expect(waiting).resolves.toBe(false)
       })
 
-      it('followed by login re-sends via subscribeAll and confirms on the new generation', async () => {
+      it('followed by login re-sends via subscribeAll and confirms on the new connection', async () => {
         await subscribe('stream-notify-user', ['uid/media-signal'])
         await subscribe('stream-notify-user', ['uid/media-calls'])
 

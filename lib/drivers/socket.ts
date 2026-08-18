@@ -89,8 +89,8 @@ export class Socket extends SDKEventEmitter {
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
-  private connectionGeneration = 0
-  private readonly subscriptionConfirmedEvent = 'subscription:confirmed'
+  private confirmedSubscriptions = new Set<string>()
+  private readinessListeners = new Set<() => void>()
 
   /** Create a websocket handler */
   constructor (
@@ -135,7 +135,7 @@ export class Socket extends SDKEventEmitter {
         this.logger.error(err)
         return reject(err)
       }
-      this.connectionGeneration += 1
+      this.confirmedSubscriptions.clear()
       // Tear down the previous connection before replacing it.
       // Callers only reach here when the existing socket isn't healthy, so
       // detaching its handlers and closing it stops a stale or still-connecting
@@ -348,6 +348,7 @@ export class Socket extends SDKEventEmitter {
 
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
+    this.confirmedSubscriptions.delete(id)
     delete this.subscriptions[id]
   }
 
@@ -738,13 +739,16 @@ export class Socket extends SDKEventEmitter {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
-        const confirmedId = (result.subs) ? result.subs[0] : undefined
-        if (confirmedId) return this.rememberSubscription(confirmedId, name, params, callback, true)
+        const confirmedId = result.subs?.[0]
+        if (!confirmedId) return undefined
+        const subscription = this.recordSubscription(confirmedId, name, params, callback)
+        if (subscription) this.confirmSubscription(confirmedId)
+        return subscription
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
         if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
-          this.rememberSubscription(err.id, name, params, callback)
+          this.recordSubscription(err.id, name, params, callback)
         } else if (id && err instanceof DDPError) {
           this.forgetSubscription(id)
         }
@@ -759,29 +763,24 @@ export class Socket extends SDKEventEmitter {
    * locally and sends no `unsub`: closing the connection ends the streams on
    * the server.
    */
-  private rememberSubscription = (
+  private recordSubscription = (
     id: string,
     name: string,
     params: any[],
-    callback?: ISocketMessageCallback,
-    confirmed?: boolean
+    callback?: ISocketMessageCallback
   ) => {
     if (!this.connection) return
     const unsubscribe = this.unsubscribe.bind(this, id)
     const onEvent = this.onEvent.bind(this, name)
-    const existing = this.subscriptions[id]
-    const confirmedOnGeneration = confirmed
-      ? this.connectionGeneration
-      : existing?.confirmedOnGeneration === this.connectionGeneration
-        ? this.connectionGeneration
-        : undefined
-    const subscription = { id, name, params, unsubscribe, onEvent, confirmedOnGeneration }
+    const subscription = { id, name, params, unsubscribe, onEvent }
     if (callback) subscription.onEvent(callback)
     this.subscriptions[id] = subscription
-    if (confirmedOnGeneration === this.connectionGeneration) {
-      this.emit(this.subscriptionConfirmedEvent, subscription)
-    }
     return subscription
+  }
+
+  private confirmSubscription = (id: string) => {
+    this.confirmedSubscriptions.add(id)
+    this.readinessListeners.forEach((check) => check())
   }
 
   /**
@@ -801,8 +800,8 @@ export class Socket extends SDKEventEmitter {
   private findConfirmedSubscription = ({ name, params = [] }: IStream): ISubscription | undefined =>
     this.findSubscriptions({ name, params })
       .find((sub) => (
-        sub.confirmedOnGeneration === this.connectionGeneration &&
-        sub.params?.length === params.length
+        sub.params?.length === params.length &&
+        this.confirmedSubscriptions.has(sub.id as string)
       ))
 
   whenReady = (
@@ -815,7 +814,7 @@ export class Socket extends SDKEventEmitter {
         if (settled) return
         settled = true
         clearTimeout(deadline)
-        this.off(this.subscriptionConfirmedEvent, check)
+        this.readinessListeners.delete(check)
         resolve(value)
       }
       const check = () => {
@@ -824,7 +823,7 @@ export class Socket extends SDKEventEmitter {
         }
       }
       const deadline = setTimeout(() => finish(false), timeoutMs)
-      this.on(this.subscriptionConfirmedEvent, check)
+      this.readinessListeners.add(check)
       check()
     })
   }
