@@ -216,7 +216,6 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('uses exact match: a same-name prefix params entry does not count', async () => {
-      // `findSubscriptions` matches on prefix; readiness must not.
       await subscribe('stream-notify-user', ['uid/media-signal', false])
 
       const waiting = socket.whenReady(streams)

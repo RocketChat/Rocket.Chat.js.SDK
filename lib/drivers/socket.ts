@@ -798,27 +798,13 @@ export class Socket extends SDKEventEmitter {
         params.every((param, index) => sub.params?.[index] === param)
       ))
 
-  /**
-   * The DDP subscriptions on this Socket for one stream name, matched exactly on
-   * the params given: same length and element-wise `===`. Prefix matching lives
-   * in `findSubscriptions` for its existing callers and is not used here.
-   */
   private findConfirmedSubscription = ({ name, params = [] }: IStream): ISubscription | undefined =>
-    Object.keys(this.subscriptions || {})
-      .map((id) => this.subscriptions[id])
+    this.findSubscriptions({ name, params })
       .find((sub) => (
-        sub &&
-        sub.name === name &&
         sub.confirmedOnGeneration === this.connectionGeneration &&
-        sub.params?.length === params.length &&
-        params.every((param, index) => sub.params[index] === param)
+        sub.params?.length === params.length
       ))
 
-  /**
-   * Resolve when every stream asked for has a Confirmed sub on the current
-   * generation, or `false` when the Deadline rings first. Sends no `sub` of its
-   * own: it is a query over the recorded state. See ADR-0009.
-   */
   whenReady = (
     streams: IStream[],
     timeoutMs = this.config.timeout

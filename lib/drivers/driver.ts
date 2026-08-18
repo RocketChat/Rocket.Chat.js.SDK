@@ -148,13 +148,6 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, `${this.userId}/${event}`, false)))
   }
 
-  /**
-   * Resolve when the user's media-signal and media-calls streams are Confirmed
-   * subs on the current connection, or `false` when the Deadline rings first.
-   *
-   * This is a query over the Socket's recorded subscriptions; it sends no `sub`
-   * of its own. The re-send happens through `subscribeAll` on Login.
-   */
   waitForNotifyUserMediaSubs = (timeoutMs = this.ddp.config.timeout): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
