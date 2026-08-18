@@ -106,7 +106,7 @@ A single bounded liveness check on a Socket that looks open, asked for on demand
 _Avoid_: Health check, ping (that is one message of the chain)
 
 **Detached socket**:
-A Socket the Driver has dropped its reference to and unhooked every handler from, without the Transport having confirmed the close. It may still be open to the peer, and may still revive; nothing it does afterwards reaches the Driver.
+A Socket that has unhooked every handler from its Transport and dropped its reference to it, without the Transport having confirmed the close. That Transport may still be open to the peer, and may still revive; nothing it does afterwards reaches the Socket.
 _Avoid_: Orphan, zombie, abandoned socket — abandoning belongs to waits, leaked socket
 
 **Deadline**:
