@@ -723,8 +723,9 @@ export class Socket extends SDKEventEmitter {
    * Sole owner of `subscriptions`: the entry is written when the server
    * acknowledged the `sub`, or when its answer was abandoned after the frame went
    * out on a connection that is still installed. A refused `sub`, one that never
-   * reached the wire, and one whose connection is gone leave nothing behind.
-   * See ADR-0006.
+   * reached the wire, and one whose connection is gone leave nothing behind, and
+   * a resubscribe under an existing id that the server refuses forgets that
+   * entry. See ADR-0004 and ADR-0006.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -740,6 +741,8 @@ export class Socket extends SDKEventEmitter {
         // See ADR-0006.
         if (err instanceof AbandonedRequest || err instanceof ExpiredRequest) {
           this.rememberSubscription(err.id, name, params, callback)
+        } else if (id && err instanceof DDPError) {
+          this.forgetSubscription(id)
         }
         return undefined
       })
