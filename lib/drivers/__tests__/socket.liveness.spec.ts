@@ -382,15 +382,14 @@ describe('Socket liveness', () => {
 
     it('keeps pinging when the reopen it asked for finds the socket healthy again', async () => {
       // The ping goes out, its reply deadline expires, and a reopen is scheduled.
-      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2 + 1)
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
       const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
       expect(pingCount()).toBe(1)
+      expect(socket.openTimeout).toBeDefined()
 
       // Any frame stamps lastPing, so the scheduled reopen finds the socket
       // connected and returns without building anything.
-      // The reopen was scheduled one millisecond ago, so this lands a tick short
-      // of it.
-      await jest.advanceTimersByTimeAsync(socket.config.reopen - 2)
+      await jest.advanceTimersByTimeAsync(socket.config.reopen - 1)
       transport.receive({ msg: 'updated' })
       await jest.advanceTimersByTimeAsync(1)
 
@@ -402,14 +401,19 @@ describe('Socket liveness', () => {
     })
 
     it('keeps pinging when the ping is abandoned and no reopen is asked for', async () => {
-      // A transport that went away without a close event: the ping's write finds
-      // it shut, so the wait is abandoned and `reopenUnlessAbandoned` declines.
-      transport.readyState = CLOSED
+      await jest.advanceTimersToNextTimerAsync()
+      const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
+      expect(pingCount()).toBe(1)
 
-      await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
+      // The event abandons the ping's wait, so `reopenUnlessAbandoned` declines
+      // and nothing else is left to keep the chain going.
+      socket.emit('disconnected')
+      await jest.advanceTimersByTimeAsync(0)
 
       expect(socket.openTimeout).toBeUndefined()
-      expect(socket.pingTimeout).toBeDefined()
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
+      expect(pingCount()).toBeGreaterThan(1)
     })
   })
 })
