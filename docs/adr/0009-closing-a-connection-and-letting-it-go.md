@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Succeeds:** ADR-0003
+
 ## Context
 
 ADR-0003 governs the rejections the SDK makes and the Deadlines that cause them.
