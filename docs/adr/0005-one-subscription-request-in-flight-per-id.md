@@ -40,8 +40,8 @@ substance at `METEOR@2.16` and `METEOR@1.8.1` — `Session` takes one message fr
 a session at a time, through a single `inQueue` drained by one worker, and its
 own design comment gives the reason: *"unsub needs to be ordered against sub"*.
 The handlers are `Session.prototype.protocol_handlers.sub` and `.unsub`; the
-names ADR-0004 and the issue used, `_livedata_sub` and `_livedata_unsub`, are
-not in the source. `unsub` is synchronous — `_stopSubscription` deletes the id
+names the issue used, `_livedata_sub` and `_livedata_unsub`, are not in the
+source. `unsub` is synchronous — `_stopSubscription` deletes the id
 from `_namedSubs` and sends `nosub` before the handler returns — so a following
 `sub` for that id finds nothing registered, does not take the idempotency early
 return that would otherwise drop it in silence, and is answered with its own
