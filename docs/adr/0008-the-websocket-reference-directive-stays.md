@@ -45,8 +45,8 @@ The directive stays, and the rule that flags it stays at `warn`.
   would fail the lint on a line that must not change, and the only ways to make
   the lint pass would be to break the consuming app or to add a suppression
   comment for a permanent condition.
-- The single warning is expected to stay for as long as the declaration is
-  hand-written and the SDK ships as source. It is not a backlog item.
+- These warnings are expected to stay for as long as the declarations are
+  hand-written and the SDK ships as source. They are not backlog items.
 
 ## Consequences
 
@@ -77,4 +77,4 @@ The rule stays at `warn` for the same reason `triple-slash-reference` does: at
 `error` it would fail the lint on a line that is correct as written, and the only
 way to pass would be an inline suppression for a permanent condition. This repo
 has no inline suppressions and no test-file overrides — specs lint under the same
-rules — so the two standing warnings are the whole warning budget.
+rules — so these three warnings across the two rules are the whole warning budget.
