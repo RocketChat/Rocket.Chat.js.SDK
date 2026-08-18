@@ -475,18 +475,21 @@ describe('Driver.connect', () => {
 
   const failConnects = async (driver: Driver, attempts: number) => {
     for (let attempt = 0; attempt < attempts; attempt++) {
+      const socketsBeforeAttempt = fakeSockets.length
       const failing = driver.connect()
-      fakeSockets[attempt].onerror?.(new Error('no route to host'))
+      fakeSockets[socketsBeforeAttempt].onerror?.(new Error('no route to host'))
       await expect(failing).rejects.toThrow('no route to host')
     }
   }
 
-  it('leaves nothing behind when connects fail', async () => {
+  it('echoes no connected while connects fail', async () => {
     const driver = createDriver()
+    const connectedSeen = jest.fn()
+    driver.on('connected', connectedSeen)
 
     await failConnects(driver, 3)
 
-    expect(driver.removeAllListeners('connected')).toHaveLength(0)
+    expect(connectedSeen).not.toHaveBeenCalled()
   })
 
   it('echoes connected once after earlier connects failed', async () => {
@@ -498,8 +501,9 @@ describe('Driver.connect', () => {
     const connectedSeen = jest.fn()
     driver.on('connected', connectedSeen)
 
+    const socketsBeforeConnect = fakeSockets.length
     const connecting = driver.connect()
-    await driveToHandshake(fakeSockets[failedAttempts])
+    await driveToHandshake(fakeSockets[socketsBeforeConnect])
     await connecting
 
     expect(connectedSeen).toHaveBeenCalledTimes(1)

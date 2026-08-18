@@ -175,6 +175,18 @@ describe('Socket connection lifecycle', () => {
 
       await driveToHandshake(replacement)
       await opening
+    })
+
+    it('schedules no Reopen for the abandoned open', async () => {
+      const stillConnecting = createSocket(logger)
+      const abandoned = stillConnecting.open()
+      const socketsBeforeReplacement = fakeSockets.length
+
+      const opening = stillConnecting.reopenNow()
+
+      await expect(abandoned).rejects.toThrow('[ddp] connection closed before it opened')
+      await driveToHandshake(fakeSockets[socketsBeforeReplacement])
+      await opening
 
       await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
       expect(fakeSockets).toHaveLength(socketsBeforeReplacement + 1)
