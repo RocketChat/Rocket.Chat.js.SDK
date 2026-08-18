@@ -177,7 +177,8 @@ an Error that the SDK writes.
   asks the question. The Deadline ends a wait; it does not diagnose a connection.
   It carries the id, for the reason ADR-0006 gives: the DDP message was written to
   the transport and no answer came, so a `sub` that expires keeps its entry exactly
-  as an abandoned one does.
+  as an abandoned one does. Its type is unexported and sets no `name`, so a
+  caller sees an ordinary Error and the message above.
 - The Deadline covers each send that waits for a DDP response, the handshake
   included — an `open()` against a server that accepts the socket and never answers
   the handshake rejects rather than hanging. The rejection is the whole answer for

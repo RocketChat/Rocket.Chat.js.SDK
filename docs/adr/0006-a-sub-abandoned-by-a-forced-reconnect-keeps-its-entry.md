@@ -105,16 +105,15 @@ The server's answer decides; silence keeps the instruction.
   is unchanged: the poll only decides when to re-send, and the gate resolves on
   whether that resubscribe was acknowledged. An abandoned one resolves
   `undefined`, which the gate counts as unacknowledged.
-- ADR-0004's remaining open question is untouched: whether a `sub` may be sent
-  for an id whose `unsub` is still in flight is still not settled, and the
-  behaviour of the server in that case is still not known. This ADR does make
-  the case more frequent. `unsubscribe` already keeps its entry on the same
-  class of rejection, so a forced reconnect that abandons an `unsub` and a `sub`
-  together leaves both, and `subscribeAll` re-sends the `sub` at the next
-  Login under an id whose `unsub` never got an answer.
+- Whether a `sub` may be sent for an id whose `unsub` is still in flight is
+  answered by ADR-0005. This ADR makes the case more frequent: `unsubscribe`
+  already keeps its entry on the same class of rejection, so a forced reconnect
+  that abandons an `unsub` and a `sub` together leaves both, and `subscribeAll`
+  re-sends the `sub` at the next Login under an id whose `unsub` never got an
+  answer.
 - Under ADR-0004 `subscribe` forgets an entry whose resubscribe the server
-  refuses, so an entry a successful `sub` wrote does
-  not survive a later refusal.
+  refuses, so an entry a successful `sub` wrote does not survive a later
+  refusal.
 - A third rejection carries an id: the Deadline ADR-0003 gives the DDP
   response, which ends the wait when the connection stays up and the server
   never answers. It falls on the same side of the line as an abandoned one — the
