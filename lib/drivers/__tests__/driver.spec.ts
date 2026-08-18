@@ -461,7 +461,7 @@ describe('Driver.connect', () => {
     expect(connectedSeen).toHaveBeenCalledTimes(1)
   })
 
-  it('accumulates nothing on the driver when connects fail', async () => {
+  it('echoes one connected however many connects failed first', async () => {
     const driver = createDriver()
     const failedAttempts = 3
 

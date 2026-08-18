@@ -47,18 +47,18 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
 
 	/**
 	 * Initialise the Socket with given options or defaults.
-	 * Resolves with the Socket once it is open.
+	 * Resolves with the Driver once its Socket is open.
 	 * @example <caption>Using promise</caption>
 	 *  import { driver } from '@rocket.chat/sdk'
 	 *  driver.connect()
 	 *    .then(() => console.log('connected'))
 	 *    .catch((err) => console.error(err))
 	 */
-  connect = async (overrides: any = {}): Promise<any> => {
+  connect = async (options: any = {}): Promise<any> => {
     if (this.connected) {
       return this
     }
-    this.logger.info('[driver] Connecting', { ...this.config, ...overrides })
+    this.logger.info('[driver] Connecting', { ...this.config, ...options })
     try {
       await this.ddp.open()
     } catch (err) {
