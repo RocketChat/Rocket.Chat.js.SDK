@@ -53,10 +53,10 @@ const createSocket = (logger: ILogger) => new Socket({
 })
 
 /**
- * Connecting and reconnecting. Every test starts from a real open connection
- * built through `openFakeConnection`, which asserts the mocked transport
- * constructor actually ran — so no assertion below can pass against a socket
- * the driver never built.
+ * Connecting and reconnecting. Unless a test needs a connection that never
+ * opened, it starts from a real open one built through `openFakeConnection`,
+ * which asserts the mocked transport constructor actually ran — so no assertion
+ * below can pass against a socket the driver never built.
  *
  * Accepted gap: the fake's `readyState` is driven by hand, so "is connected" is
  * asserted against a value the test itself wrote. A real socket reporting OPEN
@@ -160,6 +160,36 @@ describe('Socket connection lifecycle', () => {
 
       await driveToHandshake(fakeSockets[1])
       await reopening
+    })
+
+    it('rejects the replaced open as an abandoned wait rather than leaving it pending', async () => {
+      const stillConnecting = createSocket(logger)
+      const abandoned = stillConnecting.open()
+      const socketsBeforeReplacement = fakeSockets.length
+
+      const opening = stillConnecting.reopenNow()
+      const replacement = fakeSockets[socketsBeforeReplacement]
+
+      await expect(abandoned).rejects.toThrow('[ddp] connection closed before it opened')
+      expect(stillConnecting.openTimeout).toBeUndefined()
+
+      await driveToHandshake(replacement)
+      await opening
+    })
+
+    it('schedules no Reopen for the abandoned open', async () => {
+      const stillConnecting = createSocket(logger)
+      const abandoned = stillConnecting.open()
+      const socketsBeforeReplacement = fakeSockets.length
+
+      const opening = stillConnecting.reopenNow()
+
+      await expect(abandoned).rejects.toThrow('[ddp] connection closed before it opened')
+      await driveToHandshake(fakeSockets[socketsBeforeReplacement])
+      await opening
+
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      expect(fakeSockets).toHaveLength(socketsBeforeReplacement + 1)
     })
   })
 
