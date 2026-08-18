@@ -37,8 +37,9 @@ point where the decision has to be made.
 
 ## Decision
 
-An entry is forgotten when the server has answered, and kept when it has not. An
-entry is written on the same terms.
+An entry is forgotten when the server has answered, and kept when it has not.
+`subscribe` writes its entry on the server's `ready`, and a `sub` the server
+refuses leaves none.
 
 - `toError` returns a `DDPError`. Every value it produces is a `DDPError`,
   including the one it builds from a DDP error that arrived as a bare string.
