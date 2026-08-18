@@ -84,12 +84,11 @@ entry is written on the same terms.
   compiles this SDK from TypeScript source with its own toolchain, and a
   toolchain that downlevels classes breaks `instanceof` for a subclass of `Error`
   without it.
-- The rule now governs the writing of an entry as well as its removal, but only
-  the write itself. `subscribe` still swallows its own failure and resolves
-  `undefined` rather than re-throwing, and `subscribeAll` re-sends every entry
-  under its own id without removing one the server now refuses. An entry that a
-  successful `sub` wrote therefore survives a later refusal, and `subscribeAll`
-  re-requests it at every Login. A separate issue tracks it.
+- The rule now governs the writing of an entry as well as its removal, and a
+  `sub` sent under an existing id that the server refuses forgets that entry, so
+  a refused resubscribe is no longer re-requested at every Login. `subscribe`
+  still swallows its own failure and resolves `undefined` rather than
+  re-throwing. A separate issue tracks that.
 - Whether a `sub` may be sent for an id whose `unsub` is still in flight is not
   settled here, and the behaviour of the server in that case is not known. A
   separate issue tracks the question.

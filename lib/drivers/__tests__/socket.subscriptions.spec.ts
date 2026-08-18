@@ -91,6 +91,34 @@ describe('Socket subscription bookkeeping', () => {
     expect(transport.sent).toHaveLength(framesBefore)
   })
 
+  describe('a resubscribe the server now refuses', () => {
+    it('forgets the entry, so it is not re-requested at the next login', async () => {
+      await subscribe('stream-room-messages', ['GENERAL'])
+
+      const resubscribing = socket.subscribeAll()
+      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
+      await resubscribing
+
+      expect(socket.subscriptions).toEqual({})
+
+      const framesBefore = transport.sent.length
+      await socket.subscribeAll()
+      expect(transport.sent).toHaveLength(framesBefore)
+    })
+
+    it('keeps the entry when the rejection is the SDK\'s own, not the server\'s', async () => {
+      // A reopen abandons the wait while the server may still be streaming, so
+      // the instruction to re-establish has to survive. See ADR-0004.
+      await subscribe('stream-room-messages', ['GENERAL'])
+
+      const resubscribing = socket.subscribeAll()
+      socket.reopenNow()
+      await resubscribing
+
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+    })
+  })
+
   it('holds nothing while a subscription is still in flight', async () => {
     // The other half of the same change: the map is written on the server's
     // acknowledgement, so an unanswered `sub` is not in it yet.
