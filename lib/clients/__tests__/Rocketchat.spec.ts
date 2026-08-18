@@ -13,10 +13,10 @@ const createClient = (restClient?: FakeClient) =>
 const answerDdpLoginWith = (client: RocketChatClient, login: { id: string, token: string }) =>
   jest.spyOn(client.ddp, 'login').mockResolvedValue(login as any)
 
-const loggedInClient = async (ddpToken: string = 'token') => {
+const loggedInClient = async (ddpToken: string = 'fake-token') => {
   const restClient = new FakeClient()
   const client = createClient(restClient)
-  answerDdpLoginWith(client, { id: 'id', token: ddpToken })
+  answerDdpLoginWith(client, { id: 'fake-user-id', token: ddpToken })
 
   const pending = client.login({ username: 'user', password: 'pass' })
   restClient.lastRequest().resolve(loginResponse())
@@ -67,8 +67,8 @@ describe('client.ddp', () => {
 describe('client.resume', () => {
   const resumedClient = async () => {
     const client = createClient()
-    answerDdpLoginWith(client, { id: 'id', token: 'token' })
-    await client.resume({ token: 'token' })
+    answerDdpLoginWith(client, { id: 'fake-user-id', token: 'fake-token' })
+    await client.resume({ token: 'fake-token' })
     return client
   }
 
@@ -78,31 +78,31 @@ describe('client.resume', () => {
 
   it('sets the REST auth headers', async () => {
     expect((await resumedClient()).client.headers).toMatchObject({
-      'X-Auth-Token': 'token',
-      'X-User-Id': 'id'
+      'X-Auth-Token': 'fake-token',
+      'X-User-Id': 'fake-user-id'
     })
   })
 
   it('leaves an existing login with the same credentials untouched', async () => {
     const client = await loggedInClient()
 
-    await client.resume({ token: 'token' })
+    await client.resume({ token: 'fake-token' })
 
-    expect(client.currentLogin).toMatchObject({ username: 'user', authToken: 'token' })
+    expect(client.currentLogin).toMatchObject({ username: 'fake-username', authToken: 'fake-token' })
   })
 
   it('replaces the login when the token has rotated', async () => {
     const client = await loggedInClient()
-    answerDdpLoginWith(client, { id: 'id', token: 'rotated' })
+    answerDdpLoginWith(client, { id: 'fake-user-id', token: 'rotated' })
 
     await client.resume({ token: 'rotated' })
 
-    expect(client.currentLogin).toMatchObject({ userId: 'id', authToken: 'rotated', username: 'user' })
+    expect(client.currentLogin).toMatchObject({ userId: 'fake-user-id', authToken: 'rotated', username: 'fake-username' })
   })
 
   it('drops the login result holding the superseded token', async () => {
     const client = await loggedInClient()
-    answerDdpLoginWith(client, { id: 'id', token: 'rotated' })
+    answerDdpLoginWith(client, { id: 'fake-user-id', token: 'rotated' })
 
     await client.resume({ token: 'rotated' })
 
@@ -130,7 +130,7 @@ describe('client.login', () => {
     const client = await loggedInClient('ddp-token')
 
     expect(client.currentLogin).toMatchObject({
-      username: 'user',
+      username: 'fake-username',
       authToken: 'ddp-token',
       result: null
     })
@@ -141,7 +141,7 @@ describe('client.logout', () => {
   const loggedOutClient = async () => {
     const restClient = new FakeClient()
     const client = createClient(restClient)
-    client.resumeLogin({ userId: 'id', authToken: 'token' })
+    client.resumeLogin({ userId: 'fake-user-id', authToken: 'fake-token' })
 
     const pending = client.logout()
     restClient.lastRequest().resolve({ status: 200, data: {} })

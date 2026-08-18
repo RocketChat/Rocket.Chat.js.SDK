@@ -5,28 +5,21 @@ import { FakeClient } from './fakeClient'
 import { loginResponse } from './loginResponse'
 import { answerFetchWith } from './fakeFetch'
 
-const fakeLoginResponse = () => loginResponse({
-  userId: 'fake-user-id',
-  authToken: 'fake-token',
-  username: 'fake-username'
-})
-
-const anonymousApiWith = <T extends Api> (
-  ApiClass: new (config: any) => T,
-  logger?: ILogger
-) => {
+export const anonymousApiWithFakeClient = () => {
   const restClient = new FakeClient()
-  return { api: new ApiClass({ client: restClient, logger }), restClient }
+  return { api: new Api({ client: restClient }), restClient }
 }
 
-export const anonymousApiWithFakeClient = () => anonymousApiWith(Api)
-
-export const anonymousApiRocketChatWithFakeClient = () => anonymousApiWith(ApiRocketChat)
+export const anonymousApiRocketChatWithFakeClient = () => {
+  const restClient = new FakeClient()
+  return { api: new ApiRocketChat({ client: restClient }), restClient }
+}
 
 export const loggedInApiWithFakeClient = async (logger?: ILogger) => {
-  const { api, restClient } = anonymousApiWith(Api, logger)
+  const restClient = new FakeClient()
+  const api = new Api({ client: restClient, logger })
 
-  restClient.enqueueReply(fakeLoginResponse())
+  restClient.enqueueReply(loginResponse())
   await api.login({ username: 'user', password: 'pass' })
   restClient.requests = []
 
@@ -35,7 +28,7 @@ export const loggedInApiWithFakeClient = async (logger?: ILogger) => {
 
 export const loggedInApiWithFakeFetch = async (host?: string) => {
   const api = new Api({ host })
-  answerFetchWith(fakeLoginResponse().data)
+  answerFetchWith(loginResponse().data)
   await api.login({ username: 'user', password: 'pass' })
   answerFetchWith({})
   return { api, restClient: api.client }

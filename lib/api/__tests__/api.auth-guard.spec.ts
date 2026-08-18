@@ -32,7 +32,7 @@ describe('Api auth guard', () => {
     const pending = api.login({ username: 'user', password: 'pass' })
     restClient.lastRequest().resolve(loginResponse())
 
-    await expect(pending).resolves.toMatchObject({ userId: 'id' })
+    await expect(pending).resolves.toMatchObject({ userId: 'fake-user-id' })
     expect(api.loggedIn()).toBe(true)
   })
 
@@ -56,6 +56,6 @@ describe('Api auth guard', () => {
     restClient.lastRequest().resolve(infoResponse())
     await pending
 
-    expect(restClient.headers).toMatchObject({ 'X-Auth-Token': 'token', 'X-User-Id': 'id' })
+    expect(restClient.headers).toMatchObject({ 'X-Auth-Token': 'fake-token', 'X-User-Id': 'fake-user-id' })
   })
 })
