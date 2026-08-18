@@ -205,6 +205,7 @@ describe('Socket connection lifecycle', () => {
 
       await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
       expect(fakeSockets).toHaveLength(3)
+      expect(socket.openTimeout).toBeUndefined()
     })
   })
 

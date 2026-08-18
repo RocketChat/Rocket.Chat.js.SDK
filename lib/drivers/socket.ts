@@ -382,8 +382,7 @@ export class Socket extends SDKEventEmitter {
    * via the open/timeout paths.
    *
    * Past the deadline the promise resolves and `reopenPromise` is cleared even
-   * though the connection may still be down, so the deadline also schedules a
-   * `reopen` to keep the retry chain going.
+   * though the connection may still be down.
    */
   reopenNow = (): Promise<void> => {
     if (this.reopenPromise) {
