@@ -192,8 +192,6 @@ describe('Socket liveness', () => {
      * the pong resolves. Running all timers is worse still — a self-rescheduling
      * chain hits the runner's timer-count abort.
      */
-    const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
-
     const tick = async (deliver?: () => void) => {
       await jest.advanceTimersToNextTimerAsync()
       deliver?.()
@@ -203,6 +201,8 @@ describe('Socket liveness', () => {
     const tickWithPong = () => tick(() => transport.receive({ msg: 'pong' }))
     const tickWithoutPong = () => tick()
     const tickWithUnreadableMessage = () => tick(() => transport.receiveRaw('not json'))
+
+    const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
 
     it('reschedules itself, leaving exactly one pending timer per tick', async () => {
       expect(jest.getTimerCount()).toBe(1)
@@ -404,8 +404,7 @@ describe('Socket liveness', () => {
       await jest.advanceTimersToNextTimerAsync()
       expect(pingCount()).toBe(1)
 
-      // The event abandons the ping's wait, so `reopenUnlessAbandoned` declines
-      // and nothing else is left to keep the chain going.
+      // The event abandons the ping's wait, so `reopenUnlessAbandoned` declines.
       socket.emit('disconnected')
       await jest.advanceTimersByTimeAsync(0)
 
