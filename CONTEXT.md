@@ -66,9 +66,10 @@ Login sets. What Api depends on, so a consuming app or a spec can supply its own
 _Avoid_: Client interface (ambiguous with the entry point)
 
 **Current login**:
-The authenticated identity Api holds after a Login — username, user id and auth
-token, with no username when the login was resumed from a token. Set on login and
-cleared on logout; `loggedIn()` reports on it.
+The authenticated identity Api holds after a Login — username, user id, auth
+token and the login result. A Login resumed from a token knows neither the
+username nor the result. Set on login and cleared on logout; `loggedIn()`
+reports on it.
 _Avoid_: Session, credentials (those are what a Login is given, not what it
 yields), user
 

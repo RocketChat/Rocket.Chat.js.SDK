@@ -1,4 +1,5 @@
 import Api from '../lib/api/api'
+import ClientRest from '../lib/api/RocketChat'
 import { ILogger } from '../interfaces'
 import { FakeClient } from './fakeClient'
 import { loginResponse } from './loginResponse'
@@ -10,15 +11,25 @@ const fakeLoginResponse = () => loginResponse({
   username: 'fake-username'
 })
 
+export const anonymousApiWithFakeClient = () => {
+  const restClient = new FakeClient()
+  return { api: new Api({ client: restClient }), restClient }
+}
+
+export const anonymousClientRestWithFakeClient = () => {
+  const restClient = new FakeClient()
+  return { api: new ClientRest({ client: restClient }), restClient }
+}
+
 export const loggedInApiWithFakeClient = async (logger?: ILogger) => {
-  const client = new FakeClient()
-  const api = new Api({ client, logger })
+  const restClient = new FakeClient()
+  const api = new Api({ client: restClient, logger })
 
-  client.replyOnce('POST', fakeLoginResponse())
+  restClient.enqueueReply(fakeLoginResponse())
   await api.login({ username: 'user', password: 'pass' })
-  client.requests = []
+  restClient.requests = []
 
-  return { api, client }
+  return { api, restClient }
 }
 
 export const loggedInApiWithStubbedFetch = async (host?: string) => {
@@ -26,5 +37,5 @@ export const loggedInApiWithStubbedFetch = async (host?: string) => {
   answerFetchWith(fakeLoginResponse().data)
   await api.login({ username: 'user', password: 'pass' })
   answerFetchWith({})
-  return { api, client: api.client }
+  return { api, restClient: api.client }
 }

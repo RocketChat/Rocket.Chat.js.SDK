@@ -21,10 +21,10 @@ export class FakeClient implements IClient {
 
   headers: any = {}
 
-  private readonly replies: { [method: string]: any[] } = {}
+  private readonly replies: any[] = []
 
-  replyOnce (method: FakeRequest['method'], response: any): void {
-    this.replies[method] = [...(this.replies[method] || []), response]
+  enqueueReply (response: any): void {
+    this.replies.push(response)
   }
 
   get (url: string, data: any, options?: any, apiVersion?: string): Promise<any> {
@@ -58,8 +58,7 @@ export class FakeClient implements IClient {
       if (signal?.aborted) return reject(abortError())
       signal?.addEventListener('abort', () => reject(abortError()))
 
-      const queued = this.replies[method]
-      if (queued?.length) resolve(queued.shift())
+      if (this.replies.length) resolve(this.replies.shift())
     })
   }
 }

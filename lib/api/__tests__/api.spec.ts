@@ -1,17 +1,19 @@
 import Api from '../api'
 import { logger as moduleLogger } from '../../log'
 import { createSilentLogger } from '../../../test/createSilentLogger'
-import { FakeClient } from '../../../test/fakeClient'
-import { loggedInApiWithFakeClient } from '../../../test/loggedInApi'
+import {
+  anonymousApiWithFakeClient,
+  loggedInApiWithFakeClient
+} from '../../../test/apiFixtures'
 
-const ok = () => ({ status: 200, data: {} })
+const emptySuccess = () => ({ status: 200, data: {} })
 
 describe('api', () => {
   describe('login', () => {
     it('installs the auth headers the following requests need', async () => {
-      const { client } = await loggedInApiWithFakeClient()
+      const { restClient } = await loggedInApiWithFakeClient()
 
-      expect(client.headers).toEqual({
+      expect(restClient.headers).toEqual({
         'X-Auth-Token': 'fake-token',
         'X-User-Id': 'fake-user-id'
       })
@@ -28,52 +30,60 @@ describe('api', () => {
 
   describe('logout', () => {
     it('answers nothing without asking the server when there is no login', async () => {
-      const client = new FakeClient()
-      const api = new Api({ client })
+      const { api, restClient } = anonymousApiWithFakeClient()
 
       await expect(api.logout()).resolves.toBeNull()
-      expect(client.requests).toHaveLength(0)
+      expect(restClient.requests).toHaveLength(0)
     })
 
     it('clears the identity once the server has answered', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('POST', ok())
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply(emptySuccess())
 
       await api.logout()
 
       expect(api.userId).toBe('')
       expect(api.username).toBeNull()
-      expect(client.lastRequest().url).toBe('logout')
+      expect(restClient.lastRequest().url).toBe('logout')
+    })
+
+    it('removes the auth headers and leaves the others in place', async () => {
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.headers = { ...restClient.headers, 'X-Custom-Header': 'kept' }
+      restClient.enqueueReply(emptySuccess())
+
+      await api.logout()
+
+      expect(restClient.headers).toEqual({ 'X-Custom-Header': 'kept' })
     })
   })
 
   describe('request', () => {
-    it('reaches the client for an unauthenticated request when logged out', async () => {
-      const client = new FakeClient()
-      const api = new Api({ client })
-      client.replyOnce('POST', ok())
+    it('reaches the restClient for an unauthenticated request when logged out', async () => {
+      const { api, restClient } = anonymousApiWithFakeClient()
+      restClient.enqueueReply(emptySuccess())
 
       await api.post('login', { username: 'user' }, false)
 
-      expect(client.lastRequest()).toMatchObject({
+      expect(restClient.lastRequest()).toMatchObject({
         method: 'POST',
         data: { username: 'user' }
       })
     })
 
-    it('routes each method to its own client call', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('GET', ok())
-      client.replyOnce('POST', ok())
-      client.replyOnce('PUT', ok())
-      client.replyOnce('DELETE', ok())
+    it('routes each method to its own restClient call', async () => {
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
 
       await api.get('a', {})
       await api.post('b', {})
       await api.put('c', {})
       await api.del('d', {})
 
-      expect(client.requests.map((request) => request.method)).toEqual([
+      expect(restClient.requests.map((request) => request.method)).toEqual([
         'GET',
         'POST',
         'PUT',
@@ -81,76 +91,76 @@ describe('api', () => {
       ])
     })
 
-    it('passes the body the caller asked for through to the client', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('POST', ok())
-      client.replyOnce('PUT', ok())
+    it('passes the body the caller asked for through to the restClient', async () => {
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply(emptySuccess())
+      restClient.enqueueReply(emptySuccess())
 
       await api.post('chat.postMessage', { msg: 'hello' })
-      expect(client.lastRequest().data).toEqual({ msg: 'hello' })
+      expect(restClient.lastRequest().data).toEqual({ msg: 'hello' })
 
       await api.put('chat.update', { msg: 'edited' })
-      expect(client.lastRequest().data).toEqual({ msg: 'edited' })
+      expect(restClient.lastRequest().data).toEqual({ msg: 'edited' })
     })
 
-    it('passes the api version through to the client', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('GET', ok())
+    it('passes the api version through to the restClient', async () => {
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply(emptySuccess())
 
       await api.get('rooms.info', {}, true, undefined, {}, 'v2')
 
-      expect(client.lastRequest().apiVersion).toBe('v2')
+      expect(restClient.lastRequest().apiVersion).toBe('v2')
     })
 
     it('carries the abort signal on every request', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('GET', ok())
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply(emptySuccess())
 
       await api.get('me', {})
 
-      expect(client.lastRequest().options.signal).toBe(api.controller.signal)
+      expect(restClient.lastRequest().options.signal).toBe(api.controller.signal)
     })
 
     it('answers with the body of the result', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('GET', { status: 200, data: { success: true } })
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply({ status: 200, data: { success: true } })
 
       await expect(api.get('me', {})).resolves.toEqual({ success: true })
     })
 
     it('throws the result itself when the status is a failure', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
+      const { api, restClient } = await loggedInApiWithFakeClient()
       const failed = { status: 400, data: { error: 'nope' } }
-      client.replyOnce('GET', failed)
+      restClient.enqueueReply(failed)
 
       await expect(api.get('me', {})).rejects.toBe(failed)
     })
 
     it('accepts a failure status the caller asked to ignore', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('GET', { status: 400, data: { error: 'nope' } })
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply({ status: 400, data: { error: 'nope' } })
 
       await expect(api.get('me', {}, true, /400/)).resolves.toEqual({ error: 'nope' })
     })
 
-    it('throws when the client answers nothing at all', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('GET', undefined)
+    it('throws when the restClient answers nothing at all', async () => {
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply(undefined)
 
       await expect(api.get('me', {})).rejects.toThrow('API GET me result undefined')
     })
 
     it('answers a DELETE with the whole result when it carries no body', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
+      const { api, restClient } = await loggedInApiWithFakeClient()
       const result = { status: 200, data: undefined }
-      client.replyOnce('DELETE', result)
+      restClient.enqueueReply(result)
 
       await expect(api.del('rooms.delete', {})).resolves.toBe(result)
     })
 
     it('answers a DELETE with the body when it carries one', async () => {
-      const { api, client } = await loggedInApiWithFakeClient()
-      client.replyOnce('DELETE', { status: 200, data: { success: true } })
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply({ status: 200, data: { success: true } })
 
       await expect(api.del('rooms.delete', {})).resolves.toEqual({ success: true })
     })
@@ -160,7 +170,7 @@ describe('api', () => {
     let api: Api
 
     beforeEach(() => {
-      api = new Api({ client: new FakeClient() })
+      api = anonymousApiWithFakeClient().api
     })
 
     it('accepts a 2xx and a 3xx status', () => {
@@ -181,8 +191,8 @@ describe('api', () => {
   describe('logger', () => {
     it('logs to the logger it was handed', async () => {
       const logger = createSilentLogger()
-      const { api, client } = await loggedInApiWithFakeClient(logger)
-      client.replyOnce('GET', ok())
+      const { api, restClient } = await loggedInApiWithFakeClient(logger)
+      restClient.enqueueReply(emptySuccess())
 
       await api.get('me', {})
 
@@ -191,8 +201,8 @@ describe('api', () => {
 
     it('logs the failure to the logger it was handed', async () => {
       const logger = createSilentLogger()
-      const { api, client } = await loggedInApiWithFakeClient(logger)
-      client.replyOnce('GET', { status: 400, data: {} })
+      const { api, restClient } = await loggedInApiWithFakeClient(logger)
+      restClient.enqueueReply({ status: 400, data: {} })
 
       await expect(api.get('me', {})).rejects.toBeDefined()
 
@@ -200,7 +210,7 @@ describe('api', () => {
     })
 
     it('falls back to the module logger when handed none', () => {
-      expect(new Api({ client: new FakeClient() }).logger).toBe(moduleLogger)
+      expect(anonymousApiWithFakeClient().api.logger).toBe(moduleLogger)
     })
   })
 })

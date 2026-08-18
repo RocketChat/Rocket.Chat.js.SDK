@@ -2,7 +2,7 @@ import { logger as Logger } from '../log'
 
 import {
 	ILogger,
-	IRestLogin,
+	ICurrentLogin,
 	IAPIRequest,
 	IMessage,
 	ICredentials
@@ -98,17 +98,17 @@ class Client implements IClient {
     this._headers = obj
   }
   get headers (): any {
-    return {
-      'Content-Type': 'application/json',
-      ...settings.customHeaders,
-      ...this._headers
-    }
+    return this._headers
   }
 
   getHeaders (options?: any) {
     return options && options.customHeaders ?
       options.customHeaders :
-      this.headers
+      {
+        'Content-Type': 'application/json',
+        ...settings.customHeaders,
+        ...this._headers
+      }
   }
 
   getBody (data: any) {
@@ -184,6 +184,9 @@ export interface IApiOptions {
 
 export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
 
+const authTokenHeader = 'X-Auth-Token'
+const userIdHeader = 'X-User-Id'
+
 /**
 	* @module API
 	* Provides a base client for handling requests with generic Rocket.Chat's REST API
@@ -193,7 +196,7 @@ export default class Api extends SDKEventEmitter {
   userId: string = ''
   logger: ILogger
   client: IClient
-  currentLogin: IRestLogin | null = null
+  currentLogin: ICurrentLogin | null = null
   controller: AbortController
 
   constructor ({ client, host, logger = Logger }: IApiOptions) {
@@ -293,32 +296,35 @@ export default class Api extends SDKEventEmitter {
     return data
   }
 
-  resumeLogin ({ userId, authToken }: Pick<IRestLogin, 'userId' | 'authToken'>) {
+  resumeLogin ({ userId, authToken }: Pick<ICurrentLogin, 'userId' | 'authToken'>) {
     const previous = this.currentLogin?.userId === userId ? this.currentLogin : null
     if (previous?.authToken === authToken) {
       return
     }
     this.setLogin({
-      username: previous ? previous.username : null,
+      username: previous?.username ?? null,
       userId,
       authToken,
       result: null
     })
   }
 
-  private setLogin (login: IRestLogin) {
+  private setLogin (login: ICurrentLogin) {
     this.userId = login.userId
     this.currentLogin = login
     this.client.headers = {
-      'X-Auth-Token': login.authToken,
-      'X-User-Id': login.userId
+      [authTokenHeader]: login.authToken,
+      [userIdHeader]: login.userId
     }
   }
 
   private clearLogin () {
     this.userId = ''
     this.currentLogin = null
-    this.client.headers = {}
+    const headers = { ...this.client.headers }
+    delete headers[authTokenHeader]
+    delete headers[userIdHeader]
+    this.client.headers = headers
   }
 
   async logout () {
