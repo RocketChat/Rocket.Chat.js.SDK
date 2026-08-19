@@ -84,9 +84,6 @@ and an `/** @internal */` tag alone, which enforces nothing.
   `@rocket.chat/sdk/clients/Rocketchat`. Nothing in this repo or in
   Rocket.Chat.ReactNative uses it, and it carried no default export, so the
   root import is unaffected.
-- Until the app moves, the documentation is ahead of the code: CONTEXT.md
-  reserves `ddp` as a qualifier while `Driver.ddp` still exists. Issue #338
-  stays open until the renames land.
 
 ## Migration
 
