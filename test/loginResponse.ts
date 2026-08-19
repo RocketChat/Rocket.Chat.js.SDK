@@ -1,8 +1,5 @@
-/**
- * The shape a successful REST `login` answers with, as the Api reads it.
- */
 export const loginResponse = (
-  { userId = 'id', authToken = 'token', username = 'user' } = {}
+  { userId = 'fake-user-id', authToken = 'fake-token', username = 'fake-username' } = {}
 ) => ({
   status: 200,
   data: { data: { userId, authToken, me: { username } } }

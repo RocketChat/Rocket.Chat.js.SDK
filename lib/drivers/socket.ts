@@ -30,8 +30,12 @@ import {
 
 import { IStream } from './definitions'
 import { DDPError, toError } from './ddpError'
-import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
+
+function hostToWS (host: string, ssl = false) {
+  host = host.replace(/^(https?:\/\/)?/, '')
+  return `ws${ssl ? 's' : ''}://${host}`
+}
 
 const userDisconnectCloseCode = 4000;
 const socketOpen = 1;
@@ -599,13 +603,18 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
+  private reopenAndKeepPinging = (err: unknown) => {
+    this.reopenUnlessAbandoned(err)
+    if (this.connection) this.ping()
+  }
+
   /** Send ping, record time, re-open if nothing comes back, repeat */
   ping = async () => {
     if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.ping())
-        .catch(this.reopenUnlessAbandoned)
+        .catch(this.reopenAndKeepPinging)
     }, this.config.ping)
   }
 
