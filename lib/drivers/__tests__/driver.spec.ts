@@ -1,6 +1,7 @@
 import { Driver } from '../driver'
 import { ISocketOptions } from '../../../interfaces'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { trackResolution } from '../../../test/trackResolution'
 import {
   CLOSED,
   driveToHandshake,
@@ -132,11 +133,10 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     await addMediaSubscription(driver, transport, 'media-signal')
 
     const waiting = driver.waitForNotifyUserMediaSubs()
-    let resolved: boolean | undefined
-    waiting.then((value) => { resolved = value })
+    const resolution = trackResolution(waiting)
 
     await jest.advanceTimersByTimeAsync(1)
-    expect(resolved).toBeUndefined()
+    expect(resolution.value).toBeUndefined()
 
     await addMediaSubscription(driver, transport, 'media-calls')
     await expect(waiting).resolves.toBe(true)
@@ -163,12 +163,11 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     driver.userId = userId
 
     const waiting = driver.waitForNotifyUserMediaSubs()
-    let resolved: boolean | undefined
-    waiting.then((value) => { resolved = value })
+    const resolution = trackResolution(waiting)
 
     driver['socket'].subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal')
     await jest.advanceTimersByTimeAsync(1)
-    expect(resolved).toBeUndefined()
+    expect(resolution.value).toBeUndefined()
 
     transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
     await jest.advanceTimersByTimeAsync(1)
@@ -306,11 +305,10 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     driver.userId = userId
 
     const waiting = driver.waitForNotifyUserMediaSubs()
-    let resolved: boolean | undefined
-    waiting.then((value) => { resolved = value })
+    const resolution = trackResolution(waiting)
 
     await jest.advanceTimersByTimeAsync(timeout - 1)
-    expect(resolved).toBeUndefined()
+    expect(resolution.value).toBeUndefined()
 
     await jest.advanceTimersByTimeAsync(1)
     await expect(waiting).resolves.toBe(false)
