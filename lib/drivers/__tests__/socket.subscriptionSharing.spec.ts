@@ -7,6 +7,7 @@ import {
   driveToHandshake,
   openFakeConnection,
   subFrames,
+  lastSubId,
   subscribeAndAck,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -44,7 +45,7 @@ describe('Socket subscription sharing', () => {
     const framesBefore = subFrames(transport.sent)
     expect(framesBefore).toHaveLength(1)
 
-    transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
+    transport.receive({ msg: 'ready', subs: [lastSubId(transport)] })
     await Promise.all([first, second])
 
     expect(subFrames(transport.sent)).toEqual(framesBefore)
@@ -54,7 +55,7 @@ describe('Socket subscription sharing', () => {
   it('hands the second caller the subscription, not undefined', async () => {
     const first = socket.subscribe('stream-room-messages', ['GENERAL'])
     const second = socket.subscribe('stream-room-messages', ['GENERAL'])
-    transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
+    transport.receive({ msg: 'ready', subs: [lastSubId(transport)] })
 
     const [firstSub, secondSub] = await Promise.all([first, second])
 
@@ -80,7 +81,7 @@ describe('Socket subscription sharing', () => {
     // the write would find nothing and send a second `sub` under an id already
     // in use — worse than the duplicate this fix removes.
     const first = socket.subscribe('stream-room-messages', ['GENERAL'])
-    transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
+    transport.receive({ msg: 'ready', subs: [lastSubId(transport)] })
 
     const second = socket.subscribe('stream-room-messages', ['GENERAL'])
     await Promise.all([first, second])
@@ -123,7 +124,7 @@ describe('Socket subscription sharing', () => {
 
     expect(subFrames(transport.sent)).toHaveLength(framesBefore + 1)
 
-    transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
+    transport.receive({ msg: 'ready', subs: [lastSubId(transport)] })
     await resubscribing
   })
 
@@ -138,7 +139,7 @@ describe('Socket subscription sharing', () => {
 
     expect(subFrames(transport.sent)).toHaveLength(framesBefore + 1)
 
-    transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
+    transport.receive({ msg: 'ready', subs: [lastSubId(transport)] })
     await expect(waiting).resolves.toBe(true)
   })
 
@@ -146,7 +147,7 @@ describe('Socket subscription sharing', () => {
     // Nothing is recorded until the server acks, so the resubscribe never gets
     // to start and its deadline settles it while the `sub` is still pending.
     socket.subscribe('stream-notify-user', ['uid/media-signal'])
-    const id = transport.lastSent().id
+    const id = lastSubId(transport)
 
     const waiting = socket.resubscribeWhenRecorded([
       { name: 'stream-notify-user', params: ['uid/media-signal'] }
@@ -188,7 +189,7 @@ describe('Socket subscription sharing', () => {
     const resubscribing = socket.subscribeAll()
     await flushMicrotasks()
     expect(subFrames(reopened.sent)).toHaveLength(1)
-    reopened.receive({ msg: 'ready', subs: [reopened.lastSent().id] })
+    reopened.receive({ msg: 'ready', subs: [lastSubId(reopened)] })
     await resubscribing
 
     await socket.subscribe('stream-room-messages', ['GENERAL'])
@@ -199,7 +200,7 @@ describe('Socket subscription sharing', () => {
 
   it('leaves one record when the abandoned catch path writes the entry', async () => {
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-    const id = transport.lastSent().id
+    const id = lastSubId(transport)
 
     socket.reopenNow()
     await subscribing
