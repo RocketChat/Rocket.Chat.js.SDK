@@ -11,7 +11,7 @@ import type { ISocket, IDriver, IStream } from './definitions'
 import {
   ISocketOptions,
   ISubscription,
-  ICredentials,
+  IRealtimeCredentials,
   ILoginResult,
   ICallback,
   ILogger
@@ -179,7 +179,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/** Login to Rocket.Chat via DDP */
-  login = async (credentials: ICredentials, _args: any): Promise<any> => {
+  login = async (credentials: IRealtimeCredentials, _args: any): Promise<any> => {
     if (!this.socket || !this.socket.connected) {
       await this.connect()
     }
