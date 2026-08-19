@@ -94,6 +94,14 @@ export class Socket extends SDKEventEmitter {
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
+  /** The `unsub` waits for the last holder to let go. See ADR-0011. */
+  private subscriptionHolders: { [id: string]: number } = {}
+
+  /** Subscriptions whose `unsub` is on the wire, so no longer reusable. */
+  private endingSubscriptions: { [id: string]: true } = {}
+
+  private streamRequests: { [streamKey: string]: Promise<ISubscription | undefined> } = {}
+
   /** Create a websocket handler */
   constructor (
     options: ISocketOptions | any = {},
@@ -347,11 +355,14 @@ export class Socket extends SDKEventEmitter {
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
     delete this.subscriptions[id]
+    delete this.subscriptionHolders[id]
+    delete this.endingSubscriptions[id]
   }
 
   /** Drop every DDP subscription, one key at a time, in the same object. */
   forgetAllSubscriptions = () => {
     Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
+    this.streamRequests = {}
   }
 
   // Call open directly, so it skips openTimeout
@@ -734,10 +745,91 @@ export class Socket extends SDKEventEmitter {
    * reached the wire, and one whose connection is gone leave nothing behind, and
    * a resubscribe under an existing id that the server refuses forgets that
    * entry. See ADR-0004 and ADR-0006.
+   *
+   * One DDP subscription per stream: a caller that names no id and asks for a
+   * stream already recorded, or already in flight, is given a share of that one
+   * rather than a second id for the same stream. See ADR-0011.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
   subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback, id?: string) => {
+    if (id) return this.sendSubscribe(name, params, callback, id)
+
+    const streamKey = this.streamKeyOf(name, params)
+    if (!streamKey) return this.sendSubscribe(name, params, callback)
+
+    const pending = this.streamRequests[streamKey]
+    if (pending) {
+      return pending
+        .then((subscription) => subscription || this.findSubscription(streamKey, name))
+        .then((subscription) => this.holdSubscription(subscription, callback))
+    }
+
+    const recorded = this.findSubscription(streamKey, name)
+    if (recorded) return Promise.resolve(this.holdSubscription(recorded, callback))
+
+    const subscribing = this.sendSubscribe(name, params, callback)
+      .then((subscription) => this.holdSubscription(subscription))
+    const forget = () => {
+      if (this.streamRequests[streamKey] === subscribing) delete this.streamRequests[streamKey]
+    }
+    this.streamRequests[streamKey] = subscribing
+    subscribing.then(forget, forget)
+    return subscribing
+  }
+
+  /**
+   * A stream's identity, as the serialized form of its name and params. Callers
+   * rebuild their params for every request, so two streams are the same by
+   * value rather than by reference, with object keys ordered so that the same
+   * params written in a different order still read as one stream. Params no
+   * serializer can read name no stream at all.
+   */
+  private streamKeyOf = (name: string, params: any[]) => {
+    const withSortedKeys = (_key: string, value: any) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+      return Object.keys(value).sort().reduce((sorted: any, key) => {
+        sorted[key] = value[key]
+        return sorted
+      }, {})
+    }
+    try {
+      return JSON.stringify([name, params], withSortedKeys)
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * The recorded subscription for exactly this stream, and only while it is
+   * still reusable. Unlike `findSubscriptions`, the params have to match in
+   * full: a prefix match would collapse two different `stream-notify-logged`
+   * streams into one.
+   */
+  private findSubscription = (streamKey: string, name: string) =>
+    this.findSubscriptions({ name }).find((subscription) => (
+      subscription.id &&
+      !this.endingSubscriptions[subscription.id] &&
+      this.streamKeyOf(name, subscription.params || []) === streamKey
+    ))
+
+  private holdSubscription = (
+    subscription: ISubscription | undefined,
+    callback?: ISocketMessageCallback
+  ) => {
+    const id = subscription?.id
+    if (!subscription || !id) return undefined
+    if (callback) subscription.onEvent?.(callback)
+    this.subscriptionHolders[id] = (this.subscriptionHolders[id] || 0) + 1
+    return subscription
+  }
+
+  private sendSubscribe = (
+    name: string,
+    params: any[],
+    callback?: ISocketMessageCallback,
+    id?: string
+  ) => {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
@@ -851,9 +943,21 @@ export class Socket extends SDKEventEmitter {
     return Promise.all(subscriptions)
   }
 
-  /** Unsubscribe to server stream, resolve with unsubscribe request result */
+  /**
+   * Let go of a server stream. Resolves with the unsubscribe request result for
+   * the last holder of the subscription, and with `undefined` for any holder
+   * before it, which sends no `unsub`. See ADR-0011.
+   */
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
+
+    const holders = this.subscriptionHolders[id] || 1
+    if (holders > 1) {
+      this.subscriptionHolders[id] = holders - 1
+      return Promise.resolve(undefined)
+    }
+
+    this.endingSubscriptions[id] = true
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((data: any) => {
         this.forgetSubscription(id)
@@ -861,14 +965,19 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         if (err instanceof DDPError) this.forgetSubscription(id)
+        else delete this.endingSubscriptions[id]
         this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
         throw err
       })
   }
 
-  /** Unsubscribe from all active subscriptions, ignoring any the server refuses */
+  /**
+   * Unsubscribe from all active subscriptions, ignoring any the server refuses.
+   * A teardown of everything, so it ends each stream whoever else holds it.
+   */
   unsubscribeAll = () => {
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
+      delete this.subscriptionHolders[id]
       return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })
     return Promise.all(unsubAll).then(() => undefined)
