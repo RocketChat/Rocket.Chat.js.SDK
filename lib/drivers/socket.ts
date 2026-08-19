@@ -742,7 +742,6 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
-  /** Re-establish a recorded stream on the current connection, under its own id. */
   private resubscribe = (sub: RecordedDDPSubscription) =>
     this.queueSubscriptionRequest(sub.id, () => this.sendSubscription(sub.id, sub.name, sub.params))
 
@@ -812,7 +811,7 @@ export class Socket extends SDKEventEmitter {
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
     const recordedPerStream = () => streams.map((stream) => this.findSubscriptionsByParamPrefix(stream))
-    const resend = (subs: RecordedDDPSubscription[]) => Promise.all(
+    const resubscribeAll = (subs: RecordedDDPSubscription[]) => Promise.all(
       subs.map((sub) => this.resubscribe(sub))
     )
       .then((results) => {
@@ -840,7 +839,7 @@ export class Socket extends SDKEventEmitter {
         if (!perStream.every((subs) => subs.length > 0)) return
         inFlight = true
         const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as RecordedDDPSubscription[])
-        resend(recorded).then((value) => {
+        resubscribeAll(recorded).then((value) => {
           inFlight = false
           finish(value)
         })

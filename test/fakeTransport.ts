@@ -1,6 +1,7 @@
 import type WebSocketClient from 'universal-websocket-client'
 
 import type { Socket } from '../lib/drivers/socket'
+import type { ISocketMessageCallback } from '../interfaces'
 
 /**
  * The one and only way a spec gets a websocket: the transport module is mocked
@@ -203,11 +204,9 @@ export const flushMicrotasks = async (): Promise<void> => {
   for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
 }
 
-/** The `sub` frames among raw sent frames, parsed. */
 export const subFrames = (frames: string[]) =>
   frames.map((frame) => JSON.parse(frame)).filter((frame) => frame.msg === 'sub')
 
-/** The id of the last sent frame, which must be a `sub`. */
 export const expectLastSubId = (transport: FakeWebSocket): string => {
   const { msg, id } = transport.lastSent() as { msg: string, id: string }
   expect(msg).toBe('sub')
@@ -224,7 +223,7 @@ export const subscribeAndAck = async (
   transport: FakeWebSocket,
   name: string,
   params: any[],
-  callback?: any
+  callback?: ISocketMessageCallback
 ) => {
   const subscribing = socket.subscribe(name, params, callback)
   const { id } = transport.lastSent()
