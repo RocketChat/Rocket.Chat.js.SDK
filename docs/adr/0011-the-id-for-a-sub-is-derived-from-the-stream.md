@@ -58,7 +58,8 @@ the caller is handed the record that is already there.
 
 - **A DDP subscription is shared.** Two `subscribe` calls for one stream get one
   record, and the first `unsubscribe` ends the stream for every caller holding
-  it. A caller that needs a lifetime of its own needs an id of its own.
+  it. There is no way to ask for a private one: the id is derived, so a caller
+  cannot supply its own.
 - **A second holder's `unsubscribe()` rejects.** Once the first has ended the
   stream, the second finds no entry and gets `[ddp] No subscription to
   unsubscribe from`. That rejection was previously a redundant no-op on a

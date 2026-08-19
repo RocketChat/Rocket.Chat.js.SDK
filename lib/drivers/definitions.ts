@@ -10,6 +10,7 @@ import {
 export type RecordedSubscription = ISubscription & {
   id: string
   name: string
+  params: any[]
   onEvent: (callback: ISocketMessageCallback) => void
 }
 

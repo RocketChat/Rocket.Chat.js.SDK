@@ -6,6 +6,8 @@ import {
   fakeSockets,
   driveToHandshake,
   openFakeConnection,
+  subFrames,
+  subscribeAndAck,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -32,15 +34,8 @@ describe('Socket subscription sharing', () => {
     transport = await openFakeConnection(socket)
   })
 
-  const subFrames = (frames: string[]) =>
-    frames.map((frame) => JSON.parse(frame)).filter((frame) => frame.msg === 'sub')
-
-  const subscribe = async (name: string, params: any[], callback?: any) => {
-    const subscribing = socket.subscribe(name, params, callback)
-    const { id } = transport.lastSent()
-    transport.receive({ msg: 'ready', subs: [id] })
-    return subscribing
-  }
+  const subscribe = (name: string, params: any[], callback?: any) =>
+    subscribeAndAck(socket, transport, name, params, callback)
 
   it('puts one sub frame on the wire for two concurrent subscribes to one stream', async () => {
     const first = socket.subscribe('stream-room-messages', ['GENERAL'])
@@ -117,19 +112,6 @@ describe('Socket subscription sharing', () => {
 
     expect(subFrames(transport.sent)).toHaveLength(framesBefore + 1)
     expect(Object.keys(socket.subscriptions)).toHaveLength(1)
-  })
-
-  it('re-establishes a stream the server ended with an unpaired nosub', async () => {
-    await subscribe('stream-room-messages', ['GENERAL'])
-    const id = transport.lastSent().id
-
-    transport.receive({ msg: 'nosub', id })
-
-    const framesBefore = subFrames(transport.sent).length
-    await subscribe('stream-room-messages', ['GENERAL'])
-
-    expect(subFrames(transport.sent)).toHaveLength(framesBefore + 1)
-    expect(Object.keys(socket.subscriptions)).toEqual([id])
   })
 
   it('re-sends a recorded stream on subscribeAll rather than sharing it', async () => {

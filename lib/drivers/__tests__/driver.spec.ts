@@ -79,8 +79,6 @@ describe('Driver.subscribe', () => {
 
     transport.receive({ msg: 'ready', subs: [id] })
 
-    // The subscription holds the reshaped params rather than the ones the
-    // caller passed.
     await expect(subscribing).resolves.toMatchObject({
       id,
       name: 'stream-notify-room',

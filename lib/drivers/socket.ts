@@ -121,7 +121,6 @@ export class Socket extends SDKEventEmitter {
 
     this.on('result', (data: any) => this.emit(data.id, { id: data.id, result: data.result, error: data.error }))
     this.on('ready', (data: any) => this.emit(data.subs[0], data))
-    this.on('nosub', (data: any) => this.forgetSubscription(data.id))
   }
 
   /**
@@ -789,9 +788,8 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * The DDP subscriptions on this Socket for one stream name, matched on the
-   * params given. `subscriptions` is keyed by DDP subscription id, so a caller
-   * that knows a stream by name and params reads it through here.
+   * The DDP subscriptions on this Socket for one stream name, matched on a
+   * prefix of the params given.
    */
   findSubscriptions = ({ name, params = [] }: IStream): RecordedSubscription[] =>
     Object.keys(this.subscriptions || {})

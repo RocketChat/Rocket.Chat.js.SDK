@@ -202,3 +202,32 @@ export const driveToHandshake = async (transport: FakeWebSocket, session = 'fake
 export const flushMicrotasks = async (): Promise<void> => {
   for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
 }
+
+/** The `sub` frames among raw sent frames, parsed. */
+export const subFrames = (frames: string[]) =>
+  frames.map((frame) => JSON.parse(frame)).filter((frame) => frame.msg === 'sub')
+
+/** The id of the last sent frame, which must be a `sub`. */
+export const lastSubId = (transport: FakeWebSocket): string => {
+  const { msg, id } = transport.lastSent() as { msg: string, id: string }
+  expect(msg).toBe('sub')
+  return id
+}
+
+/**
+ * The server's `ready` carries the subscription id in `subs[0]`, and the
+ * driver re-emits it under that id — so acknowledging a subscription means
+ * naming the id it was created with.
+ */
+export const subscribeAndAck = async (
+  socket: Socket,
+  transport: FakeWebSocket,
+  name: string,
+  params: any[],
+  callback?: any
+) => {
+  const subscribing = socket.subscribe(name, params, callback)
+  const { id } = transport.lastSent()
+  transport.receive({ msg: 'ready', subs: [id] })
+  return subscribing
+}

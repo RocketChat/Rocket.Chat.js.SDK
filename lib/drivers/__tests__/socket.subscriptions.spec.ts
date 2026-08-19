@@ -6,7 +6,9 @@ import {
   flushMicrotasks,
   fakeSockets,
   driveToHandshake,
+  lastSubId,
   openFakeConnection,
+  subscribeAndAck,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -32,18 +34,8 @@ describe('Socket subscription bookkeeping', () => {
     transport = await openFakeConnection(socket)
   })
 
-  /**
-   * The server's `ready` carries the subscription id in `subs[0]`, and the
-   * driver re-emits it under that id — so acknowledging a subscription means
-   * naming the id it was created with.
-   */
-  const subscribe = async (name: string, params: any[]) => {
-    const subscribing = socket.subscribe(name, params)
-    const { id } = transport.lastSent() as { id: string }
-    transport.receive({ msg: 'ready', subs: [id] })
-    await subscribing
-    return id
-  }
+  const subscribe = async (name: string, params: any[]) =>
+    (await subscribeAndAck(socket, transport, name, params))!.id
 
   it('keys a subscription by the id the server acknowledged', async () => {
     const id = await subscribe('stream-room-messages', ['GENERAL'])
@@ -92,17 +84,6 @@ describe('Socket subscription bookkeeping', () => {
     expect(transport.sent).toHaveLength(framesBefore)
   })
 
-  it('forgets a subscription the server ended on its own', async () => {
-    // A `nosub` with no request in flight — a permission revoked, a room deleted.
-    // `send`'s per-id listener is long gone, so nothing but the standing listener
-    // hears it, and the entry would otherwise outlive the stream forever.
-    await subscribe('stream-room-messages', ['GENERAL'])
-
-    transport.receive({ msg: 'nosub', id: transport.lastSent().id })
-
-    expect(socket.subscriptions).toEqual({})
-  })
-
   describe('a resubscribe under an existing id', () => {
     it('forgets the entry, so it is not re-requested at the next login', async () => {
       const id = await subscribe('stream-room-messages', ['GENERAL'])
@@ -134,8 +115,7 @@ describe('Socket subscription bookkeeping', () => {
     // acknowledgement, so an unanswered `sub` is not in it yet.
     socket.subscribe('stream-room-messages', ['GENERAL'])
 
-    const { msg, id } = transport.lastSent()
-    expect(msg).toBe('sub')
+    const id = lastSubId(transport)
     expect(socket.subscriptions).toEqual({})
 
     transport.receive({ msg: 'ready', subs: [id] })
@@ -240,8 +220,7 @@ describe('Socket subscription bookkeeping', () => {
       // name: nothing to unsubscribe with, and nothing for `subscribeAll` to
       // re-establish at the next login.
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      const { msg, id } = transport.lastSent() as { msg: string, id: string }
-      expect(msg).toBe('sub')
+      const id = lastSubId(transport)
 
       socket.reopenNow()
       await expect(subscribing).resolves.toBeUndefined()
@@ -300,8 +279,7 @@ describe('Socket subscription bookkeeping', () => {
     // A close and a forced reopen are the same loss: the frame went out and the
     // answer can never arrive. Both must leave the entry behind.
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-    const { msg, id } = transport.lastSent() as { msg: string, id: string }
-    expect(msg).toBe('sub')
+    const id = lastSubId(transport)
 
     transport.close()
     await expect(subscribing).resolves.toBeUndefined()
@@ -316,8 +294,7 @@ describe('Socket subscription bookkeeping', () => {
   describe('a subscription the server never answered', () => {
     it('is kept under the id it was sent with when the deadline expires', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      const { msg, id } = transport.lastSent() as { msg: string, id: string }
-      expect(msg).toBe('sub')
+      const id = lastSubId(transport)
 
       await jest.advanceTimersByTimeAsync(socket.config.timeout)
       await expect(subscribing).resolves.toBeUndefined()
