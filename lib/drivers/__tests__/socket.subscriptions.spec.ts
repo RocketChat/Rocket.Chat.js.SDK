@@ -519,9 +519,6 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('subscribes afresh while an unsubscribe is still on the wire', async () => {
-      // The entry survives until the server answers the `unsub` (ADR-0004).
-      // Reusing it in that window hands the new caller a stream the server is
-      // about to end, with no `sub` ever sent for it.
       const subscription = await subscribe('stream-notify-logged', ['permissions-changed'])
       const unsubscribing = subscription!.unsubscribe()
       await flushMicrotasks()
@@ -550,9 +547,6 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('counts no holder for a subscriber the reconnect left with nothing', async () => {
-      // The `sub` was abandoned, so the first caller received `undefined` and
-      // holds nothing. The second caller is the only holder, and its
-      // `unsubscribe` has to end the stream.
       const abandoned = socket.subscribe('stream-notify-logged', ['permissions-changed'])
       socket.reopenNow()
       await expect(abandoned).resolves.toBeUndefined()
@@ -595,9 +589,19 @@ describe('Socket subscription bookkeeping', () => {
         .toMatchObject([{ msg: 'sub', name: 'stream-notify-logged' }])
     })
 
+    it('subscribes afresh once every subscription is unsubscribed, rather than reusing the request', async () => {
+      socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      await socket.unsubscribeAll()
+
+      const framesBefore = transport.sent.length
+      socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      await flushMicrotasks()
+
+      expect(transport.sent.slice(framesBefore).map((frame) => JSON.parse(frame)))
+        .toMatchObject([{ msg: 'sub', name: 'stream-notify-logged' }])
+    })
+
     it('unsubscribes only once the last holder lets go', async () => {
-      // Both holders share one subscription object, so there is one handle to
-      // let go with, twice.
       const subscription = await subscribe('stream-notify-logged', ['permissions-changed'])
       await socket.subscribe('stream-notify-logged', ['permissions-changed'])
 

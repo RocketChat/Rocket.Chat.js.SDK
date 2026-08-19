@@ -106,8 +106,10 @@ handed it are counted. An explicit id is not part of this rule.
   anything while any holder remains, and sends the `unsub` only for the last one.
   `forgetSubscription` drops the count with the entry, so the two are never out
   of step.
-- `unsubscribeAll` drops the holder count and the ending mark of every entry
-  before it unsubscribes anything. It is a teardown of everything, so it ends
+- `unsubscribeAll` drops the holder count, the ending mark and the in-flight
+  request of every entry before it unsubscribes anything. Leaving a request
+  behind would have a subscribe arriving in that window await a request whose
+  subscription is gone, and be answered with nothing. It is a teardown of everything, so it ends
   each stream whoever else holds it. This is what keeps ADR-0004's statement
   that `unsubscribeAll` sends `unsub` frames true once streams are shared, and with it the `logout` that awaits it.
 - The holder count and the ending mark are one state per subscription id, held

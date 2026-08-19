@@ -359,11 +359,7 @@ export class Socket extends SDKEventEmitter {
     this.forgetSubscriptionState(id)
   }
 
-  /**
-   * Drop every DDP subscription, one key at a time, in the same object, and
-   * every instruction about one. A state for an entry that is already gone
-   * would outlive it — a subscribe still settling writes one. See ADR-0011.
-   */
+  /** See ADR-0011. */
   forgetAllSubscriptions = () => {
     Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
     this.subscriptionStates = {}
@@ -832,32 +828,30 @@ export class Socket extends SDKEventEmitter {
     return subscription
   }
 
-  private holderCountOf = (id: string) => this.subscriptionStates[id]?.holders ?? 0
-
-  private isEnding = (id: string) => this.subscriptionStates[id]?.ending ?? false
+  private subscriptionState = (id: string) => (
+    this.subscriptionStates[id] || (this.subscriptionStates[id] = { holders: 0, ending: false })
+  )
 
   private addHolder = (id: string) => {
-    this.subscriptionStates[id] = { holders: this.holderCountOf(id) + 1, ending: this.isEnding(id) }
+    this.subscriptionState(id).holders += 1
   }
 
   private dropHolder = (id: string) => {
-    this.subscriptionStates[id] = { holders: this.holderCountOf(id) - 1, ending: this.isEnding(id) }
+    this.subscriptionState(id).holders -= 1
   }
 
   private markEnding = (id: string) => {
-    this.subscriptionStates[id] = { holders: this.holderCountOf(id), ending: true }
+    this.subscriptionState(id).ending = true
   }
 
-  /**
-   * Drop the count and the mark together, so an entry whose `unsub` failed is
-   * reusable again and inherits no holder that has let go. See ADR-0011.
-   */
+  private isEnding = (id: string) => this.subscriptionStates[id]?.ending ?? false
+
+  /** See ADR-0011. */
   private forgetSubscriptionState = (id: string) => {
     delete this.subscriptionStates[id]
   }
 
-  /** No count is an abandoned `sub`'s entry, which is still unsubscribable. */
-  private endsForNobodyElse = (id: string) => this.holderCountOf(id) <= 1
+  private hasOtherHolders = (id: string) => (this.subscriptionStates[id]?.holders ?? 0) > 1
 
   private sendSubscribe = (
     name: string,
@@ -986,7 +980,7 @@ export class Socket extends SDKEventEmitter {
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
 
-    if (!this.endsForNobodyElse(id)) {
+    if (this.hasOtherHolders(id)) {
       this.dropHolder(id)
       return Promise.resolve(undefined)
     }
@@ -1011,6 +1005,7 @@ export class Socket extends SDKEventEmitter {
    */
   unsubscribeAll = () => {
     this.subscriptionStates = {}
+    this.streamRequests = {}
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
       return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })
