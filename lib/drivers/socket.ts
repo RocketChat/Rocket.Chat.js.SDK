@@ -94,7 +94,7 @@ export class Socket extends SDKEventEmitter {
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
-  /** Holders counted per DDP subscription id. See ADR-0011. */
+  /** See ADR-0011. */
   private subscriptionHolders: { [id: string]: number } = {}
 
   /** Subscriptions whose `unsub` is on the wire, so no longer reusable. */
@@ -768,10 +768,10 @@ export class Socket extends SDKEventEmitter {
     const inFlight = this.streamRequests[streamKey]
     if (inFlight) {
       return inFlight
-        .then(() => this.holdSubscription(this.findSubscription({ name, params }, streamKey), callback))
+        .then(() => this.holdSubscription(this.findSubscription(name, streamKey), callback))
     }
 
-    const recorded = this.findSubscription({ name, params }, streamKey)
+    const recorded = this.findSubscription(name, streamKey)
     if (recorded) return Promise.resolve(this.holdSubscription(recorded, callback))
 
     return this.recordStreamRequest(streamKey, this.sendSubscribe(name, params, callback)
@@ -816,7 +816,7 @@ export class Socket extends SDKEventEmitter {
    * full: a prefix match would collapse two different `stream-notify-logged`
    * streams into one.
    */
-  private findSubscription = ({ name }: IStream, streamKey: string) =>
+  private findSubscription = (name: string, streamKey: string) =>
     this.findSubscriptions({ name }).find((subscription) => (
       subscription.id &&
       !this.endingSubscriptions.has(subscription.id) &&
@@ -1004,8 +1004,8 @@ export class Socket extends SDKEventEmitter {
    * A teardown of everything, so it ends each stream whoever else holds it.
    */
   unsubscribeAll = () => {
+    this.subscriptionHolders = {}
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
-      delete this.subscriptionHolders[id]
       return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })
     return Promise.all(unsubAll).then(() => undefined)

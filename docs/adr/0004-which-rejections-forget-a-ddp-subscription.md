@@ -60,9 +60,12 @@ refuses leaves none; the answer that never came is ADR-0006's.
   any other rejection. It re-throws on the rejection path and resolves with the
   DDP response's result on the other. The rejection a caller receives is
   unchanged by this ADR.
-- `unsubscribeAll` decides nothing of its own. Each `unsubscribe` decides its own
-  entry, and `unsubscribeAll` catches each failure so one refusal cannot stop the
-  rest, or stop the Method call that `logout` makes after it.
+- `unsubscribeAll` decides no entry's fate on a rejection. Each `unsubscribe`
+  decides its own entry, and `unsubscribeAll` catches each failure so one refusal
+  cannot stop the rest, or stop the Method call that `logout` makes after it. It
+  does decide that every stream ends whoever holds it, by dropping the holder
+  counts first — see ADR-0011 — which only makes each `unsub` reach the wire, and
+  leaves what its rejection then means to `unsubscribe`.
 - What a close does to the entries is settled by ADR-0009: once the close has
   run, no DDP response can arrive and no per-entry decision can run. A Socket
   the consuming app closed keeps no instruction to re-establish anything.

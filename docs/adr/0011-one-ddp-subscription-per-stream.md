@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Succeeds:** ADR-0010
+**Succeeds:** ADR-0006
 
 ## Context
 
@@ -106,7 +106,7 @@ handed it are counted. An explicit id is not part of this rule.
   anything while any holder remains, and sends the `unsub` only for the last one.
   `forgetSubscription` drops the count with the entry, so the two are never out
   of step.
-- `unsubscribeAll` drops the count for each id before unsubscribing it. It is a
+- `unsubscribeAll` drops every count before it unsubscribes anything. It is a
   teardown of everything, so it ends each stream whoever else holds it. This is
   what keeps ADR-0004's statement that `unsubscribeAll` sends `unsub` frames
   true once streams are shared, and with it the `logout` that awaits it.
