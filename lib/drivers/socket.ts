@@ -798,9 +798,9 @@ export class Socket extends SDKEventEmitter {
         params.every((param, index) => sub.params?.[index] === param)
       ))
 
-  private findConfirmedSubscription = ({ name, params = [] }: IStream): ISubscription | undefined =>
+  private hasConfirmedSubscription = ({ name, params = [] }: IStream): boolean =>
     this.findSubscriptions({ name, params })
-      .find((sub) => (
+      .some((sub) => (
         sub.params?.length === params.length &&
         sub.id !== undefined &&
         this.confirmedSubscriptionIds.has(sub.id)
@@ -820,7 +820,7 @@ export class Socket extends SDKEventEmitter {
         resolve(value)
       }
       const resolveIfConfirmed = () => {
-        if (streams.every((stream) => this.findConfirmedSubscription(stream))) {
+        if (streams.every(this.hasConfirmedSubscription)) {
           finish(true)
         }
       }

@@ -31,6 +31,8 @@ export const USER_DISCONNECT = 4000
  */
 export const fakeSockets: FakeWebSocket[] = []
 
+export const mostRecentFakeSocket = (): FakeWebSocket => fakeSockets[fakeSockets.length - 1]
+
 /**
  * A real class, not a three-property stub: `readyState` is read-only on the
  * declared transport type, and a mocked class is what lets a spec move it
@@ -203,20 +205,13 @@ export const flushMicrotasks = async (): Promise<void> => {
   for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
 }
 
-/**
- * Force a reconnect and drive the socket it builds through open and handshake.
- *
- * The reopen constructs its socket behind a promise the spec never gets to
- * hold, so the new fake is read out of the registry; passing `previous` pins
- * that a replacement was really built rather than the old one reused.
- */
 export const reopenAndHandshake = async (
   socket: Pick<Socket, 'reopenNow'>,
   previous?: FakeWebSocket,
   session = 'reopened-session'
 ): Promise<FakeWebSocket> => {
   const reopening = socket.reopenNow()
-  const reopened = fakeSockets[fakeSockets.length - 1]
+  const reopened = mostRecentFakeSocket()
   if (previous) expect(reopened).not.toBe(previous)
   await driveToHandshake(reopened, session)
   await reopening

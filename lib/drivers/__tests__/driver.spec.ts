@@ -7,6 +7,7 @@ import {
   FakeWebSocket,
   fakeSockets,
   flushMicrotasks,
+  mostRecentFakeSocket,
   openFakeConnection,
   reopenAndHandshake,
   useFakeClockAndSocketRegistry
@@ -132,7 +133,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     let resolved: boolean | undefined
-    waiting.then((value: boolean) => { resolved = value })
+    waiting.then((value) => { resolved = value })
 
     await jest.advanceTimersByTimeAsync(1)
     expect(resolved).toBeUndefined()
@@ -163,7 +164,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     let resolved: boolean | undefined
-    waiting.then((value: boolean) => { resolved = value })
+    waiting.then((value) => { resolved = value })
 
     driver.ddp.subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal')
     await jest.advanceTimersByTimeAsync(1)
@@ -205,6 +206,18 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     await expect(waiting).resolves.toBe(true)
   })
 
+  it('resolves true when one of two entries recorded for the same stream is confirmed', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver.ddp)
+    driver.userId = userId
+    await addMediaSubscription(driver, transport, 'media-signal')
+    driver.ddp.subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal-again')
+    transport.receive({ msg: 'nosub', id: 'sub-media-signal-again' })
+    await addMediaSubscription(driver, transport, 'media-calls')
+
+    await expect(driver.waitForNotifyUserMediaSubs()).resolves.toBe(true)
+  })
+
   describe('after a reopen', () => {
     it('resolves false at the deadline when no login re-confirms the entries', async () => {
       const driver = createDriver()
@@ -221,6 +234,24 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
       expect(reopened.sent).toHaveLength(sentBefore)
       await expect(waiting).resolves.toBe(false)
+    })
+
+    it('resolves true when the streams only land on the connection a reopen is still building', async () => {
+      const driver = createDriver()
+      await openFakeConnection(driver.ddp)
+      driver.userId = userId
+
+      const reopening = driver.reopenNow()
+      const reopened = mostRecentFakeSocket()
+      const waiting = driver.waitForNotifyUserMediaSubs()
+
+      await driveToHandshake(reopened, 'reopened-session')
+      await reopening
+
+      await addMediaSubscription(driver, reopened, 'media-signal')
+      await addMediaSubscription(driver, reopened, 'media-calls')
+
+      await expect(waiting).resolves.toBe(true)
     })
 
     it('resolves true after login re-sends and the server confirms on the new connection', async () => {
@@ -268,7 +299,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     let resolved: boolean | undefined
-    waiting.then((value: boolean) => { resolved = value })
+    waiting.then((value) => { resolved = value })
 
     await jest.advanceTimersByTimeAsync(timeout - 1)
     expect(resolved).toBeUndefined()

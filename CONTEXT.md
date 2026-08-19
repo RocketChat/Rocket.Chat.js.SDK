@@ -83,9 +83,7 @@ A recorded DDP subscription that is not a Confirmed sub — its `ready` never ar
 _Avoid_: Pending subscription, stale sub
 
 **Readiness**:
-Whether every stream a caller named is a Confirmed sub right now. The Socket
-records it and answers from the record — asking costs no wire traffic and sends
-no `sub`. Scoped to a connection, like the confirmations it reads.
+Whether every stream a caller named is a Confirmed sub right now. The Socket records it and answers from the record — asking costs no wire traffic and sends no `sub`. Scoped to a connection, like the confirmations it reads.
 _Avoid_: Ready state (that is the Transport's), live, healthy
 
 **Method call**:

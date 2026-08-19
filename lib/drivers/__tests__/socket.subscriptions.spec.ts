@@ -162,9 +162,8 @@ describe('Socket subscription bookkeeping', () => {
 
       const waiting = socket.whenReady(streams)
       let resolved: boolean | undefined
-      waiting.then((value: boolean) => { resolved = value })
+      waiting.then((value) => { resolved = value })
 
-      // One of the two is not enough.
       await jest.advanceTimersByTimeAsync(1)
       expect(resolved).toBeUndefined()
 
@@ -175,7 +174,7 @@ describe('Socket subscription bookkeeping', () => {
     it('waits when no entry exists yet', async () => {
       const waiting = socket.whenReady(streams)
       let resolved: boolean | undefined
-      waiting.then((value: boolean) => { resolved = value })
+      waiting.then((value) => { resolved = value })
 
       socket.subscribe('stream-notify-user', ['uid/media-signal'])
       await jest.advanceTimersByTimeAsync(1)
@@ -207,7 +206,7 @@ describe('Socket subscription bookkeeping', () => {
     it('takes its deadline from the configured timeout when given none', async () => {
       const waiting = socket.whenReady(streams)
       let resolved: boolean | undefined
-      waiting.then((value: boolean) => { resolved = value })
+      waiting.then((value) => { resolved = value })
 
       await jest.advanceTimersByTimeAsync(socket.config.timeout - 1)
       expect(resolved).toBeUndefined()
