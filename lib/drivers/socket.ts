@@ -49,6 +49,14 @@ const abandonedBySocketChange = '[ddp] connection replaced before the message wa
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
 const deadlineExpired = '[ddp] no response arrived before the deadline'
 
+const withSortedKeys = (_key: string, value: any) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  return Object.keys(value).sort().reduce((sorted: any, key) => {
+    sorted[key] = value[key]
+    return sorted
+  }, {})
+}
+
 class AbandonedWait extends Error {
   constructor (message?: string) {
     super(message)
@@ -93,6 +101,15 @@ export class Socket extends SDKEventEmitter {
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
+
+  /**
+   * Per subscription id: how many callers were handed it, and whether its
+   * `unsub` is on the wire, so no longer reusable. See ADR-0011.
+   */
+  private subscriptionStates: { [id: string]: { holders: number, ending: boolean } } = {}
+
+  /** The subscribe still in flight for a stream, so a second caller shares it. */
+  private streamRequests: { [streamKey: string]: Promise<ISubscription | undefined> } = {}
 
   /** Create a websocket handler */
   constructor (
@@ -347,11 +364,13 @@ export class Socket extends SDKEventEmitter {
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
     delete this.subscriptions[id]
+    this.forgetSubscriptionState(id)
   }
 
-  /** Drop every DDP subscription, one key at a time, in the same object. */
+  /** See ADR-0011. */
   forgetAllSubscriptions = () => {
     Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
+    this.streamRequests = {}
   }
 
   // Call open directly, so it skips openTimeout
@@ -734,10 +753,111 @@ export class Socket extends SDKEventEmitter {
    * reached the wire, and one whose connection is gone leave nothing behind, and
    * a resubscribe under an existing id that the server refuses forgets that
    * entry. See ADR-0004 and ADR-0006.
+   *
+   * One DDP subscription per stream: a caller that names no id and asks for a
+   * stream already recorded, or already in flight, is given a share of that one
+   * rather than a second id for the same stream. See ADR-0011.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
   subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback, id?: string) => {
+    if (id) return this.sendSubscribe(name, params, callback, id)
+
+    const streamKey = this.streamKeyOf({ name, params })
+    if (!streamKey) return this.sendSubscribe(name, params, callback)
+
+    const inFlight = this.streamRequests[streamKey]
+    if (inFlight) {
+      return inFlight
+        .then(() => this.shareSubscription(this.findSubscription(name, streamKey), callback))
+    }
+
+    const recorded = this.findSubscription(name, streamKey)
+    if (recorded) return Promise.resolve(this.shareSubscription(recorded, callback))
+
+    return this.recordStreamRequest(streamKey, this.sendSubscribe(name, params, callback)
+      .then((subscription) => this.shareSubscription(subscription)))
+  }
+
+  /** Keep a subscribe reachable as the one in flight for its stream, until it settles. */
+  private recordStreamRequest = (streamKey: string, subscribing: Promise<ISubscription | undefined>) => {
+    const forget = () => {
+      if (this.streamRequests[streamKey] === subscribing) delete this.streamRequests[streamKey]
+    }
+    this.streamRequests[streamKey] = subscribing
+    subscribing.then(forget, forget)
+    return subscribing
+  }
+
+  /**
+   * A stream's identity, as the serialised form of its name and params. Callers
+   * rebuild their params for every request, so two streams are the same by
+   * value rather than by reference, with object keys ordered so that the same
+   * params written in a different order still read as one stream. Params no
+   * serialiser can read yield no stream key, so such a call is never shared.
+   */
+  private streamKeyOf = ({ name, params = [] }: IStream) => {
+    try {
+      return JSON.stringify([name, params], withSortedKeys)
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * The recorded subscription for exactly this stream, and only while it is
+   * still reusable. Unlike `findSubscriptions`, the params have to match in
+   * full: a prefix match would collapse two different `stream-notify-logged`
+   * streams into one.
+   */
+  private findSubscription = (name: string, streamKey: string) =>
+    this.findSubscriptions({ name }).find((subscription) => (
+      subscription.id &&
+      !this.isEnding(subscription.id) &&
+      this.streamKeyOf({ name, params: subscription.params }) === streamKey
+    ))
+
+  private shareSubscription = (
+    subscription: ISubscription | undefined,
+    callback?: ISocketMessageCallback
+  ) => {
+    if (!subscription?.id) return undefined
+    if (callback) subscription.onEvent?.(callback)
+    this.addHolder(subscription.id)
+    return subscription
+  }
+
+  private subscriptionState = (id: string) => (
+    this.subscriptionStates[id] || (this.subscriptionStates[id] = { holders: 0, ending: false })
+  )
+
+  private addHolder = (id: string) => {
+    this.subscriptionState(id).holders += 1
+  }
+
+  private dropHolder = (id: string) => {
+    this.subscriptionState(id).holders -= 1
+  }
+
+  private markEnding = (id: string) => {
+    this.subscriptionState(id).ending = true
+  }
+
+  private isEnding = (id: string) => this.subscriptionStates[id]?.ending ?? false
+
+  /** See ADR-0011. */
+  private forgetSubscriptionState = (id: string) => {
+    delete this.subscriptionStates[id]
+  }
+
+  private hasOtherHolders = (id: string) => (this.subscriptionStates[id]?.holders ?? 0) > 1
+
+  private sendSubscribe = (
+    name: string,
+    params: any[],
+    callback?: ISocketMessageCallback,
+    id?: string
+  ) => {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
@@ -851,9 +971,20 @@ export class Socket extends SDKEventEmitter {
     return Promise.all(subscriptions)
   }
 
-  /** Unsubscribe to server stream, resolve with unsubscribe request result */
+  /**
+   * Let go of a server stream. Resolves with the unsubscribe request result for
+   * the last holder of the subscription, and with `undefined` for any holder
+   * before it, which sends no `unsub`. See ADR-0011.
+   */
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
+
+    if (this.hasOtherHolders(id)) {
+      this.dropHolder(id)
+      return Promise.resolve(undefined)
+    }
+
+    this.markEnding(id)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((data: any) => {
         this.forgetSubscription(id)
@@ -861,13 +992,19 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         if (err instanceof DDPError) this.forgetSubscription(id)
+        else this.forgetSubscriptionState(id)
         this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
         throw err
       })
   }
 
-  /** Unsubscribe from all active subscriptions, ignoring any the server refuses */
+  /**
+   * Unsubscribe from all active subscriptions, ignoring any the server refuses.
+   * A teardown of everything, so it ends each stream whoever else holds it.
+   */
   unsubscribeAll = () => {
+    this.subscriptionStates = {}
+    this.streamRequests = {}
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
       return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })

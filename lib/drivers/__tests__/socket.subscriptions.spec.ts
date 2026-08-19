@@ -453,6 +453,199 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
+  describe('subscribing twice to one stream', () => {
+    it('reuses the subscription rather than minting a second id', async () => {
+      await subscribe('stream-notify-logged', ['permissions-changed'])
+      const reused = await socket.subscribe('stream-notify-logged', ['permissions-changed'])
+
+      expect(reused).toMatchObject({ id: 'ddp-1' })
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+    })
+
+    it('reuses it when the params are rebuilt, as every Driver subscribe rebuilds them', async () => {
+      const options = () => ['permissions-changed', { useCollection: false, args: [] }]
+      await subscribe('stream-notify-logged', options())
+      const reused = await socket.subscribe('stream-notify-logged', options())
+
+      expect(reused).toMatchObject({ id: 'ddp-1' })
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+    })
+
+    it('keeps two streams of the same name apart', async () => {
+      await subscribe('stream-notify-logged', ['permissions-changed'])
+      await subscribe('stream-notify-logged', ['Users:NameChanged'])
+
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1', 'ddp-2'])
+    })
+
+    it('delivers the stream to the second subscriber too', async () => {
+      const first = jest.fn()
+      const second = jest.fn()
+      const subscribing = socket.subscribe('stream-notify-logged', ['permissions-changed'], first)
+      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+      await subscribing
+
+      await socket.subscribe('stream-notify-logged', ['permissions-changed'], second)
+      socket.emit('stream-notify-logged', { msg: 'changed' })
+
+      expect(first).toHaveBeenCalled()
+      expect(second).toHaveBeenCalled()
+    })
+
+    it('collapses two subscribes in flight at once', async () => {
+      const first = socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      const second = socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+
+      const [firstSub, secondSub] = await Promise.all([first, second])
+      expect(firstSub).toMatchObject({ id: 'ddp-1' })
+      expect(secondSub).toMatchObject({ id: 'ddp-1' })
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+    })
+
+    it('leaves the second caller with nothing when the server refuses the subscribe they joined', async () => {
+      const first = socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      const second = socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      const framesBefore = transport.sent.length
+      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
+
+      await expect(first).resolves.toBeUndefined()
+      await expect(second).resolves.toBeUndefined()
+      expect(socket.subscriptions).toEqual({})
+      expect(transport.sent).toHaveLength(framesBefore)
+    })
+
+    it('does not grow the registry when a reconnect re-runs the caller\'s subscribe', async () => {
+      await subscribe('stream-notify-logged', ['permissions-changed'])
+
+      socket.reopenNow()
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+
+      socket.subscribeAll()
+      await flushMicrotasks()
+      reopened.receive({ msg: 'ready', subs: ['ddp-1'] })
+      await socket.subscribe('stream-notify-logged', ['permissions-changed'])
+
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+    })
+
+    it('subscribes afresh while an unsubscribe is still on the wire', async () => {
+      const subscription = await subscribe('stream-notify-logged', ['permissions-changed'])
+      const unsubscribing = subscription!.unsubscribe()
+      await flushMicrotasks()
+      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+      socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+      await unsubscribing
+      await flushMicrotasks()
+
+      expect(transport.lastSent()).toMatchObject({
+        msg: 'sub',
+        name: 'stream-notify-logged'
+      })
+    })
+
+    it('reads the same params written in a different order as one stream', async () => {
+      await subscribe('stream-notify-logged', ['permissions-changed', { useCollection: false, args: [] }])
+      const reused = await socket.subscribe(
+        'stream-notify-logged',
+        ['permissions-changed', { args: [], useCollection: false }]
+      )
+
+      expect(reused).toMatchObject({ id: 'ddp-1' })
+      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+    })
+
+    it('counts no holder for a subscriber the reconnect left with nothing', async () => {
+      const abandoned = socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      socket.reopenNow()
+      await expect(abandoned).resolves.toBeUndefined()
+
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+      const subscription = await socket.subscribe('stream-notify-logged', ['permissions-changed'])
+
+      const unsubscribing = subscription!.unsubscribe()
+      await flushMicrotasks()
+      expect(reopened.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+      reopened.receive({ msg: 'result', id: 'ddp-1', result: true })
+      await unsubscribing
+      expect(socket.subscriptions['ddp-1']).toBeUndefined()
+    })
+
+    it('ends a shared stream when unsubscribing from all, whoever else holds it', async () => {
+      await subscribe('stream-notify-logged', ['permissions-changed'])
+      await socket.subscribe('stream-notify-logged', ['permissions-changed'])
+
+      const unsubscribing = socket.unsubscribeAll()
+      await flushMicrotasks()
+      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+      await unsubscribing
+      expect(Object.keys(socket.subscriptions)).toEqual([])
+    })
+
+    it('subscribes afresh once the subscriptions are forgotten, rather than reusing the request', async () => {
+      socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      socket.forgetAllSubscriptions()
+
+      const framesBefore = transport.sent.length
+      socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      await flushMicrotasks()
+
+      expect(transport.sent.slice(framesBefore).map((frame) => JSON.parse(frame)))
+        .toMatchObject([{ msg: 'sub', name: 'stream-notify-logged' }])
+    })
+
+    it('subscribes afresh once every subscription is unsubscribed, rather than reusing the request', async () => {
+      socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      await socket.unsubscribeAll()
+
+      const framesBefore = transport.sent.length
+      socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      await flushMicrotasks()
+
+      expect(transport.sent.slice(framesBefore).map((frame) => JSON.parse(frame)))
+        .toMatchObject([{ msg: 'sub', name: 'stream-notify-logged' }])
+    })
+
+    it('unsubscribes only once the last holder lets go', async () => {
+      const subscription = await subscribe('stream-notify-logged', ['permissions-changed'])
+      const shared = await socket.subscribe('stream-notify-logged', ['permissions-changed'])
+
+      await subscription!.unsubscribe()
+      expect(transport.lastSent()).toMatchObject({ msg: 'sub' })
+      expect(socket.subscriptions['ddp-1']).toBeDefined()
+
+      const unsubscribing = shared!.unsubscribe()
+      await flushMicrotasks()
+      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+
+      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+      await unsubscribing
+      expect(socket.subscriptions['ddp-1']).toBeUndefined()
+    })
+
+    it('lets the next holder end a stream whose unsubscribe the SDK itself rejected', async () => {
+      const subscription = await subscribe('stream-notify-logged', ['permissions-changed'])
+      transport.sendError = new Error('socket closed under the write')
+      await expect(subscription!.unsubscribe()).rejects.toThrow('socket closed under the write')
+      transport.sendError = null
+
+      await socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      const unsubscribing = socket.unsubscribe('ddp-1')
+      await flushMicrotasks()
+
+      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+      await unsubscribing
+    })
+  })
+
   describe('closing the connection', () => {
     it('forgets every subscription locally without sending an unsubscribe', async () => {
       await subscribe('stream-room-messages', ['GENERAL'])
