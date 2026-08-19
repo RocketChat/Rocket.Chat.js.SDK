@@ -17,11 +17,11 @@ The Socket holds its DDP subscriptions in `Socket.subscriptions`, keyed by id.
 instruction to re-establish that stream at the next Login.
 
 `unsubscribe` removed its entry before it sent the `unsub` DDP message. A DDP
-subscription that the server refused to end was then a stream the SDK could no
-longer name, and could neither retry nor re-establish. Moving the removal into
-the DDP response corrected that case and created the opposite one: every
-rejection kept the entry, including the rejection that says the server does not
-have the DDP subscription at all.
+subscription that the server refused to end was then a stream the SDK could not
+name, and could neither retry nor re-establish. Moving the removal into the DDP
+response corrected that case and created the opposite one: every rejection kept
+the entry, including the rejection that says the server does not have the DDP
+subscription at all.
 
 The two rejections are opposite in what they report.
 
@@ -37,8 +37,9 @@ point where the decision has to be made.
 
 ## Decision
 
-An entry is forgotten when the server has answered, and kept when it has not. An
-entry is written on the same terms.
+An entry is forgotten when the server has answered, and kept when it has not.
+`subscribe` writes its entry on the server's `ready`, and a `sub` the server
+refuses leaves none; the answer that never came is ADR-0006's.
 
 - `toError` returns a `DDPError`. Every value it produces is a `DDPError`,
   including the one it builds from a DDP error that arrived as a bare string.
@@ -46,40 +47,39 @@ entry is written on the same terms.
   ADR-0001, so the type marks provenance in the value itself, and a caller reads
   it with `instanceof`. A rejection the SDK originates under ADR-0003 is a plain
   `Error` and is therefore not a `DDPError`.
-- `subscribe` writes its entry when the server has answered. It is the only
-  writer, and it writes on the `ready` DDP response, under the id the server
-  confirmed. A `sub` the server refuses leaves nothing behind, and a `sub` sent
-  under an existing id that the server refuses forgets that entry: the server has
-  answered, and nothing is streaming, so there is no stream for a later Login to
-  re-establish. A `sub` whose response never arrives is settled by ADR-0006,
-  which keeps the entry because the server may still be streaming.
+- `subscribe` is the only writer of an entry, and where the server answers it
+  writes on the `ready` DDP response, under the id the server confirmed. A `sub`
+  the server refuses leaves nothing behind, and a `sub` sent under an existing id
+  that the server refuses forgets that entry: the server has answered, and
+  nothing is streaming, so there is no stream for a later Login to re-establish.
+  A `sub` whose response never arrives is settled by ADR-0006, which has
+  `subscribe` write an entry the `ready` never arrived to write, because the
+  server may still be streaming.
 - `unsubscribe` forgets its DDP subscription on a DDP response, whether that
   response succeeded or carried a DDP error. It keeps its DDP subscription on
-  any other rejection. It re-throws in both cases. The rejection a caller
-  receives is unchanged by this ADR.
+  any other rejection. It re-throws on the rejection path and resolves with the
+  DDP response's result on the other. The rejection a caller receives is
+  unchanged by this ADR.
 - `unsubscribeAll` decides nothing of its own. Each `unsubscribe` decides its own
   entry, and `unsubscribeAll` catches each failure so one refusal cannot stop the
   rest, or stop the Method call that `logout` makes after it.
-- `close` forgets every DDP subscription. `close` does not wait for the `unsub`
-  DDP messages it sends, and it tears the Socket down, so no DDP response can
-  arrive and no per-entry decision can run. A Socket the consuming app closed
-  keeps no instruction to re-establish anything.
+- What a close does to the entries is settled by ADR-0009: once the close has
+  run, no DDP response can arrive and no per-entry decision can run. A Socket
+  the consuming app closed keeps no instruction to re-establish anything.
 - A Reopen forgets nothing. Every entry survives, and that is what lets
   `subscribeAll` restore the streams after the next Login. This half of the rule
   is expressed by the absence of any removal on that path.
 - The removals are `forgetSubscription(id)` and `forgetAllSubscriptions()` on
   `Socket`. `forgetAllSubscriptions` removes one key at a time from the same
-  object. `Driver.subscriptions` is assigned `this.ddp.subscriptions` in
-  `connect`, so the Driver and the Socket hold one object between them. Putting a
-  fresh object in place of the old one would leave the Driver reading every entry
-  the clear was meant to drop.
+  object, and it does so by calling `forgetSubscription` for each id, so a single
+  removal and a clear leave through one path.
 
 ## Consequences
 
-- A DDP subscription the server refuses to end is no longer re-requested at every
-  Login for the life of the Socket. In practice a Rocket.Chat server answers
-  `unsub` with a bare `nosub` and no DDP error, so the corrected path is rare.
-  What changes is which behaviour the specs certify as correct.
+- A DDP subscription the server refuses to end is forgotten, so later Logins do
+  not re-request it for the life of the Socket. In practice a Rocket.Chat server
+  answers `unsub` with a bare `nosub` and no DDP error, so this path is rare. The
+  specs certify this behaviour as the correct one.
 - A caller that reads only `err.message` sees no difference. The `DDPError` type
   adds a distinction; it removes nothing. `name` stays `Error`, so nothing that
   matches on the name changes.
@@ -87,13 +87,14 @@ entry is written on the same terms.
   compiles this SDK from TypeScript source with its own toolchain, and a
   toolchain that downlevels classes breaks `instanceof` for a subclass of `Error`
   without it.
-- The rule now governs the writing of an entry as well as its removal, so a
-  refused resubscribe is no longer re-requested at every Login. `subscribe`
-  still swallows its own failure and resolves `undefined` rather than
-  re-throwing. A separate issue tracks that.
-- Whether a `sub` may be sent for an id whose `unsub` is still in flight is not
-  settled here, and the behaviour of the server in that case is not known. A
-  separate issue tracks the question.
+- The rule governs the writing of an entry as well as its removal, so a refused
+  resubscribe is forgotten and later Logins do not re-request it. `subscribe`
+  still swallows its own failure and resolves `undefined` rather than re-throwing.
+  A separate issue tracks that.
+- Whether a `sub` may be sent for an id whose `unsub` is still in flight is
+  settled by ADR-0005, which also draws the bound on the rule above: a DDP
+  response names what the server holds as long as one request is in flight under
+  that id, and ADR-0005 keeps it to one.
 - Applying the rule to the write reopens, on the `sub` path, the case the Context
   describes for `unsubscribe`. A Reopen rejects a `sub` that is still in flight,
   under ADR-0003, while the server may already be streaming. Which side to prefer

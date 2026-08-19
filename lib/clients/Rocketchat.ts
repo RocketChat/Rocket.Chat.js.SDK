@@ -1,19 +1,19 @@
-import type { ISocket, IStream } from '../drivers/definitions'
+import type { IStream } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
 import ApiRocketChat from '../api/RocketChat'
 import { ILoginResult, ICallback, ISubscription, ILoginCredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
-export default class RocketChatClient extends ApiRocketChat implements ISocket {
+export default class RocketChatClient extends ApiRocketChat {
   userId: string = ''
-  ddp: Driver
+  driver: Driver
 
   constructor ({ logger = Logger, ...config }: any) {
     super({ ...config, logger })
-    this.ddp = new Driver({ ...config, logger })
+    this.driver = new Driver({ ...config, logger })
   }
 
   async resume ({ token }: { token: string }) {
-    const login: ILoginResult = await this.ddp.login({ resume: token }, {})
+    const login: ILoginResult = await this.driver.login({ resume: token }, {})
     this.resumeLogin({ userId: login.id, authToken: login.token })
     return login
   }
@@ -23,25 +23,25 @@ export default class RocketChatClient extends ApiRocketChat implements ISocket {
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }
 
-  async connect (): Promise<any> { return this.ddp.connect() }
-  async disconnect (): Promise<any> { return this.ddp.disconnect() }
-  async checkAndReopen (): Promise<void> { return this.ddp.checkAndReopen() }
-  async onStreamData (event: string, cb: ICallback): Promise<any> { return this.ddp.onStreamData(event, cb) }
-  async subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined> { return (this.ddp as ISocket).subscribe(topic, ...args) }
-  async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return this.ddp.subscribeRaw(...args) }
-  async unsubscribe (subscription: ISubscription): Promise<any> { return this.ddp.unsubscribe(subscription) }
-  async unsubscribeAll (): Promise<any> { return this.ddp.unsubscribeAll() }
-  async resubscribeWhenRecorded (streams: IStream[], timeoutMs?: number): Promise<boolean> { return this.ddp.resubscribeWhenRecorded(streams, timeoutMs) }
-  async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return this.ddp.subscribeRoom(rid, ...args) }
-  async subscribeNotifyAll (): Promise<any> { return this.ddp.subscribeNotifyAll() }
-  async subscribeLoggedNotify (): Promise<any> { return this.ddp.subscribeLoggedNotify() }
-  async subscribeNotifyUser (): Promise<any> { return this.ddp.subscribeNotifyUser() }
+  async connect (): Promise<any> { return this.driver.connect() }
+  async disconnect (): Promise<any> { return this.driver.disconnect() }
+  async checkAndReopen (): Promise<void> { return this.driver.checkAndReopen() }
+  async onStreamData (event: string, cb: ICallback): Promise<any> { return this.driver.onStreamData(event, cb) }
+  async subscribe (topic: string, eventname: string, ...args: any[]): Promise<ISubscription | undefined> { return this.driver.subscribe(topic, eventname, ...args) }
+  async subscribeRaw (...args: any[]): Promise<ISubscription | undefined> { return this.driver.subscribeRaw(...args) }
+  async unsubscribe (subscription: ISubscription): Promise<any> { return this.driver.unsubscribe(subscription) }
+  async unsubscribeAll (): Promise<any> { return this.driver.unsubscribeAll() }
+  async resubscribeWhenRecorded (streams: IStream[], timeoutMs?: number): Promise<boolean> { return this.driver.resubscribeWhenRecorded(streams, timeoutMs) }
+  async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return this.driver.subscribeRoom(rid, ...args) }
+  async subscribeNotifyAll (): Promise<any> { return this.driver.subscribeNotifyAll() }
+  async subscribeLoggedNotify (): Promise<any> { return this.driver.subscribeLoggedNotify() }
+  async subscribeNotifyUser (): Promise<any> { return this.driver.subscribeNotifyUser() }
   get url () {
-    return Promise.resolve(this.ddp.config.host)
+    return Promise.resolve(this.driver.config.host)
   }
   async onMessage (cb: ICallback): Promise<any> {
-    return this.ddp.onMessage(cb)
+    return this.driver.onMessage(cb)
   }
-  async methodCall (method: string, ...args: any[]): Promise<ISubscription> { return this.ddp.methodCall(method, ...args) }
+  async methodCall (method: string, ...args: any[]): Promise<ISubscription> { return this.driver.methodCall(method, ...args) }
 
 }

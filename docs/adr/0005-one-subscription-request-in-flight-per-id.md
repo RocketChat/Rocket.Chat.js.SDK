@@ -40,8 +40,8 @@ substance at `METEOR@2.16` and `METEOR@1.8.1` — `Session` takes one message fr
 a session at a time, through a single `inQueue` drained by one worker, and its
 own design comment gives the reason: *"unsub needs to be ordered against sub"*.
 The handlers are `Session.prototype.protocol_handlers.sub` and `.unsub`; the
-names ADR-0004 and the issue used, `_livedata_sub` and `_livedata_unsub`, are
-not in the source. `unsub` is synchronous — `_stopSubscription` deletes the id
+names the issue used, `_livedata_sub` and `_livedata_unsub`, are not in the
+source. `unsub` is synchronous — `_stopSubscription` deletes the id
 from `_namedSubs` and sends `nosub` before the handler returns — so a following
 `sub` for that id finds nothing registered, does not take the idempotency early
 return that would otherwise drop it in silence, and is answered with its own
@@ -61,10 +61,11 @@ the first to have its DDP response before its own frame is written.
 - The wait ends on the response, whether it succeeded or carried a DDP error.
   Neither outcome is examined here — what a rejection does to the entry stays
   with ADR-0004.
-- Nothing bounds the wait but the request before it. There is no Deadline and no
-  bookkeeping about the connection. The amendment to ADR-0003 gives the reason: a
-  send cannot outlive the connection it was issued on, so every request settles,
-  and a chain always drains.
+- Nothing here bounds the wait but the request before it. The chain adds no
+  Deadline and no bookkeeping about the connection of its own: a subscription
+  request is a send, so it carries the Deadline ADR-0003 gives every send, and a
+  send cannot outlive the connection it was issued on. Every request settles, and
+  a chain always drains.
 - A request registers itself when it is queued, not when its frame is written. A
   third request must find the second and wait behind it. If the entry were
   written only at the moment the frame goes out, the second and the third would
@@ -81,7 +82,7 @@ the first to have its DDP response before its own frame is written.
 - Two `sub`s under one id, and two `unsub`s under one id, serialise on the same
   rule. Neither was known to lose data, but both left a second response with no
   listener.
-- A Login that runs while an `unsub` is in flight now re-establishes that stream
+- A Login that runs while an `unsub` is in flight re-establishes that stream
   after the server has ended it, rather than racing it. The end state is the one
   the entry describes.
 - `send` still correlates by id alone, and a listener stranded by a scheduled
@@ -99,5 +100,4 @@ the first to have its DDP response before its own frame is written.
 - No single place on `Socket` owns what happens to work in flight when the
   connection changes. That knowledge is in the abandon listeners of `send`, in
   `waitForOpen`, and in `reopenUnlessAbandoned`. This ADR removes one of the
-  places that held a piece of it. Whether the rest belongs together is open, and
-  is not a question for a correction of this fault.
+  places that held a piece of it.

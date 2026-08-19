@@ -29,8 +29,12 @@ import {
 
 import { IStream } from './definitions'
 import { DDPError, toError } from './ddpError'
-import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
+
+function hostToWS (host: string, ssl = false) {
+  host = host.replace(/^(https?:\/\/)?/, '')
+  return `ws${ssl ? 's' : ''}://${host}`
+}
 
 const userDisconnectCloseCode = 4000;
 const socketOpen = 1;
@@ -310,11 +314,8 @@ export class Socket extends SDKEventEmitter {
     })
 
   /**
-   * Disconnect the DDP from server and forget every subscription locally: the
-   * close ends them on the server, so no `unsub` is sent. A reopen during the
-   * wait that installed a different connection over this one supersedes the
-   * close: that socket and the subscriptions it filled are left as they are.
-   * See ADR-0003.
+   * Close the Transport and forget every DDP subscription locally.
+   * See ADR-0009.
    */
   close = async (): Promise<void> => {
     this.settleReopen?.()
