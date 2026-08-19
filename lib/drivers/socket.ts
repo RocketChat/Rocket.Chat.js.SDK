@@ -49,6 +49,14 @@ const abandonedBySocketChange = '[ddp] connection replaced before the message wa
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
 const deadlineExpired = '[ddp] no response arrived before the deadline'
 
+const withSortedKeys = (_key: string, value: any) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  return Object.keys(value).sort().reduce((sorted: any, key) => {
+    sorted[key] = value[key]
+    return sorted
+  }, {})
+}
+
 class AbandonedWait extends Error {
   constructor (message?: string) {
     super(message)
@@ -362,7 +370,6 @@ export class Socket extends SDKEventEmitter {
   /** See ADR-0011. */
   forgetAllSubscriptions = () => {
     Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
-    this.subscriptionStates = {}
     this.streamRequests = {}
   }
 
@@ -790,13 +797,6 @@ export class Socket extends SDKEventEmitter {
    * serialiser can read yield no stream key, so such a call is never shared.
    */
   private streamKeyOf = ({ name, params = [] }: IStream) => {
-    const withSortedKeys = (_key: string, value: any) => {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) return value
-      return Object.keys(value).sort().reduce((sorted: any, key) => {
-        sorted[key] = value[key]
-        return sorted
-      }, {})
-    }
     try {
       return JSON.stringify([name, params], withSortedKeys)
     } catch {
@@ -821,10 +821,9 @@ export class Socket extends SDKEventEmitter {
     subscription: ISubscription | undefined,
     callback?: ISocketMessageCallback
   ) => {
-    const id = subscription?.id
-    if (!subscription || !id) return undefined
+    if (!subscription?.id) return undefined
     if (callback) subscription.onEvent?.(callback)
-    this.addHolder(id)
+    this.addHolder(subscription.id)
     return subscription
   }
 
