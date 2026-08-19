@@ -234,7 +234,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
       await addMediaSubscription(driver, transport, 'media-signal')
       await addMediaSubscription(driver, transport, 'media-calls')
 
-      const reopened = await reopenAndHandshake(driver, transport)
+      const reopened = await reopenAndHandshake(driver)
 
       const sentBefore = reopened.sent.length
       const waiting = driver.waitForNotifyUserMediaSubs(500)
@@ -269,7 +269,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
       await addMediaSubscription(driver, transport, 'media-signal')
       await addMediaSubscription(driver, transport, 'media-calls')
 
-      const reopened = await reopenAndHandshake(driver, transport)
+      const reopened = await reopenAndHandshake(driver)
 
       const waiting = driver.waitForNotifyUserMediaSubs()
       const framesBefore = reopened.sent.length

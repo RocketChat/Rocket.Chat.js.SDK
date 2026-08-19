@@ -804,23 +804,26 @@ export class Socket extends SDKEventEmitter {
         params.every((param, index) => sub.params?.[index] === param)
       ))
 
-  private hasConfirmedSubscription = ({ name, params = [] }: IStream): boolean =>
-    this.findSubscriptions({ name, params })
-      .some((sub) => (
+  private hasConfirmedSubscription = ({ name, params = [] }: IStream): boolean => {
+    for (const id of this.confirmedSubscriptionIds) {
+      const sub = this.subscriptions[id]
+      if (
+        sub &&
+        sub.name === name &&
         sub.params?.length === params.length &&
-        sub.id !== undefined &&
-        this.confirmedSubscriptionIds.has(sub.id)
-      ))
+        params.every((param, index) => sub.params?.[index] === param)
+      ) return true
+    }
+    return false
+  }
 
   whenReady = (
     streams: IStream[],
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
+    if (streams.every(this.hasConfirmedSubscription)) return Promise.resolve(true)
     return new Promise<boolean>((resolve) => {
-      let settled = false
       const finish = (value: boolean) => {
-        if (settled) return
-        settled = true
         clearTimeout(deadline)
         this.readinessListeners.delete(resolveIfConfirmed)
         resolve(value)
@@ -832,7 +835,6 @@ export class Socket extends SDKEventEmitter {
       }
       const deadline = setTimeout(() => finish(false), timeoutMs)
       this.readinessListeners.add(resolveIfConfirmed)
-      resolveIfConfirmed()
     })
   }
 

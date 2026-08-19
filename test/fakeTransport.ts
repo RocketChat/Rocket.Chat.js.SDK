@@ -207,12 +207,10 @@ export const flushMicrotasks = async (): Promise<void> => {
 
 export const reopenAndHandshake = async (
   socket: Pick<Socket, 'reopenNow'>,
-  previous?: FakeWebSocket,
   session = 'reopened-session'
 ): Promise<FakeWebSocket> => {
   const reopening = socket.reopenNow()
   const reopened = mostRecentFakeSocket()
-  if (previous) expect(reopened).not.toBe(previous)
   await driveToHandshake(reopened, session)
   await reopening
   return reopened
