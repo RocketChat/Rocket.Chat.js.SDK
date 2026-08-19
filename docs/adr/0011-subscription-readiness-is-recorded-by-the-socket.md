@@ -24,7 +24,7 @@ is needed only works while the session is authenticated. A reopened connection
 is anonymous until the app logs in again, and that window is reachable: the app
 forces a reconnect on foreground and inside the call-accept path itself, and
 re-logs in only when a `close` flipped its stored connection state. On the
-anonymous session the server refuses the `sub` with an errored `nosub`, and per
+anonymous session the server refuses the `sub` with a failed `nosub`, and per
 ADR-0004 that refusal forgets the entry — the check destroys the state it
 checks. `loggedIn` cannot gate the re-send either: it is `connected &&
 !!resume`, `resume` survives across connections, and nothing clears it, so an
@@ -88,6 +88,6 @@ Readiness is recorded state; the query is derived; the query sends nothing.
   recorded state, and the Driver reopen test gains the Login the real app
   performs, plus a sibling pinning that a reopen without a login resolves
   `false` at the Deadline.
-- The two `nosub` shapes this work surfaced — an errored one forgets the
-  entry, an errorless one keeps it, and the SDK never inspects `msg` to tell
-  them apart — are unchanged here and tracked as #360.
+- The two `nosub` shapes this work surfaced — a failed one forgets the
+  entry, one without a DDP error keeps it, and the SDK never inspects `msg`
+  to tell them apart — are unchanged here and tracked as #360.
