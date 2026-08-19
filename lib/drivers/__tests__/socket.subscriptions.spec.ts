@@ -91,6 +91,17 @@ describe('Socket subscription bookkeeping', () => {
     expect(transport.sent).toHaveLength(framesBefore)
   })
 
+  it('forgets a subscription the server ended on its own', async () => {
+    // A `nosub` with no request in flight — a permission revoked, a room deleted.
+    // `send`'s per-id listener is long gone, so nothing but the standing listener
+    // hears it, and the entry would otherwise outlive the stream forever.
+    await subscribe('stream-room-messages', ['GENERAL'])
+
+    transport.receive({ msg: 'nosub', id: transport.lastSent().id })
+
+    expect(socket.subscriptions).toEqual({})
+  })
+
   describe('a resubscribe under an existing id', () => {
     it('forgets the entry, so it is not re-requested at the next login', async () => {
       await subscribe('stream-room-messages', ['GENERAL'])

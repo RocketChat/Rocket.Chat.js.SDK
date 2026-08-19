@@ -119,6 +119,7 @@ export class Socket extends SDKEventEmitter {
 
     this.on('result', (data: any) => this.emit(data.id, { id: data.id, result: data.result, error: data.error }))
     this.on('ready', (data: any) => this.emit(data.subs[0], data))
+    this.on('nosub', (data: any) => this.forgetSubscription(data.id))
   }
 
   /**
