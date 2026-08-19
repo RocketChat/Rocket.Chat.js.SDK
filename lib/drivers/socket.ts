@@ -30,8 +30,12 @@ import {
 
 import { IStream } from './definitions'
 import { DDPError, toError } from './ddpError'
-import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
+
+function hostToWS (host: string, ssl = false) {
+  host = host.replace(/^(https?:\/\/)?/, '')
+  return `ws${ssl ? 's' : ''}://${host}`
+}
 
 const userDisconnectCloseCode = 4000;
 const socketOpen = 1;
@@ -43,6 +47,7 @@ const abandonedByReopen = '[ddp] connection reopened before the response arrived
 const abandonedByClose = '[ddp] connection closed before the response arrived'
 const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
+const deadlineExpired = '[ddp] no response arrived before the deadline'
 
 class AbandonedWait extends Error {
   constructor (message?: string) {
@@ -59,6 +64,17 @@ class AbandonedRequest extends AbandonedWait {
   constructor (public id: string, message: string) {
     super(message)
     Object.setPrototypeOf(this, AbandonedRequest.prototype)
+  }
+}
+
+/**
+ * The wait for a DDP response ended by its Deadline, carrying the id so a caller
+ * can name what the server may still have acted on. See ADR-0003 and ADR-0006.
+ */
+class ExpiredWait extends Error {
+  constructor (public id: string) {
+    super(deadlineExpired)
+    Object.setPrototypeOf(this, ExpiredWait.prototype)
   }
 }
 
@@ -408,7 +424,9 @@ export class Socket extends SDKEventEmitter {
    * via the open/timeout paths.
    *
    * Past the deadline the promise resolves and `reopenPromise` is cleared even
-   * though the connection may still be down.
+   * though the connection may still be down. Whether that settle needs another
+   * Reopen is left to `rearmLivenessChain`, which asks whether anything is
+   * already running behind it.
    */
   reopenNow = (): Promise<void> => {
     if (this.reopenPromise) {
@@ -417,6 +435,9 @@ export class Socket extends SDKEventEmitter {
 
     this.reopenPromise = new Promise<void>(resolve => {
       this.cancelScheduledReopen()
+      // The next ping was scheduled for the connection this rebuild replaces, so
+      // it no longer answers for the one the driver will have.
+      this.cancelScheduledPing()
       this.lastPing = 0
       try {
         this.emit('disconnected')
@@ -441,7 +462,7 @@ export class Socket extends SDKEventEmitter {
 
       this.createConnection().catch(() => {})
 
-      const timeout = setTimeout(() => cleanup(), this.config.timeout)
+      const timeout = setTimeout(cleanup, this.config.timeout)
     })
 
     return this.reopenPromise
@@ -497,6 +518,10 @@ export class Socket extends SDKEventEmitter {
 
   private cancelLivenessChain = () => {
     delete this.pingInFlight
+    this.cancelScheduledPing()
+  }
+
+  private cancelScheduledPing = () => {
     if (!this.pingTimeout) return
     clearTimeout(this.pingTimeout as any)
     delete this.pingTimeout
@@ -551,11 +576,10 @@ export class Socket extends SDKEventEmitter {
    * some responses don't return the ID fallback to just matching on event name.
    * Data often includes an error attribute if something went wrong, but certain
    * types of calls send back a different `msg` value instead, e.g. `nosub`.
-   * @param obj       Object to be sent
-   * @param msg       The `data.msg` value to wait for in response
-   * @param errorMsg  An alternate `data.msg` value indicating an error response
+   * @param obj        Object to be sent
+   * @param deadlineMs How long to wait for the DDP response before rejecting
    */
-  send = async (obj: any): Promise<any> => {
+  send = async (obj: any, deadlineMs = this.config.timeout): Promise<any> => {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
@@ -608,10 +632,18 @@ export class Socket extends SDKEventEmitter {
         }
       }))
 
+      let deadlineTimer: NodeJS.Timer | number | undefined
+
       const removeListeners = () => {
+        clearTimeout(deadlineTimer as any)
         this.off(listener, onResponse)
         abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
       }
+
+      deadlineTimer = setTimeout(() => {
+        removeListeners()
+        reject(new ExpiredWait(id))
+      }, deadlineMs)
 
       const onResponse = (result: any) => {
         removeListeners()
@@ -637,21 +669,10 @@ export class Socket extends SDKEventEmitter {
       const pingedConnection = this.connection
       this.pingInFlight = pingedConnection
 
-      let deadline: NodeJS.Timer | number | undefined
-      const answered = new Promise<void>((_, expire) => {
-        deadline = setTimeout(
-          () => expire(new Error('[ddp] ping went unanswered')),
-          this.config.ping
-        )
-      })
-
-      Promise.race([this.send({ msg: 'ping' }), answered])
+      this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.armLivenessChain(pingedConnection))
         .catch(this.reopenUnlessAbandoned)
-        .finally(() => {
-          delete this.pingInFlight
-          clearTimeout(deadline as any)
-        })
+        .finally(() => { delete this.pingInFlight })
     }, this.config.ping)
   }
 
@@ -744,8 +765,8 @@ export class Socket extends SDKEventEmitter {
    * a session at a time and answers in that order, so waiting for the response
    * is enough to keep one request per id on the wire.
    *
-   * Nothing bounds the wait but the request before it. A send that loses its
-   * connection is abandoned rather than left pending, so a chain always drains.
+   * The wait is bounded by the request before it, which each send bounds in
+   * turn with its own deadline, so a chain always drains.
    */
   private queueSubscriptionRequest = <T>(id: string | undefined, request: () => Promise<T>): Promise<T> => {
     if (!id) return request()
@@ -771,8 +792,9 @@ export class Socket extends SDKEventEmitter {
    * Sole owner of `subscriptions`: the entry is written when the server
    * acknowledged the `sub`, or when its answer was abandoned after the frame went
    * out on a connection that is still installed. A refused `sub`, one that never
-   * reached the wire, and one whose connection is gone leave nothing behind.
-   * See ADR-0006.
+   * reached the wire, and one whose connection is gone leave nothing behind, and
+   * a resubscribe under an existing id that the server refuses forgets that
+   * entry. See ADR-0004 and ADR-0006.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -785,8 +807,10 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        if (err instanceof AbandonedRequest) {
+        if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
           this.rememberSubscription(err.id, name, params, callback)
+        } else if (id && err instanceof DDPError) {
+          this.forgetSubscription(id)
         }
         return undefined
       })

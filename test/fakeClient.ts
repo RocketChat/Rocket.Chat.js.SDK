@@ -1,14 +1,8 @@
 import type { IClient } from '../lib/api/api'
 
-/**
- * Every request is recorded with the options the Api built for it and left
- * pending until the spec resolves or rejects it, so a spec can hold a request
- * open across an `abort()`.
- */
-
 export interface FakeRequest {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE'
-  url: string
+  endpoint: string
   data: any
   options: { signal?: AbortSignal }
   apiVersion: string
@@ -23,21 +17,30 @@ const abortError = (): Error => {
 }
 
 export class FakeClient implements IClient {
-  headers: any = {}
+  host: string = ''
 
   requests: FakeRequest[] = []
 
-  get = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
-    this.record('GET', url, data, options, apiVersion)
+  headers: any = {}
 
-  post = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
-    this.record('POST', url, data, options, apiVersion)
+  private readonly replies: any[] = []
 
-  put = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
-    this.record('PUT', url, data, options, apiVersion)
+  enqueueReply (...replies: any[]): void {
+    this.replies.push(...replies)
+  }
 
-  delete = (url: string, data: any, options?: any, apiVersion: string = 'v1') =>
-    this.record('DELETE', url, data, options, apiVersion)
+  get (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.record('GET', endpoint, data, options, apiVersion)
+  }
+  post (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.record('POST', endpoint, data, options, apiVersion)
+  }
+  put (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.record('PUT', endpoint, data, options, apiVersion)
+  }
+  delete (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.record('DELETE', endpoint, data, options, apiVersion)
+  }
 
   lastRequest (): FakeRequest {
     return this.requests[this.requests.length - 1]
@@ -45,17 +48,19 @@ export class FakeClient implements IClient {
 
   private record (
     method: FakeRequest['method'],
-    url: string,
+    endpoint: string,
     data: any,
     options: any,
-    apiVersion: string
+    apiVersion: string = 'v1'
   ): Promise<any> {
     return new Promise((resolve, reject) => {
-      const request: FakeRequest = { method, url, data, options, apiVersion, resolve, reject }
-      this.requests.push(request)
+      this.requests.push({ method, endpoint, data, options, apiVersion, resolve, reject })
+
       const { signal } = options || {}
       if (signal?.aborted) return reject(abortError())
       signal?.addEventListener('abort', () => reject(abortError()))
+
+      if (this.replies.length) resolve(this.replies.shift())
     })
   }
 }

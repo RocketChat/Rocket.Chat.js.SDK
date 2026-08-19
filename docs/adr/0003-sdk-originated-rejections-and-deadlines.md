@@ -107,8 +107,9 @@ an Error that the SDK writes.
   `'[ddp] connection reopened before the response arrived'`, and a close with
   `'[ddp] connection closed before the response arrived'` — a close is not a
   Reopen, and a caller retrying on the wrong one retries into a closed Socket.
-  This is not a Deadline, and the paragraph above still holds: nothing here bounds
-  a Method call on a connection that stays up and stays silent.
+  This is not a Deadline, and when this was written nothing here bounded a Method
+  call on a connection that stays up and stays silent — the fourth amendment below
+  is what does.
   One window stays open to all three events: `send` attaches its listeners a
   microtask after `waitForOpen` resolves, so a connection lost in between is
   announced to nobody, and a guard at that point abandons the wait instead. The
@@ -225,7 +226,51 @@ an Error that the SDK writes.
   unchanged, because the connection is read before the write either way. What
   changes is that a quiet connection is no longer a bounded case at all. The
   rule is the one the first amendment states: the connection, not a clock.
-- **Fourth amendment.** A scheduled Reopen replaces the connection, and no
+- **Fourth amendment.** `send` has a Deadline for the DDP response now, and the
+  paragraph refusing it above no longer holds. The rule that the connection ends
+  the wait stays, and every ending it names still ends it first — this Deadline
+  answers the one case no connection event reaches, where the connection stays up
+  and the server simply never answers. `alive()` is refreshed by any readable
+  frame, so a Socket carrying other traffic never Reopens, and before this the one
+  Method call the server dropped waited for the life of the process, holding the
+  caller's promise and leaking its listeners.
+  The default bound is `config.timeout`, the option that already means how long a
+  caller is willing to wait for an answer, so an app that wants a different one
+  moves the option it already has. The only new public surface is an optional
+  per-send bound, which `ping` uses. The refusal above said the correct bound for
+  a Login is not the ping interval; it is not, and this Deadline is not the ping
+  interval.
+  `ping` is the one caller that names its own, and it still names `config.ping`,
+  so the consequence above holds on the Transport open path: the bound on the pong
+  is the ping interval there, and an app patient with a Method call is not thereby
+  slower to notice a dead pipe. The Deadline starts after the write, not at the
+  call, so a ping issued while the Socket is not Transport open first waits out
+  the wait on `open` — up to `config.reopen * 2` — and only then the ping
+  interval.
+  `ping` no longer races its send against a Deadline of its own, because the
+  Deadline it needed is now the one every send has. What it does when that
+  Deadline expires is unchanged.
+  An expired Deadline rejects with a plain Error under the rule at the top of this
+  ADR — `'[ddp] no response arrived before the deadline'`. It is deliberately
+  **not** an Abandoned wait: no connection went away, so nobody has answered the
+  fault, and `ping` and the retry inside `reopen` do Reopen on it. For every other
+  caller the rejection is the whole answer: the Socket stays Transport open, and
+  nothing rebuilds it on account of one unanswered call. Deciding that a
+  connection is dead stays with the Liveness chain, which is the only thing that
+  asks the question. The Deadline ends a wait; it does not diagnose a connection.
+  It carries the id, for the reason ADR-0006 gives: the DDP message was written to
+  the transport and no answer came, so a `sub` that expires keeps its entry
+  exactly as an abandoned one does. The type is unexported and sets no `name`, so
+  a caller sees an ordinary Error and the message above.
+  The Deadline covers each send that waits for a DDP response, the handshake
+  included — an `open()` against a server that accepts the socket and never
+  answers the handshake now rejects rather than hanging. The rejection is the
+  whole answer for a consumer that called `open()` itself: the transport stays
+  open with no DDP session behind it and nothing schedules a Reopen. Only the
+  retry inside `reopen()`, which routes the rejection through
+  `reopenUnlessAbandoned`, retries on the schedule `config.reopen` sets. A `pong`
+  waits for nothing and arms no Deadline.
+- **Fifth amendment.** A scheduled Reopen replaces the connection, and no
   longer consults `connected` or opens through `open`, which declines to replace a
   connection that reads as connected. The one case where it does not build a
   connection of its own is a Reopen already in flight: it joins that rebuild
@@ -241,9 +286,18 @@ an Error that the SDK writes.
   the chain when it settles, through `rearmLivenessChain`, so it covers its public
   callers too: a consumer-invoked `reopenNow` that settled on its Deadline used to
   leave the chain with nothing scheduled — issue #294 through the public surface.
-  Its own retry no longer routes through `reopenUnlessAbandoned`, because
-  `reopenNow` swallows a creation error and settles on its own Deadline, leaving no
-  rejection to branch on.
+  It no longer schedules a Reopen of its own on that Deadline either: the re-arm
+  is the whole answer, and asking twice armed one behind a chain that was already
+  running. There is nothing to route through `reopenUnlessAbandoned` in any case,
+  because `reopenNow` swallows a creation error and settles on its own Deadline,
+  leaving no rejection to branch on.
+  The rebuild cancels the ping the chain had scheduled, because that ping was
+  scheduled for the connection it replaces. Left standing it answered the re-arm's
+  question for a connection it was not armed for, and its remaining delay is
+  whatever is left of `config.ping` — so a rebuild whose handshake never lands sat
+  unwatched for up to a ping interval instead of getting a Reopen after
+  `config.reopen`. A ping already in flight is not cancelled with it: that one is
+  tracked against its connection and answers the question on its own terms.
   Every other place the chain can end holds a rejection, and each of the three
   routes it through `reopenUnlessAbandoned`, the one point that decides whether a
   failure asks for a Reopen: an unanswered `ping`, a handshake that did not
@@ -272,8 +326,8 @@ an Error that the SDK writes.
   Reopen, and the rebuild was left with the connection set, the chain unarmed and
   nothing scheduled — issue #294, in the one shape that survived every amendment
   above: a rebuild whose transport opens and whose `connect` is never answered
-  gets no rejection at all, since `send` has no Deadline for a DDP response, so
-  `reopenNow`'s own Deadline is the only thing left to re-arm the chain. A ping in
+  waits out the Deadline the fourth amendment gave `send` before anything rejects,
+  and `reopenNow`'s own Deadline is what re-arms the chain in the meantime. A ping in
   flight on a replaced connection therefore counts as nothing scheduled. A ping in
   flight on the connection the driver still has counts as the chain running, which
   is what a Reopen that could not build anything reads.
@@ -344,7 +398,7 @@ an Error that the SDK writes.
   — issue #294 again, this time chosen by the peer. `onClose` records the
   connection the driver started a close on and compares it, so a server-sent 4000
   Reopens like any other code.
-  `ping` no longer wrote anything by the fourth amendment — the write moved into
+  `ping` no longer wrote anything by this amendment — the write moved into
   the timer — so it is named `armLivenessChain`, and the pong continuation, which
   did the same two things behind one more guard, is the same method: it takes the
   connection the ping went out on, and the current connection is the default for

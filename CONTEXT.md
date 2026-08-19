@@ -32,6 +32,47 @@ _Avoid_: Msg, post, chat
 **Reaction**:
 An emoji attached to an existing message by a user.
 
+### REST
+
+**Api**:
+The REST half of a Client — every request to the server's HTTP API, plus the
+identity those requests are made under. A Client is an Api; it extends one and
+adds the realtime side.
+_Avoid_: API (unqualified — that is the server's), REST driver, service
+
+**Endpoint**:
+The name of one REST operation, passed to Api without a host or an api version —
+`chat.sendMessage`, `users.info`. Not a URL.
+_Avoid_: Route, path, URL, method (that is GET, POST, PUT or DELETE)
+
+**Api version**:
+The version segment of the request URL, `v1` unless a call overrides it.
+Per-request, not per-Client.
+_Avoid_: API version of the server, release
+
+**REST client**:
+The thing that actually performs an Endpoint request over HTTP — builds the URL
+from a host, an Api version and the Endpoint, carries the auth headers, and
+returns a status and a body. Behind `IClient`, and swappable: a Client builds the
+SDK's own if it is handed none. Say REST client, never Client — an unqualified
+Client is the SDK entry point below. The class implementing the SDK's own is
+named `Client` in `lib/api/api.ts`, which is the one place the two names touch;
+it is not exported, and nothing outside that file should name it.
+_Avoid_: Client (unqualified), http client, transport, fetcher
+
+**IClient**:
+The interface a REST client satisfies — the four verb methods and the headers a
+Login sets. What Api depends on, so a consuming app or a spec can supply its own.
+_Avoid_: Client interface (ambiguous with the entry point)
+
+**Current login**:
+The authenticated identity Api holds after a Login — username, user id, auth
+token and the login result. A Login resumed from a token knows neither the
+username nor the result. Set on login and cleared on logout; `loggedIn()`
+reports on it.
+_Avoid_: Session, credentials (those are what a Login is given, not what it
+yields), user
+
 ### Realtime
 
 **Client**:
@@ -116,3 +157,7 @@ _Avoid_: Timeout — that is a config option, and several Deadlines are derived 
 **Abandoned wait**:
 A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline — no clock decides it, the connection does. A DDP message waiting to be written is abandoned on the same rule: it belongs to the connection it was issued on and is never written to the one that replaces it.
 _Avoid_: Cancelled, timed out
+
+**Expired wait**:
+A wait the SDK ends because its Deadline rang — a clock decides it, not the connection. Not an Abandoned wait — no connection went away, and what it waited for may still arrive, too late to answer the caller; the Socket stays Transport open, and whether the connection itself is dead stays with the Liveness chain. A DDP subscription whose wait expires keeps its entry on the same rule as an abandoned one: its `sub` reached the wire, and the server may still have acted on it.
+_Avoid_: Expired request (the term names the wait, not the rejection), timed out

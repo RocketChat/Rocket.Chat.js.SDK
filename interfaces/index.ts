@@ -12,8 +12,10 @@ export interface ILogger {
  * @param host        Host URL:PORT, converted to websocket protocol
  * @param useSsl      Use SSL (https/wss) to connect
  * @param timeout     How long to wait (ms) before abandoning connection, and
- *                    the value several other deadlines are derived from — each
- *                    is documented where it is used
+ *                    also how long any send that waits for a DDP response waits
+ *                    for it once the message is written. The value several other
+ *                    deadlines are derived from — each is documented where it
+ *                    is used
  * @param reopen      ms interval before attempting reopens on disconnect. Twice
  *                    this is also how long a send waits for the connection to
  *                    open before it is rejected, so the deadline outlasts the
@@ -148,6 +150,13 @@ export interface ILoginResultAPI {
     authToken: string
     userId: string
   }
+}
+
+export interface ICurrentLogin {
+  username: string | null
+  userId: string
+  authToken: string
+  result: ILoginResultAPI | null
 }
 
 /** Error-first callback param type */

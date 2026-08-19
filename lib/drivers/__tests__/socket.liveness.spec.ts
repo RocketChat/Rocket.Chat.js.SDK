@@ -205,6 +205,8 @@ describe('Socket liveness', () => {
     const tickWithoutPong = () => tick()
     const tickWithUnreadableMessage = () => tick(() => transport.receiveRaw('not json'))
 
+    const pingCount = () => transport.sent.filter(frame => JSON.parse(frame).msg === 'ping').length
+
     it('reschedules itself, leaving exactly one pending timer per tick', async () => {
       expect(jest.getTimerCount()).toBe(1)
 
@@ -218,18 +220,62 @@ describe('Socket liveness', () => {
       }
     })
 
+    it('bounds the wait for the pong by the ping interval, not the timeout', async () => {
+      const impatient = new Socket({
+        host: 'localhost:3000',
+        logger: createSilentLogger(),
+        ping: PING_INTERVAL,
+        timeout: PING_INTERVAL * 10
+      })
+      const impatientTransport = await openFakeConnection(impatient)
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL)
+      expect(impatientTransport.lastSent()).toEqual({ msg: 'ping' })
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
+      expect(impatient.openTimeout).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(1)
+      expect(impatient.openTimeout).toBeDefined()
+
+      await impatient.close()
+    })
+
+    it('starts the pong wait only once the ping is written, not when it fires on a dropped socket', async () => {
+      transport.readyState = CLOSED
+
+      await jest.advanceTimersToNextTimerAsync()
+
+      expect(transport.sent).toHaveLength(1)
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL)
+
+      expect(transport.sent).toHaveLength(1)
+      expect(socket.openTimeout).toBeUndefined()
+
+      transport.readyState = OPEN
+      socket.emit('open')
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
+      expect(socket.openTimeout).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(1)
+      expect(socket.openTimeout).toBeDefined()
+    })
+
     it('reconnects when one pong is withheld', async () => {
-      // This test used to pin the opposite: the chain died for good, because the
-      // ping's send went out while `connected` was still true, waited forever on
-      // a pong reply, and the `.catch(() => this.reopen())` behind it never ran.
-      // `ping` now races its send against a deadline of its own, so the withheld
-      // pong is what triggers the reconnect rather than what prevents it.
+      // The withheld pong is what triggers the reconnect: the ping's send is
+      // bounded by the ping interval it names, so a server that stays open and
+      // silent still ends the wait.
       await tickWithPong()
       await tickWithPong()
 
       await tickWithoutPong()
 
-      // The ping's own deadline, the one timer the unanswered send leaves behind.
+      // The deadline the ping gave its send, the one timer it leaves behind.
       expect(jest.getTimerCount()).toBe(1)
 
       // One millisecond past the deadline, which is also one past the aliveness
@@ -373,6 +419,15 @@ describe('Socket liveness', () => {
       return replacement
     }
 
+    /**
+     * A send whose own Deadline cannot be what ends it, so the rebuild is what
+     * the tests below are left proving. Every send has a Deadline of
+     * `config.timeout`, which here is the ping interval the whole file is
+     * arithmetic about — shorter than the walk to the scheduled reopen.
+     */
+    const sendOutlastingTheRebuild = () =>
+      socket.send({ msg: 'method', method: 'anything' }, PING_INTERVAL * 100)
+
     const replacementWithoutHandshake = async () => {
       const replacement = await advanceToScheduledReopen()
 
@@ -403,7 +458,7 @@ describe('Socket liveness', () => {
     })
 
     it('ends a send left pending by rebuilding, however alive the socket reads', async () => {
-      const pending = socket.send({ msg: 'method', method: 'anything' })
+      const pending = sendOutlastingTheRebuild()
       const settled = jest.fn()
       pending.then(settled, settled)
 
@@ -419,7 +474,7 @@ describe('Socket liveness', () => {
     })
 
     it('rebuilds for a server that keeps sending frames and never answers a ping', async () => {
-      const pending = socket.send({ msg: 'method', method: 'anything' })
+      const pending = sendOutlastingTheRebuild()
       pending.catch(() => undefined)
 
       await scheduleReopenByWithholdingPong()
@@ -435,7 +490,7 @@ describe('Socket liveness', () => {
     })
 
     it('schedules another reopen when the replacement never completes its handshake', async () => {
-      const pending = socket.send({ msg: 'method', method: 'anything' })
+      const pending = sendOutlastingTheRebuild()
       const settled = jest.fn()
       pending.then(settled, settled)
 
@@ -482,7 +537,7 @@ describe('Socket liveness', () => {
         throw new Error('consumer listener')
       })
 
-      const pending = socket.send({ msg: 'method', method: 'anything' })
+      const pending = sendOutlastingTheRebuild()
       pending.catch(() => undefined)
 
       await scheduleReopenByWithholdingPong()
@@ -513,6 +568,47 @@ describe('Socket liveness', () => {
       await socket.close()
 
       expect(jest.getTimerCount()).toBe(0)
+    })
+
+    it('keeps pinging when the reopen it asked for finds the socket healthy again', async () => {
+      // The ping goes out, its reply deadline expires, and a reopen is scheduled.
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
+      expect(pingCount()).toBe(1)
+      expect(socket.openTimeout).toBeDefined()
+
+      // A frame arriving just before the reopen fires leaves the socket reading
+      // as connected. The reopen replaces it anyway, and the chain the
+      // replacement's handshake arms is what keeps the pings coming.
+      await jest.advanceTimersByTimeAsync(socket.config.reopen - 1)
+      transport.receive({ msg: 'updated' })
+      await jest.advanceTimersByTimeAsync(1)
+
+      expect(fakeSockets).toHaveLength(2)
+      transport = fakeSockets[1]
+      await driveToHandshake(transport)
+
+      const pingsBeforeIdle = pingCount()
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 3)
+      expect(pingCount()).toBeGreaterThan(pingsBeforeIdle)
+    })
+
+    it('keeps pinging when a rebuild abandons the ping in flight', async () => {
+      await jest.advanceTimersToNextTimerAsync()
+      expect(pingCount()).toBe(1)
+
+      // The rebuild abandons the ping's wait, so `reopenUnlessAbandoned`
+      // declines: the rebuild, not the ping, answers for the connection now.
+      const reopening = socket.reopenNow()
+      await jest.advanceTimersByTimeAsync(0)
+
+      transport = fakeSockets[1]
+      await driveToHandshake(transport)
+      await reopening
+
+      expect(socket.openTimeout).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(PING_INTERVAL)
+      expect(pingCount()).toBe(1)
     })
   })
 })

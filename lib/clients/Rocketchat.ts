@@ -1,9 +1,9 @@
 import type { ISocket, IStream } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
-import ClientRest from '../api/RocketChat'
-import { ISocketOptions, ICallback, ISubscription, ICredentials } from '../../interfaces'
+import ApiRocketChat from '../api/RocketChat'
+import { ILoginResult, ICallback, ISubscription, ICredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
-export default class RocketChatClient extends ClientRest implements ISocket {
+export default class RocketChatClient extends ApiRocketChat implements ISocket {
   userId: string = ''
   ddp: Driver
 
@@ -13,7 +13,9 @@ export default class RocketChatClient extends ClientRest implements ISocket {
   }
 
   async resume ({ token }: { token: string }) {
-    return this.ddp.login({ token } as any, {})
+    const login: ILoginResult = await this.ddp.login({ token } as any, {})
+    this.resumeLogin({ userId: login.id, authToken: login.token })
+    return login
   }
 
   async login (credentials: ICredentials) {
@@ -21,7 +23,7 @@ export default class RocketChatClient extends ClientRest implements ISocket {
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }
 
-  async connect (options: ISocketOptions): Promise<any> { return this.ddp.connect(options) }
+  async connect (): Promise<any> { return this.ddp.connect() }
   async disconnect (): Promise<any> { return this.ddp.disconnect() }
   async checkAndReopen (): Promise<void> { return this.ddp.checkAndReopen() }
   async onStreamData (event: string, cb: ICallback): Promise<any> { return this.ddp.onStreamData(event, cb) }
