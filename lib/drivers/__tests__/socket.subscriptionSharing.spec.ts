@@ -178,6 +178,24 @@ describe('Socket subscription sharing', () => {
     transport.receive({ msg: 'ready', subs: [id] })
   })
 
+  it('resolves false when another request on the same id holds the queue past its deadline', async () => {
+    const subscription = await subscribe('stream-notify-user', ['uid/media-signal'])
+
+    // The `unsub` is on the wire and unanswered, so it still holds the id's
+    // queue and the entry it will remove is still there for the poll to find.
+    subscription!.unsubscribe()
+    const framesBefore = subFrames(transport.sent).length
+
+    const waiting = socket.resubscribeWhenRecorded([
+      { name: 'stream-notify-user', params: ['uid/media-signal'] }
+    ], 500)
+
+    await jest.advanceTimersByTimeAsync(500)
+
+    await expect(waiting).resolves.toBe(false)
+    expect(subFrames(transport.sent)).toHaveLength(framesBefore)
+  })
+
   it('leaves one record after a reconnect resubscribes and the caller subscribes again', async () => {
     await subscribe('stream-room-messages', ['GENERAL'])
 
