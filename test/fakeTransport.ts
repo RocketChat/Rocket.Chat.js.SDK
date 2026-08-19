@@ -207,7 +207,7 @@ export const flushMicrotasks = async (): Promise<void> => {
 export const subFrames = (frames: string[]) =>
   frames.map((frame) => JSON.parse(frame)).filter((frame) => frame.msg === 'sub')
 
-export const expectLastSubId = (transport: FakeWebSocket): string => {
+export const lastSubId = (transport: FakeWebSocket): string => {
   const { msg, id } = transport.lastSent() as { msg: string, id: string }
   expect(msg).toBe('sub')
   return id

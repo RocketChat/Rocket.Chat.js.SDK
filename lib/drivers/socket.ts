@@ -26,7 +26,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
-import { IStream, RecordedDDPSubscription } from './definitions'
+import { IStream, RecordedDDPSubscription, IDDPSubscriptionRequest } from './definitions'
 import { DDPError, toError } from './ddpError'
 import { sha256 } from 'js-sha256'
 
@@ -47,7 +47,7 @@ const abandonedBySocketChange = '[ddp] connection replaced before the message wa
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
 const deadlineExpired = '[ddp] no response arrived before the deadline'
 
-/** One stream is one id, so `subscriptions[id]` is the dedup index. See ADR-0011. */
+/** See ADR-0011. */
 const subscriptionId = (name: string, params: any[]) =>
   `sub-${name}-${sha256(JSON.stringify(params))}`
 
@@ -736,30 +736,28 @@ export class Socket extends SDKEventEmitter {
     const id = subscriptionId(name, params)
     return this.queueSubscriptionRequest(id, () => {
       const shared = this.subscriptions[id]
-      if (!shared) return this.sendSubscription(id, name, params, callback)
+      if (!shared) return this.sendSubscription({ id, name, params }, callback)
       if (callback) shared.onEvent(callback)
       return Promise.resolve(shared)
     })
   }
 
   private resubscribe = (sub: RecordedDDPSubscription) =>
-    this.queueSubscriptionRequest(sub.id, () => this.sendSubscription(sub.id, sub.name, sub.params))
+    this.queueSubscriptionRequest(sub.id, () => this.sendSubscription(sub))
 
   private sendSubscription = (
-    id: string,
-    name: string,
-    params: any[],
+    stream: IDDPSubscriptionRequest,
     callback?: ISocketMessageCallback
-  ) => this.send({ msg: 'sub', id, name, params })
+  ) => this.send({ msg: 'sub', ...stream })
     .then((result) => {
-      if (result.subs?.length) return this.rememberSubscription(id, name, params, callback)
+      if (result.subs?.length) return this.rememberSubscription(stream, callback)
     })
     .catch((err) => {
       this.logger.error(`[ddp] Subscribe error: ${err.message}`)
       if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
-        this.rememberSubscription(id, name, params, callback)
+        this.rememberSubscription(stream, callback)
       } else if (err instanceof DDPError) {
-        this.forgetSubscription(id)
+        this.forgetSubscription(stream.id)
       }
       return undefined
     })
@@ -772,9 +770,7 @@ export class Socket extends SDKEventEmitter {
    * the server.
    */
   private rememberSubscription = (
-    id: string,
-    name: string,
-    params: any[],
+    { id, name, params }: IDDPSubscriptionRequest,
     callback?: ISocketMessageCallback
   ) => {
     if (!this.connection) return

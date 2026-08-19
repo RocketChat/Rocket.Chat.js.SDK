@@ -7,10 +7,13 @@ import {
   IRealtimeCredentials
 } from '../../interfaces'
 
-export type RecordedDDPSubscription = ISubscription & {
+export interface IDDPSubscriptionRequest {
   id: string
   name: string
   params: any[]
+}
+
+export type RecordedDDPSubscription = ISubscription & IDDPSubscriptionRequest & {
   onEvent: (callback: ISocketMessageCallback) => void
 }
 

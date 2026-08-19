@@ -6,7 +6,7 @@ import {
   flushMicrotasks,
   fakeSockets,
   driveToHandshake,
-  expectLastSubId,
+  lastSubId,
   openFakeConnection,
   subscribeAndAck,
   useFakeClockAndSocketRegistry
@@ -115,7 +115,7 @@ describe('Socket subscription bookkeeping', () => {
     // acknowledgement, so an unanswered `sub` is not in it yet.
     socket.subscribe('stream-room-messages', ['GENERAL'])
 
-    const id = expectLastSubId(transport)
+    const id = lastSubId(transport)
     expect(socket.subscriptions).toEqual({})
 
     transport.receive({ msg: 'ready', subs: [id] })
@@ -220,7 +220,7 @@ describe('Socket subscription bookkeeping', () => {
       // name: nothing to unsubscribe with, and nothing for `subscribeAll` to
       // re-establish at the next login.
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      const id = expectLastSubId(transport)
+      const id = lastSubId(transport)
 
       socket.reopenNow()
       await expect(subscribing).resolves.toBeUndefined()
@@ -279,7 +279,7 @@ describe('Socket subscription bookkeeping', () => {
     // A close and a forced reopen are the same loss: the frame went out and the
     // answer can never arrive. Both must leave the entry behind.
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-    const id = expectLastSubId(transport)
+    const id = lastSubId(transport)
 
     transport.close()
     await expect(subscribing).resolves.toBeUndefined()
@@ -294,7 +294,7 @@ describe('Socket subscription bookkeeping', () => {
   describe('a subscription the server never answered', () => {
     it('is kept under the id it was sent with when the deadline expires', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      const id = expectLastSubId(transport)
+      const id = lastSubId(transport)
 
       await jest.advanceTimersByTimeAsync(socket.config.timeout)
       await expect(subscribing).resolves.toBeUndefined()
