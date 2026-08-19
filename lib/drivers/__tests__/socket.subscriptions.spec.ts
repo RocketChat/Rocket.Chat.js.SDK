@@ -39,17 +39,18 @@ describe('Socket subscription bookkeeping', () => {
    */
   const subscribe = async (name: string, params: any[]) => {
     const subscribing = socket.subscribe(name, params)
-    const { id } = transport.lastSent()
+    const { id } = transport.lastSent() as { id: string }
     transport.receive({ msg: 'ready', subs: [id] })
-    return subscribing
+    await subscribing
+    return id
   }
 
   it('keys a subscription by the id the server acknowledged', async () => {
-    await subscribe('stream-room-messages', ['GENERAL'])
+    const id = await subscribe('stream-room-messages', ['GENERAL'])
 
-    expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
-    expect(socket.subscriptions['ddp-1']).toMatchObject({
-      id: 'ddp-1',
+    expect(Object.keys(socket.subscriptions)).toEqual([id])
+    expect(socket.subscriptions[id]).toMatchObject({
+      id,
       name: 'stream-room-messages',
       params: ['GENERAL']
     })
@@ -58,22 +59,22 @@ describe('Socket subscription bookkeeping', () => {
   it('resubscribes everything under the existing id rather than minting a new one', async () => {
     // The resume path after a reconnect: `login` calls `subscribeAll`, which
     // must re-establish the *same* subscription, not a second one alongside it.
-    await subscribe('stream-room-messages', ['GENERAL'])
+    const id = await subscribe('stream-room-messages', ['GENERAL'])
 
     const resubscribing = socket.subscribeAll()
 
     expect(transport.lastSent()).toEqual({
       msg: 'sub',
-      id: 'ddp-1',
+      id,
       name: 'stream-room-messages',
       params: ['GENERAL']
     })
 
-    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    transport.receive({ msg: 'ready', subs: [id] })
     await resubscribing
 
     // One entry, still under the original id — a minted id would leave two.
-    expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+    expect(Object.keys(socket.subscriptions)).toEqual([id])
   })
 
   it('holds nothing for a subscription the server refused', async () => {
@@ -81,7 +82,7 @@ describe('Socket subscription bookkeeping', () => {
     // subscription left an entry nobody owned: never acknowledged, never
     // unsubscribed, and resubscribed by `subscribeAll` forever.
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-    transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
+    transport.receive({ msg: 'nosub', id: transport.lastSent().id, error: { reason: 'no such stream' } })
 
     await expect(subscribing).resolves.toBeUndefined()
     expect(socket.subscriptions).toEqual({})
@@ -104,10 +105,10 @@ describe('Socket subscription bookkeeping', () => {
 
   describe('a resubscribe under an existing id', () => {
     it('forgets the entry, so it is not re-requested at the next login', async () => {
-      await subscribe('stream-room-messages', ['GENERAL'])
+      const id = await subscribe('stream-room-messages', ['GENERAL'])
 
       const resubscribing = socket.subscribeAll()
-      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
+      transport.receive({ msg: 'nosub', id, error: { reason: 'no such stream' } })
       await resubscribing
 
       expect(socket.subscriptions).toEqual({})
@@ -118,13 +119,13 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('keeps the entry when a reopen abandons the wait, since the server may still be streaming', async () => {
-      await subscribe('stream-room-messages', ['GENERAL'])
+      const id = await subscribe('stream-room-messages', ['GENERAL'])
 
       const resubscribing = socket.subscribeAll()
       socket.reopenNow()
       await resubscribing
 
-      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+      expect(Object.keys(socket.subscriptions)).toEqual([id])
     })
   })
 
@@ -133,20 +134,21 @@ describe('Socket subscription bookkeeping', () => {
     // acknowledgement, so an unanswered `sub` is not in it yet.
     socket.subscribe('stream-room-messages', ['GENERAL'])
 
-    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+    const { msg, id } = transport.lastSent()
+    expect(msg).toBe('sub')
     expect(socket.subscriptions).toEqual({})
 
-    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    transport.receive({ msg: 'ready', subs: [id] })
   })
 
   describe('finding a subscription by name and params', () => {
     it('matches on the stream name and the params given', async () => {
-      await subscribe('stream-notify-user', ['uid/media-signal', false])
+      const signalId = await subscribe('stream-notify-user', ['uid/media-signal', false])
       await subscribe('stream-notify-user', ['uid/media-calls', false])
       await subscribe('stream-room-messages', ['GENERAL'])
 
       expect(socket.findSubscriptions({ name: 'stream-notify-user', params: ['uid/media-signal'] }))
-        .toMatchObject([{ id: 'ddp-1', params: ['uid/media-signal', false] }])
+        .toMatchObject([{ id: signalId, params: ['uid/media-signal', false] }])
       expect(socket.findSubscriptions({ name: 'stream-notify-user' })).toHaveLength(2)
       expect(socket.findSubscriptions({ name: 'stream-notify-user', params: ['uid/media-video'] })).toEqual([])
       expect(socket.findSubscriptions({ name: 'stream-room-messages' })).toHaveLength(1)
@@ -157,7 +159,7 @@ describe('Socket subscription bookkeeping', () => {
 
       expect(socket.findSubscriptions({ name: 'stream-notify-user' })).toEqual([])
 
-      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+      transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
     })
   })
 
@@ -168,7 +170,7 @@ describe('Socket subscription bookkeeping', () => {
     ]
 
     it('waits for every stream, then re-sends each under its own id', async () => {
-      await subscribe('stream-notify-user', ['uid/media-signal'])
+      const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
 
       const waiting = socket.resubscribeWhenRecorded(streams)
       let resolved: boolean | undefined
@@ -178,19 +180,19 @@ describe('Socket subscription bookkeeping', () => {
       await jest.advanceTimersByTimeAsync(100)
       expect(resolved).toBeUndefined()
 
-      await subscribe('stream-notify-user', ['uid/media-calls'])
+      const callsId = await subscribe('stream-notify-user', ['uid/media-calls'])
       const sentBefore = transport.sent.length
       await jest.advanceTimersByTimeAsync(100)
 
       expect(transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame))).toEqual([
-        { msg: 'sub', id: 'ddp-1', name: 'stream-notify-user', params: ['uid/media-signal'] },
-        { msg: 'sub', id: 'ddp-2', name: 'stream-notify-user', params: ['uid/media-calls'] }
+        { msg: 'sub', id: signalId, name: 'stream-notify-user', params: ['uid/media-signal'] },
+        { msg: 'sub', id: callsId, name: 'stream-notify-user', params: ['uid/media-calls'] }
       ])
 
       // Readiness is the server's ack, not the send.
       expect(resolved).toBeUndefined()
-      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
-      transport.receive({ msg: 'ready', subs: ['ddp-2'] })
+      transport.receive({ msg: 'ready', subs: [signalId] })
+      transport.receive({ msg: 'ready', subs: [callsId] })
 
       await expect(waiting).resolves.toBe(true)
     })
@@ -220,12 +222,12 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('resolves false when the server refuses one of the resubscribes', async () => {
-      await subscribe('stream-notify-user', ['uid/media-signal'])
-      await subscribe('stream-notify-user', ['uid/media-calls'])
+      const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
+      const callsId = await subscribe('stream-notify-user', ['uid/media-calls'])
 
       const waiting = socket.resubscribeWhenRecorded(streams)
-      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
-      transport.receive({ msg: 'nosub', id: 'ddp-2' })
+      transport.receive({ msg: 'ready', subs: [signalId] })
+      transport.receive({ msg: 'nosub', id: callsId })
 
       await expect(waiting).resolves.toBe(false)
     })
@@ -238,14 +240,15 @@ describe('Socket subscription bookkeeping', () => {
       // name: nothing to unsubscribe with, and nothing for `subscribeAll` to
       // re-establish at the next login.
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+      const { msg, id } = transport.lastSent() as { msg: string, id: string }
+      expect(msg).toBe('sub')
 
       socket.reopenNow()
       await expect(subscribing).resolves.toBeUndefined()
 
-      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
-      expect(socket.subscriptions['ddp-1']).toMatchObject({
-        id: 'ddp-1',
+      expect(Object.keys(socket.subscriptions)).toEqual([id])
+      expect(socket.subscriptions[id]).toMatchObject({
+        id,
         name: 'stream-room-messages',
         params: ['GENERAL']
       })
@@ -253,6 +256,7 @@ describe('Socket subscription bookkeeping', () => {
 
     it('is re-established under that same id at the next login', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      const { id } = transport.lastSent()
       socket.reopenNow()
       await subscribing
 
@@ -265,7 +269,7 @@ describe('Socket subscription bookkeeping', () => {
 
       expect(reopened.sent.slice(framesBefore).map((frame) => JSON.parse(frame))).toEqual([{
         msg: 'sub',
-        id: 'ddp-1',
+        id,
         name: 'stream-room-messages',
         params: ['GENERAL']
       }])
@@ -273,6 +277,7 @@ describe('Socket subscription bookkeeping', () => {
 
     it('can be unsubscribed from, unlike one that was never written', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      const { id } = transport.lastSent() as { id: string }
       socket.reopenNow()
       await subscribing
 
@@ -281,12 +286,12 @@ describe('Socket subscription bookkeeping', () => {
 
       // Nothing to await: the point is that the `unsub` goes out at all. Without
       // the entry, `unsubscribe` rejects up front and never reaches the wire.
-      const unsubscribing = socket.unsubscribe('ddp-1').catch((err) => err)
+      const unsubscribing = socket.unsubscribe(id).catch((err) => err)
       await flushMicrotasks()
 
-      expect(reopened.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+      expect(reopened.lastSent()).toEqual({ msg: 'unsub', id })
 
-      reopened.receive({ msg: 'result', id: 'ddp-1', result: true })
+      reopened.receive({ msg: 'result', id, result: true })
       await unsubscribing
     })
   })
@@ -295,13 +300,14 @@ describe('Socket subscription bookkeeping', () => {
     // A close and a forced reopen are the same loss: the frame went out and the
     // answer can never arrive. Both must leave the entry behind.
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-    expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+    const { msg, id } = transport.lastSent() as { msg: string, id: string }
+    expect(msg).toBe('sub')
 
     transport.close()
     await expect(subscribing).resolves.toBeUndefined()
 
-    expect(socket.subscriptions['ddp-1']).toMatchObject({
-      id: 'ddp-1',
+    expect(socket.subscriptions[id]).toMatchObject({
+      id,
       name: 'stream-room-messages',
       params: ['GENERAL']
     })
@@ -310,13 +316,14 @@ describe('Socket subscription bookkeeping', () => {
   describe('a subscription the server never answered', () => {
     it('is kept under the id it was sent with when the deadline expires', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      expect(transport.lastSent()).toMatchObject({ msg: 'sub', id: 'ddp-1' })
+      const { msg, id } = transport.lastSent() as { msg: string, id: string }
+      expect(msg).toBe('sub')
 
       await jest.advanceTimersByTimeAsync(socket.config.timeout)
       await expect(subscribing).resolves.toBeUndefined()
 
-      expect(socket.subscriptions['ddp-1']).toMatchObject({
-        id: 'ddp-1',
+      expect(socket.subscriptions[id]).toMatchObject({
+        id,
         name: 'stream-room-messages',
         params: ['GENERAL']
       })
@@ -367,16 +374,16 @@ describe('Socket subscription bookkeeping', () => {
 
   describe('unsubscribing from a live subscription', () => {
     it('keeps its bookkeeping until the server acknowledges', async () => {
-      await subscribe('stream-room-messages', ['GENERAL'])
+      const id = await subscribe('stream-room-messages', ['GENERAL'])
 
-      const unsubscribing = socket.unsubscribe('ddp-1')
+      const unsubscribing = socket.unsubscribe(id)
 
       // The `unsub` DDP message is on the wire and unanswered, so the
       // subscription is still the driver's to name.
-      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
-      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+      expect(transport.lastSent()).toEqual({ msg: 'unsub', id })
+      expect(Object.keys(socket.subscriptions)).toEqual([id])
 
-      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+      transport.receive({ msg: 'result', id, result: true })
       await expect(unsubscribing).resolves.toBe(true)
 
       // Acknowledged — now it is gone.
@@ -387,10 +394,10 @@ describe('Socket subscription bookkeeping', () => {
       // A `nosub` carrying a DDP error is the server saying it does not have
       // this subscription. Keeping the entry would have `subscribeAll` re-ask
       // for a stream nobody wants, on every login, for the life of the socket.
-      await subscribe('stream-room-messages', ['GENERAL'])
+      const id = await subscribe('stream-room-messages', ['GENERAL'])
 
-      const unsubscribing = socket.unsubscribe('ddp-1')
-      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
+      const unsubscribing = socket.unsubscribe(id)
+      transport.receive({ msg: 'nosub', id, error: { reason: 'no such subscription' } })
       await expect(unsubscribing).rejects.toThrow('no such subscription')
       await expect(unsubscribing).rejects.toMatchObject({ reason: 'no such subscription' })
 
@@ -398,19 +405,19 @@ describe('Socket subscription bookkeeping', () => {
 
       await socket.subscribeAll()
 
-      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+      expect(transport.lastSent()).toEqual({ msg: 'unsub', id })
     })
 
     it('keeps the subscription when the rejection is the SDK\'s own', async () => {
       // No DDP response arrived, so the server may well still be streaming: the
       // driver must still hold the id to resubscribe with.
-      await subscribe('stream-room-messages', ['GENERAL'])
+      const id = await subscribe('stream-room-messages', ['GENERAL'])
 
-      const unsubscribing = socket.unsubscribe('ddp-1')
+      const unsubscribing = socket.unsubscribe(id)
       socket.reopenNow()
       await expect(unsubscribing).rejects.toThrow('[ddp] connection reopened before the response arrived')
 
-      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
+      expect(Object.keys(socket.subscriptions)).toEqual([id])
     })
   })
 
@@ -419,13 +426,13 @@ describe('Socket subscription bookkeeping', () => {
       // `unsubscribeAll` does not wipe the collection: each unsubscribe decides
       // its own entry. It is a best-effort cleanup, so one refusal does not fail
       // the whole call — and a refusal the server sent forgets its entry too.
-      await subscribe('stream-room-messages', ['GENERAL'])
-      await subscribe('stream-notify-user', ['alice/message'])
+      const messagesId = await subscribe('stream-room-messages', ['GENERAL'])
+      const notifyId = await subscribe('stream-notify-user', ['alice/message'])
 
       const unsubscribingAll = socket.unsubscribeAll()
 
-      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
-      transport.receive({ msg: 'nosub', id: 'ddp-2', error: { reason: 'no such subscription' } })
+      transport.receive({ msg: 'result', id: messagesId, result: true })
+      transport.receive({ msg: 'nosub', id: notifyId, error: { reason: 'no such subscription' } })
       await unsubscribingAll
 
       expect(socket.subscriptions).toEqual({})
@@ -433,27 +440,27 @@ describe('Socket subscription bookkeeping', () => {
 
     it('leaves behind the ones the SDK rejected itself', async () => {
       // Nothing reached the server, so both streams may still be running.
-      await subscribe('stream-room-messages', ['GENERAL'])
-      await subscribe('stream-notify-user', ['alice/message'])
+      const messagesId = await subscribe('stream-room-messages', ['GENERAL'])
+      const notifyId = await subscribe('stream-notify-user', ['alice/message'])
 
       const unsubscribingAll = socket.unsubscribeAll()
       socket.reopenNow()
       await unsubscribingAll
 
-      expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1', 'ddp-2'])
+      expect(Object.keys(socket.subscriptions)).toEqual([messagesId, notifyId])
     })
 
     it('still logs out when the server refuses an unsubscribe', async () => {
       // `logout` unsubscribes first and then calls the method. A refusal that
       // failed the whole cleanup would strand the user logged in on the server.
-      await subscribe('stream-room-messages', ['GENERAL'])
+      const id = await subscribe('stream-room-messages', ['GENERAL'])
 
       // The handler goes on immediately: a driver that fails the cleanup rejects
       // here, and an unobserved rejection takes the run down rather than failing
       // this test.
       const loggingOut = socket.logout().catch((err) => err)
 
-      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such subscription' } })
+      transport.receive({ msg: 'nosub', id, error: { reason: 'no such subscription' } })
       await flushMicrotasks()
 
       const loggingOutFrame = transport.lastSent()

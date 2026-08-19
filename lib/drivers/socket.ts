@@ -49,6 +49,22 @@ const abandonedBySocketChange = '[ddp] connection replaced before the message wa
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
 const deadlineExpired = '[ddp] no response arrived before the deadline'
 
+/** A DDP subscription as `rememberSubscription` writes it into the registry. */
+type RecordedSubscription = ISubscription & {
+  id: string
+  name: string
+  onEvent: (callback: ISocketMessageCallback) => void
+}
+
+/**
+ * The DDP subscription id for a stream. Two subscribes are the same stream iff
+ * the name matches and `JSON.stringify(params)` matches byte for byte, so
+ * `subscriptions[id]` is itself the index of what is already subscribed to.
+ * See ADR-0011.
+ */
+const subscriptionId = (name: string, params: any[]) =>
+  `sub-${name}-${sha256(JSON.stringify(params))}`
+
 class AbandonedWait extends Error {
   constructor (message?: string) {
     super(message)
@@ -82,7 +98,7 @@ export class Socket extends SDKEventEmitter {
   sent = 0
   host: string
   lastPing = Date.now()
-  subscriptions: { [id: string]: ISubscription } = {}
+  subscriptions: { [id: string]: RecordedSubscription } = {}
   config: ISocketConfig
   openTimeout?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
@@ -708,9 +724,7 @@ export class Socket extends SDKEventEmitter {
    * The wait is bounded by the request before it, which each send bounds in
    * turn with its own deadline, so a chain always drains.
    */
-  private queueSubscriptionRequest = <T>(id: string | undefined, request: () => Promise<T>): Promise<T> => {
-    if (!id) return request()
-
+  private queueSubscriptionRequest = <T>(id: string, request: () => Promise<T>): Promise<T> => {
     // The tail is registered here rather than when the frame goes out, so a
     // third request queues behind the second rather than behind the first.
     const waiting = this.subscriptionRequests[id]
@@ -734,27 +748,44 @@ export class Socket extends SDKEventEmitter {
    * out on a connection that is still installed. A refused `sub`, one that never
    * reached the wire, and one whose connection is gone leave nothing behind, and
    * a resubscribe under an existing id that the server refuses forgets that
-   * entry. See ADR-0004 and ADR-0006.
+   * entry. A second call for a stream already recorded shares that record and
+   * sends nothing. See ADR-0004, ADR-0006 and ADR-0011.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
-  subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback, id?: string) => {
+  subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback) => {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
-    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
-      .then((result) => {
-        const confirmedId = (result.subs) ? result.subs[0] : undefined
-        if (confirmedId) return this.rememberSubscription(confirmedId, name, params, callback)
-      })
-      .catch((err) => {
-        this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-        if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
-          this.rememberSubscription(err.id, name, params, callback)
-        } else if (id && err instanceof DDPError) {
-          this.forgetSubscription(id)
-        }
-        return undefined
-      })
+    const id = subscriptionId(name, params)
+    return this.queueSubscriptionRequest(id, () => {
+      const shared = this.subscriptions[id]
+      if (!shared) return this.sendSubscription(id, name, params, callback)
+      if (callback) shared.onEvent(callback)
+      return Promise.resolve(shared)
+    })
   }
+
+  /** Re-establish a recorded stream on the current connection, under its own id. */
+  private resubscribe = (sub: RecordedSubscription) =>
+    this.queueSubscriptionRequest(sub.id, () => this.sendSubscription(sub.id, sub.name, sub.params))
+
+  private sendSubscription = (
+    id: string,
+    name: string,
+    params: any[],
+    callback?: ISocketMessageCallback
+  ) => this.send({ msg: 'sub', id, name, params })
+    .then((result) => {
+      if (result.subs?.length) return this.rememberSubscription(id, name, params, callback)
+    })
+    .catch((err) => {
+      this.logger.error(`[ddp] Subscribe error: ${err.message}`)
+      if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
+        this.rememberSubscription(id, name, params, callback)
+      } else if (err instanceof DDPError) {
+        this.forgetSubscription(id)
+      }
+      return undefined
+    })
 
   /**
    * Write the entry that instructs `subscribeAll` to establish this stream.
@@ -783,7 +814,7 @@ export class Socket extends SDKEventEmitter {
    * params given. `subscriptions` is keyed by DDP subscription id, so a caller
    * that knows a stream by name and params reads it through here.
    */
-  findSubscriptions = ({ name, params = [] }: IStream): ISubscription[] =>
+  findSubscriptions = ({ name, params = [] }: IStream): RecordedSubscription[] =>
     Object.keys(this.subscriptions || {})
       .map((id) => this.subscriptions[id])
       .filter((sub) => (
@@ -804,8 +835,8 @@ export class Socket extends SDKEventEmitter {
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
     const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
-    const resubscribe = (subs: ISubscription[]) => Promise.all(
-      subs.map((sub) => this.subscribe(sub.name, sub.params, undefined, sub.id))
+    const resend = (subs: RecordedSubscription[]) => Promise.all(
+      subs.map((sub) => this.resubscribe(sub))
     )
       .then((results) => {
         const unacknowledged = subs.filter((_, index) => !results[index])
@@ -831,8 +862,8 @@ export class Socket extends SDKEventEmitter {
         const perStream = recordedPerStream()
         if (!perStream.every((subs) => subs.length > 0)) return
         inFlight = true
-        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as ISubscription[])
-        resubscribe(recorded).then((value) => {
+        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as RecordedSubscription[])
+        resend(recorded).then((value) => {
           inFlight = false
           finish(value)
         })
@@ -845,10 +876,8 @@ export class Socket extends SDKEventEmitter {
 
   /** Subscribe to all pre-configured streams (e.g. on login resume) */
   subscribeAll = () => {
-    const subscriptions = Object.keys(this.subscriptions || {}).map((key) => {
-      const { name, params, id } = this.subscriptions[key]
-      return this.subscribe(name, params, undefined, id)
-    })
+    const subscriptions = Object.keys(this.subscriptions || {})
+      .map((key) => this.resubscribe(this.subscriptions[key]))
     return Promise.all(subscriptions)
   }
 

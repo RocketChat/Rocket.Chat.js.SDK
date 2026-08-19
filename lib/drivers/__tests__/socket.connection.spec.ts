@@ -648,9 +648,8 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('writes nothing of its own to a replacement installed during the wait', async () => {
-      const id = 'sub-1'
-      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'], undefined, id)
-      transport.receive({ msg: 'ready', subs: [id] })
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
       await subscribing
 
       transport.answersClose = false
