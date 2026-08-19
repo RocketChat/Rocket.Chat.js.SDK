@@ -225,52 +225,137 @@ an Error that the SDK writes.
   unchanged, because the connection is read before the write either way. What
   changes is that a quiet connection is no longer a bounded case at all. The
   rule is the one the first amendment states: the connection, not a clock.
-- **Fourth amendment.** A scheduled Reopen replaces the connection. It does not
-  read `connected` first, and it no longer opens through `open`, which declines
-  to replace a connection that reads as connected. `connected` cannot answer the
-  question a Reopen asks: `lastPing` moves on any frame, so a server that emits
-  frames and never answers a ping reads as connected while nothing it says is a
-  pong. A Reopen that declined on that reading left the Liveness chain with
-  nothing scheduled — no next ping and no Reopen — for the one connection whose
-  pending sends had nothing else to end their wait. Consulting it at all was also
-  a livelock: ping deadline, Reopen, connected, ping, forever, and never a
-  rebuild.
-  The Reopen therefore goes through `reopenNow`, which emits `disconnected`,
-  zeroes `lastPing` and builds the replacement, so every send written to the
-  connection it replaces settles under the first amendment. Its retry no longer
-  routes through `reopenUnlessAbandoned`: `reopenNow` swallows a creation error
-  and settles on its own Deadline, so there is no rejection left to branch on.
-  `reopenNow` owns the re-arm, in one place rather than two that could schedule
-  behind each other, and it therefore covers its public callers as well: a
-  consumer-invoked `reopenNow` that settles on its Deadline with the socket still
-  connecting cancelled the scheduled Reopen on the way in and armed no ping, and
-  no `onClose` fires for the socket it detached, so it would otherwise leave the
-  chain with nothing scheduled — issue #294 through the public surface.
-  The re-arm reads `pingTimeout`, and that reading is narrower than "the chain is
-  running". `pingTimeout` is set by `ping`, which only a completed handshake or a
-  pong reaches, and it is deleted as the timer fires, so it never says a ping is
-  scheduled when none is — but it reads empty while a ping is in flight, and empty
-  for a rebuild whose handshake has not landed yet. Both are read as "not
-  scheduled", and both therefore get a Reopen. What keeps that from force-replacing
-  a connection that turns out to be healthy is the other half of the guard:
-  arming the chain cancels a scheduled Reopen. Only a completed handshake or a pong
-  arms it, which is the answer the scheduled Reopen was waiting for, so a handshake
-  or a pong landing after the Deadline retires the Reopen that was scheduled in its
-  place. A replacement that opens and then never answers the handshake, while
-  frames keep moving `lastPing`, arms nothing and still gets its Reopen. The
-  re-arm also runs on a throw, and a consumer listener on `disconnected` cannot
-  abort the rebuild: the emit is guarded, so a throw there is logged rather than
-  left to reject the Reopen before it has built anything. `ping` keeps
-  `reopenUnlessAbandoned`, where a rejection still says which failure asked for a
-  Reopen.
-  `checkAndReopen` is the exception, and stays one: it is the deliberate
-  force-reconnect entry point, reads `connected` itself and opens through `open`,
-  so what this amendment says of a Reopen is said of the scheduled one.
-  `close` therefore cancels the scheduled Reopen before it waits rather than only
-  after: settling an in-flight Reopen is the first thing `close` does, and that
-  settle now arms one. With the default delays the close Deadline expires first,
-  but a consumer whose `reopen` is shorter than that Deadline would have the
-  Reopen fire inside the wait, install a replacement, and leave `close`
-  superseded by a connection nobody asked for. The cancel after the wait stays:
-  a transport close carrying any other code reaches `onClose` during the wait
-  and arms another one.
+- **Fourth amendment.** A scheduled Reopen replaces the connection, and no
+  longer consults `connected` or opens through `open`, which declines to replace a
+  connection that reads as connected. The one case where it does not build a
+  connection of its own is a Reopen already in flight: it joins that rebuild
+  rather than starting a second one, and that rebuild replaces the connection. `connected` cannot answer the question a
+  Reopen asks: `lastPing` moves on any frame, so a server that emits frames and
+  never answers a ping reads as connected while nothing it says is a pong. A
+  Reopen that declined on that reading left the Liveness chain with nothing
+  scheduled for the one connection whose pending sends had nothing else to end
+  their wait, and consulting it at all was a livelock — ping deadline, Reopen,
+  connected, ping, forever, and never a rebuild.
+  The Reopen goes through `reopenNow` instead, so every send written to the
+  connection it replaces settles under the first amendment. `reopenNow` re-arms
+  the chain when it settles, through `rearmLivenessChain`, so it covers its public
+  callers too: a consumer-invoked `reopenNow` that settled on its Deadline used to
+  leave the chain with nothing scheduled — issue #294 through the public surface.
+  Its own retry no longer routes through `reopenUnlessAbandoned`, because
+  `reopenNow` swallows a creation error and settles on its own Deadline, leaving no
+  rejection to branch on.
+  Every other place the chain can end holds a rejection, and each of the three
+  routes it through `reopenUnlessAbandoned`, the one point that decides whether a
+  failure asks for a Reopen: an unanswered `ping`, a handshake that did not
+  complete in `onOpen`, and a failed `open` from `checkAndReopen`. The last two
+  used to log and stop, which left the connection set, the chain unarmed and
+  nothing scheduled — issue #294, reached through a public entry point in the
+  `checkAndReopen` case. Logging is not handling. A wait that a connection going
+  away abandoned still asks for no Reopen, because whoever replaced that
+  connection is already rebuilding. The re-arm also runs when a consumer listener on `disconnected` throws:
+  that emit is guarded, so such a throw cannot abort the rebuild.
+  The re-arm asks whether the chain is running, and `pingTimeout` alone did not
+  answer that. It reads empty for the whole in-flight window, because the timer
+  deletes it as it fires, so a ping with up to `config.ping` left to be answered
+  counted as nothing scheduled and got a Reopen after `config.reopen` — a
+  force-replace of a connection that may well have been healthy, prevented only
+  when the answer beat the shorter of the two delays. A ping in flight is now
+  tracked in its own field and reads as the chain running, so no Reopen is armed
+  behind it. Nothing is lost when that ping never comes back: its own Deadline of
+  `config.ping` settles it either way, and that failure reaches
+  `reopenUnlessAbandoned` as before. That field holds the connection the ping went
+  out on rather than a flag, because the question is whether the chain is running
+  for the connection the driver has *now*. A ping written to a socket the
+  transport had already closed waits in `waitForOpen`, so it is still in flight
+  when a Reopen replaces the connection under it, and as a flag it answered yes
+  for the replacement. It then rejected as an abandoned wait, which asks for no
+  Reopen, and the rebuild was left with the connection set, the chain unarmed and
+  nothing scheduled — issue #294, in the one shape that survived every amendment
+  above: a rebuild whose transport opens and whose `connect` is never answered
+  gets no rejection at all, since `send` has no Deadline for a DDP response, so
+  `reopenNow`'s own Deadline is the only thing left to re-arm the chain. A ping in
+  flight on a replaced connection therefore counts as nothing scheduled. A ping in
+  flight on the connection the driver still has counts as the chain running, which
+  is what a Reopen that could not build anything reads.
+  A rebuild whose handshake has not landed still counts as nothing scheduled and
+  still gets a Reopen.
+  The other half of the guard stays: arming the chain cancels a scheduled Reopen.
+  That cancel is now conditional, and two guards state the condition: the
+  connection the ping went out on is still the current one, asked where the chain
+  continues after a pong, and that connection is still open, asked where the chain
+  is armed. A pong is not the answer a Reopen
+  that `onClose` scheduled was waiting for — a late frame completing a ping on a
+  transport that is gone used to cancel that Reopen and arm the chain on a closed
+  socket, which pushed recovery from `config.reopen` out to `config.ping` plus two
+  Reopen delays.
+  `checkAndReopen` stays the exception: it is the deliberate force-reconnect entry
+  point, reads `connected` itself and opens through `open`, so this amendment
+  speaks only of the scheduled Reopen.
+  `close` therefore lets go of any Reopen before its wait as well as after: one
+  step, settling an in-flight Reopen and cancelling the scheduled one together.
+  Cancelling a Reopen cannot undo a rebuild it already started, and a `close`
+  that finds itself superseded now asks whether anything still answers for the
+  connection that superseded it. Two things can: the Liveness chain armed for
+  that connection, and an `open()` still waiting on its handshake. Either way the
+  close is superseded as before and leaves that connection and its subscriptions
+  alone. Where neither holds, the close lets go of it on the same terms —
+  closing, detaching and forgetting — and it returns with no connection rather
+  than with a replacement and nothing scheduled, the state issue #294 names. It
+  is reached whenever a Reopen settles inside the close wait, arms the next one,
+  and that Reopen delay is shorter than what is left of the wait. A `close` means
+  the consumer has let the connection go, so a rebuild it did not ask for does not
+  outlive it with nothing behind it.
+  The armed chain alone was the wrong question, twice over. It is time-blind: the
+  chain is armed in `onOpen` only after the handshake round-trip, so a healthy
+  replacement mid-handshake read as unanswered-for for a full round-trip and a
+  close landing in that window took it. And it says nothing about who asked for
+  the connection: an `open()` the consuming app made during the wait installs one,
+  and that connection is not the driver's rebuild to discard. So the question is
+  asked of the connection: is an `open()` that built it still waiting on it. The
+  pending-open reject the driver already holds per socket answers it, cleared when
+  the handshake settles either way, so a connection whose `open()` has already
+  failed is not mistaken for one still being waited on. A Reopen is not asked
+  about, because a Reopen cannot name who asked for it and the close has settled
+  and cancelled every Reopen by the time it asks — including one a consumer
+  started, which is the same rule as before this amendment.
+  Every connection the close lets go of is detached, not only the last one: the
+  loop hands off to a replacement and can return on one, and a socket it walked
+  past with its pending open unsettled is the stranded wait this ADR exists to
+  end.
+  It runs first because a settle arms a Reopen, and a consumer whose `reopen` is
+  shorter than the close Deadline would otherwise have it fire inside the wait and
+  leave `close` superseded by a connection nobody asked for. It runs again after
+  the wait, for a transport close carrying any other code that reaches `onClose`
+  during it — and it runs *before* `close` asks whether it was superseded. A
+  Reopen that fired inside the wait is exactly the case that supersedes it, so a
+  cancel behind that question is a cancel that case never reaches: the close
+  returns leaving a Reopen armed against a connection its caller has already let
+  go, rebuilding sockets for as long as the Socket lives.
+  The connection `onClose` compares against is recorded for the length of the
+  close and released when the wait is over, so a Socket does not hold the last
+  Transport it closed for the rest of its life.
+  The code-4000 carve-out in `onClose` — the one place a close asks for no Reopen —
+  now applies only to a close the driver itself started. `close` feeds a synthetic
+  close event with that code through `onClose` deliberately, and that path is
+  unchanged: it still does not Reopen. But a server is free to send 4000 too, and
+  such a close arrived at the same carve-out and was treated as the driver's own:
+  an in-flight ping rejected as an abandoned wait, which asks for no Reopen
+  either, and the chain ended with the connection still set and nothing scheduled
+  — issue #294 again, this time chosen by the peer. `onClose` records the
+  connection the driver started a close on and compares it, so a server-sent 4000
+  Reopens like any other code.
+  `ping` no longer wrote anything by the fourth amendment — the write moved into
+  the timer — so it is named `armLivenessChain`, and the pong continuation, which
+  did the same two things behind one more guard, is the same method: it takes the
+  connection the ping went out on, and the current connection is the default for
+  the caller that has just handshaken one. The continuation was never only a pong
+  either; it runs whenever the race resolves. `ping` is not in `ISocket` and no
+  caller outside `onOpen` reaches it, so no entry point is kept behind the name.
+  A server that emits frames and never answers a ping therefore gets a fresh
+  connection every `ping` interval plus `ping` deadline plus `reopen` delay: the
+  chain waits `config.ping` before writing a ping, the written ping races a second
+  `config.ping`, and the Reopen it fails into waits `config.reopen` — 50 seconds at
+  the defaults, dominated by the ping timings rather than the reopen delay. That
+  spacing is fixed, so the rebuild loop is unbounded and never backs off: the cure
+  for the old livelock is a connection rebuilt at a constant rate for as long as
+  the server stays that way.

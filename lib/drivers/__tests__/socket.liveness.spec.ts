@@ -1,3 +1,4 @@
+import { ISocketOptions } from '../../../interfaces'
 import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
@@ -6,6 +7,7 @@ import {
   FakeWebSocket,
   fakeSockets,
   OPEN,
+  fakeTransportModule,
   openFakeConnection,
   USER_DISCONNECT,
   useFakeClockAndSocketRegistry
@@ -22,10 +24,11 @@ useFakeClockAndSocketRegistry()
  */
 const PING_INTERVAL = 3000
 
-const createSocket = () => new Socket({
+const createSocket = (overrides: ISocketOptions = {}) => new Socket({
   host: 'localhost:3000',
   logger: createSilentLogger(),
-  timeout: PING_INTERVAL
+  timeout: PING_INTERVAL,
+  ...overrides
 })
 
 /**
@@ -302,6 +305,36 @@ describe('Socket liveness', () => {
       expect(socket.openTimeout).toBeUndefined()
     })
 
+    it('schedules a reopen when the server closes with the user-disconnect code mid-ping', async () => {
+      await jest.advanceTimersToNextTimerAsync()
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+
+      transport.close(USER_DISCONNECT)
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(socket.openTimeout).toBeDefined()
+
+      await jest.advanceTimersByTimeAsync(socket.config.reopen)
+      expect(fakeSockets).toHaveLength(2)
+    })
+
+    it('keeps the reopen scheduled when a pong completes a ping on a transport that is gone', async () => {
+      await jest.advanceTimersToNextTimerAsync()
+      expect(transport.lastSent()).toEqual({ msg: 'ping' })
+
+      transport.readyState = CLOSED
+      socket.reopen()
+      expect(socket.openTimeout).toBeDefined()
+
+      transport.receive({ msg: 'pong' })
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(socket.openTimeout).toBeDefined()
+
+      await jest.advanceTimersByTimeAsync(socket.config.reopen)
+      expect(fakeSockets).toHaveLength(2)
+    })
+
     it('reconnects when a server answers pings with nothing readable', async () => {
       await tickWithPong()
 
@@ -318,65 +351,51 @@ describe('Socket liveness', () => {
       expect(fakeSockets).toHaveLength(2)
     })
 
-    /**
-     * Withhold one pong and step one millisecond past the ping's deadline, which
-     * is what schedules the reopen.
-     */
     const scheduleReopenByWithholdingPong = async () => {
       await tickWithoutPong()
       await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
       expect(socket.openTimeout).toBeDefined()
     }
 
-    /**
-     * Deliver an unrelated frame while the reopen delay is still running. Any
-     * frame moves `lastPing`, so the socket reads as connected again.
-     */
     const receiveUnrelatedFrame = async () => {
       await jest.advanceTimersByTimeAsync(PING_INTERVAL)
       transport.receive({ msg: 'updated', methods: ['1'] })
-      expect(socket.connected).toBe(true)
     }
 
-    /**
-     * Fire the scheduled reopen, take its socket through open and handshake, and
-     * make it the transport the rest of the test drives — the connection it
-     * replaced is gone, so leaving the fixture on that one would assert nothing.
-     */
-    const adoptReplacementAfterHandshake = async () => {
+    const advanceToScheduledReopen = async () => {
       await jest.advanceTimersToNextTimerAsync()
-      transport = fakeSockets[fakeSockets.length - 1]
-      await driveToHandshake(transport)
+      return fakeSockets[fakeSockets.length - 1]
     }
 
-    /**
-     * Fire the scheduled reopen and let its socket open without ever answering
-     * the handshake, while unrelated frames keep arriving on it. That socket
-     * becomes the fixture too, for the same reason.
-     */
-    const adoptReplacementWithoutHandshake = async () => {
-      await jest.advanceTimersToNextTimerAsync()
-      transport = fakeSockets[fakeSockets.length - 1]
+    const replacementAfterHandshake = async () => {
+      const replacement = await advanceToScheduledReopen()
+      await driveToHandshake(replacement)
+      return replacement
+    }
 
-      transport.readyState = OPEN
-      transport.onopen?.({})
+    const replacementWithoutHandshake = async () => {
+      const replacement = await advanceToScheduledReopen()
+
+      replacement.readyState = OPEN
+      replacement.onopen?.({})
       await jest.advanceTimersByTimeAsync(0)
 
-      transport.receive({ msg: 'updated', methods: ['1'] })
+      replacement.receive({ msg: 'updated', methods: ['1'] })
       await jest.advanceTimersByTimeAsync(socket.config.timeout)
+      return replacement
     }
 
     it('replaces the connection when a scheduled reopen finds the socket alive again', async () => {
       await tickWithPong()
       await scheduleReopenByWithholdingPong()
       await receiveUnrelatedFrame()
+      expect(socket.connected).toBe(true)
 
-      await adoptReplacementAfterHandshake()
+      transport = await replacementAfterHandshake()
 
       expect(fakeSockets).toHaveLength(2)
       expect(socket.connected).toBe(true)
 
-      // And the chain is running on the replacement, not on the socket it left.
       await tickWithPong()
       expect(jest.getTimerCount()).toBe(1)
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
@@ -390,9 +409,10 @@ describe('Socket liveness', () => {
 
       await scheduleReopenByWithholdingPong()
       await receiveUnrelatedFrame()
+      expect(socket.connected).toBe(true)
       expect(settled).not.toHaveBeenCalled()
 
-      await adoptReplacementAfterHandshake()
+      transport = await replacementAfterHandshake()
 
       expect(fakeSockets).toHaveLength(2)
       await expect(pending).rejects.toThrow('[ddp] connection reopened before the response arrived')
@@ -404,12 +424,11 @@ describe('Socket liveness', () => {
 
       await scheduleReopenByWithholdingPong()
 
-      // Frame after frame keeps the socket reading as connected right up to the
-      // reopen, and none of them is a pong.
       await receiveUnrelatedFrame()
       await receiveUnrelatedFrame()
+      expect(socket.connected).toBe(true)
 
-      await adoptReplacementAfterHandshake()
+      transport = await replacementAfterHandshake()
 
       expect(fakeSockets).toHaveLength(2)
       await expect(pending).rejects.toThrow('[ddp] connection reopened before the response arrived')
@@ -423,20 +442,15 @@ describe('Socket liveness', () => {
       await scheduleReopenByWithholdingPong()
       await receiveUnrelatedFrame()
 
-      await adoptReplacementWithoutHandshake()
-      const replacement = transport
+      const replacement = await replacementWithoutHandshake()
+      transport = replacement
 
-      // The frames the replacement carries move the stamp, so it reads as
-      // connected while no pong has ever answered on it.
       expect(socket.connected).toBe(true)
       expect(socket.pingTimeout).toBeUndefined()
       expect(socket.openTimeout).toBeDefined()
 
-      // The send written to the connection this reopen replaced is already over.
       await expect(pending).rejects.toThrow('[ddp] connection reopened before the response arrived')
 
-      // And the chain keeps going: the next reopen replaces the socket whose
-      // handshake never completed.
       await jest.advanceTimersByTimeAsync(socket.config.reopen)
       expect(fakeSockets).toHaveLength(3)
       expect(fakeSockets[fakeSockets.length - 1]).not.toBe(replacement)
@@ -445,19 +459,14 @@ describe('Socket liveness', () => {
     it('schedules no reopen behind a handshake that lands after the reopen deadline', async () => {
       await scheduleReopenByWithholdingPong()
 
-      // The reopen fires and builds a socket that is still connecting when the
-      // rebuild's own deadline expires, so the chain is re-armed with a reopen.
       await jest.advanceTimersToNextTimerAsync()
       const replacement = fakeSockets[fakeSockets.length - 1]
       await jest.advanceTimersByTimeAsync(socket.config.timeout)
       expect(socket.openTimeout).toBeDefined()
 
-      // The handshake then completes late and starts the chain on that socket.
       transport = replacement
       await driveToHandshake(transport)
 
-      // One or the other, never both: the reopen that would force-replace this
-      // healthy connection is gone.
       expect(socket.pingTimeout).toBeDefined()
       expect(socket.openTimeout).toBeUndefined()
       expect(jest.getTimerCount()).toBe(1)
@@ -466,24 +475,6 @@ describe('Socket liveness', () => {
       expect(fakeSockets).toHaveLength(2)
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
       expect(socket.connected).toBe(true)
-    })
-
-    it('re-arms the chain when a consumer reopen settles on its deadline', async () => {
-      const reopening = socket.reopenNow()
-
-      // The socket the consumer's reopen built never opens, so no `onOpen` ends
-      // that wait and no `onClose` fires for the connection it detached.
-      await jest.advanceTimersByTimeAsync(socket.config.timeout)
-      await reopening
-
-      expect(fakeSockets).toHaveLength(2)
-      expect(socket.connected).toBe(false)
-      expect(socket.pingTimeout).toBeUndefined()
-      expect(socket.openTimeout).toBeDefined()
-
-      // And that reopen goes on to replace the socket that never opened.
-      await jest.advanceTimersByTimeAsync(socket.config.reopen)
-      expect(fakeSockets).toHaveLength(3)
     })
 
     it('keeps rebuilding when a consumer listener on disconnected throws', async () => {
@@ -497,13 +488,12 @@ describe('Socket liveness', () => {
       await scheduleReopenByWithholdingPong()
       await receiveUnrelatedFrame()
 
-      await adoptReplacementAfterHandshake()
+      transport = await replacementAfterHandshake()
 
       expect(fakeSockets).toHaveLength(2)
       expect(socket.connected).toBe(true)
       await expect(pending).rejects.toThrow('[ddp] connection reopened before the response arrived')
 
-      // The chain runs on the replacement rather than being stranded by the throw.
       await tickWithPong()
       expect(jest.getTimerCount()).toBe(1)
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
@@ -527,39 +517,262 @@ describe('Socket liveness', () => {
   })
 })
 
-describe('a close whose wait outlasts the reopen delay', () => {
-  /** How long `close` waits on a transport that never answers it. */
-  const CLOSE_DEADLINE = 2000
-
-  /**
-   * Shorter than the close deadline, so the reopen delay elapses inside that
-   * wait. With the 10000 default it cannot, and this test would pass on a
-   * socket that resurrects itself.
-   */
-  const REOPEN_DELAY = 400
+describe('Socket close whose wait outlasts the reopen delay', () => {
+  const REOPEN_DELAY_SHORTER_THAN_CLOSE_DEADLINE = 400
+  const PAST_THE_CLOSE_DEADLINE = PING_INTERVAL
 
   it('leaves neither a connection nor a reopen behind', async () => {
-    const socket = new Socket({
-      host: 'localhost:3000',
-      logger: createSilentLogger(),
-      timeout: PING_INTERVAL,
-      reopen: REOPEN_DELAY
-    })
+    const socket = createSocket({ reopen: REOPEN_DELAY_SHORTER_THAN_CLOSE_DEADLINE })
 
-    // No handshake, so nothing arms a ping, and the reopen below is the one
-    // thing `close` settles that can schedule another.
     socket.open().catch(() => undefined)
     socket.reopenNow()
     expect(fakeSockets).toHaveLength(2)
 
     fakeSockets[1].answersClose = false
     const closing = socket.close()
-    await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+    await jest.advanceTimersByTimeAsync(PAST_THE_CLOSE_DEADLINE)
     await closing
 
     expect(fakeSockets).toHaveLength(2)
     expect(socket.connection).toBeUndefined()
     expect(socket.openTimeout).toBeUndefined()
     expect(jest.getTimerCount()).toBe(0)
+  })
+})
+
+describe('Socket close superseded by a reopen mid-wait', () => {
+  const THE_CLOSE_DEADLINE = 2000
+  const REOPEN_DELAY = 400
+  const REBUILD_DEADLINE = 400
+  const PING_INTERVAL_INSIDE_THE_CLOSE_WAIT = 500
+
+  const closeSupersededByAReopen = async () => {
+    const socket = createSocket({
+      reopen: REOPEN_DELAY,
+      timeout: REBUILD_DEADLINE,
+      ping: PING_INTERVAL_INSIDE_THE_CLOSE_WAIT
+    })
+    const transport = await openFakeConnection(socket)
+    transport.answersClose = false
+
+    const closing = socket.close()
+    await jest.advanceTimersByTimeAsync(THE_CLOSE_DEADLINE)
+    await closing
+
+    return socket
+  }
+
+  it('schedules no reopen once the close it superseded returns', async () => {
+    const socket = await closeSupersededByAReopen()
+
+    expect(fakeSockets).toHaveLength(2)
+    expect(socket.openTimeout).toBeUndefined()
+
+    await jest.advanceTimersByTimeAsync(REOPEN_DELAY * 4)
+    expect(fakeSockets).toHaveLength(2)
+  })
+
+  it('lets go of the connection the reopen built rather than leaving it unwatched', async () => {
+    const socket = await closeSupersededByAReopen()
+
+    expect(fakeSockets).toHaveLength(2)
+    expect(socket.connection).toBeUndefined()
+    expect(socket.pingTimeout).toBeUndefined()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+})
+
+describe('Socket close superseded by an open mid-wait', () => {
+  const THE_CLOSE_DEADLINE = 2000
+  const REOPEN_DELAY_PAST_THE_CLOSE_DEADLINE = 4000
+  const PING_INTERVAL_INSIDE_THE_CLOSE_WAIT = 500
+  const AFTER_THE_UNANSWERED_PING = PING_INTERVAL_INSIDE_THE_CLOSE_WAIT * 2
+
+  it('leaves a connection whose handshake an open is still waiting on alone', async () => {
+    const socket = createSocket({
+      reopen: REOPEN_DELAY_PAST_THE_CLOSE_DEADLINE,
+      ping: PING_INTERVAL_INSIDE_THE_CLOSE_WAIT
+    })
+    const transport = await openFakeConnection(socket)
+    transport.answersClose = false
+
+    const closing = socket.close()
+    await jest.advanceTimersByTimeAsync(AFTER_THE_UNANSWERED_PING)
+    expect(socket.pingTimeout).toBeUndefined()
+
+    transport.readyState = CLOSED
+    const opening = socket.open()
+    const replacement = fakeSockets[1]
+
+    await jest.advanceTimersByTimeAsync(THE_CLOSE_DEADLINE)
+    await closing
+
+    expect(socket.connection).toBe(replacement)
+    expect(replacement.onmessage).not.toBeNull()
+
+    await driveToHandshake(replacement)
+    await opening
+    expect(socket.connected).toBe(true)
+  })
+
+  it('lets go of a connection whose open has landed and whose chain has since died', async () => {
+    const socket = createSocket({
+      reopen: REOPEN_DELAY_PAST_THE_CLOSE_DEADLINE,
+      ping: PING_INTERVAL_INSIDE_THE_CLOSE_WAIT
+    })
+    const transport = await openFakeConnection(socket)
+    transport.answersClose = false
+
+    const closing = socket.close()
+    await jest.advanceTimersByTimeAsync(AFTER_THE_UNANSWERED_PING)
+
+    transport.readyState = CLOSED
+    const opening = socket.open()
+    const replacement = fakeSockets[1]
+    await driveToHandshake(replacement)
+    await opening
+
+    replacement.sendError = new Error('the transport refused the write')
+    await jest.advanceTimersByTimeAsync(PING_INTERVAL_INSIDE_THE_CLOSE_WAIT)
+    expect(socket.pingTimeout).toBeUndefined()
+
+    await jest.advanceTimersByTimeAsync(THE_CLOSE_DEADLINE - AFTER_THE_UNANSWERED_PING - PING_INTERVAL_INSIDE_THE_CLOSE_WAIT)
+    await closing
+
+    expect(socket.connection).toBeUndefined()
+    expect(replacement.closedWith).toEqual([USER_DISCONNECT])
+  })
+
+  it('lets go of a connection whose open has already failed', async () => {
+    const socket = createSocket({
+      reopen: REOPEN_DELAY_PAST_THE_CLOSE_DEADLINE,
+      ping: PING_INTERVAL_INSIDE_THE_CLOSE_WAIT
+    })
+    const transport = await openFakeConnection(socket)
+    transport.answersClose = false
+
+    const closing = socket.close()
+    await jest.advanceTimersByTimeAsync(AFTER_THE_UNANSWERED_PING)
+
+    transport.readyState = CLOSED
+    const opening = socket.open()
+    const replacement = fakeSockets[1]
+    replacement.sendError = new Error('the transport refused the write')
+    replacement.readyState = OPEN
+    replacement.onopen?.({})
+    await expect(opening).rejects.toBe(replacement.sendError)
+
+    await jest.advanceTimersByTimeAsync(THE_CLOSE_DEADLINE)
+    await closing
+
+    expect(socket.connection).toBeUndefined()
+    expect(jest.getTimerCount()).toBe(0)
+  })
+})
+
+describe('Socket reopen settling on its deadline', () => {
+  const PING_LONGER_THAN_THE_REOPEN_DEADLINE = PING_INTERVAL * 4
+
+  const createSocketWithSlowPing = () =>
+    createSocket({ ping: PING_LONGER_THAN_THE_REOPEN_DEADLINE })
+
+  it('re-arms the chain when nothing else is running behind it', async () => {
+    const socket = createSocket()
+    socket.open().catch(() => undefined)
+
+    const reopening = socket.reopenNow()
+    await jest.advanceTimersByTimeAsync(socket.config.timeout)
+    await reopening
+
+    expect(fakeSockets).toHaveLength(2)
+    expect(socket.connected).toBe(false)
+    expect(socket.pingTimeout).toBeUndefined()
+    expect(socket.openTimeout).toBeDefined()
+
+    await jest.advanceTimersByTimeAsync(socket.config.reopen)
+    expect(fakeSockets).toHaveLength(3)
+  })
+
+  const pingLeftInFlightOnAClosedTransport = async (socket: Socket) => {
+    const transport = await openFakeConnection(socket)
+    transport.readyState = CLOSED
+    await jest.advanceTimersByTimeAsync(socket.config.ping)
+    expect(socket.pingTimeout).toBeUndefined()
+  }
+
+  it('arms a reopen behind a ping in flight on the connection it replaced', async () => {
+    const socket = createSocketWithSlowPing()
+    await pingLeftInFlightOnAClosedTransport(socket)
+
+    const reopening = socket.reopenNow()
+    await jest.advanceTimersByTimeAsync(socket.config.timeout)
+    await reopening
+
+    expect(fakeSockets).toHaveLength(2)
+    expect(socket.pingTimeout).toBeUndefined()
+    expect(socket.openTimeout).toBeDefined()
+
+    await jest.advanceTimersByTimeAsync(socket.config.reopen)
+    expect(fakeSockets).toHaveLength(3)
+  })
+
+  it('arms no reopen behind a ping in flight on the connection it still has', async () => {
+    const socket = createSocketWithSlowPing()
+    await pingLeftInFlightOnAClosedTransport(socket)
+
+    jest.spyOn(fakeTransportModule, 'default').mockImplementation(() => {
+      throw new Error('transport unavailable')
+    })
+
+    const reopening = socket.reopenNow()
+    await jest.advanceTimersByTimeAsync(socket.config.timeout)
+    await reopening
+
+    expect(fakeSockets).toHaveLength(1)
+    expect(socket.openTimeout).toBeUndefined()
+  })
+})
+
+describe('Socket handshake arming the liveness chain', () => {
+  it('arms the chain before it emits open, which is what a reopen reads', async () => {
+    const socket = createSocket()
+    const armedWhenOpenEmitted = jest.fn()
+    socket.on('open', () => armedWhenOpenEmitted(socket.pingTimeout !== undefined))
+
+    await openFakeConnection(socket)
+
+    expect(armedWhenOpenEmitted).toHaveBeenCalledWith(true)
+  })
+})
+
+describe('Socket failure at a public entry point', () => {
+  it('schedules a reopen when the handshake write fails', async () => {
+    const socket = createSocket()
+    socket.open().catch(() => undefined)
+
+    const transport = fakeSockets[0]
+    transport.sendError = new Error('the transport refused the write')
+    transport.readyState = OPEN
+    transport.onopen?.({})
+    await jest.advanceTimersByTimeAsync(0)
+
+    expect(socket.pingTimeout).toBeUndefined()
+    expect(socket.openTimeout).toBeDefined()
+
+    await jest.advanceTimersByTimeAsync(socket.config.reopen)
+    expect(fakeSockets).toHaveLength(2)
+  })
+
+  it('schedules a reopen when checkAndReopen cannot open a connection', async () => {
+    const socket = createSocket()
+    socket.checkAndReopen()
+
+    fakeSockets[0].onerror?.(new Error('the transport never connected'))
+    await jest.advanceTimersByTimeAsync(0)
+
+    expect(socket.openTimeout).toBeDefined()
+
+    await jest.advanceTimersByTimeAsync(socket.config.reopen)
+    expect(fakeSockets).toHaveLength(2)
   })
 })
