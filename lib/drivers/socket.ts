@@ -93,7 +93,7 @@ export class Socket extends SDKEventEmitter {
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private driverClosedConnection?: WebSocket
-  private pingInFlight?: WebSocket
+  private pingInFlightConnection?: WebSocket
   private openAwaitedConnections = new WeakSet<WebSocket>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
@@ -134,9 +134,12 @@ export class Socket extends SDKEventEmitter {
 
       try {
         connection = new WebSocket(this.host, null, { headers: settings.customHeaders })
-        connection.onerror = reject
         this.pendingOpenRejects.set(connection, reject)
         if (awaitedByOpen) this.openAwaitedConnections.add(connection)
+        connection.onerror = (err: any) => {
+          this.forgetPendingOpen(connection)
+          reject(err)
+        }
       } catch (err) {
         this.logger.error(err)
         return reject(err)
@@ -259,7 +262,9 @@ export class Socket extends SDKEventEmitter {
   }
 
   private forgetPendingOpen = (connection?: WebSocket) => {
-    if (connection) this.pendingOpenRejects.delete(connection)
+    if (!connection) return
+    this.pendingOpenRejects.delete(connection)
+    this.openAwaitedConnections.delete(connection)
   }
 
   /**
@@ -270,7 +275,7 @@ export class Socket extends SDKEventEmitter {
    */
   private detach = (connection: WebSocket) => {
     const rejectPendingOpen = this.pendingOpenRejects.get(connection)
-    this.pendingOpenRejects.delete(connection)
+    this.forgetPendingOpen(connection)
     Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedBeforeOpen)))
     connection.onopen = null as any
     connection.onmessage = null as any
@@ -365,8 +370,7 @@ export class Socket extends SDKEventEmitter {
     (this.livenessChainArmed() || this.awaitedByOpen(connection))
 
   private awaitedByOpen = (connection: WebSocket) =>
-    this.openAwaitedConnections.has(connection) &&
-    this.pendingOpenRejects.has(connection)
+    this.openAwaitedConnections.has(connection)
 
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
@@ -507,14 +511,14 @@ export class Socket extends SDKEventEmitter {
 
   private livenessChainArmed = () =>
     !!this.pingTimeout ||
-    (this.pingInFlight !== undefined && this.pingInFlight === this.connection)
+    (this.pingInFlightConnection !== undefined && this.pingInFlightConnection === this.connection)
 
   private rearmLivenessChain = () => {
     if (!this.livenessChainArmed()) this.reopen()
   }
 
   private cancelLivenessChain = () => {
-    delete this.pingInFlight
+    delete this.pingInFlightConnection
     this.cancelScheduledPing()
   }
 
@@ -652,8 +656,9 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
-  armLivenessChain = (pingedConnection = this.connection) => {
-    if (pingedConnection === this.connection && this.transportOpen) {
+  private armLivenessChain = (pingedConnection = this.connection) => {
+    if (pingedConnection !== this.connection) return
+    if (this.transportOpen) {
       this.cancelScheduledReopen()
     }
     this.scheduleNextPing()
@@ -664,12 +669,16 @@ export class Socket extends SDKEventEmitter {
     this.pingTimeout = setTimeout(() => {
       delete this.pingTimeout
       const pingedConnection = this.connection
-      this.pingInFlight = pingedConnection
+      this.pingInFlightConnection = pingedConnection
 
       this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.armLivenessChain(pingedConnection))
         .catch(this.reopenUnlessAbandoned)
-        .finally(() => { delete this.pingInFlight })
+        .finally(() => {
+          if (this.pingInFlightConnection === pingedConnection) {
+            delete this.pingInFlightConnection
+          }
+        })
     }, this.config.ping)
   }
 

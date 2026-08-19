@@ -758,6 +758,31 @@ describe('Socket close superseded by an open mid-wait', () => {
     expect(socket.connection).toBeUndefined()
     expect(jest.getTimerCount()).toBe(0)
   })
+
+  it('lets go of a connection whose open failed at the transport', async () => {
+    const socket = createSocket({
+      reopen: REOPEN_DELAY_PAST_THE_CLOSE_DEADLINE,
+      ping: PING_INTERVAL_INSIDE_THE_CLOSE_WAIT
+    })
+    const transport = await openFakeConnection(socket)
+    transport.answersClose = false
+
+    const closing = socket.close()
+    await jest.advanceTimersByTimeAsync(AFTER_THE_UNANSWERED_PING)
+
+    transport.readyState = CLOSED
+    const opening = socket.open()
+    const replacement = fakeSockets[1]
+    const transportError = new Error('the transport never connected')
+    replacement.onerror?.(transportError)
+    await expect(opening).rejects.toBe(transportError)
+
+    await jest.advanceTimersByTimeAsync(THE_CLOSE_DEADLINE)
+    await closing
+
+    expect(socket.connection).toBeUndefined()
+    expect(jest.getTimerCount()).toBe(0)
+  })
 })
 
 describe('Socket reopen settling on its deadline', () => {

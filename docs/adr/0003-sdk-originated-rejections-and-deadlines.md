@@ -366,9 +366,10 @@ an Error that the SDK writes.
   the connection: an `open()` the consuming app made during the wait installs one,
   and that connection is not the driver's rebuild to discard. So the question is
   asked of the connection: is an `open()` that built it still waiting on it. The
-  pending-open reject the driver already holds per socket answers it, cleared when
-  the handshake settles either way, so a connection whose `open()` has already
-  failed is not mistaken for one still being waited on. A Reopen is not asked
+  pending-open record the driver already holds per socket answers it, cleared when
+  the handshake settles either way and when the transport errors before one
+  starts, so a connection whose `open()` has already failed is not mistaken for
+  one still being waited on. A Reopen is not asked
   about, because a Reopen cannot name who asked for it and the close has settled
   and cancelled every Reopen by the time it asks — including one a consumer
   started, which is the same rule as before this amendment.
