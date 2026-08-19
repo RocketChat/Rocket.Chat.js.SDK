@@ -3,8 +3,15 @@ import {
   ILogger,
   ICallback,
   ISubscription,
+  ISocketMessageCallback,
   ICredentials
 } from '../../interfaces'
+
+export type RecordedSubscription = ISubscription & {
+  id: string
+  name: string
+  onEvent: (callback: ISocketMessageCallback) => void
+}
 
 export interface IStream {
   name: string

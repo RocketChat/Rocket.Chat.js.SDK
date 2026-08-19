@@ -14,7 +14,6 @@ import * as settings from '../settings';
 import {
   ISocketOptions,
   ISocketConfig,
-  ISubscription,
   ICredentials,
   ILoginResult,
   ICredentialsPass,
@@ -28,7 +27,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
-import { IStream } from './definitions'
+import { IStream, RecordedSubscription } from './definitions'
 import { DDPError, toError } from './ddpError'
 import { sha256 } from 'js-sha256'
 
@@ -49,19 +48,7 @@ const abandonedBySocketChange = '[ddp] connection replaced before the message wa
 const abandonedBeforeOpen = '[ddp] connection closed before it opened'
 const deadlineExpired = '[ddp] no response arrived before the deadline'
 
-/** A DDP subscription as `rememberSubscription` writes it into the registry. */
-type RecordedSubscription = ISubscription & {
-  id: string
-  name: string
-  onEvent: (callback: ISocketMessageCallback) => void
-}
-
-/**
- * The DDP subscription id for a stream. Two subscribes are the same stream iff
- * the name matches and `JSON.stringify(params)` matches byte for byte, so
- * `subscriptions[id]` is itself the index of what is already subscribed to.
- * See ADR-0011.
- */
+/** One stream is one id, so `subscriptions[id]` is the dedup index. See ADR-0011. */
 const subscriptionId = (name: string, params: any[]) =>
   `sub-${name}-${sha256(JSON.stringify(params))}`
 

@@ -56,6 +56,13 @@ refuses leaves none; the answer that never came is ADR-0006's.
   A `sub` whose response never arrives is settled by ADR-0006, which has
   `subscribe` write an entry the `ready` never arrived to write, because the
   server may still be streaming.
+- A `nosub` forgets the entry it names, whatever prompted it. The server sends
+  one to refuse a `sub`, to answer an `unsub`, and on its own when it ends a
+  stream — a permission revoked, a room deleted. All three say the same thing,
+  that the server is not streaming, so a standing listener forgets the entry and
+  the paths above that also forget it are left idempotent rather than special.
+  Without it a server-initiated `nosub` has no listener at all: the one `send`
+  registers lives only while a request is in flight.
 - `unsubscribe` forgets its DDP subscription on a DDP response, whether that
   response succeeded or carried a DDP error. It keeps its DDP subscription on
   any other rejection. It re-throws on the rejection path and resolves with the
