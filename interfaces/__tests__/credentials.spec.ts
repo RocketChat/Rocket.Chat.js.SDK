@@ -13,6 +13,8 @@ describe('ILoginCredentials', () => {
     accepts({ saml: true, credentialToken: 'token' })
     accepts({ cas: { credentialToken: 'token' } })
     accepts({ oauth: { credentialToken: 'token', credentialSecret: 'secret' } })
+    accepts({ identityToken: 'token', fullName: { givenName: 'Ada', familyName: 'Lovelace' } })
+    accepts({ totp: { code: '123456', login: { username: 'user', password: 'pass' } } })
   })
 
   it('rejects an incomplete method', () => {
@@ -20,5 +22,9 @@ describe('ILoginCredentials', () => {
     accepts({ username: 'user' })
     // @ts-expect-error an LDAP login needs its own password field
     accepts({ ldap: true, username: 'user' })
+    // @ts-expect-error a two-factor login confirms another login method
+    accepts({ totp: { code: '123456' } })
+    // @ts-expect-error the server destructures fullName unguarded
+    accepts({ identityToken: 'token' })
   })
 })

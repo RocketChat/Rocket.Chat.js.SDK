@@ -97,6 +97,33 @@ export interface ICredentialsCasAPI {
   cas: { credentialToken: string }
 }
 
+/**
+ * Two-factor payload for `POST /api/v1/login`. The server declines the login
+ * unless `code` is truthy, then re-runs the login handlers against `login`,
+ * so `login` is whichever method the code is confirming.
+ */
+export interface ICredentialsTotpAPI {
+  totp: {
+    code: string
+    login: ILoginCredentials
+  }
+}
+
+/**
+ * Apple payload for `POST /api/v1/login`. `email` is only a fallback for when
+ * the identity token carries none. `fullName` is required because the server
+ * destructures it unguarded — send an empty object when Apple omits it, which
+ * it does on every sign-in after the first.
+ */
+export interface ICredentialsAppleAPI {
+  identityToken: string
+  fullName: {
+    givenName?: string | null
+    familyName?: string | null
+  }
+  email?: string | null
+}
+
 /** User credentials for password login method */
 export interface ICredentialsPass {
   user: { username: string }
@@ -152,6 +179,8 @@ export type ILoginCredentials =
   ICredentialsCrowdAPI |
   ICredentialsSamlAPI |
   ICredentialsCasAPI |
+  ICredentialsTotpAPI |
+  ICredentialsAppleAPI |
   ICredentialsOAuth |
   ICredentialsAuthenticated
 
