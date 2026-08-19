@@ -102,8 +102,9 @@ an Error that the SDK writes.
   own, and no Login on it yet, so a Method call moved to it is sent under an
   identity the caller did not ask for. A `sub` moved to it is worse: it is written
   under an id from a session that has ended. The rejection carries the type an
-  abandoned wait carries, so `reopenUnlessAbandoned` does not Reopen for it: the connection was replaced by `createConnection`, and the replacement
-  starts its own Liveness chain in `onOpen`.
+  abandoned wait carries, so `reopenUnlessAbandoned` does not Reopen for it: the
+  connection was replaced by `createConnection`, and the replacement starts its
+  own Liveness chain in `onOpen`.
 - Whether `send` waits for the connection to open is decided on the Transport's
   own state. A send on a Transport open Socket does not wait: it is written to
   that connection at once, and `waitForOpen` — the only Deadline before the
@@ -246,9 +247,10 @@ an Error that the SDK writes.
 - What a caller gets from an immediate reconnect is an Error, not `undefined`.
   Callers read `err.message` in their `catch` blocks, and that read only works
   when what is thrown is an Error.
-- The Deadline on the chain's ping is `config.ping`, so a consuming app that lowers that
-  option for the Liveness chain also lowers the bound on the wait for the
-  `pong`. The documentation of the option says this at `interfaces/index.ts`.
+- The Deadline on the chain's ping is `config.ping`, so a consuming app that
+  lowers that option for the Liveness chain also lowers the bound on the wait
+  for the `pong`. The documentation of the option says this at
+  `interfaces/index.ts`.
 - The connection ending is still what ends a wait first; the Deadline answers the
   one case no connection event reaches, where the connection stays up and the
   server simply never answers. `alive()` is refreshed by any readable frame, so a
@@ -272,8 +274,9 @@ an Error that the SDK writes.
   behind it is retried on the schedule `config.reopen` sets rather than left with
   nothing scheduled.
 - Rejections reach `reopenUnlessAbandoned`, the one place that decides on a
-  Reopen for a failure. A close would rebuild the Socket the caller had just closed,
-  and a Reopen would queue a second Reopen behind the one already under way. An
+  Reopen for a failure. A close would rebuild the Socket the caller had just
+  closed, and a Reopen would queue a second Reopen behind the one already under
+  way. An
   abandoned wait therefore carries its own Error type, and it Reopens on every
   rejection except that one: a connection that went away has already been
   answered, by `onClose` or by the replacement itself, and only a failure that
