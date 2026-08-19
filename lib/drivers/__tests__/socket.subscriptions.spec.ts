@@ -1,5 +1,6 @@
 import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { trackResolution } from '../../../test/trackResolution'
 import {
   CLOSED,
   FakeWebSocket,
@@ -155,15 +156,18 @@ describe('Socket subscription bookkeeping', () => {
       { name: 'stream-notify-user', params: ['uid/media-calls'] }
     ]
 
+    it('resolves true when nothing is asked for', async () => {
+      await expect(socket.whenReady([])).resolves.toBe(true)
+    })
+
     it('resolves true once the streams are confirmed on the current connection', async () => {
       await subscribe('stream-notify-user', ['uid/media-signal'])
 
       const waiting = socket.whenReady(streams)
-      let resolved: boolean | undefined
-      waiting.then((value) => { resolved = value })
+      const resolution = trackResolution(waiting)
 
       await jest.advanceTimersByTimeAsync(1)
-      expect(resolved).toBeUndefined()
+      expect(resolution.value).toBeUndefined()
 
       await subscribe('stream-notify-user', ['uid/media-calls'])
       await expect(waiting).resolves.toBe(true)
@@ -171,12 +175,11 @@ describe('Socket subscription bookkeeping', () => {
 
     it('waits when no entry exists yet', async () => {
       const waiting = socket.whenReady(streams)
-      let resolved: boolean | undefined
-      waiting.then((value) => { resolved = value })
+      const resolution = trackResolution(waiting)
 
       socket.subscribe('stream-notify-user', ['uid/media-signal'])
       await jest.advanceTimersByTimeAsync(1)
-      expect(resolved).toBeUndefined()
+      expect(resolution.value).toBeUndefined()
 
       const { id: signalId } = transport.lastSent()
       transport.receive({ msg: 'ready', subs: [signalId] })
@@ -203,11 +206,10 @@ describe('Socket subscription bookkeeping', () => {
 
     it('takes its deadline from the configured timeout when given none', async () => {
       const waiting = socket.whenReady(streams)
-      let resolved: boolean | undefined
-      waiting.then((value) => { resolved = value })
+      const resolution = trackResolution(waiting)
 
       await jest.advanceTimersByTimeAsync(socket.config.timeout - 1)
-      expect(resolved).toBeUndefined()
+      expect(resolution.value).toBeUndefined()
 
       await jest.advanceTimersByTimeAsync(1)
       await expect(waiting).resolves.toBe(false)
