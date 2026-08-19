@@ -71,7 +71,7 @@ the caller is handed the record that is already there.
 - **Three keys mean "the same stream", and they do not agree.** They are
   deliberately different and each is load-bearing:
   1. the derived id — exact, by value, over `name` and every param;
-  2. `findSubscriptionsByParamPrefix` — a *prefix* match over `params`, compared with `===`,
+  2. `findSubscriptions` — a *prefix* match over `params`, compared with `===`,
      so an object param never matches it at all. `resubscribeWhenRecorded`
      depends on the looseness; it is not a defect to be aligned with (1).
   3. `rememberSubscription` binds `onEvent` and `unsubscribe` to the stream
@@ -80,7 +80,7 @@ the caller is handed the record that is already there.
   It is (3) that decides whether a message is delivered once. Sharing a record
   removes the duplicate delivery because it removes the duplicate `onEvent`
   registration, not because the id changed. This is also why deduplicating
-  through `findSubscriptionsByParamPrefix` — the fix the issue suggested — cannot work: it
+  through `findSubscriptions` — the fix the issue suggested — cannot work: it
   matches streams the server considers distinct, and misses object params
   entirely.
 - **Ids are readable.** The stream name stays in the id, so

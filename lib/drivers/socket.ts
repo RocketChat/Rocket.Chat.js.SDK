@@ -786,7 +786,7 @@ export class Socket extends SDKEventEmitter {
    * The DDP subscriptions on this Socket for one stream name, matched on a
    * prefix of the params given.
    */
-  findSubscriptionsByParamPrefix = ({ name, params = [] }: IStream): RecordedDDPSubscription[] =>
+  findSubscriptions = ({ name, params = [] }: IStream): RecordedDDPSubscription[] =>
     Object.keys(this.subscriptions || {})
       .map((id) => this.subscriptions[id])
       .filter((sub) => (
@@ -806,7 +806,7 @@ export class Socket extends SDKEventEmitter {
     streams: IStream[],
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
-    const recordedPerStream = () => streams.map((stream) => this.findSubscriptionsByParamPrefix(stream))
+    const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
     const resubscribeAll = (subs: RecordedDDPSubscription[]) => Promise.all(
       subs.map((sub) => this.resubscribe(sub))
     )

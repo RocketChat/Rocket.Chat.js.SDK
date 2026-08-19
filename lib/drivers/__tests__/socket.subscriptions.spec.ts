@@ -127,17 +127,17 @@ describe('Socket subscription bookkeeping', () => {
       await subscribe('stream-notify-user', ['uid/media-calls', false])
       await subscribe('stream-room-messages', ['GENERAL'])
 
-      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-notify-user', params: ['uid/media-signal'] }))
+      expect(socket.findSubscriptions({ name: 'stream-notify-user', params: ['uid/media-signal'] }))
         .toMatchObject([{ id: signalId, params: ['uid/media-signal', false] }])
-      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-notify-user' })).toHaveLength(2)
-      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-notify-user', params: ['uid/media-video'] })).toEqual([])
-      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-room-messages' })).toHaveLength(1)
+      expect(socket.findSubscriptions({ name: 'stream-notify-user' })).toHaveLength(2)
+      expect(socket.findSubscriptions({ name: 'stream-notify-user', params: ['uid/media-video'] })).toEqual([])
+      expect(socket.findSubscriptions({ name: 'stream-room-messages' })).toHaveLength(1)
     })
 
     it('finds nothing while the subscription is still in flight', () => {
       socket.subscribe('stream-notify-user', ['uid/media-signal', false])
 
-      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-notify-user' })).toEqual([])
+      expect(socket.findSubscriptions({ name: 'stream-notify-user' })).toEqual([])
 
       transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
     })
