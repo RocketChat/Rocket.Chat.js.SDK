@@ -84,5 +84,8 @@ and an `/** @internal */` tag alone, which enforces nothing.
   `@rocket.chat/sdk/clients/Rocketchat`. Nothing in this repo or in
   Rocket.Chat.ReactNative uses it, and it carried no default export, so the
   root import is unaffected.
+- The names this ADR decides are not in the code yet: the Driver's field is
+  still a public `ddp`, and the client still declares `implements ISocket`. The
+  rename is tracked on its own.
 - The three renames land together in a single SDK PR, and the app's pin moves
   in its own.

@@ -57,8 +57,9 @@ refuses leaves none; the answer that never came is ADR-0006's.
   server may still be streaming.
 - `unsubscribe` forgets its DDP subscription on a DDP response, whether that
   response succeeded or carried a DDP error. It keeps its DDP subscription on
-  any other rejection. It re-throws in both cases. The rejection a caller
-  receives is unchanged by this ADR.
+  any other rejection. It re-throws on the rejection path and resolves with the
+  DDP response's result on the other. The rejection a caller receives is
+  unchanged by this ADR.
 - `unsubscribeAll` decides nothing of its own. Each `unsubscribe` decides its own
   entry, and `unsubscribeAll` catches each failure so one refusal cannot stop the
   rest, or stop the Method call that `logout` makes after it.
@@ -70,10 +71,8 @@ refuses leaves none; the answer that never came is ADR-0006's.
   is expressed by the absence of any removal on that path.
 - The removals are `forgetSubscription(id)` and `forgetAllSubscriptions()` on
   `Socket`. `forgetAllSubscriptions` removes one key at a time from the same
-  object. `Driver.subscriptions` is assigned `this.ddp.subscriptions` in
-  `connect`, so the Driver and the Socket hold one object between them. Putting a
-  fresh object in place of the old one would leave the Driver reading every entry
-  the clear was meant to drop.
+  object, and it does so by calling `forgetSubscription` for each id, so a single
+  removal and a clear leave through one path.
 
 ## Consequences
 

@@ -94,9 +94,11 @@ an Error that the SDK writes.
   also folds in `alive()`, which would abandon a send on a socket that is open and
   merely quiet — and, because an abandoned wait suppresses the Reopen, would
   suppress it for the one connection with nobody rebuilding it.
-- `send` belongs to the connection that was current when it was called. If another
-  connection has taken its place before the write, `send` rejects with
-  `'[ddp] connection replaced before the message was written'`. A DDP session
+- `send` belongs to the connection that was current when it was called. Where it
+  waited for the connection to open, and another connection has taken its place
+  by the time that wait resolves, `send` rejects with
+  `'[ddp] connection replaced before the message was written'`. A send on a
+  Transport open Socket never waits, so it has no such window. A DDP session
   belongs to the connection that carries it. The replacement has a session of its
   own, and no Login on it yet, so a Method call moved to it is sent under an
   identity the caller did not ask for. A `sub` moved to it is worse: it is written

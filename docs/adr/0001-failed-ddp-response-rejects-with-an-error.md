@@ -16,7 +16,7 @@ had to be deliberate.
 A failed DDP response rejects with an `Error`.
 
 - The message is the DDP error's `reason`, falling back to its `message`, then
-  to the DDP error itself when it is a bare string.
+  to a JSON serialisation of the DDP error itself.
 - The DDP error's own fields are copied onto the Error, so callers branching on
   `err.error` or `err.errorType` keep working.
 - `message`, `name` and `stack` are **not** copied. The Error's own identity
@@ -27,16 +27,16 @@ A failed DDP response rejects with an `Error`.
   `new Error(String(...))`. A server may legally send a bare string, and this
   helper is the boundary where wire data becomes an Error, so it normalises
   rather than assuming a shape.
-- The DDP error's shape is named by a type at this seam, even though DDP
+- The DDP error's shape is named by a type at this boundary, even though DDP
   messages elsewhere in the driver are untyped.
 
 ## Consequences
 
 - Callers receive an `Error`, not a plain object, and
-  `lib/drivers/__tests__/ddp.send.spec.ts` asserts it.
+  `lib/drivers/__tests__/socket.send.spec.ts` asserts it.
 - Specs that assert this contract assert both halves — the message *and* the
   preserved fields — so a future refactor cannot drop the copied fields
   silently.
-- `unsubscribe`'s own `Promise.reject(id)` is **out of scope**. It is the
-  driver's own rejection value, not a DDP error, and it needs a real reason
-  rather than a wrapped id. It remains a known bug, tracked separately.
+- `unsubscribe` rejecting for an id it holds no entry for is **out of scope**.
+  That is the driver's own rejection value, not a DDP error, so it is an Error
+  naming the id it found nothing for rather than one built by this helper.
