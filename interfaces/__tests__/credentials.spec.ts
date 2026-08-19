@@ -13,8 +13,6 @@ describe('ILoginCredentials', () => {
     accepts({ saml: true, credentialToken: 'token' })
     accepts({ cas: { credentialToken: 'token' } })
     accepts({ oauth: { credentialToken: 'token', credentialSecret: 'secret' } })
-
-    expect(true).toBe(true)
   })
 
   it('rejects an incomplete method', () => {
@@ -22,7 +20,5 @@ describe('ILoginCredentials', () => {
     accepts({ username: 'user' })
     // @ts-expect-error an LDAP login needs its own password field
     accepts({ ldap: true, username: 'user' })
-
-    expect(true).toBe(true)
   })
 })
