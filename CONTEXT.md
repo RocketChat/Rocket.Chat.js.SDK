@@ -82,6 +82,12 @@ _Avoid_: Active subscription, live sub
 A recorded DDP subscription that is not a Confirmed sub — its `ready` never arrived, or arrived on an earlier connection. The record is an instruction to establish the stream, not a claim the server holds it.
 _Avoid_: Pending subscription, stale sub
 
+**Readiness**:
+Whether every stream a caller named is a Confirmed sub right now. The Socket
+records it and answers from the record — asking costs no wire traffic and sends
+no `sub`. Scoped to a connection, like the confirmations it reads.
+_Avoid_: Ready state (that is the Transport's), live, healthy
+
 **Method call**:
 A named server procedure invoked over the realtime connection, as opposed to a REST request.
 _Avoid_: RPC, command

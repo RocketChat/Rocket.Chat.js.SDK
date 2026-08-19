@@ -7,6 +7,7 @@ import {
   fakeSockets,
   driveToHandshake,
   openFakeConnection,
+  reopenAndHandshake,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -42,14 +43,6 @@ describe('Socket subscription bookkeeping', () => {
     const { id } = transport.lastSent()
     transport.receive({ msg: 'ready', subs: [id] })
     return subscribing
-  }
-
-  const reopenAndHandshake = async () => {
-    const reopening = socket.reopenNow()
-    const reopened = fakeSockets[fakeSockets.length - 1]
-    await driveToHandshake(reopened, 'reopened-session')
-    await reopening
-    return reopened
   }
 
   it('keys a subscription by the id the server acknowledged', async () => {
@@ -237,13 +230,14 @@ describe('Socket subscription bookkeeping', () => {
         await subscribe('stream-notify-user', ['uid/media-signal'])
         await subscribe('stream-notify-user', ['uid/media-calls'])
 
-        const reopened = await reopenAndHandshake()
+        const reopened = await reopenAndHandshake(socket)
 
         const framesBefore = reopened.sent.length
         const waiting = socket.whenReady(streams, 500)
         await jest.advanceTimersByTimeAsync(500)
 
         expect(reopened.sent).toHaveLength(framesBefore)
+        expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1', 'ddp-2'])
         await expect(waiting).resolves.toBe(false)
       })
 
@@ -251,7 +245,7 @@ describe('Socket subscription bookkeeping', () => {
         await subscribe('stream-notify-user', ['uid/media-signal'])
         await subscribe('stream-notify-user', ['uid/media-calls'])
 
-        const reopened = await reopenAndHandshake()
+        const reopened = await reopenAndHandshake(socket)
 
         const waiting = socket.whenReady(streams)
         const framesBefore = reopened.sent.length

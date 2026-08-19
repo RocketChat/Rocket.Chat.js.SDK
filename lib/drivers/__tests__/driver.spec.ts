@@ -8,6 +8,7 @@ import {
   fakeSockets,
   flushMicrotasks,
   openFakeConnection,
+  reopenAndHandshake,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -110,15 +111,6 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   /** Register a media subscription on the Socket, as a successful sub would. */
   const addMediaSubscription = (driver: Driver, transport: FakeWebSocket, name: string) =>
     addSubscription(driver, transport, `${userId}/${name}`, `sub-${name}`)
-
-  const reopenAndHandshake = async (driver: Driver, previous: FakeWebSocket) => {
-    const reopening = driver.reopenNow()
-    const reopened = fakeSockets[fakeSockets.length - 1]
-    expect(reopened).not.toBe(previous)
-    await driveToHandshake(reopened, 'reopened-session')
-    await reopening
-    return reopened
-  }
 
   it('resolves false without a logged-in user, before scheduling anything', async () => {
     const driver = createDriver()

@@ -99,12 +99,12 @@ The server's answer decides; silence keeps the instruction.
   before, and send `unsub` frames for them. Both already tolerate a server that
   refuses: `unsubscribeAll` catches each failure, and `close` forgets everything
   regardless.
-- `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
-  polls `subscriptions` for the two media entries, and an entry written on an
-  abandoned `sub` now ends that poll where it would previously have kept waiting.
-  Readiness itself is unchanged: the poll only decides when to re-send, and the
-  gate resolves on whether that resubscribe was acknowledged. An abandoned one
-  resolves `undefined`, which the gate counts as unacknowledged.
+- `Driver.waitForNotifyUserMediaSubs` reads the two media entries, and an entry
+  written on an abandoned `sub` counts as one of them. Readiness itself is
+  unchanged by this ADR: an entry is an instruction to establish the stream, not
+  a confirmation. ADR-0009 replaces the mechanism behind that gate with
+  `Socket.whenReady`, which answers from the recorded confirmations instead of
+  from the presence of an entry.
 - ADR-0004's remaining open question is untouched: whether a `sub` may be sent
   for an id whose `unsub` is still in flight is still not settled, and the
   behaviour of the server in that case is still not known. This ADR does make

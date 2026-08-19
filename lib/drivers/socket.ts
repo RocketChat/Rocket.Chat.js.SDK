@@ -781,7 +781,7 @@ export class Socket extends SDKEventEmitter {
 
   private confirmSubscription = (id: string) => {
     this.confirmedSubscriptionIds.add(id)
-    this.readinessListeners.forEach((check) => check())
+    this.readinessListeners.forEach((listener) => listener())
   }
 
   /**
@@ -802,7 +802,8 @@ export class Socket extends SDKEventEmitter {
     this.findSubscriptions({ name, params })
       .find((sub) => (
         sub.params?.length === params.length &&
-        this.confirmedSubscriptionIds.has(sub.id as string)
+        sub.id !== undefined &&
+        this.confirmedSubscriptionIds.has(sub.id)
       ))
 
   whenReady = (
@@ -815,17 +816,17 @@ export class Socket extends SDKEventEmitter {
         if (settled) return
         settled = true
         clearTimeout(deadline)
-        this.readinessListeners.delete(check)
+        this.readinessListeners.delete(resolveIfConfirmed)
         resolve(value)
       }
-      const check = () => {
+      const resolveIfConfirmed = () => {
         if (streams.every((stream) => this.findConfirmedSubscription(stream))) {
           finish(true)
         }
       }
       const deadline = setTimeout(() => finish(false), timeoutMs)
-      this.readinessListeners.add(check)
-      check()
+      this.readinessListeners.add(resolveIfConfirmed)
+      resolveIfConfirmed()
     })
   }
 
