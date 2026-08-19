@@ -784,11 +784,11 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * A stream's identity, as the serialized form of its name and params. Callers
+   * A stream's identity, as the serialised form of its name and params. Callers
    * rebuild their params for every request, so two streams are the same by
    * value rather than by reference, with object keys ordered so that the same
    * params written in a different order still read as one stream. Params no
-   * serialiser can read name no stream, so such a call is never shared.
+   * serialiser can read yield no stream key, so such a call is never shared.
    */
   private streamKeyOf = (name: string, params: any[]) => {
     const withSortedKeys = (_key: string, value: any) => {
@@ -827,6 +827,16 @@ export class Socket extends SDKEventEmitter {
     if (callback) subscription.onEvent?.(callback)
     this.subscriptionHolders[id] = (this.subscriptionHolders[id] || 0) + 1
     return subscription
+  }
+
+  /**
+   * Make a subscription whose `unsub` failed reusable again. The caller that
+   * sent it has let go, so its count goes with the ending mark, or the next
+   * caller inherits a holder that no longer exists. See ADR-0011.
+   */
+  private releaseSubscription = (id: string) => {
+    this.endingSubscriptions.delete(id)
+    delete this.subscriptionHolders[id]
   }
 
   /**
@@ -977,7 +987,7 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         if (err instanceof DDPError) this.forgetSubscription(id)
-        else this.endingSubscriptions.delete(id)
+        else this.releaseSubscription(id)
         this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
         throw err
       })

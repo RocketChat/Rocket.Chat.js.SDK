@@ -613,6 +613,21 @@ describe('Socket subscription bookkeeping', () => {
       await unsubscribing
       expect(socket.subscriptions['ddp-1']).toBeUndefined()
     })
+
+    it('lets the next holder end a stream whose unsubscribe the SDK itself rejected', async () => {
+      const subscription = await subscribe('stream-notify-logged', ['permissions-changed'])
+      transport.sendError = new Error('socket closed under the write')
+      await expect(subscription!.unsubscribe()).rejects.toThrow('socket closed under the write')
+      transport.sendError = undefined
+
+      await socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      const unsubscribing = socket.unsubscribe('ddp-1')
+      await flushMicrotasks()
+
+      expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
+      transport.receive({ msg: 'result', id: 'ddp-1', result: true })
+      await unsubscribing
+    })
   })
 
   describe('closing the connection', () => {

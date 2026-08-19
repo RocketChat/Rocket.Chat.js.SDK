@@ -79,7 +79,11 @@ handed it are counted. An explicit id is not part of this rule.
 - An entry whose `unsub` is on the wire is not reusable. `unsubscribe` marks the
   id as ending before it sends, `findSubscription` skips a marked id, and the
   mark is dropped when the entry is forgotten, or when the `unsub` was rejected
-  by a rejection the SDK originated and the entry survives under ADR-0004.
+  by a rejection the SDK originated and the entry survives under ADR-0004. The
+  holder count goes with the mark on that second path: the caller that sent the
+  failed `unsub` has let go, so leaving its count behind would give the entry a
+  holder that no longer exists, and the next caller's `unsubscribe` would only
+  count that phantom down and send nothing.
   Without the mark, the pairing ADR-0005 serialises — a `subscribe` for a stream
   whose `unsub` is still in flight — would hand the new caller a subscription for
   a stream the server is about to end, with no `sub` ever sent. That is a
