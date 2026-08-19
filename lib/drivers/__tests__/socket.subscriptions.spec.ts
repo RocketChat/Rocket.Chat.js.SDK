@@ -1,12 +1,12 @@
 import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { trackResolution } from '../../../test/trackResolution'
 import {
   CLOSED,
   FakeWebSocket,
   flushMicrotasks,
-  fakeSockets,
-  driveToHandshake,
   openFakeConnection,
+  reopenAndHandshake,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -150,72 +150,126 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
-  describe('resubscribing once the streams asked for are present', () => {
+  describe('whenReady', () => {
     const streams = [
       { name: 'stream-notify-user', params: ['uid/media-signal'] },
       { name: 'stream-notify-user', params: ['uid/media-calls'] }
     ]
 
-    it('waits for every stream, then re-sends each under its own id', async () => {
+    it('resolves true when nothing is asked for', async () => {
+      await expect(socket.whenReady([])).resolves.toBe(true)
+    })
+
+    it('resolves true once the streams are confirmed on the current connection', async () => {
       await subscribe('stream-notify-user', ['uid/media-signal'])
 
-      const waiting = socket.resubscribeWhenRecorded(streams)
-      let resolved: boolean | undefined
-      waiting.then((value) => { resolved = value })
+      const waiting = socket.whenReady(streams)
+      const resolution = trackResolution(waiting)
 
-      // One of the two is not enough to start.
-      await jest.advanceTimersByTimeAsync(100)
-      expect(resolved).toBeUndefined()
+      await jest.advanceTimersByTimeAsync(1)
+      expect(resolution.value).toBeUndefined()
 
       await subscribe('stream-notify-user', ['uid/media-calls'])
-      const sentBefore = transport.sent.length
-      await jest.advanceTimersByTimeAsync(100)
+      await expect(waiting).resolves.toBe(true)
+    })
 
-      expect(transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame))).toEqual([
-        { msg: 'sub', id: 'ddp-1', name: 'stream-notify-user', params: ['uid/media-signal'] },
-        { msg: 'sub', id: 'ddp-2', name: 'stream-notify-user', params: ['uid/media-calls'] }
-      ])
+    it('waits when no entry exists yet', async () => {
+      const waiting = socket.whenReady(streams)
+      const resolution = trackResolution(waiting)
 
-      // Readiness is the server's ack, not the send.
-      expect(resolved).toBeUndefined()
-      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
-      transport.receive({ msg: 'ready', subs: ['ddp-2'] })
+      socket.subscribe('stream-notify-user', ['uid/media-signal'])
+      await jest.advanceTimersByTimeAsync(1)
+      expect(resolution.value).toBeUndefined()
+
+      const { id: signalId } = transport.lastSent()
+      transport.receive({ msg: 'ready', subs: [signalId] })
+      await jest.advanceTimersByTimeAsync(1)
+
+      socket.subscribe('stream-notify-user', ['uid/media-calls'])
+      await jest.advanceTimersByTimeAsync(1)
+      const { id: callsId } = transport.lastSent()
+      transport.receive({ msg: 'ready', subs: [callsId] })
 
       await expect(waiting).resolves.toBe(true)
     })
 
-    it('resolves false on its deadline, and stops polling', async () => {
-      const waiting = socket.resubscribeWhenRecorded(streams, 500)
+    it('resolves false at the deadline when no entry exists', async () => {
+      const waiting = socket.whenReady(streams, 500)
       const timersBefore = jest.getTimerCount()
 
-      await jest.advanceTimersByTimeAsync(500)
-
-      await expect(waiting).resolves.toBe(false)
-      // Both the deadline and the poll interval are gone — a leaked interval
-      // would keep resubscribing for the life of the process.
-      expect(jest.getTimerCount()).toBe(timersBefore - 2)
-    })
-
-    it('takes its deadline from the configured timeout when given none', async () => {
-      const waiting = socket.resubscribeWhenRecorded(streams)
-      let resolved: boolean | undefined
-      waiting.then((value) => { resolved = value })
-
-      await jest.advanceTimersByTimeAsync(socket.config.timeout - 1)
-      expect(resolved).toBeUndefined()
+      await jest.advanceTimersByTimeAsync(499)
+      expect(jest.getTimerCount()).toBe(timersBefore)
 
       await jest.advanceTimersByTimeAsync(1)
       await expect(waiting).resolves.toBe(false)
     })
 
-    it('resolves false when the server refuses one of the resubscribes', async () => {
+    it('takes its deadline from the configured timeout when given none', async () => {
+      const waiting = socket.whenReady(streams)
+      const resolution = trackResolution(waiting)
+
+      await jest.advanceTimersByTimeAsync(socket.config.timeout - 1)
+      expect(resolution.value).toBeUndefined()
+
+      await jest.advanceTimersByTimeAsync(1)
+      await expect(waiting).resolves.toBe(false)
+    })
+
+    it('uses exact match: a same-name prefix params entry does not count', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal', false])
+
+      const waiting = socket.whenReady(streams)
+
+      await jest.advanceTimersByTimeAsync(socket.config.timeout)
+      await expect(waiting).resolves.toBe(false)
+    })
+
+    describe('after a reopen', () => {
+      it('keeps entries but turns them Unconfirmed, so no sub frame is sent', async () => {
+        await subscribe('stream-notify-user', ['uid/media-signal'])
+        await subscribe('stream-notify-user', ['uid/media-calls'])
+
+        const reopened = await reopenAndHandshake(socket)
+
+        const framesBefore = reopened.sent.length
+        const waiting = socket.whenReady(streams, 500)
+        await jest.advanceTimersByTimeAsync(500)
+
+        expect(reopened.sent).toHaveLength(framesBefore)
+        expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1', 'ddp-2'])
+        await expect(waiting).resolves.toBe(false)
+      })
+
+      it('followed by login re-sends via subscribeAll and confirms on the new connection', async () => {
+        await subscribe('stream-notify-user', ['uid/media-signal'])
+        await subscribe('stream-notify-user', ['uid/media-calls'])
+
+        const reopened = await reopenAndHandshake(socket)
+
+        const waiting = socket.whenReady(streams)
+        const framesBefore = reopened.sent.length
+        socket.subscribeAll()
+        await flushMicrotasks()
+
+        expect(reopened.sent.slice(framesBefore).map((frame) => JSON.parse(frame))).toEqual([
+          { msg: 'sub', id: 'ddp-1', name: 'stream-notify-user', params: ['uid/media-signal'] },
+          { msg: 'sub', id: 'ddp-2', name: 'stream-notify-user', params: ['uid/media-calls'] }
+        ])
+
+        reopened.receive({ msg: 'ready', subs: ['ddp-1'] })
+        reopened.receive({ msg: 'ready', subs: ['ddp-2'] })
+        await expect(waiting).resolves.toBe(true)
+      })
+    })
+
+    it('turns every sub Unconfirmed the moment the connection closes, before a new one exists', async () => {
       await subscribe('stream-notify-user', ['uid/media-signal'])
       await subscribe('stream-notify-user', ['uid/media-calls'])
 
-      const waiting = socket.resubscribeWhenRecorded(streams)
-      transport.receive({ msg: 'ready', subs: ['ddp-1'] })
-      transport.receive({ msg: 'nosub', id: 'ddp-2' })
+      transport.close()
 
+      const waiting = socket.whenReady(streams, 500)
+      await jest.advanceTimersByTimeAsync(500)
       await expect(waiting).resolves.toBe(false)
     })
   })
@@ -242,11 +296,8 @@ describe('Socket subscription bookkeeping', () => {
 
     it('is re-established under that same id at the next login', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      socket.reopenNow()
+      const reopened = await reopenAndHandshake(socket)
       await subscribing
-
-      const reopened = fakeSockets[1]
-      await driveToHandshake(reopened)
 
       const framesBefore = reopened.sent.length
       socket.subscribeAll()
@@ -262,11 +313,8 @@ describe('Socket subscription bookkeeping', () => {
 
     it('can be unsubscribed from, unlike one that was never written', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      socket.reopenNow()
+      const reopened = await reopenAndHandshake(socket)
       await subscribing
-
-      const reopened = fakeSockets[1]
-      await driveToHandshake(reopened)
 
       // Nothing to await: the point is that the `unsub` goes out at all. Without
       // the entry, `unsubscribe` rejects up front and never reaches the wire.

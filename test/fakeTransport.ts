@@ -31,6 +31,8 @@ export const USER_DISCONNECT = 4000
  */
 export const fakeSockets: FakeWebSocket[] = []
 
+export const mostRecentFakeSocket = (): FakeWebSocket => fakeSockets[fakeSockets.length - 1]
+
 /**
  * A real class, not a three-property stub: `readyState` is read-only on the
  * declared transport type, and a mocked class is what lets a spec move it
@@ -201,4 +203,15 @@ export const driveToHandshake = async (transport: FakeWebSocket, session = 'fake
  */
 export const flushMicrotasks = async (): Promise<void> => {
   for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
+}
+
+export const reopenAndHandshake = async (
+  socket: Pick<Socket, 'reopenNow'>,
+  session = 'reopened-session'
+): Promise<FakeWebSocket> => {
+  const reopening = socket.reopenNow()
+  const reopened = mostRecentFakeSocket()
+  await driveToHandshake(reopened, session)
+  await reopening
+  return reopened
 }

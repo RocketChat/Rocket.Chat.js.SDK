@@ -7,6 +7,7 @@ import {
   driveToHandshake,
   FakeWebSocket,
   fakeSockets,
+  mostRecentFakeSocket,
   fakeTransportModule,
   OPEN,
   openFakeConnection,
@@ -378,7 +379,7 @@ describe('Socket connection lifecycle', () => {
       await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE - 1)
 
       const reopening = socket.reopenNow()
-      const replacement = fakeSockets[fakeSockets.length - 1]
+      const replacement = mostRecentFakeSocket()
       await driveToHandshake(replacement)
       await reopening
 

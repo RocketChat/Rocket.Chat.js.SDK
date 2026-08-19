@@ -51,7 +51,7 @@ The server's answer decides; silence keeps the instruction.
   under the id the request was sent with. A `sub` the server refused with a
   `nosub` carrying a DDP error still leaves nothing behind.
 - Either write is conditional on the Socket still holding a connection.
-  `rememberSubscription` returns early when it holds none, because an entry is an
+  `recordSubscription` returns early when it holds none, because an entry is an
   instruction to a later Login on this Socket, and a Socket with no connection has
   nothing to instruct.
 - A `sub` that was never written to the Transport leaves nothing behind. A failed
@@ -103,12 +103,12 @@ The server's answer decides; silence keeps the instruction.
 - `unsubscribeAll` acts on these entries and sends `unsub` frames for them, on
   the terms ADR-0004 sets. `Socket.close()` forgets them all and sends nothing,
   under ADR-0009.
-- `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
-  polls `subscriptions` for the two media entries, and an entry written on an
-  abandoned `sub` ends that poll instead of keeping it waiting. Readiness itself
-  is unchanged: the poll only decides when to re-send, and the gate resolves on
-  whether that resubscribe was acknowledged. An abandoned one resolves
-  `undefined`, which the gate counts as unacknowledged.
+- `Driver.waitForNotifyUserMediaSubs` reads the two media entries, and an entry
+  written on an abandoned `sub` counts as one of them. Readiness itself is
+  unchanged by this ADR: an entry is an instruction to establish the stream, not
+  a confirmation. ADR-0011 replaces the mechanism behind that gate with
+  `Socket.whenReady`, which answers from the recorded confirmations instead of
+  from the presence of an entry.
 - `unsubscribe` already keeps its entry on the same class of rejection, so a
   forced reconnect that abandons an `unsub` and a `sub` together leaves both, and
   `subscribeAll` re-sends the `sub` at the next Login under an id whose `unsub`

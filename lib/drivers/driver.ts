@@ -148,22 +148,13 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, `${this.userId}/${event}`, false)))
   }
 
-  /**
-   * Re-send the user's media-signal and media-calls subscriptions on the current
-   * Socket and resolve when the server acks them with `ready`. This gives the app
-   * an observable readiness signal after a forced reconnect.
-   *
-   * The Socket owns both the waiting and the re-sending: the re-send goes out under
-   * the ids the streams were first sent with, which this Driver's own `subscribe`
-   * would drop.
-   */
-  waitForNotifyUserMediaSubs = (timeoutMs = this.socket.config.timeout): Promise<boolean> => {
+  waitForNotifyUserMediaSubs = (timeoutMs?: number): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
     }
     const topic = 'stream-notify-user'
     const userId = this.userId
-    return this.resubscribeWhenRecorded(
+    return this.whenReady(
       ['media-signal', 'media-calls'].map(name => ({ name: topic, params: [`${userId}/${name}`] })),
       timeoutMs
     )
@@ -199,12 +190,12 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     return this.socket.unsubscribe(subscription.id)
   }
 
-  resubscribeWhenRecorded = (streams: IStream[], timeoutMs?: number): Promise<boolean> => {
-    return this.socket.resubscribeWhenRecorded(streams, timeoutMs)
-  }
-
   unsubscribeAll = (): Promise<void> => {
     return this.socket.unsubscribeAll()
+  }
+
+  whenReady = (streams: IStream[], timeoutMs?: number): Promise<boolean> => {
+    return this.socket.whenReady(streams, timeoutMs)
   }
 
   onStreamData = (event: string, cb: ICallback): Promise<any> => {

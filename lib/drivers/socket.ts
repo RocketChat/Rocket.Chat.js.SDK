@@ -43,6 +43,8 @@ const socketClosed = 3;
 
 const socketDeadlineMs = 2000;
 
+const subscriptionConfirmed = 'subscriptionConfirmed'
+
 const abandonedByReopen = '[ddp] connection reopened before the response arrived'
 const abandonedByClose = '[ddp] connection closed before the response arrived'
 const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
@@ -137,6 +139,7 @@ export class Socket extends SDKEventEmitter {
         this.logger.error(err)
         return reject(err)
       }
+      this.forgetConfirmations()
       // Tear down the previous connection before replacing it.
       // Callers only reach here when the existing socket isn't healthy, so
       // detaching its handlers and closing it stops a stale or still-connecting
@@ -206,6 +209,7 @@ export class Socket extends SDKEventEmitter {
     if (closedConnection && closedConnection !== this.connection) {
       return
     }
+    this.forgetConfirmations()
     this.emit('close', e)
     try {
       if (e?.code !== userDisconnectCloseCode) {
@@ -741,13 +745,16 @@ export class Socket extends SDKEventEmitter {
     this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'sub', id, name, params }))
       .then((result) => {
-        const confirmedId = (result.subs) ? result.subs[0] : undefined
-        if (confirmedId) return this.rememberSubscription(confirmedId, name, params, callback)
+        const confirmedId = result.subs?.[0]
+        if (!confirmedId) return undefined
+        return this.confirmSubscription(
+          this.recordSubscription(confirmedId, name, params, callback)
+        )
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
         if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
-          this.rememberSubscription(err.id, name, params, callback)
+          this.recordSubscription(err.id, name, params, callback)
         } else if (id && err instanceof DDPError) {
           this.forgetSubscription(id)
         }
@@ -762,7 +769,7 @@ export class Socket extends SDKEventEmitter {
    * locally and sends no `unsub`: closing the connection ends the streams on
    * the server.
    */
-  private rememberSubscription = (
+  private recordSubscription = (
     id: string,
     name: string,
     params: any[],
@@ -776,6 +783,18 @@ export class Socket extends SDKEventEmitter {
     this.subscriptions[id] = subscription
     return subscription
   }
+
+  private confirmSubscription = (subscription?: ISubscription) => {
+    if (!subscription) return undefined
+    subscription.confirmed = true
+    this.emit(subscriptionConfirmed)
+    return subscription
+  }
+
+  private forgetConfirmations = () =>
+    Object.keys(this.subscriptions).forEach((id) => {
+      this.subscriptions[id].confirmed = false
+    })
 
   /**
    * The DDP subscriptions on this Socket for one stream name, matched on the
@@ -791,54 +810,27 @@ export class Socket extends SDKEventEmitter {
         params.every((param, index) => sub.params?.[index] === param)
       ))
 
-  /**
-   * Re-send the given streams on the current connection under the ids they were
-   * first sent with, and resolve on whether the server acked every one of them.
-   *
-   * Nothing goes out until every stream asked for is recorded here, so the
-   * deadline expiring first resolves false.
-   */
-  resubscribeWhenRecorded = (
+  private hasConfirmedSubscription = ({ name, params = [] }: IStream): boolean =>
+    this.findSubscriptions({ name, params }).some(
+      (sub) => sub.confirmed && sub.params?.length === params.length
+    )
+
+  whenReady = (
     streams: IStream[],
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
-    const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
-    const resubscribe = (subs: ISubscription[]) => Promise.all(
-      subs.map((sub) => this.subscribe(sub.name, sub.params, undefined, sub.id))
-    )
-      .then((results) => {
-        const unacknowledged = subs.filter((_, index) => !results[index])
-        unacknowledged.forEach((sub) => this.logger.error(
-          `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
-        ))
-        return unacknowledged.length === 0
-      })
-      .catch(() => false)
-
     return new Promise<boolean>((resolve) => {
-      let settled = false
-      let inFlight = false
       const finish = (value: boolean) => {
-        if (settled) return
-        settled = true
-        clearInterval(poll)
         clearTimeout(deadline)
+        this.off(subscriptionConfirmed, resolveIfConfirmed)
         resolve(value)
       }
-      const attempt = () => {
-        if (inFlight) return
-        const perStream = recordedPerStream()
-        if (!perStream.every((subs) => subs.length > 0)) return
-        inFlight = true
-        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as ISubscription[])
-        resubscribe(recorded).then((value) => {
-          inFlight = false
-          finish(value)
-        })
+      const resolveIfConfirmed = () => {
+        if (streams.every(this.hasConfirmedSubscription)) finish(true)
       }
       const deadline = setTimeout(() => finish(false), timeoutMs)
-      const poll = setInterval(attempt, 100)
-      attempt()
+      this.on(subscriptionConfirmed, resolveIfConfirmed)
+      resolveIfConfirmed()
     })
   }
 
