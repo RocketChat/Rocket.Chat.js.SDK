@@ -107,19 +107,18 @@ handed it are counted. An explicit id is not part of this rule.
   `forgetSubscription` drops the count with the entry, so the two are never out
   of step.
 - `unsubscribeAll` drops the holder count and the ending mark of every entry
-  before it unsubscribes anything. It is a
-  teardown of everything, so it ends each stream whoever else holds it. This is
-  what keeps ADR-0004's statement that `unsubscribeAll` sends `unsub` frames
-  true once streams are shared, and with it the `logout` that awaits it.
+  before it unsubscribes anything. It is a teardown of everything, so it ends
+  each stream whoever else holds it. This is what keeps ADR-0004's statement
+  that `unsubscribeAll` sends `unsub` frames true once streams are shared, and with it the `logout` that awaits it.
 - The holder count and the ending mark are one state per subscription id, held
   beside `subscriptions` rather than on the entry, because they belong to this
   Socket's bookkeeping and not to the instruction a later Login reads. An entry
   replayed by `subscribeAll` says nothing about how many callers hold it. One
   state per id is also what keeps a count and a mark from going out of step, as
   every lifecycle step drops or writes both at once. The per-stream request map
-  lives there for the same reason, and `forgetAllSubscriptions` clears the request map alongside the
-  entries, so a Socket closed under ADR-0009 keeps no instruction of any kind —
-  not an entry, not a count, not a mark, and not a request another caller could
+  lives there for the same reason, and `forgetAllSubscriptions` clears the
+  request map alongside the entries, so a Socket closed under ADR-0009 keeps no
+  instruction of any kind — not an entry, not a count, not a mark, and not a request another caller could
   still be given a share of.
 - A reuse registers the caller's callback before it returns. Callbacks are
   unaffected by the collapse because `rememberSubscription` binds `onEvent` to

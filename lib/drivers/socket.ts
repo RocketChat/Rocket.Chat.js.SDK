@@ -849,19 +849,14 @@ export class Socket extends SDKEventEmitter {
   }
 
   /**
-   * Drop the holder count and the ending mark together, so a subscription whose
-   * `unsub` failed is reusable again by a caller that inherits no holder the
-   * caller which sent that `unsub` has already let go of. See ADR-0011.
+   * Drop the count and the mark together, so an entry whose `unsub` failed is
+   * reusable again and inherits no holder that has let go. See ADR-0011.
    */
   private forgetSubscriptionState = (id: string) => {
     delete this.subscriptionStates[id]
   }
 
-  /**
-   * Whether this caller's `unsub` ends the stream for nobody else. No count is
-   * the entry an abandoned `sub` wrote, which was handed to nobody and still has
-   * to be unsubscribable. See ADR-0006 and ADR-0011.
-   */
+  /** No count is an abandoned `sub`'s entry, which is still unsubscribable. */
   private endsForNobodyElse = (id: string) => this.holderCountOf(id) <= 1
 
   private sendSubscribe = (
