@@ -208,7 +208,7 @@ export const subFrames = (frames: string[]) =>
   frames.map((frame) => JSON.parse(frame)).filter((frame) => frame.msg === 'sub')
 
 /** The id of the last sent frame, which must be a `sub`. */
-export const lastSubId = (transport: FakeWebSocket): string => {
+export const expectLastSubId = (transport: FakeWebSocket): string => {
   const { msg, id } = transport.lastSent() as { msg: string, id: string }
   expect(msg).toBe('sub')
   return id

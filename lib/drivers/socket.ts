@@ -26,7 +26,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
-import { IStream, RecordedSubscription } from './definitions'
+import { IStream, RecordedDDPSubscription } from './definitions'
 import { DDPError, toError } from './ddpError'
 import { sha256 } from 'js-sha256'
 
@@ -84,7 +84,7 @@ export class Socket extends SDKEventEmitter {
   sent = 0
   host: string
   lastPing = Date.now()
-  subscriptions: { [id: string]: RecordedSubscription } = {}
+  subscriptions: { [id: string]: RecordedDDPSubscription } = {}
   config: ISocketConfig
   openTimeout?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
@@ -743,7 +743,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Re-establish a recorded stream on the current connection, under its own id. */
-  private resubscribe = (sub: RecordedSubscription) =>
+  private resubscribe = (sub: RecordedDDPSubscription) =>
     this.queueSubscriptionRequest(sub.id, () => this.sendSubscription(sub.id, sub.name, sub.params))
 
   private sendSubscription = (
@@ -791,7 +791,7 @@ export class Socket extends SDKEventEmitter {
    * The DDP subscriptions on this Socket for one stream name, matched on a
    * prefix of the params given.
    */
-  findSubscriptions = ({ name, params = [] }: IStream): RecordedSubscription[] =>
+  findSubscriptionsByParamPrefix = ({ name, params = [] }: IStream): RecordedDDPSubscription[] =>
     Object.keys(this.subscriptions || {})
       .map((id) => this.subscriptions[id])
       .filter((sub) => (
@@ -811,8 +811,8 @@ export class Socket extends SDKEventEmitter {
     streams: IStream[],
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
-    const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
-    const resend = (subs: RecordedSubscription[]) => Promise.all(
+    const recordedPerStream = () => streams.map((stream) => this.findSubscriptionsByParamPrefix(stream))
+    const resend = (subs: RecordedDDPSubscription[]) => Promise.all(
       subs.map((sub) => this.resubscribe(sub))
     )
       .then((results) => {
@@ -839,7 +839,7 @@ export class Socket extends SDKEventEmitter {
         const perStream = recordedPerStream()
         if (!perStream.every((subs) => subs.length > 0)) return
         inFlight = true
-        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as RecordedSubscription[])
+        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as RecordedDDPSubscription[])
         resend(recorded).then((value) => {
           inFlight = false
           finish(value)

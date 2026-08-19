@@ -6,7 +6,7 @@ import {
   flushMicrotasks,
   fakeSockets,
   driveToHandshake,
-  lastSubId,
+  expectLastSubId,
   openFakeConnection,
   subscribeAndAck,
   useFakeClockAndSocketRegistry
@@ -115,7 +115,7 @@ describe('Socket subscription bookkeeping', () => {
     // acknowledgement, so an unanswered `sub` is not in it yet.
     socket.subscribe('stream-room-messages', ['GENERAL'])
 
-    const id = lastSubId(transport)
+    const id = expectLastSubId(transport)
     expect(socket.subscriptions).toEqual({})
 
     transport.receive({ msg: 'ready', subs: [id] })
@@ -127,17 +127,17 @@ describe('Socket subscription bookkeeping', () => {
       await subscribe('stream-notify-user', ['uid/media-calls', false])
       await subscribe('stream-room-messages', ['GENERAL'])
 
-      expect(socket.findSubscriptions({ name: 'stream-notify-user', params: ['uid/media-signal'] }))
+      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-notify-user', params: ['uid/media-signal'] }))
         .toMatchObject([{ id: signalId, params: ['uid/media-signal', false] }])
-      expect(socket.findSubscriptions({ name: 'stream-notify-user' })).toHaveLength(2)
-      expect(socket.findSubscriptions({ name: 'stream-notify-user', params: ['uid/media-video'] })).toEqual([])
-      expect(socket.findSubscriptions({ name: 'stream-room-messages' })).toHaveLength(1)
+      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-notify-user' })).toHaveLength(2)
+      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-notify-user', params: ['uid/media-video'] })).toEqual([])
+      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-room-messages' })).toHaveLength(1)
     })
 
     it('finds nothing while the subscription is still in flight', () => {
       socket.subscribe('stream-notify-user', ['uid/media-signal', false])
 
-      expect(socket.findSubscriptions({ name: 'stream-notify-user' })).toEqual([])
+      expect(socket.findSubscriptionsByParamPrefix({ name: 'stream-notify-user' })).toEqual([])
 
       transport.receive({ msg: 'ready', subs: [transport.lastSent().id] })
     })
@@ -220,7 +220,7 @@ describe('Socket subscription bookkeeping', () => {
       // name: nothing to unsubscribe with, and nothing for `subscribeAll` to
       // re-establish at the next login.
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      const id = lastSubId(transport)
+      const id = expectLastSubId(transport)
 
       socket.reopenNow()
       await expect(subscribing).resolves.toBeUndefined()
@@ -279,7 +279,7 @@ describe('Socket subscription bookkeeping', () => {
     // A close and a forced reopen are the same loss: the frame went out and the
     // answer can never arrive. Both must leave the entry behind.
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-    const id = lastSubId(transport)
+    const id = expectLastSubId(transport)
 
     transport.close()
     await expect(subscribing).resolves.toBeUndefined()
@@ -294,7 +294,7 @@ describe('Socket subscription bookkeeping', () => {
   describe('a subscription the server never answered', () => {
     it('is kept under the id it was sent with when the deadline expires', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      const id = lastSubId(transport)
+      const id = expectLastSubId(transport)
 
       await jest.advanceTimersByTimeAsync(socket.config.timeout)
       await expect(subscribing).resolves.toBeUndefined()

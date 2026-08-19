@@ -7,7 +7,7 @@ import {
   IRealtimeCredentials
 } from '../../interfaces'
 
-export type RecordedSubscription = ISubscription & {
+export type RecordedDDPSubscription = ISubscription & {
   id: string
   name: string
   params: any[]
