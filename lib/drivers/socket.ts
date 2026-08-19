@@ -43,6 +43,8 @@ const socketClosed = 3;
 
 const socketDeadlineMs = 2000;
 
+const subscriptionConfirmed = 'subscriptionConfirmed'
+
 const abandonedByReopen = '[ddp] connection reopened before the response arrived'
 const abandonedByClose = '[ddp] connection closed before the response arrived'
 const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
@@ -93,8 +95,6 @@ export class Socket extends SDKEventEmitter {
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
-  private confirmedSubscriptionIds = new Set<string>()
-  private readinessListeners = new Set<() => void>()
 
   /** Create a websocket handler */
   constructor (
@@ -139,7 +139,7 @@ export class Socket extends SDKEventEmitter {
         this.logger.error(err)
         return reject(err)
       }
-      this.confirmedSubscriptionIds.clear()
+      this.forgetConfirmations()
       // Tear down the previous connection before replacing it.
       // Callers only reach here when the existing socket isn't healthy, so
       // detaching its handlers and closing it stops a stale or still-connecting
@@ -209,7 +209,7 @@ export class Socket extends SDKEventEmitter {
     if (closedConnection && closedConnection !== this.connection) {
       return
     }
-    this.confirmedSubscriptionIds.clear()
+    this.forgetConfirmations()
     this.emit('close', e)
     try {
       if (e?.code !== userDisconnectCloseCode) {
@@ -350,7 +350,6 @@ export class Socket extends SDKEventEmitter {
 
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
-    this.confirmedSubscriptionIds.delete(id)
     delete this.subscriptions[id]
   }
 
@@ -748,9 +747,9 @@ export class Socket extends SDKEventEmitter {
       .then((result) => {
         const confirmedId = result.subs?.[0]
         if (!confirmedId) return undefined
-        const subscription = this.recordSubscription(confirmedId, name, params, callback)
-        if (subscription) this.confirmSubscription(confirmedId)
-        return subscription
+        return this.confirmSubscription(
+          this.recordSubscription(confirmedId, name, params, callback)
+        )
       })
       .catch((err) => {
         this.logger.error(`[ddp] Subscribe error: ${err.message}`)
@@ -785,10 +784,17 @@ export class Socket extends SDKEventEmitter {
     return subscription
   }
 
-  private confirmSubscription = (id: string) => {
-    this.confirmedSubscriptionIds.add(id)
-    this.readinessListeners.forEach((listener) => listener())
+  private confirmSubscription = (subscription?: ISubscription) => {
+    if (!subscription) return undefined
+    subscription.confirmed = true
+    this.emit(subscriptionConfirmed)
+    return subscription
   }
+
+  private forgetConfirmations = () =>
+    Object.keys(this.subscriptions).forEach((id) => {
+      this.subscriptions[id].confirmed = false
+    })
 
   /**
    * The DDP subscriptions on this Socket for one stream name, matched on the
@@ -806,30 +812,25 @@ export class Socket extends SDKEventEmitter {
 
   private hasConfirmedSubscription = ({ name, params = [] }: IStream): boolean =>
     this.findSubscriptions({ name, params }).some(
-      (sub) =>
-        sub.params?.length === params.length &&
-        sub.id !== undefined &&
-        this.confirmedSubscriptionIds.has(sub.id)
+      (sub) => sub.confirmed && sub.params?.length === params.length
     )
 
   whenReady = (
     streams: IStream[],
     timeoutMs = this.config.timeout
   ): Promise<boolean> => {
-    if (streams.every(this.hasConfirmedSubscription)) return Promise.resolve(true)
     return new Promise<boolean>((resolve) => {
       const finish = (value: boolean) => {
         clearTimeout(deadline)
-        this.readinessListeners.delete(resolveIfConfirmed)
+        this.off(subscriptionConfirmed, resolveIfConfirmed)
         resolve(value)
       }
       const resolveIfConfirmed = () => {
-        if (streams.every(this.hasConfirmedSubscription)) {
-          finish(true)
-        }
+        if (streams.every(this.hasConfirmedSubscription)) finish(true)
       }
       const deadline = setTimeout(() => finish(false), timeoutMs)
-      this.readinessListeners.add(resolveIfConfirmed)
+      this.on(subscriptionConfirmed, resolveIfConfirmed)
+      resolveIfConfirmed()
     })
   }
 
