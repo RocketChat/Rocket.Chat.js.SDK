@@ -804,18 +804,13 @@ export class Socket extends SDKEventEmitter {
         params.every((param, index) => sub.params?.[index] === param)
       ))
 
-  private hasConfirmedSubscription = ({ name, params = [] }: IStream): boolean => {
-    for (const id of this.confirmedSubscriptionIds) {
-      const sub = this.subscriptions[id]
-      if (
-        sub &&
-        sub.name === name &&
+  private hasConfirmedSubscription = ({ name, params = [] }: IStream): boolean =>
+    this.findSubscriptions({ name, params }).some(
+      (sub) =>
         sub.params?.length === params.length &&
-        params.every((param, index) => sub.params?.[index] === param)
-      ) return true
-    }
-    return false
-  }
+        sub.id !== undefined &&
+        this.confirmedSubscriptionIds.has(sub.id)
+    )
 
   whenReady = (
     streams: IStream[],
