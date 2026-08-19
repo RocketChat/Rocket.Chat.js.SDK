@@ -67,6 +67,11 @@ class AbandonedRequest extends AbandonedWait {
   }
 }
 
+interface PendingOpen {
+  reject: (err: Error) => void
+  awaitedByOpen: boolean
+}
+
 /**
  * The wait for a DDP response ended by its Deadline, carrying the id so a caller
  * can name what the server may still have acted on. See ADR-0003 and ADR-0006.
@@ -91,10 +96,9 @@ export class Socket extends SDKEventEmitter {
   logger: ILogger
   reopenPromise?: Promise<void>
   private settleReopen?: () => void
-  private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
+  private pendingOpens = new WeakMap<WebSocket, PendingOpen>()
   private driverClosedConnection?: WebSocket
   private pingInFlightConnection?: WebSocket
-  private openAwaitedConnections = new WeakSet<WebSocket>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   /** Create a websocket handler */
@@ -134,8 +138,7 @@ export class Socket extends SDKEventEmitter {
 
       try {
         connection = new WebSocket(this.host, null, { headers: settings.customHeaders })
-        this.pendingOpenRejects.set(connection, reject)
-        if (awaitedByOpen) this.openAwaitedConnections.add(connection)
+        this.pendingOpens.set(connection, { reject, awaitedByOpen })
         connection.onerror = (err: any) => {
           this.forgetPendingOpen(connection)
           reject(err)
@@ -186,7 +189,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Send handshake message to confirm connection, start pinging. */
-  onOpen = async (resolve: Function, reject: Function, openedConnection?: WebSocket) => {
+  onOpen = async (resolve: Function, reject: Function, openedConnection: WebSocket) => {
     this.lastPing = Date.now()
 
     // `onopen` is a websocket callback, so a throw here has nowhere to go.
@@ -261,10 +264,8 @@ export class Socket extends SDKEventEmitter {
     if (data.id) this.emit(data.id, data)
   }
 
-  private forgetPendingOpen = (connection?: WebSocket) => {
-    if (!connection) return
-    this.pendingOpenRejects.delete(connection)
-    this.openAwaitedConnections.delete(connection)
+  private forgetPendingOpen = (connection: WebSocket) => {
+    this.pendingOpens.delete(connection)
   }
 
   /**
@@ -274,9 +275,9 @@ export class Socket extends SDKEventEmitter {
    * so a handshake rejection already in flight settles it first.
    */
   private detach = (connection: WebSocket) => {
-    const rejectPendingOpen = this.pendingOpenRejects.get(connection)
+    const pendingOpen = this.pendingOpens.get(connection)
     this.forgetPendingOpen(connection)
-    Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedBeforeOpen)))
+    Promise.resolve().then(() => pendingOpen?.reject(new AbandonedWait(abandonedBeforeOpen)))
     connection.onopen = null as any
     connection.onmessage = null as any
     connection.onerror = null as any
@@ -339,14 +340,12 @@ export class Socket extends SDKEventEmitter {
   close = async (): Promise<void> => {
     this.cancelAnyReopen()
 
-    let connection = this.connection
-
-    while (connection) {
+    while (this.connection) {
+      const connection = this.connection
       await this.letGoOfConnection(connection)
 
       if (!this.replaced(connection)) break
       if (this.supersededByWatchedConnection(this.connection)) return
-      connection = this.connection
     }
 
     this.cancelLivenessChain()
@@ -367,10 +366,7 @@ export class Socket extends SDKEventEmitter {
 
   private supersededByWatchedConnection = (connection?: WebSocket) =>
     connection !== undefined &&
-    (this.livenessChainArmed() || this.awaitedByOpen(connection))
-
-  private awaitedByOpen = (connection: WebSocket) =>
-    this.openAwaitedConnections.has(connection)
+    (this.livenessChainArmed() || this.pendingOpens.get(connection)?.awaitedByOpen === true)
 
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
