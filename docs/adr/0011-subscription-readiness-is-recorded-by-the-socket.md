@@ -9,10 +9,10 @@
 Issue 312: the Socket keeps no record of whether a DDP subscription was
 confirmed. The caller that needs one is Rocket.Chat.ReactNative's call-accept
 path: after a forced reconnect the app must know when its `media-signal` and
-`media-calls` streams are live again before it answers. What it has today is
+`media-calls` streams are Confirmed subs again before it answers. What it has today is
 `resubscribeWhenRecorded`, which polls `subscriptions` every 100ms until the
 entries exist, re-sends each under the id it was first sent with, and resolves
-on whether the re-send was acknowledged.
+on whether the re-send was confirmed.
 
 Three properties of that mechanism fail the caller.
 
@@ -30,8 +30,8 @@ checks. `loggedIn` cannot gate the re-send either: it is `connected &&
 !!resume`, `resume` survives across connections, and nothing clears it, so an
 anonymous reopened session reports logged in.
 
-The poll exists because the only readiness signal on offer was the ack of the
-mechanism's own re-send. Once readiness is recorded, the signal is the record,
+The poll exists because the only readiness signal on offer was the DDP response
+to the mechanism's own re-send. Once readiness is recorded, the signal is the record,
 and the poll has nothing left to wait for.
 
 The re-send itself cannot be repaired inside this issue. The only way to know a

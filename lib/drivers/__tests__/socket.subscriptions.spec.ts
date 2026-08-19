@@ -178,14 +178,14 @@ describe('Socket subscription bookkeeping', () => {
       await jest.advanceTimersByTimeAsync(1)
       expect(resolved).toBeUndefined()
 
-      const { id } = transport.lastSent()
-      transport.receive({ msg: 'ready', subs: [id] })
+      const { id: signalId } = transport.lastSent()
+      transport.receive({ msg: 'ready', subs: [signalId] })
       await jest.advanceTimersByTimeAsync(1)
 
       socket.subscribe('stream-notify-user', ['uid/media-calls'])
       await jest.advanceTimersByTimeAsync(1)
-      const { id: id2 } = transport.lastSent()
-      transport.receive({ msg: 'ready', subs: [id2] })
+      const { id: callsId } = transport.lastSent()
+      transport.receive({ msg: 'ready', subs: [callsId] })
 
       await expect(waiting).resolves.toBe(true)
     })

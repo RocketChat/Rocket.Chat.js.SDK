@@ -148,7 +148,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, `${this.userId}/${event}`, false)))
   }
 
-  waitForNotifyUserMediaSubs = (timeoutMs = this.socket.config.timeout): Promise<boolean> => {
+  waitForNotifyUserMediaSubs = (timeoutMs?: number): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
     }
