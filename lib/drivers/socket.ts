@@ -89,7 +89,7 @@ export class Socket extends SDKEventEmitter {
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
-  private confirmedSubscriptions = new Set<string>()
+  private confirmedSubscriptionIds = new Set<string>()
   private readinessListeners = new Set<() => void>()
 
   /** Create a websocket handler */
@@ -135,7 +135,7 @@ export class Socket extends SDKEventEmitter {
         this.logger.error(err)
         return reject(err)
       }
-      this.confirmedSubscriptions.clear()
+      this.confirmedSubscriptionIds.clear()
       // Tear down the previous connection before replacing it.
       // Callers only reach here when the existing socket isn't healthy, so
       // detaching its handlers and closing it stops a stale or still-connecting
@@ -205,7 +205,7 @@ export class Socket extends SDKEventEmitter {
     if (closedConnection && closedConnection !== this.connection) {
       return
     }
-    this.confirmedSubscriptions.clear()
+    this.confirmedSubscriptionIds.clear()
     this.emit('close', e)
     try {
       if (e?.code !== userDisconnectCloseCode) {
@@ -349,7 +349,7 @@ export class Socket extends SDKEventEmitter {
 
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
-    this.confirmedSubscriptions.delete(id)
+    this.confirmedSubscriptionIds.delete(id)
     delete this.subscriptions[id]
   }
 
@@ -780,7 +780,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   private confirmSubscription = (id: string) => {
-    this.confirmedSubscriptions.add(id)
+    this.confirmedSubscriptionIds.add(id)
     this.readinessListeners.forEach((check) => check())
   }
 
@@ -802,7 +802,7 @@ export class Socket extends SDKEventEmitter {
     this.findSubscriptions({ name, params })
       .find((sub) => (
         sub.params?.length === params.length &&
-        this.confirmedSubscriptions.has(sub.id as string)
+        this.confirmedSubscriptionIds.has(sub.id as string)
       ))
 
   whenReady = (
