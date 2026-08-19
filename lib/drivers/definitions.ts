@@ -4,7 +4,7 @@ import {
   ICallback,
   ISubscription,
   ISocketMessageCallback,
-  ICredentials
+  IRealtimeCredentials
 } from '../../interfaces'
 
 export type RecordedSubscription = ISubscription & {
@@ -40,7 +40,7 @@ export interface ISocket {
 
 export interface IDriver {
   config: any
-  login (credentials: ICredentials, args: any): Promise<any>
+  login (credentials: IRealtimeCredentials, args: any): Promise<any>
 
   subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]>
 
