@@ -4,8 +4,6 @@ import {
   CLOSED,
   FakeWebSocket,
   flushMicrotasks,
-  fakeSockets,
-  driveToHandshake,
   openFakeConnection,
   reopenAndHandshake,
   useFakeClockAndSocketRegistry
@@ -296,11 +294,8 @@ describe('Socket subscription bookkeeping', () => {
 
     it('is re-established under that same id at the next login', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      socket.reopenNow()
+      const reopened = await reopenAndHandshake(socket)
       await subscribing
-
-      const reopened = fakeSockets[1]
-      await driveToHandshake(reopened)
 
       const framesBefore = reopened.sent.length
       socket.subscribeAll()
@@ -316,11 +311,8 @@ describe('Socket subscription bookkeeping', () => {
 
     it('can be unsubscribed from, unlike one that was never written', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      socket.reopenNow()
+      const reopened = await reopenAndHandshake(socket)
       await subscribing
-
-      const reopened = fakeSockets[1]
-      await driveToHandshake(reopened)
 
       // Nothing to await: the point is that the `unsub` goes out at all. Without
       // the entry, `unsubscribe` rejects up front and never reaches the wire.

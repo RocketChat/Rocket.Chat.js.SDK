@@ -211,11 +211,19 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const transport = await openFakeConnection(driver.ddp)
     driver.userId = userId
     await addMediaSubscription(driver, transport, 'media-signal')
-    driver.ddp.subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal-again')
-    transport.receive({ msg: 'nosub', id: 'sub-media-signal-again' })
     await addMediaSubscription(driver, transport, 'media-calls')
 
-    await expect(driver.waitForNotifyUserMediaSubs()).resolves.toBe(true)
+    const unanswered = driver.ddp.subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal-again')
+    await jest.advanceTimersByTimeAsync(driver.config.timeout)
+    await unanswered
+
+    expect(Object.keys(driver.ddp.subscriptions)).toEqual(
+      expect.arrayContaining(['sub-media-signal', 'sub-media-signal-again'])
+    )
+
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
+    await expect(waiting).resolves.toBe(true)
   })
 
   describe('after a reopen', () => {
