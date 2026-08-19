@@ -3,7 +3,7 @@ import {
   ILogger,
   ICallback,
   ISubscription,
-  ICredentials
+  IRealtimeCredentials
 } from '../../interfaces'
 
 export interface IStream {
@@ -33,7 +33,7 @@ export interface ISocket {
 
 export interface IDriver {
   config: any
-  login (credentials: ICredentials, args: any): Promise<any>
+  login (credentials: IRealtimeCredentials, args: any): Promise<any>
 
   subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]>
 

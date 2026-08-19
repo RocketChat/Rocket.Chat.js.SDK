@@ -5,6 +5,7 @@ import {
   anonymousApiWithFakeClient,
   loggedInApiWithFakeClient
 } from '../../../test/apiFixtures'
+import { loginResponse } from '../../../test/loginResponse'
 
 const emptySuccess = () => ({ status: 200, data: {} })
 
@@ -25,6 +26,27 @@ describe('api', () => {
       expect(api.userId).toBe('fake-user-id')
       expect(api.username).toBe('fake-username')
       expect(api.loggedIn()).toBe(true)
+    })
+
+    it('keeps the answered login data, user included, as the current result', async () => {
+      const { api } = await loggedInApiWithFakeClient()
+      const result = api.currentLogin!.result!
+
+      expect(result).toEqual({
+        userId: 'fake-user-id',
+        authToken: 'fake-token',
+        me: { _id: 'fake-user-id', username: 'fake-username' }
+      })
+    })
+
+    it('sends a resume token as its own login method', async () => {
+      const { api, restClient } = anonymousApiWithFakeClient()
+      restClient.enqueueReply(loginResponse())
+
+      await api.login({ resume: 'fake-token' })
+
+      expect(restClient.requests[0].data).toEqual({ resume: 'fake-token' })
+      expect(api.userId).toBe('fake-user-id')
     })
   })
 

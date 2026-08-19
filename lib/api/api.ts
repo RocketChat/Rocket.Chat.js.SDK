@@ -5,7 +5,9 @@ import {
 	ICurrentLogin,
 	IAPIRequest,
 	IMessage,
-	ICredentials
+	ILoginCredentials,
+	ILoginData,
+	ILoginResult
 } from '../../interfaces'
 
 import { Message } from '../message'
@@ -286,10 +288,10 @@ export default class Api extends SDKEventEmitter {
 		) ? true : false
   }
 
-  async login (credentials: ICredentials, args?: any): Promise<any> {
-    const { data } = await this.post('login', { ...credentials, ...args }, false)
+  async login (credentials: ILoginCredentials, args?: any): Promise<ILoginData | ILoginResult | null> {
+    const { data }: { data: ILoginData } = await this.post('login', { ...credentials, ...args }, false)
     this.setLogin({
-      username: data.me.username,
+      username: data.me.username ?? null,
       userId: data.userId,
       authToken: data.authToken,
       result: data

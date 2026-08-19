@@ -64,6 +64,25 @@ describe('client.ddp', () => {
   })
 })
 
+describe('client.login', () => {
+  it('answers with the realtime session it resumed into', async () => {
+    const restClient = new FakeClient()
+    const client = createClient(restClient)
+    answerDdpLoginWith(client, { id: 'fake-user-id', token: 'fake-token' })
+
+    const pending = client.login({ username: 'user', password: 'pass' })
+    restClient.lastRequest().resolve(loginResponse())
+
+    expect(await pending).toMatchObject({ id: 'fake-user-id', token: 'fake-token' })
+  })
+
+  it('keeps the answered user on the current login', async () => {
+    const client = await loggedInClient()
+
+    expect(client.currentLogin!.result!.me).toMatchObject({ username: 'fake-username' })
+  })
+})
+
 describe('client.resume', () => {
   const resumedClient = async () => {
     const client = createClient()
@@ -71,6 +90,15 @@ describe('client.resume', () => {
     await client.resume({ token: 'fake-token' })
     return client
   }
+
+  it('resumes the realtime session with the token as a resume credential', async () => {
+    const client = createClient()
+    const ddpLogin = answerDdpLoginWith(client, { id: 'fake-user-id', token: 'fake-token' })
+
+    await client.resume({ token: 'fake-token' })
+
+    expect(ddpLogin).toHaveBeenCalledWith({ resume: 'fake-token' }, {})
+  })
 
   it('leaves the client logged in for REST', async () => {
     expect((await resumedClient()).loggedIn()).toBe(true)

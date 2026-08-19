@@ -15,11 +15,10 @@ import {
   ISocketOptions,
   ISocketConfig,
   ISubscription,
-  ICredentials,
+  IRealtimeCredentials,
   ILoginResult,
   ICredentialsPass,
   isLoginPass,
-  ICredentialsOAuth,
   isLoginOAuth,
   ICredentialsAuthenticated,
   isLoginAuthenticated,
@@ -639,7 +638,7 @@ export class Socket extends SDKEventEmitter {
    * Login to server and resubscribe to all subs, resolve with user information.
    * @param credentials User credentials (username/password, oauth or token)
    */
-  login = async (credentials: any) => {
+  login = async (credentials: IRealtimeCredentials) => {
     const params = this.loginParams(credentials)
     this.resume = (await this.call('login', params) as ILoginResult)
     this.subscribeAll().catch(console.log)
@@ -648,14 +647,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   /** Take variety of login credentials object types for accepted params */
-  loginParams = (
-    credentials:
-      ICredentialsPass |
-      ICredentialsOAuth |
-      ICredentialsAuthenticated |
-      ILoginResult |
-      ICredentials
-  ) => {
+  loginParams = (credentials: IRealtimeCredentials) => {
     if (
       isLoginPass(credentials) ||
       isLoginOAuth(credentials) ||

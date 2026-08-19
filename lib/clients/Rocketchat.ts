@@ -1,7 +1,7 @@
 import type { ISocket, IStream } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
 import ApiRocketChat from '../api/RocketChat'
-import { ILoginResult, ICallback, ISubscription, ICredentials } from '../../interfaces'
+import { ILoginResult, ICallback, ISubscription, ILoginCredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
 export default class RocketChatClient extends ApiRocketChat implements ISocket {
   userId: string = ''
@@ -13,12 +13,12 @@ export default class RocketChatClient extends ApiRocketChat implements ISocket {
   }
 
   async resume ({ token }: { token: string }) {
-    const login: ILoginResult = await this.ddp.login({ token } as any, {})
+    const login: ILoginResult = await this.ddp.login({ resume: token }, {})
     this.resumeLogin({ userId: login.id, authToken: login.token })
     return login
   }
 
-  async login (credentials: ICredentials) {
+  async login (credentials: ILoginCredentials): Promise<ILoginResult | null> {
     await super.login(credentials)
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }

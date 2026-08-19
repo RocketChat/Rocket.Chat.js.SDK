@@ -58,6 +58,45 @@ export interface ICredentials {
   ldapOptions?: object
 }
 
+/**
+ * Password payload for `POST /api/v1/login`. The server only builds the
+ * password login out of these keys — any other key in the body sends the
+ * whole body to the login handlers untouched instead.
+ */
+export interface ICredentialsPasswordAPI {
+  password: string
+  username?: string
+  user?: string
+  email?: string
+  code?: string
+}
+
+/** LDAP payload for `POST /api/v1/login` */
+export interface ICredentialsLdapAPI {
+  ldap: true
+  username: string
+  ldapPass: string
+  ldapOptions?: object
+}
+
+/** CROWD payload for `POST /api/v1/login` */
+export interface ICredentialsCrowdAPI {
+  crowd: true
+  username: string
+  crowdPassword: string
+}
+
+/** SAML payload for `POST /api/v1/login` */
+export interface ICredentialsSamlAPI {
+  saml: true
+  credentialToken: string
+}
+
+/** CAS payload for `POST /api/v1/login` */
+export interface ICredentialsCasAPI {
+  cas: { credentialToken: string }
+}
+
 /** User credentials for password login method */
 export interface ICredentialsPass {
   user: { username: string }
@@ -97,6 +136,24 @@ export interface ICredentialsAuthenticated {
 export function isLoginAuthenticated (params: any): params is ICredentialsAuthenticated {
   return (params.resume !== undefined)
 }
+
+/** The credentials the realtime layer takes, in any of its accepted shapes */
+export type IRealtimeCredentials =
+  ICredentialsPass |
+  ICredentialsOAuth |
+  ICredentialsAuthenticated |
+  ILoginResult |
+  ICredentials
+
+/** The login methods `POST /api/v1/login` accepts */
+export type ILoginCredentials =
+  ICredentialsPasswordAPI |
+  ICredentialsLdapAPI |
+  ICredentialsCrowdAPI |
+  ICredentialsSamlAPI |
+  ICredentialsCasAPI |
+  ICredentialsOAuth |
+  ICredentialsAuthenticated
 
 /**
  * Common args for POST, GET, PUT, DELETE requests
@@ -152,11 +209,49 @@ export interface ILoginResultAPI {
   }
 }
 
+/**
+ * The logged-in user, as `POST /api/v1/login` answers it. Wider than `IUserAPI`
+ * and almost entirely optional, because the server builds it from whichever
+ * fields the account has.
+ */
+export interface ILoginUser {
+  _id: string
+  username?: string
+  name?: string
+  nickname?: string
+  bio?: string
+  status?: string
+  statusText?: string
+  statusDefault?: string
+  statusConnection?: string
+  statusLivechat?: string
+  active?: boolean
+  type?: string
+  utcOffset?: number
+  language?: string
+  roles?: string[]
+  emails?: { address: string, verified: boolean }[]
+  settings?: { preferences?: { [preference: string]: any } }
+  customFields?: { [field: string]: any }
+  services?: { [service: string]: any }
+  requirePasswordChange?: boolean
+  avatarUrl?: string
+  avatarETag?: string
+  isOAuthUser?: boolean
+}
+
+/** The `data` of a `POST /api/v1/login` response */
+export interface ILoginData {
+  authToken: string
+  userId: string
+  me: ILoginUser
+}
+
 export interface ICurrentLogin {
   username: string | null
   userId: string
   authToken: string
-  result: ILoginResultAPI | null
+  result: ILoginData | null
 }
 
 /** Error-first callback param type */
