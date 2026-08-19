@@ -226,7 +226,7 @@ export const subscribeAndAck = async (
   callback?: ISocketMessageCallback
 ) => {
   const subscribing = socket.subscribe(name, params, callback)
-  const { id } = transport.lastSent()
+  const id = lastSubId(transport)
   transport.receive({ msg: 'ready', subs: [id] })
   return subscribing
 }
