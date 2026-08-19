@@ -173,10 +173,9 @@ export class Socket extends SDKEventEmitter {
 
     if (this.reopenPromise) {
       await this.reopenPromise
-      if (!this.connected) {
-        await this.createConnection(true)
+      if (this.connected) {
+        return this.connection
       }
-      return this.connection
     }
 
     await this.createConnection(true)
@@ -197,11 +196,11 @@ export class Socket extends SDKEventEmitter {
       })
     } catch (err) {
       this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
-      this.forgetPendingOpen(openedConnection)
       this.reopenUnlessAbandoned(err)
       return reject(err)
+    } finally {
+      this.forgetPendingOpen(openedConnection)
     }
-    this.forgetPendingOpen(openedConnection)
     this.session = connected.session
     this.armLivenessChain()
     this.emit('open')
@@ -435,8 +434,6 @@ export class Socket extends SDKEventEmitter {
 
     this.reopenPromise = new Promise<void>(resolve => {
       this.cancelScheduledReopen()
-      // The next ping was scheduled for the connection this rebuild replaces, so
-      // it no longer answers for the one the driver will have.
       this.cancelScheduledPing()
       this.lastPing = 0
       try {

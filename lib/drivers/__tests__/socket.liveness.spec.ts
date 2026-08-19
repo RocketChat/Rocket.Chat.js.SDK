@@ -419,12 +419,6 @@ describe('Socket liveness', () => {
       return replacement
     }
 
-    /**
-     * A send whose own Deadline cannot be what ends it, so the rebuild is what
-     * the tests below are left proving. Every send has a Deadline of
-     * `config.timeout`, which here is the ping interval the whole file is
-     * arithmetic about — shorter than the walk to the scheduled reopen.
-     */
     const sendOutlastingTheRebuild = () =>
       socket.send({ msg: 'method', method: 'anything' }, PING_INTERVAL * 100)
 
