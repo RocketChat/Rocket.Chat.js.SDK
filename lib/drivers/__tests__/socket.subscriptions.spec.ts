@@ -618,7 +618,7 @@ describe('Socket subscription bookkeeping', () => {
       const subscription = await subscribe('stream-notify-logged', ['permissions-changed'])
       transport.sendError = new Error('socket closed under the write')
       await expect(subscription!.unsubscribe()).rejects.toThrow('socket closed under the write')
-      transport.sendError = undefined
+      transport.sendError = null
 
       await socket.subscribe('stream-notify-logged', ['permissions-changed'])
       const unsubscribing = socket.unsubscribe('ddp-1')
