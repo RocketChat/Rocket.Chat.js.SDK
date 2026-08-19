@@ -94,11 +94,11 @@ export class Socket extends SDKEventEmitter {
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
-  /** See ADR-0011. */
-  private subscriptionHolders: { [id: string]: number } = {}
-
-  /** Subscriptions whose `unsub` is on the wire, so no longer reusable. */
-  private endingSubscriptions = new Set<string>()
+  /**
+   * Per subscription id: how many callers were handed it, and whether its
+   * `unsub` is on the wire, so no longer reusable. See ADR-0011.
+   */
+  private subscriptionStates: { [id: string]: { holders: number, ending: boolean } } = {}
 
   /** The subscribe still in flight for a stream, so a second caller shares it. */
   private streamRequests: { [streamKey: string]: Promise<ISubscription | undefined> } = {}
@@ -356,19 +356,17 @@ export class Socket extends SDKEventEmitter {
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
     delete this.subscriptions[id]
-    delete this.subscriptionHolders[id]
-    this.endingSubscriptions.delete(id)
+    this.forgetSubscriptionState(id)
   }
 
   /**
    * Drop every DDP subscription, one key at a time, in the same object, and
-   * every instruction about one. A count or mark for an entry that is already
-   * gone would outlive it — a subscribe still settling writes one. See ADR-0011.
+   * every instruction about one. A state for an entry that is already gone
+   * would outlive it — a subscribe still settling writes one. See ADR-0011.
    */
   forgetAllSubscriptions = () => {
     Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
-    this.subscriptionHolders = {}
-    this.endingSubscriptions.clear()
+    this.subscriptionStates = {}
     this.streamRequests = {}
   }
 
@@ -768,14 +766,14 @@ export class Socket extends SDKEventEmitter {
     const inFlight = this.streamRequests[streamKey]
     if (inFlight) {
       return inFlight
-        .then(() => this.holdSubscription(this.findSubscription(name, streamKey), callback))
+        .then(() => this.shareSubscription(this.findSubscription(name, streamKey), callback))
     }
 
     const recorded = this.findSubscription(name, streamKey)
-    if (recorded) return Promise.resolve(this.holdSubscription(recorded, callback))
+    if (recorded) return Promise.resolve(this.shareSubscription(recorded, callback))
 
     return this.recordStreamRequest(streamKey, this.sendSubscribe(name, params, callback)
-      .then((subscription) => this.holdSubscription(subscription)))
+      .then((subscription) => this.shareSubscription(subscription)))
   }
 
   /** Keep a subscribe reachable as the one in flight for its stream, until it settles. */
@@ -819,39 +817,52 @@ export class Socket extends SDKEventEmitter {
   private findSubscription = (name: string, streamKey: string) =>
     this.findSubscriptions({ name }).find((subscription) => (
       subscription.id &&
-      !this.endingSubscriptions.has(subscription.id) &&
+      !this.isEnding(subscription.id) &&
       this.streamKeyOf({ name, params: subscription.params }) === streamKey
     ))
 
-  private holdSubscription = (
+  private shareSubscription = (
     subscription: ISubscription | undefined,
     callback?: ISocketMessageCallback
   ) => {
     const id = subscription?.id
     if (!subscription || !id) return undefined
     if (callback) subscription.onEvent?.(callback)
-    this.subscriptionHolders[id] = this.holderCountOf(id) + 1
+    this.addHolder(id)
     return subscription
   }
 
-  /**
-   * Make a subscription whose `unsub` failed reusable again. The caller that
-   * sent it has let go, so its count goes with the ending mark, or the next
-   * caller inherits a holder that no longer exists. See ADR-0011.
-   */
-  private releaseSubscription = (id: string) => {
-    this.endingSubscriptions.delete(id)
-    delete this.subscriptionHolders[id]
+  private holderCountOf = (id: string) => this.subscriptionStates[id]?.holders ?? 0
+
+  private isEnding = (id: string) => this.subscriptionStates[id]?.ending ?? false
+
+  private addHolder = (id: string) => {
+    this.subscriptionStates[id] = { holders: this.holderCountOf(id) + 1, ending: this.isEnding(id) }
   }
 
-  private holderCountOf = (id: string) => this.subscriptionHolders[id] ?? 0
+  private dropHolder = (id: string) => {
+    this.subscriptionStates[id] = { holders: this.holderCountOf(id) - 1, ending: this.isEnding(id) }
+  }
+
+  private markEnding = (id: string) => {
+    this.subscriptionStates[id] = { holders: this.holderCountOf(id), ending: true }
+  }
 
   /**
-   * Whether this caller's `unsub` ends the stream for nobody else. A count of
-   * none is the entry an abandoned `sub` wrote, which was handed to nobody and
-   * still has to be unsubscribable. See ADR-0006 and ADR-0011.
+   * Drop the holder count and the ending mark together, so a subscription whose
+   * `unsub` failed is reusable again by a caller that inherits no holder the
+   * caller which sent that `unsub` has already let go of. See ADR-0011.
    */
-  private isLastHolder = (id: string) => this.holderCountOf(id) <= 1
+  private forgetSubscriptionState = (id: string) => {
+    delete this.subscriptionStates[id]
+  }
+
+  /**
+   * Whether this caller's `unsub` ends the stream for nobody else. No count is
+   * the entry an abandoned `sub` wrote, which was handed to nobody and still has
+   * to be unsubscribable. See ADR-0006 and ADR-0011.
+   */
+  private endsForNobodyElse = (id: string) => this.holderCountOf(id) <= 1
 
   private sendSubscribe = (
     name: string,
@@ -980,12 +991,12 @@ export class Socket extends SDKEventEmitter {
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
 
-    if (!this.isLastHolder(id)) {
-      this.subscriptionHolders[id] -= 1
+    if (!this.endsForNobodyElse(id)) {
+      this.dropHolder(id)
       return Promise.resolve(undefined)
     }
 
-    this.endingSubscriptions.add(id)
+    this.markEnding(id)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((data: any) => {
         this.forgetSubscription(id)
@@ -993,7 +1004,7 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         if (err instanceof DDPError) this.forgetSubscription(id)
-        else this.releaseSubscription(id)
+        else this.forgetSubscriptionState(id)
         this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
         throw err
       })
@@ -1004,7 +1015,7 @@ export class Socket extends SDKEventEmitter {
    * A teardown of everything, so it ends each stream whoever else holds it.
    */
   unsubscribeAll = () => {
-    this.subscriptionHolders = {}
+    this.subscriptionStates = {}
     const unsubAll = Object.keys(this.subscriptions).map((id) => {
       return this.subscriptions[id].unsubscribe().catch(() => undefined)
     })
