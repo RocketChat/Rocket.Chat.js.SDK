@@ -111,6 +111,15 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   const addMediaSub = (driver: Driver, transport: FakeWebSocket, name: string) =>
     addSub(driver, transport, `${userId}/${name}`, `sub-${name}`)
 
+  const reopenAndHandshake = async (driver: Driver, previous: FakeWebSocket) => {
+    const reopening = driver.reopenNow()
+    const reopened = fakeSockets[fakeSockets.length - 1]
+    expect(reopened).not.toBe(previous)
+    await driveToHandshake(reopened, 'reopened-session')
+    await reopening
+    return reopened
+  }
+
   it('resolves false without a logged-in user, before scheduling anything', async () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver.ddp)
@@ -212,11 +221,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
       await addMediaSub(driver, transport, 'media-signal')
       await addMediaSub(driver, transport, 'media-calls')
 
-      const reopening = driver.reopenNow()
-      const reopened = fakeSockets[fakeSockets.length - 1]
-      expect(reopened).not.toBe(transport)
-      await driveToHandshake(reopened, 'reopened-session')
-      await reopening
+      const reopened = await reopenAndHandshake(driver, transport)
 
       const sentBefore = reopened.sent.length
       const waiting = driver.waitForNotifyUserMediaSubs(500)
@@ -233,11 +238,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
       await addMediaSub(driver, transport, 'media-signal')
       await addMediaSub(driver, transport, 'media-calls')
 
-      const reopening = driver.reopenNow()
-      const reopened = fakeSockets[fakeSockets.length - 1]
-      expect(reopened).not.toBe(transport)
-      await driveToHandshake(reopened, 'reopened-session')
-      await reopening
+      const reopened = await reopenAndHandshake(driver, transport)
 
       const waiting = driver.waitForNotifyUserMediaSubs()
       const framesBefore = reopened.sent.length

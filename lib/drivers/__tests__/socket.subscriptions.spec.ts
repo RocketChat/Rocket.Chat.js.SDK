@@ -44,6 +44,14 @@ describe('Socket subscription bookkeeping', () => {
     return subscribing
   }
 
+  const reopenAndHandshake = async () => {
+    const reopening = socket.reopenNow()
+    const reopened = fakeSockets[fakeSockets.length - 1]
+    await driveToHandshake(reopened, 'reopened-session')
+    await reopening
+    return reopened
+  }
+
   it('keys a subscription by the id the server acknowledged', async () => {
     await subscribe('stream-room-messages', ['GENERAL'])
 
@@ -229,10 +237,7 @@ describe('Socket subscription bookkeeping', () => {
         await subscribe('stream-notify-user', ['uid/media-signal'])
         await subscribe('stream-notify-user', ['uid/media-calls'])
 
-        const reopening = socket.reopenNow()
-        const reopened = fakeSockets[fakeSockets.length - 1]
-        await driveToHandshake(reopened, 'reopened-session')
-        await reopening
+        const reopened = await reopenAndHandshake()
 
         const framesBefore = reopened.sent.length
         const waiting = socket.whenReady(streams, 500)
@@ -246,10 +251,7 @@ describe('Socket subscription bookkeeping', () => {
         await subscribe('stream-notify-user', ['uid/media-signal'])
         await subscribe('stream-notify-user', ['uid/media-calls'])
 
-        const reopening = socket.reopenNow()
-        const reopened = fakeSockets[fakeSockets.length - 1]
-        await driveToHandshake(reopened, 'reopened-session')
-        await reopening
+        const reopened = await reopenAndHandshake()
 
         const waiting = socket.whenReady(streams)
         const framesBefore = reopened.sent.length
@@ -265,6 +267,17 @@ describe('Socket subscription bookkeeping', () => {
         reopened.receive({ msg: 'ready', subs: ['ddp-2'] })
         await expect(waiting).resolves.toBe(true)
       })
+    })
+
+    it('turns every sub Unconfirmed the moment the connection closes, before a new one exists', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal'])
+      await subscribe('stream-notify-user', ['uid/media-calls'])
+
+      transport.close()
+
+      const waiting = socket.whenReady(streams, 500)
+      await jest.advanceTimersByTimeAsync(500)
+      await expect(waiting).resolves.toBe(false)
     })
   })
 

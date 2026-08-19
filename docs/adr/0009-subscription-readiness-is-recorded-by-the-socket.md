@@ -49,9 +49,10 @@ Readiness is recorded state; the query is derived; the query sends nothing.
   query over the entries and the set: it resolves `true` when every stream
   asked for has a Confirmed sub, `false` when the Deadline rings first, and
   never rejects. It sends no `sub` of its own.
-- Readiness is scoped to a connection: `createConnection` clears the set, so
-  a reopen turns every sub Unconfirmed without a pass over `subscriptions` —
-  the clear does the forgetting.
+- Readiness is scoped to a connection: `onClose` clears the set the moment
+  the connection ends and `createConnection` clears it again for the new
+  one, so a reopen turns every sub Unconfirmed without a pass over
+  `subscriptions` — the clear does the forgetting.
 - The 100ms poll dies with the mechanism that needed it. The re-send stays
   where it has always belonged: `subscribeAll` on Login. A reopen sends
   nothing, so on an anonymous reopened session the entries survive

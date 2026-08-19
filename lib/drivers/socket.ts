@@ -205,6 +205,7 @@ export class Socket extends SDKEventEmitter {
     if (closedConnection && closedConnection !== this.connection) {
       return
     }
+    this.confirmedSubscriptions.clear()
     this.emit('close', e)
     try {
       if (e?.code !== userDisconnectCloseCode) {
