@@ -43,7 +43,7 @@ describe('new Driver', () => {
     const driver = createDriver({ host: 'https://open.rocket.chat' })
 
     expect(driver.config.host).toBe('open.rocket.chat')
-    expect(driver.ddp.host).toBe('ws://open.rocket.chat/websocket')
+    expect(driver['socket'].host).toBe('ws://open.rocket.chat/websocket')
   })
 
   it('leaves a host that carries no protocol alone', () => {
@@ -54,7 +54,7 @@ describe('new Driver', () => {
     const driver = createDriver({ timeout: 250 })
 
     expect(driver.config.timeout).toBe(250)
-    expect(driver.ddp.config.ping).toBe(250)
+    expect(driver['socket'].config.ping).toBe(250)
   })
 
   it('defaults the timeout to 10000 when the caller gives none', () => {
@@ -65,7 +65,7 @@ describe('new Driver', () => {
 describe('Driver.subscribe', () => {
   it('reshapes its arguments and drops the id on the way through', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
 
     const subscribing = driver.subscribe('stream-notify-room', 'room-id/typing', false)
 
@@ -94,7 +94,7 @@ describe('Driver.subscribe', () => {
       name: 'stream-notify-room',
       params: ['room-id/typing', { useCollection: false, args: [false] }]
     })
-    expect(Object.keys(driver.ddp.subscriptions)).toEqual(['ddp-1'])
+    expect(Object.keys(driver['socket'].subscriptions)).toEqual(['ddp-1'])
   })
 })
 
@@ -104,7 +104,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   /** Register a subscription on the Socket under a given id, as a successful sub would. */
   const addSubscription = async (driver: Driver, transport: FakeWebSocket, event: string, id: string) => {
-    const subscribing = driver.ddp.subscribe(topic, [event], undefined, id)
+    const subscribing = driver['socket'].subscribe(topic, [event], undefined, id)
     transport.receive({ msg: 'ready', subs: [id] })
     await subscribing
   }
@@ -115,7 +115,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves false without a logged-in user, before scheduling anything', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     const sentBefore = transport.sent.length
     const timersBefore = jest.getTimerCount()
 
@@ -127,7 +127,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves true when both media streams are confirmed on the current connection', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSubscription(driver, transport, 'media-signal')
 
@@ -144,7 +144,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves false at the deadline when no entry exists', async () => {
     const driver = createDriver()
-    await openFakeConnection(driver.ddp)
+    await openFakeConnection(driver['socket'])
     driver.userId = userId
 
     const waiting = driver.waitForNotifyUserMediaSubs(500)
@@ -159,21 +159,21 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('waits while a subscription is still in flight', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     let resolved: boolean | undefined
     waiting.then((value) => { resolved = value })
 
-    driver.ddp.subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal')
+    driver['socket'].subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal')
     await jest.advanceTimersByTimeAsync(1)
     expect(resolved).toBeUndefined()
 
     transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
     await jest.advanceTimersByTimeAsync(1)
 
-    driver.ddp.subscribe(topic, [`${userId}/media-calls`], undefined, 'sub-media-calls')
+    driver['socket'].subscribe(topic, [`${userId}/media-calls`], undefined, 'sub-media-calls')
     await jest.advanceTimersByTimeAsync(1)
     transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
 
@@ -182,7 +182,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('does not count another user\'s media streams as this user\'s', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addSubscription(driver, transport, 'other-user/media-signal', 'sub-other-signal')
     await addSubscription(driver, transport, 'other-user/media-calls', 'sub-other-calls')
@@ -196,7 +196,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('leaves the user\'s other streams on the same topic alone', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addSubscription(driver, transport, `${userId}/message`, 'sub-message')
     await addMediaSubscription(driver, transport, 'media-signal')
@@ -208,16 +208,16 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves true when one of two entries recorded for the same stream is confirmed', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSubscription(driver, transport, 'media-signal')
     await addMediaSubscription(driver, transport, 'media-calls')
 
-    const unanswered = driver.ddp.subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal-again')
-    await jest.advanceTimersByTimeAsync(driver.config.timeout)
+    const unanswered = driver['socket'].subscribe(topic, [`${userId}/media-signal`], undefined, 'sub-media-signal-again')
+    await jest.advanceTimersByTimeAsync(driver['socket'].config.timeout)
     await unanswered
 
-    expect(Object.keys(driver.ddp.subscriptions)).toEqual(
+    expect(Object.keys(driver['socket'].subscriptions)).toEqual(
       expect.arrayContaining(['sub-media-signal', 'sub-media-signal-again'])
     )
 
@@ -229,7 +229,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   describe('after a reopen', () => {
     it('resolves false at the deadline when no login re-confirms the entries', async () => {
       const driver = createDriver()
-      const transport = await openFakeConnection(driver.ddp)
+      const transport = await openFakeConnection(driver['socket'])
       driver.userId = userId
       await addMediaSubscription(driver, transport, 'media-signal')
       await addMediaSubscription(driver, transport, 'media-calls')
@@ -246,7 +246,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     it('resolves true when the streams only land on the connection a reopen is still building', async () => {
       const driver = createDriver()
-      await openFakeConnection(driver.ddp)
+      await openFakeConnection(driver['socket'])
       driver.userId = userId
 
       const reopening = driver.reopenNow()
@@ -264,7 +264,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     it('resolves true after login re-sends and the server confirms on the new connection', async () => {
       const driver = createDriver()
-      const transport = await openFakeConnection(driver.ddp)
+      const transport = await openFakeConnection(driver['socket'])
       driver.userId = userId
       await addMediaSubscription(driver, transport, 'media-signal')
       await addMediaSubscription(driver, transport, 'media-calls')
@@ -273,7 +273,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
       const waiting = driver.waitForNotifyUserMediaSubs()
       const framesBefore = reopened.sent.length
-      const loggingIn = driver.ddp.login({ token: 'resume-token' } as any)
+      const loggingIn = driver['socket'].login({ token: 'resume-token' } as any)
       await flushMicrotasks()
 
       const loginFrame = reopened.sent[framesBefore]
@@ -302,7 +302,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   it('takes its deadline from the configured timeout when given none', async () => {
     const timeout = 4000
     const driver = createDriver({ timeout })
-    await openFakeConnection(driver.ddp)
+    await openFakeConnection(driver['socket'])
     driver.userId = userId
 
     const waiting = driver.waitForNotifyUserMediaSubs()
@@ -318,7 +318,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('leaves no timer behind once it settles', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSubscription(driver, transport, 'media-signal')
     await addMediaSubscription(driver, transport, 'media-calls')
@@ -350,7 +350,7 @@ describe('Driver.connect', () => {
     driver.on('connected', connectedSeen)
 
     transport.readyState = CLOSED
-    const sending = driver.ddp.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+    const sending = driver['socket'].send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
 
     await driveToHandshake(transport)
     await jest.advanceTimersByTimeAsync(0)

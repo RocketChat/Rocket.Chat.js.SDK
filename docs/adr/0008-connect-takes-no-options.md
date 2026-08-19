@@ -32,7 +32,7 @@ connection settings, it constructs a Driver — or a Client — with them.
 - The realtime layer's connect contract is one line: ask the Driver to connect
   and it connects with the config it was built with. There is no per-call
   override to document, test, or misleadingly log.
-- Passing options to `Client.connect` is now a type error rather than a silent
+- Passing options to `Client.connect` is a type error rather than a silent
   no-op. The consuming app already calls it with no arguments everywhere, so
   the narrowed signature breaks nothing.
 - The constructor's timeout readback in `Driver.config` remains the only path

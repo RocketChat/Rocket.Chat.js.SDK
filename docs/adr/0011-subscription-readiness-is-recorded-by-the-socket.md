@@ -1,4 +1,4 @@
-# ADR-0009: Subscription readiness is recorded by the Socket, scoped to a connection
+# ADR-0011: Subscription readiness is recorded by the Socket, scoped to a connection
 
 **Status:** Accepted
 

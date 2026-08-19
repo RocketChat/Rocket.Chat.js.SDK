@@ -30,8 +30,12 @@ import {
 
 import { IStream } from './definitions'
 import { DDPError, toError } from './ddpError'
-import { hostToWS } from '../util'
 import { sha256 } from 'js-sha256'
+
+function hostToWS (host: string, ssl = false) {
+  host = host.replace(/^(https?:\/\/)?/, '')
+  return `ws${ssl ? 's' : ''}://${host}`
+}
 
 const userDisconnectCloseCode = 4000;
 const socketOpen = 1;
@@ -315,11 +319,8 @@ export class Socket extends SDKEventEmitter {
     })
 
   /**
-   * Disconnect the DDP from server and forget every subscription locally: the
-   * close ends them on the server, so no `unsub` is sent. A reopen during the
-   * wait that installed a different connection over this one supersedes the
-   * close: that socket and the subscriptions it filled are left as they are.
-   * See ADR-0003.
+   * Close the Transport and forget every DDP subscription locally.
+   * See ADR-0009.
    */
   close = async (): Promise<void> => {
     this.settleReopen?.()
@@ -604,13 +605,18 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
+  private reopenAndKeepPinging = (err: unknown) => {
+    this.reopenUnlessAbandoned(err)
+    if (this.connection) this.ping()
+  }
+
   /** Send ping, record time, re-open if nothing comes back, repeat */
   ping = async () => {
     if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.ping())
-        .catch(this.reopenUnlessAbandoned)
+        .catch(this.reopenAndKeepPinging)
     }, this.config.ping)
   }
 

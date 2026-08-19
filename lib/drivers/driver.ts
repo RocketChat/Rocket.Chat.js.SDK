@@ -20,7 +20,7 @@ import {
 export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   logger: ILogger
   config: ISocketOptions
-  ddp: Socket
+  private readonly socket: Socket
 
 	/** Save messages subscription to ensure only one created */
   messages: ISubscription | undefined
@@ -39,9 +39,9 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
       ...moreConfigs,
       host: host.replace(/(^\w+:|^)\/\//, '')
     }
-    this.ddp = new Socket({ ...options, logger })
-    this.ddp.on('open', () => this.emit('connected'))
-    this.config = { ...options, timeout: this.ddp.config.timeout }
+    this.socket = new Socket({ ...options, logger })
+    this.socket.on('open', () => this.emit('connected'))
+    this.config = { ...options, timeout: this.socket.config.timeout }
     this.logger = logger
   }
 
@@ -59,7 +59,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     }
     this.logger.info('[driver] Connecting', this.config)
     try {
-      await this.ddp.open()
+      await this.socket.open()
     } catch (err) {
       this.logger.error(`[driver] Failed to connect: ${(err as Error).message}`)
       throw err
@@ -69,41 +69,41 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
   get connected (): boolean {
-    return !!this.ddp.connected
+    return !!this.socket.connected
   }
 
   disconnect = (): Promise<any> => {
-    return this.ddp.close()
+    return this.socket.close()
   }
 
   checkAndReopen = (): void => {
-    return this.ddp.checkAndReopen()
+    return this.socket.checkAndReopen()
   }
 
   reopenNow = (): Promise<void> => {
-    return this.ddp.reopenNow()
+    return this.socket.reopenNow()
   }
 
   probe = (deadlineMs?: number): Promise<boolean> => {
-    return this.ddp.probe(deadlineMs)
+    return this.socket.probe(deadlineMs)
   }
 
   get lastPing (): number {
-    return this.ddp.lastPing
+    return this.socket.lastPing
   }
 
   get pingInterval (): number {
-    return this.ddp.config.ping
+    return this.socket.config.ping
   }
 
   subscribe = (topic: string, eventname: string, ...args: any[]): Promise<ISubscription | undefined> => {
     this.logger.info(`[DDP driver] Subscribing to ${topic} | ${JSON.stringify(args)}`)
-    return this.ddp.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
+    return this.socket.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
   }
 
   subscribeRaw = (...args: any[]): Promise<ISubscription | undefined> => {
     this.logger.info(`[DDP driver] Raw Subscribing to ${JSON.stringify(args)}`)
-    return this.ddp.subscribe(...args as [string, any[]])
+    return this.socket.subscribe(...args as [string, any[]])
   }
 
   subscribeNotifyAll = (): Promise< any> => {
@@ -148,7 +148,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, `${this.userId}/${event}`, false)))
   }
 
-  waitForNotifyUserMediaSubs = (timeoutMs = this.ddp.config.timeout): Promise<boolean> => {
+  waitForNotifyUserMediaSubs = (timeoutMs = this.socket.config.timeout): Promise<boolean> => {
     if (!this.userId) {
       return Promise.resolve(false)
     }
@@ -171,55 +171,55 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
 
 	/** Login to Rocket.Chat via DDP */
   login = async (credentials: ICredentials, _args: any): Promise<any> => {
-    if (!this.ddp || !this.ddp.connected) {
+    if (!this.socket || !this.socket.connected) {
       await this.connect()
     }
     this.logger.info(`[DDP driver] Login with ${JSON.stringify(credentials)}`)
-    const login: ILoginResult = await this.ddp.login(credentials)
+    const login: ILoginResult = await this.socket.login(credentials)
     this.userId = login.id
     return login
   }
   logout = async () => {
-    if (this.ddp && this.ddp.connected) {
-      await this.ddp.logout()
+    if (this.socket && this.socket.connected) {
+      await this.socket.logout()
     }
 
   }
 
   unsubscribe = (subscription: ISubscription) => {
-    return this.ddp.unsubscribe(subscription.id)
+    return this.socket.unsubscribe(subscription.id)
   }
 
   unsubscribeAll = (): Promise<void> => {
-    return this.ddp.unsubscribeAll()
+    return this.socket.unsubscribeAll()
   }
 
   whenReady = (streams: IStream[], timeoutMs?: number): Promise<boolean> => {
-    return this.ddp.whenReady(streams, timeoutMs)
+    return this.socket.whenReady(streams, timeoutMs)
   }
 
   onStreamData = (event: string, cb: ICallback): Promise<any> => {
     function listener (message: any) {
       cb((message))
     }
-    return Promise.resolve(this.ddp.on(event, listener))
+    return Promise.resolve(this.socket.on(event, listener))
       .then(() => ({
-        stop: () => this.ddp.off(event, listener)
+        stop: () => this.socket.off(event, listener)
       }))
   }
 
   onMessage = (cb: ICallback): void => {
-    this.ddp.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(this.ejsonMessage(message)))
+    this.socket.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(this.ejsonMessage(message)))
   }
 
   onTyping = (cb: ICallback): Promise<any > => {
-    return this.ddp.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
+    return this.socket.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
       cb(username, isTyping)
     }) as any
   }
 
   notifyVisitorTyping = (rid: string, username: string, typing: boolean, token: string) => {
-    return this.ddp.call('stream-notify-room', `${ rid }/typing`, username, typing, { token })
+    return this.socket.call('stream-notify-room', `${ rid }/typing`, username, typing, { token })
   }
 
   ejsonMessage = (message: any) => {
@@ -230,6 +230,6 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
   methodCall = (method: string, ...args: any[]): Promise<any> => {
-    return this.ddp.call(method, ...args)
+    return this.socket.call(method, ...args)
   }
 }

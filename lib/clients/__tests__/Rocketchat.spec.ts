@@ -7,19 +7,34 @@ import { loginResponse } from '../../../test/loginResponse'
 
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
-const createClient = (client?: FakeClient) =>
-  new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client })
+const createClient = (restClient?: FakeClient) =>
+  new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client: restClient })
 
-describe('client.ddp', () => {
+const answerDdpLoginWith = (client: RocketChatClient, login: { id: string, token: string }) =>
+  jest.spyOn(client.driver, 'login').mockResolvedValue(login as any)
+
+const loggedInClient = async (ddpToken: string = 'fake-token') => {
+  const restClient = new FakeClient()
+  const client = createClient(restClient)
+  answerDdpLoginWith(client, { id: 'fake-user-id', token: ddpToken })
+
+  const pending = client.login({ username: 'user', password: 'pass' })
+  restClient.lastRequest().resolve(loginResponse())
+  await pending
+
+  return client
+}
+
+describe('client.driver', () => {
   it('is the Driver', () => {
     const client = createClient()
 
-    expect(client.ddp).toBeInstanceOf(Driver)
+    expect(client.driver).toBeInstanceOf(Driver)
   })
 
   it('receives method calls made on the client', async () => {
     const client = createClient()
-    const methodCall = jest.spyOn(client.ddp, 'methodCall').mockResolvedValue(undefined as any)
+    const methodCall = jest.spyOn(client.driver, 'methodCall').mockResolvedValue(undefined as any)
 
     await client.methodCall('getRoomIdByNameOrId', 'general')
 
@@ -28,7 +43,7 @@ describe('client.ddp', () => {
 
   it('receives room subscriptions made on the client', async () => {
     const client = createClient()
-    const subscribeRoom = jest.spyOn(client.ddp, 'subscribeRoom').mockResolvedValue([])
+    const subscribeRoom = jest.spyOn(client.driver, 'subscribeRoom').mockResolvedValue([])
 
     await client.subscribeRoom('GENERAL')
 
@@ -37,7 +52,7 @@ describe('client.ddp', () => {
 
   it('receives subscriptions made on the client, with the arguments in order', async () => {
     const client = createClient()
-    const subscribe = jest.spyOn(client.ddp, 'subscribe').mockResolvedValue(undefined)
+    const subscribe = jest.spyOn(client.driver, 'subscribe').mockResolvedValue(undefined)
 
     await client.subscribe('stream-room-messages', 'GENERAL', false)
 
@@ -50,65 +65,59 @@ describe('client.ddp', () => {
 })
 
 describe('client.resume', () => {
-  const resumed = async () => {
+  const resumedClient = async () => {
     const client = createClient()
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
-    await client.resume({ token: 'token' })
+    answerDdpLoginWith(client, { id: 'fake-user-id', token: 'fake-token' })
+    await client.resume({ token: 'fake-token' })
     return client
   }
 
   it('leaves the client logged in for REST', async () => {
-    expect((await resumed()).loggedIn()).toBe(true)
+    expect((await resumedClient()).loggedIn()).toBe(true)
   })
 
   it('sets the REST auth headers', async () => {
-    expect((await resumed()).client.headers).toMatchObject({
-      'X-Auth-Token': 'token',
-      'X-User-Id': 'id'
+    expect((await resumedClient()).client.headers).toMatchObject({
+      'X-Auth-Token': 'fake-token',
+      'X-User-Id': 'fake-user-id'
     })
   })
-
-  const loggedInClient = async () => {
-    const rest = new FakeClient()
-    const client = createClient(rest)
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'token' } as any)
-
-    const pending = client.login({ username: 'user', password: 'pass' })
-    rest.lastRequest().resolve(loginResponse())
-    await pending
-
-    return client
-  }
 
   it('leaves an existing login with the same credentials untouched', async () => {
     const client = await loggedInClient()
 
-    await client.resume({ token: 'token' })
+    await client.resume({ token: 'fake-token' })
 
-    expect(client.currentLogin).toMatchObject({ username: 'user', authToken: 'token' })
+    expect(client.currentLogin).toMatchObject({ username: 'fake-username', authToken: 'fake-token' })
   })
 
   it('replaces the login when the token has rotated', async () => {
     const client = await loggedInClient()
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'rotated' } as any)
+    answerDdpLoginWith(client, { id: 'fake-user-id', token: 'rotated' })
 
     await client.resume({ token: 'rotated' })
 
-    expect(client.currentLogin).toMatchObject({ userId: 'id', authToken: 'rotated', username: 'user' })
+    expect(client.currentLogin).toMatchObject({ userId: 'fake-user-id', authToken: 'rotated', username: 'fake-username' })
   })
 
   it('drops the login result holding the superseded token', async () => {
     const client = await loggedInClient()
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'id', token: 'rotated' } as any)
+    answerDdpLoginWith(client, { id: 'fake-user-id', token: 'rotated' })
 
     await client.resume({ token: 'rotated' })
 
     expect(client.currentLogin!.result).toBeNull()
   })
 
+  it('knows neither the username nor the result when there was no previous login', async () => {
+    const client = await resumedClient()
+
+    expect(client.currentLogin).toMatchObject({ username: null, result: null })
+  })
+
   it('replaces the login when resuming as another user', async () => {
     const client = await loggedInClient()
-    jest.spyOn(client.ddp, 'login').mockResolvedValue({ id: 'other-id', token: 'other-token' } as any)
+    answerDdpLoginWith(client, { id: 'other-id', token: 'other-token' })
 
     await client.resume({ token: 'other-token' })
 
@@ -116,14 +125,26 @@ describe('client.resume', () => {
   })
 })
 
+describe('client.login', () => {
+  it('keeps its username but drops its result when the ddp login answers another token', async () => {
+    const client = await loggedInClient('ddp-token')
+
+    expect(client.currentLogin).toMatchObject({
+      username: 'fake-username',
+      authToken: 'ddp-token',
+      result: null
+    })
+  })
+})
+
 describe('client.logout', () => {
   const loggedOutClient = async () => {
-    const rest = new FakeClient()
-    const client = createClient(rest)
-    client.resumeLogin({ userId: 'id', authToken: 'token' })
+    const restClient = new FakeClient()
+    const client = createClient(restClient)
+    client.resumeLogin({ userId: 'fake-user-id', authToken: 'fake-token' })
 
     const pending = client.logout()
-    rest.lastRequest().resolve({ status: 200, data: {} })
+    restClient.lastRequest().resolve({ status: 200, data: {} })
     await pending
 
     return client

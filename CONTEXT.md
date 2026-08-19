@@ -32,6 +32,47 @@ _Avoid_: Msg, post, chat
 **Reaction**:
 An emoji attached to an existing message by a user.
 
+### REST
+
+**Api**:
+The REST half of a Client — every request to the server's HTTP API, plus the
+identity those requests are made under. A Client is an Api; it extends one and
+adds the realtime side.
+_Avoid_: API (unqualified — that is the server's), REST driver, service
+
+**Endpoint**:
+The name of one REST operation, passed to Api without a host or an api version —
+`chat.sendMessage`, `users.info`. Not a URL.
+_Avoid_: Route, path, URL, method (that is GET, POST, PUT or DELETE)
+
+**Api version**:
+The version segment of the request URL, `v1` unless a call overrides it.
+Per-request, not per-Client.
+_Avoid_: API version of the server, release
+
+**REST client**:
+The thing that actually performs an Endpoint request over HTTP — builds the URL
+from a host, an Api version and the Endpoint, carries the auth headers, and
+returns a status and a body. Behind `IClient`, and swappable: a Client builds the
+SDK's own if it is handed none. Say REST client, never Client — an unqualified
+Client is the SDK entry point below. The class implementing the SDK's own is
+named `Client` in `lib/api/api.ts`, which is the one place the two names touch;
+it is not exported, and nothing outside that file should name it.
+_Avoid_: Client (unqualified), http client, transport, fetcher
+
+**IClient**:
+The interface a REST client satisfies — the four verb methods and the headers a
+Login sets. What Api depends on, so a consuming app or a spec can supply its own.
+_Avoid_: Client interface (ambiguous with the entry point)
+
+**Current login**:
+The authenticated identity Api holds after a Login — username, user id, auth
+token and the login result. A Login resumed from a token knows neither the
+username nor the result. Set on login and cleared on logout; `loggedIn()`
+reports on it.
+_Avoid_: Session, credentials (those are what a Login is given, not what it
+yields), user
+
 ### Realtime
 
 **Client**:
@@ -118,7 +159,7 @@ A single bounded liveness check on a Socket that looks open, asked for on demand
 _Avoid_: Health check, ping (that is one message of the chain)
 
 **Detached socket**:
-A Socket the Driver has dropped its reference to and unhooked every handler from, without the Transport having confirmed the close. It may still be open to the peer, and may still revive; nothing it does afterwards reaches the Driver.
+A Socket that has unhooked every handler from its Transport and dropped its reference to it, without the Transport having confirmed the close. That Transport may still be open to the peer, and may still revive; nothing it does afterwards reaches the Socket.
 _Avoid_: Orphan, zombie, abandoned socket — abandoning belongs to waits, leaked socket
 
 **Deadline**:
