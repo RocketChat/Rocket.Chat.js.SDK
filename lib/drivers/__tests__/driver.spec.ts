@@ -40,7 +40,7 @@ describe('new Driver', () => {
     const driver = createDriver({ host: 'https://open.rocket.chat' })
 
     expect(driver.config.host).toBe('open.rocket.chat')
-    expect(driver.ddp.host).toBe('ws://open.rocket.chat/websocket')
+    expect(driver['socket'].host).toBe('ws://open.rocket.chat/websocket')
   })
 
   it('leaves a host that carries no protocol alone', () => {
@@ -51,7 +51,7 @@ describe('new Driver', () => {
     const driver = createDriver({ timeout: 250 })
 
     expect(driver.config.timeout).toBe(250)
-    expect(driver.ddp.config.ping).toBe(250)
+    expect(driver['socket'].config.ping).toBe(250)
   })
 
   it('defaults the timeout to 10000 when the caller gives none', () => {
@@ -62,7 +62,7 @@ describe('new Driver', () => {
 describe('Driver.subscribe', () => {
   it('reshapes its arguments and drops the id on the way through', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
 
     const subscribing = driver.subscribe('stream-notify-room', 'room-id/typing', false)
 
@@ -91,7 +91,7 @@ describe('Driver.subscribe', () => {
       name: 'stream-notify-room',
       params: ['room-id/typing', { useCollection: false, args: [false] }]
     })
-    expect(Object.keys(driver.ddp.subscriptions)).toEqual(['ddp-1'])
+    expect(Object.keys(driver['socket'].subscriptions)).toEqual(['ddp-1'])
   })
 })
 
@@ -103,7 +103,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   const addSub = async (driver: Driver, transport: FakeWebSocket, event: string, id: string) => {
     // Through the Socket, with an explicit id: this is the shape the
     // readiness poll looks for — `name` the topic, `params[0]` the user event.
-    const subscribing = driver.ddp.subscribe(topic, [event], undefined, id)
+    const subscribing = driver['socket'].subscribe(topic, [event], undefined, id)
     transport.receive({ msg: 'ready', subs: [id] })
     await subscribing
   }
@@ -114,7 +114,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves false without a logged-in user, before scheduling anything', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     const sentBefore = transport.sent.length
     // The socket's own ping timer is pending here and stays that way; what the
     // guard has to avoid is adding the poll and the deadline on top of it.
@@ -128,7 +128,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves ready after an immediate reopen, on the socket the reopen built', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSub(driver, transport, 'media-signal')
     await addMediaSub(driver, transport, 'media-calls')
@@ -154,7 +154,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('does not resubscribe again while a resubscribe is still in flight', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSub(driver, transport, 'media-signal')
     await addMediaSub(driver, transport, 'media-calls')
@@ -180,7 +180,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('polls until both media subscriptions appear, then resubscribes on their own ids', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     // The field login writes. Assigning it keeps the reconnect being reproduced
     // here — subscriptions not yet restored — reachable without a login round.
     driver.userId = userId
@@ -220,7 +220,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves false when the server refuses both resubscribes', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSub(driver, transport, 'media-signal')
     await addMediaSub(driver, transport, 'media-calls')
@@ -234,7 +234,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves false when only one of the two resubscribes is refused', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSub(driver, transport, 'media-signal')
     await addMediaSub(driver, transport, 'media-calls')
@@ -248,7 +248,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves false when a resubscribe is acked without a subscription id', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSub(driver, transport, 'media-signal')
     await addMediaSub(driver, transport, 'media-calls')
@@ -264,7 +264,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('leaves the user\'s other streams on the same topic alone', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addSub(driver, transport, `${userId}/message`, 'sub-message')
     await addMediaSub(driver, transport, 'media-signal')
@@ -283,7 +283,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('does not count another user\'s media streams as this user\'s', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addSub(driver, transport, 'other-user/media-signal', 'sub-other-signal')
     await addSub(driver, transport, 'other-user/media-calls', 'sub-other-calls')
@@ -299,7 +299,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resubscribes every entry recorded for a media stream, and needs each acked', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSub(driver, transport, 'media-signal')
     // A second entry for the same stream — what an abandoned sub re-sent under a
@@ -322,7 +322,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves ready when the streams only land on the socket a reopen is still building', async () => {
     const driver = createDriver()
-    await openFakeConnection(driver.ddp)
+    await openFakeConnection(driver['socket'])
     driver.userId = userId
 
     const reopening = driver.reopenNow()
@@ -352,7 +352,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   it('takes its deadline from the configured timeout when given none', async () => {
     const timeout = 4000
     const driver = createDriver({ timeout })
-    await openFakeConnection(driver.ddp)
+    await openFakeConnection(driver['socket'])
     driver.userId = userId
 
     const waiting = driver.waitForNotifyUserMediaSubs()
@@ -368,7 +368,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('resolves false when the subscriptions never appear before the deadline', async () => {
     const driver = createDriver()
-    await openFakeConnection(driver.ddp)
+    await openFakeConnection(driver['socket'])
     driver.userId = userId
 
     const waiting = driver.waitForNotifyUserMediaSubs(500)
@@ -384,7 +384,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
   it('leaves no timer behind once it settles', async () => {
     const driver = createDriver()
-    const transport = await openFakeConnection(driver.ddp)
+    const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
     await addMediaSub(driver, transport, 'media-signal')
     await addMediaSub(driver, transport, 'media-calls')
@@ -423,7 +423,7 @@ describe('Driver.connect', () => {
     driver.on('connected', connectedSeen)
 
     transport.readyState = CLOSED
-    const sending = driver.ddp.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+    const sending = driver['socket'].send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
 
     await driveToHandshake(transport)
     await jest.advanceTimersByTimeAsync(0)
