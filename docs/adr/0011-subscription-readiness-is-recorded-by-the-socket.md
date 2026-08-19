@@ -65,8 +65,8 @@ Readiness is recorded state; the query is derived; the query sends nothing.
   to `config.timeout`. `IDriver.waitForNotifyUserMediaSubs` keeps its
   signature and becomes a caller of `whenReady`.
 - A stream matches exactly: same name, same params length, element-wise `===`.
-  The prefix match in `findSubscriptions` stays as it is for its current
-  callers and is kept out of the readiness path.
+  `findSubscriptions` keeps the prefix match its current callers rely on, so
+  the readiness path reads it and then requires the params length to agree.
 - When no entry exists yet, `whenReady` waits until the Deadline rather than
   answering early — the `sub` may still be in flight — and resolves `false`.
 
