@@ -98,8 +98,9 @@ export class Socket extends SDKEventEmitter {
   private subscriptionHolders: { [id: string]: number } = {}
 
   /** Subscriptions whose `unsub` is on the wire, so no longer reusable. */
-  private endingSubscriptions: { [id: string]: true } = {}
+  private endingSubscriptions = new Set<string>()
 
+  /** The subscribe still in flight for a stream, so a second caller shares it. */
   private streamRequests: { [streamKey: string]: Promise<ISubscription | undefined> } = {}
 
   /** Create a websocket handler */
@@ -356,7 +357,7 @@ export class Socket extends SDKEventEmitter {
   forgetSubscription = (id: string) => {
     delete this.subscriptions[id]
     delete this.subscriptionHolders[id]
-    delete this.endingSubscriptions[id]
+    this.endingSubscriptions.delete(id)
   }
 
   /** Drop every DDP subscription, one key at a time, in the same object. */
@@ -758,9 +759,9 @@ export class Socket extends SDKEventEmitter {
     const streamKey = this.streamKeyOf(name, params)
     if (!streamKey) return this.sendSubscribe(name, params, callback)
 
-    const pending = this.streamRequests[streamKey]
-    if (pending) {
-      return pending
+    const inFlight = this.streamRequests[streamKey]
+    if (inFlight) {
+      return inFlight
         .then((subscription) => subscription || this.findSubscription(streamKey, name))
         .then((subscription) => this.holdSubscription(subscription, callback))
     }
@@ -768,8 +769,12 @@ export class Socket extends SDKEventEmitter {
     const recorded = this.findSubscription(streamKey, name)
     if (recorded) return Promise.resolve(this.holdSubscription(recorded, callback))
 
-    const subscribing = this.sendSubscribe(name, params, callback)
-      .then((subscription) => this.holdSubscription(subscription))
+    return this.recordStreamRequest(streamKey, this.sendSubscribe(name, params, callback)
+      .then((subscription) => this.holdSubscription(subscription)))
+  }
+
+  /** Keep a subscribe reachable as the one in flight for its stream, until it settles. */
+  private recordStreamRequest = (streamKey: string, subscribing: Promise<ISubscription | undefined>) => {
     const forget = () => {
       if (this.streamRequests[streamKey] === subscribing) delete this.streamRequests[streamKey]
     }
@@ -783,7 +788,7 @@ export class Socket extends SDKEventEmitter {
    * rebuild their params for every request, so two streams are the same by
    * value rather than by reference, with object keys ordered so that the same
    * params written in a different order still read as one stream. Params no
-   * serializer can read name no stream at all.
+   * serialiser can read name no stream, so such a call is never shared.
    */
   private streamKeyOf = (name: string, params: any[]) => {
     const withSortedKeys = (_key: string, value: any) => {
@@ -809,7 +814,7 @@ export class Socket extends SDKEventEmitter {
   private findSubscription = (streamKey: string, name: string) =>
     this.findSubscriptions({ name }).find((subscription) => (
       subscription.id &&
-      !this.endingSubscriptions[subscription.id] &&
+      !this.endingSubscriptions.has(subscription.id) &&
       this.streamKeyOf(name, subscription.params || []) === streamKey
     ))
 
@@ -823,6 +828,14 @@ export class Socket extends SDKEventEmitter {
     this.subscriptionHolders[id] = (this.subscriptionHolders[id] || 0) + 1
     return subscription
   }
+
+  /**
+   * Whether this caller is the only one left holding a subscription, so its
+   * `unsub` ends the stream for nobody else. An entry an abandoned `sub` wrote
+   * was counted for nobody, and the one caller waiting on it may still let go,
+   * so no count reads as one last holder. See ADR-0006 and ADR-0011.
+   */
+  private isLastHolder = (id: string) => (this.subscriptionHolders[id] || 1) === 1
 
   private sendSubscribe = (
     name: string,
@@ -951,13 +964,12 @@ export class Socket extends SDKEventEmitter {
   unsubscribe = (id: any) => {
     if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
 
-    const holders = this.subscriptionHolders[id] || 1
-    if (holders > 1) {
-      this.subscriptionHolders[id] = holders - 1
+    if (!this.isLastHolder(id)) {
+      this.subscriptionHolders[id] -= 1
       return Promise.resolve(undefined)
     }
 
-    this.endingSubscriptions[id] = true
+    this.endingSubscriptions.add(id)
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((data: any) => {
         this.forgetSubscription(id)
@@ -965,7 +977,7 @@ export class Socket extends SDKEventEmitter {
       })
       .catch((err) => {
         if (err instanceof DDPError) this.forgetSubscription(id)
-        else delete this.endingSubscriptions[id]
+        else this.endingSubscriptions.delete(id)
         this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
         throw err
       })

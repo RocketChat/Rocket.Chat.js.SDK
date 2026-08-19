@@ -111,6 +111,14 @@ _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry. A recorded DDP subscription does not prove the server confirmed it — see Abandoned sub and ADR-0006.
 _Avoid_: Sub, subscription (unqualified), the map, the collection (that is a field on an incoming DDP message)
 
+**Stream key**:
+A stream's identity, as its name and params serialised in full with object keys sorted. Two callers asking for the same stream rebuild their params, so identity is by value, not by reference. What one DDP subscription per stream turns on — see ADR-0011.
+_Avoid_: Signature, hash, fingerprint, dedupe key
+
+**Holder**:
+A caller handed a share of one DDP subscription. Holders are counted per subscription, and the `unsub` waits for the last of them to let go, so one caller unsubscribing does not end the stream for another — see ADR-0011.
+_Avoid_: Subscriber (that is the client as a whole), listener, refcount, owner
+
 **Abandoned sub**:
 A DDP subscription whose `sub` reached the wire but whose DDP response the connection ended before delivering. The server may have acted on it, so its entry is kept and re-established rather than forgotten.
 _Avoid_: Lost subscription, orphaned stream, phantom
