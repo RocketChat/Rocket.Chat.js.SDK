@@ -101,15 +101,15 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   const topic = 'stream-notify-user'
 
   /** Register a subscription on the Socket under a given id, as a successful sub would. */
-  const addSub = async (driver: Driver, transport: FakeWebSocket, event: string, id: string) => {
+  const addSubscription = async (driver: Driver, transport: FakeWebSocket, event: string, id: string) => {
     const subscribing = driver.ddp.subscribe(topic, [event], undefined, id)
     transport.receive({ msg: 'ready', subs: [id] })
     await subscribing
   }
 
   /** Register a media subscription on the Socket, as a successful sub would. */
-  const addMediaSub = (driver: Driver, transport: FakeWebSocket, name: string) =>
-    addSub(driver, transport, `${userId}/${name}`, `sub-${name}`)
+  const addMediaSubscription = (driver: Driver, transport: FakeWebSocket, name: string) =>
+    addSubscription(driver, transport, `${userId}/${name}`, `sub-${name}`)
 
   const reopenAndHandshake = async (driver: Driver, previous: FakeWebSocket) => {
     const reopening = driver.reopenNow()
@@ -136,7 +136,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver.ddp)
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSubscription(driver, transport, 'media-signal')
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     let resolved: boolean | undefined
@@ -145,7 +145,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     await jest.advanceTimersByTimeAsync(1)
     expect(resolved).toBeUndefined()
 
-    await addMediaSub(driver, transport, 'media-calls')
+    await addMediaSubscription(driver, transport, 'media-calls')
     await expect(waiting).resolves.toBe(true)
   })
 
@@ -191,8 +191,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver.ddp)
     driver.userId = userId
-    await addSub(driver, transport, 'other-user/media-signal', 'sub-other-signal')
-    await addSub(driver, transport, 'other-user/media-calls', 'sub-other-calls')
+    await addSubscription(driver, transport, 'other-user/media-signal', 'sub-other-signal')
+    await addSubscription(driver, transport, 'other-user/media-calls', 'sub-other-calls')
 
     const waiting = driver.waitForNotifyUserMediaSubs(500)
 
@@ -205,9 +205,9 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver.ddp)
     driver.userId = userId
-    await addSub(driver, transport, `${userId}/message`, 'sub-message')
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    await addSubscription(driver, transport, `${userId}/message`, 'sub-message')
+    await addMediaSubscription(driver, transport, 'media-signal')
+    await addMediaSubscription(driver, transport, 'media-calls')
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     await expect(waiting).resolves.toBe(true)
@@ -218,8 +218,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
       const driver = createDriver()
       const transport = await openFakeConnection(driver.ddp)
       driver.userId = userId
-      await addMediaSub(driver, transport, 'media-signal')
-      await addMediaSub(driver, transport, 'media-calls')
+      await addMediaSubscription(driver, transport, 'media-signal')
+      await addMediaSubscription(driver, transport, 'media-calls')
 
       const reopened = await reopenAndHandshake(driver, transport)
 
@@ -235,8 +235,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
       const driver = createDriver()
       const transport = await openFakeConnection(driver.ddp)
       driver.userId = userId
-      await addMediaSub(driver, transport, 'media-signal')
-      await addMediaSub(driver, transport, 'media-calls')
+      await addMediaSubscription(driver, transport, 'media-signal')
+      await addMediaSubscription(driver, transport, 'media-calls')
 
       const reopened = await reopenAndHandshake(driver, transport)
 
@@ -289,8 +289,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver.ddp)
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    await addMediaSubscription(driver, transport, 'media-signal')
+    await addMediaSubscription(driver, transport, 'media-calls')
 
     const timersBefore = jest.getTimerCount()
 
