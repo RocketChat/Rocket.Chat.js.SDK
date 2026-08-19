@@ -503,6 +503,18 @@ describe('Socket subscription bookkeeping', () => {
       expect(Object.keys(socket.subscriptions)).toEqual(['ddp-1'])
     })
 
+    it('leaves the second caller with nothing when the server refuses the subscribe they joined', async () => {
+      const first = socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      const second = socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      const framesBefore = transport.sent.length
+      transport.receive({ msg: 'nosub', id: 'ddp-1', error: { reason: 'no such stream' } })
+
+      await expect(first).resolves.toBeUndefined()
+      await expect(second).resolves.toBeUndefined()
+      expect(socket.subscriptions).toEqual({})
+      expect(transport.sent).toHaveLength(framesBefore)
+    })
+
     it('does not grow the registry when a reconnect re-runs the caller\'s subscribe', async () => {
       await subscribe('stream-notify-logged', ['permissions-changed'])
 
@@ -603,13 +615,13 @@ describe('Socket subscription bookkeeping', () => {
 
     it('unsubscribes only once the last holder lets go', async () => {
       const subscription = await subscribe('stream-notify-logged', ['permissions-changed'])
-      await socket.subscribe('stream-notify-logged', ['permissions-changed'])
+      const shared = await socket.subscribe('stream-notify-logged', ['permissions-changed'])
 
       await subscription!.unsubscribe()
       expect(transport.lastSent()).toMatchObject({ msg: 'sub' })
       expect(socket.subscriptions['ddp-1']).toBeDefined()
 
-      const unsubscribing = subscription!.unsubscribe()
+      const unsubscribing = shared!.unsubscribe()
       await flushMicrotasks()
       expect(transport.lastSent()).toEqual({ msg: 'unsub', id: 'ddp-1' })
 
