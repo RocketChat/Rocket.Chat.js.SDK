@@ -51,7 +51,7 @@ The server's answer decides; silence keeps the instruction.
   under the id the request was sent with. A `sub` the server refused with a
   `nosub` carrying a DDP error still leaves nothing behind.
 - Either write is conditional on the Socket still holding a connection.
-  `rememberSubscription` returns early when it holds none, because an entry is an
+  `recordSubscription` returns early when it holds none, because an entry is an
   instruction to a later Login on this Socket, and a Socket with no connection has
   nothing to instruct.
 - A `sub` that was never written to the Transport leaves nothing behind. A failed

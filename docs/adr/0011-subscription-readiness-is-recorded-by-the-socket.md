@@ -43,16 +43,17 @@ and the reason has to be re-established first. It is tracked as #359.
 
 Readiness is recorded state; the query is derived; the query sends nothing.
 
-- Readiness lives in a private set of confirmed subscription ids the Socket
-  owns, beside the entries; the entry itself stays a stream handle and the
-  public `ISubscription` carries no readiness field. `whenReady` is a thin
-  query over the entries and the set: it resolves `true` when every stream
-  asked for has a Confirmed sub, `false` when the Deadline rings first, and
-  never rejects. It sends no `sub` of its own.
-- Readiness is scoped to a connection: `onClose` clears the set the moment
-  the connection ends and `createConnection` clears it again for the new
-  one, so a reopen turns every sub Unconfirmed without a pass over
-  `subscriptions` — the clear does the forgetting.
+- Readiness lives on the entry, as a `confirmed` field the Socket writes when
+  the `sub` response names the id. One fact in one place: forgetting the entry
+  forgets the confirmation with it. `whenReady` is a thin query over the
+  entries: it resolves `true` when every stream asked for has a Confirmed sub,
+  `false` when the Deadline rings first, and never rejects. It sends no `sub`
+  of its own.
+- Readiness is scoped to a connection: `onClose` unconfirms every entry the
+  moment the connection ends and `createConnection` unconfirms again for the
+  new one, so a reopen turns every sub Unconfirmed.
+- A waiter learns of a confirmation through the Socket's own emitter, which
+  ADR-0002 hardens, rather than a second notification mechanism beside it.
 - The 100ms poll dies with the mechanism that needed it. The re-send stays
   where it has always belonged: `subscribeAll` on Login. A reopen sends
   nothing, so on an anonymous reopened session the entries survive
