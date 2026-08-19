@@ -84,6 +84,9 @@ handed it are counted. An explicit id is not part of this rule.
   failed `unsub` has let go, so leaving its count behind would give the entry a
   holder that no longer exists, and the next caller's `unsubscribe` would only
   count that phantom down and send nothing.
+  A caller sharing a request still in flight is answered by looking the stream up
+  again once it settles, rather than by the object the request resolved, so the
+  mark and the entry are read on one rule whichever branch the caller took.
   Without the mark, the pairing ADR-0005 serialises — a `subscribe` for a stream
   whose `unsub` is still in flight — would hand the new caller a subscription for
   a stream the server is about to end, with no `sub` ever sent. That is a

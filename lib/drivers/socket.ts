@@ -94,7 +94,7 @@ export class Socket extends SDKEventEmitter {
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
-  /** The `unsub` waits for the last holder to let go. See ADR-0011. */
+  /** Holders counted per DDP subscription id. See ADR-0011. */
   private subscriptionHolders: { [id: string]: number } = {}
 
   /** Subscriptions whose `unsub` is on the wire, so no longer reusable. */
@@ -360,9 +360,15 @@ export class Socket extends SDKEventEmitter {
     this.endingSubscriptions.delete(id)
   }
 
-  /** Drop every DDP subscription, one key at a time, in the same object. */
+  /**
+   * Drop every DDP subscription, one key at a time, in the same object, and
+   * every instruction about one. A count or mark for an entry that is already
+   * gone would outlive it — a subscribe still settling writes one. See ADR-0011.
+   */
   forgetAllSubscriptions = () => {
     Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
+    this.subscriptionHolders = {}
+    this.endingSubscriptions.clear()
     this.streamRequests = {}
   }
 
@@ -756,17 +762,16 @@ export class Socket extends SDKEventEmitter {
   subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback, id?: string) => {
     if (id) return this.sendSubscribe(name, params, callback, id)
 
-    const streamKey = this.streamKeyOf(name, params)
+    const streamKey = this.streamKeyOf({ name, params })
     if (!streamKey) return this.sendSubscribe(name, params, callback)
 
     const inFlight = this.streamRequests[streamKey]
     if (inFlight) {
       return inFlight
-        .then((subscription) => subscription || this.findSubscription(streamKey, name))
-        .then((subscription) => this.holdSubscription(subscription, callback))
+        .then(() => this.holdSubscription(this.findSubscription({ name, params }, streamKey), callback))
     }
 
-    const recorded = this.findSubscription(streamKey, name)
+    const recorded = this.findSubscription({ name, params }, streamKey)
     if (recorded) return Promise.resolve(this.holdSubscription(recorded, callback))
 
     return this.recordStreamRequest(streamKey, this.sendSubscribe(name, params, callback)
@@ -790,7 +795,7 @@ export class Socket extends SDKEventEmitter {
    * params written in a different order still read as one stream. Params no
    * serialiser can read yield no stream key, so such a call is never shared.
    */
-  private streamKeyOf = (name: string, params: any[]) => {
+  private streamKeyOf = ({ name, params = [] }: IStream) => {
     const withSortedKeys = (_key: string, value: any) => {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return value
       return Object.keys(value).sort().reduce((sorted: any, key) => {
@@ -811,11 +816,11 @@ export class Socket extends SDKEventEmitter {
    * full: a prefix match would collapse two different `stream-notify-logged`
    * streams into one.
    */
-  private findSubscription = (streamKey: string, name: string) =>
+  private findSubscription = ({ name }: IStream, streamKey: string) =>
     this.findSubscriptions({ name }).find((subscription) => (
       subscription.id &&
       !this.endingSubscriptions.has(subscription.id) &&
-      this.streamKeyOf(name, subscription.params || []) === streamKey
+      this.streamKeyOf({ name, params: subscription.params }) === streamKey
     ))
 
   private holdSubscription = (
@@ -825,7 +830,7 @@ export class Socket extends SDKEventEmitter {
     const id = subscription?.id
     if (!subscription || !id) return undefined
     if (callback) subscription.onEvent?.(callback)
-    this.subscriptionHolders[id] = (this.subscriptionHolders[id] || 0) + 1
+    this.subscriptionHolders[id] = this.holderCountOf(id) + 1
     return subscription
   }
 
@@ -839,13 +844,14 @@ export class Socket extends SDKEventEmitter {
     delete this.subscriptionHolders[id]
   }
 
+  private holderCountOf = (id: string) => this.subscriptionHolders[id] ?? 0
+
   /**
-   * Whether this caller is the only one left holding a subscription, so its
-   * `unsub` ends the stream for nobody else. An entry an abandoned `sub` wrote
-   * was counted for nobody, and the one caller waiting on it may still let go,
-   * so no count reads as one last holder. See ADR-0006 and ADR-0011.
+   * Whether this caller's `unsub` ends the stream for nobody else. A count of
+   * none is the entry an abandoned `sub` wrote, which was handed to nobody and
+   * still has to be unsubscribable. See ADR-0006 and ADR-0011.
    */
-  private isLastHolder = (id: string) => (this.subscriptionHolders[id] || 1) === 1
+  private isLastHolder = (id: string) => this.holderCountOf(id) <= 1
 
   private sendSubscribe = (
     name: string,
