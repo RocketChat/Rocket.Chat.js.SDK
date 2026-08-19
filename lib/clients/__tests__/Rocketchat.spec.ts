@@ -11,7 +11,7 @@ const createClient = (restClient?: FakeClient) =>
   new RocketChatClient({ host: 'localhost:3000', logger: createSilentLogger(), client: restClient })
 
 const answerDdpLoginWith = (client: RocketChatClient, login: { id: string, token: string }) =>
-  jest.spyOn(client.ddp, 'login').mockResolvedValue(login as any)
+  jest.spyOn(client.driver, 'login').mockResolvedValue(login as any)
 
 const loggedInClient = async (ddpToken: string = 'fake-token') => {
   const restClient = new FakeClient()
@@ -25,16 +25,16 @@ const loggedInClient = async (ddpToken: string = 'fake-token') => {
   return client
 }
 
-describe('client.ddp', () => {
+describe('client.driver', () => {
   it('is the Driver', () => {
     const client = createClient()
 
-    expect(client.ddp).toBeInstanceOf(Driver)
+    expect(client.driver).toBeInstanceOf(Driver)
   })
 
   it('receives method calls made on the client', async () => {
     const client = createClient()
-    const methodCall = jest.spyOn(client.ddp, 'methodCall').mockResolvedValue(undefined as any)
+    const methodCall = jest.spyOn(client.driver, 'methodCall').mockResolvedValue(undefined as any)
 
     await client.methodCall('getRoomIdByNameOrId', 'general')
 
@@ -43,7 +43,7 @@ describe('client.ddp', () => {
 
   it('receives room subscriptions made on the client', async () => {
     const client = createClient()
-    const subscribeRoom = jest.spyOn(client.ddp, 'subscribeRoom').mockResolvedValue([])
+    const subscribeRoom = jest.spyOn(client.driver, 'subscribeRoom').mockResolvedValue([])
 
     await client.subscribeRoom('GENERAL')
 
@@ -52,7 +52,7 @@ describe('client.ddp', () => {
 
   it('receives subscriptions made on the client, with the arguments in order', async () => {
     const client = createClient()
-    const subscribe = jest.spyOn(client.ddp, 'subscribe').mockResolvedValue(undefined)
+    const subscribe = jest.spyOn(client.driver, 'subscribe').mockResolvedValue(undefined)
 
     await client.subscribe('stream-room-messages', 'GENERAL', false)
 

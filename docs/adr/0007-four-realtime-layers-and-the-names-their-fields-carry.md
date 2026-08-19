@@ -16,14 +16,15 @@ thing CONTEXT.md says a Client is not.
 DDP is the odd word of the three. In CONTEXT.md it is only ever a qualifier on
 wire vocabulary — DDP message, DDP response, DDP error, DDP subscription — and
 never a name for an object. In the code it names two objects, neither of which
-is the protocol.
+is the protocol: CONTEXT.md reserves `ddp` as a qualifier while `Driver.ddp`
+still exists.
 
 Underneath that, the glossary was one layer short. It defined Socket as "the raw
 websocket inside a driver", which the class is not: `Socket` performs the DDP
 handshake, answers pings, holds `subscriptions` and `lastPing`, and *owns* a raw
 websocket as `connection`. The rest of CONTEXT.md already read the other way —
 *Transport open*, *Liveness chain*, *Probe*, *Detached socket*, *Connected echo*
-and *Reopen* all treat a Socket as the DDP layer that owns a transport. One
+and *Reopen* all treat a Socket as the DDP layer that owns a Transport. One
 parenthetical disagreed with five entries and with the code.
 
 The layers behave very differently. A Driver reconnects, tracks DDP
@@ -41,7 +42,7 @@ each one is a defined term with a field named after it.
   protocol qualifies messages, responses, errors and subscriptions; it does not
   name a layer.
 - **`Driver.ddp` becomes `private readonly socket: Socket`.** It holds a
-  `Socket`, which is now a defined domain term. Private because nothing in the
+  `Socket`, which is a defined domain term. Private because nothing in the
   consuming app's production code needs it: the Driver already forwards every
   member that app reaches for — `connected`, `checkAndReopen`, `reopenNow`,
   `probe`, `lastPing`, `pingInterval`, `config` and `waitForNotifyUserMediaSubs`.
@@ -54,8 +55,8 @@ each one is a defined term with a field named after it.
   No `IClient` until something needs to type against one.
 - **`ISocket` keeps its name.** A Driver presenting the same realtime surface by
   delegation is ordinary delegation, not a reason to rename the interface.
-- **No deprecation alias.** The renames land alongside the consuming app's
-  update rather than ahead of it.
+- **No deprecation alias.** An alias would keep `ddp` naming an object, which
+  the first decision above forbids.
 - **Transport is named.** The raw websocket a Socket owns gets a term of its own,
   so the layer below the Socket can be discussed without borrowing the word
   above it.
@@ -73,7 +74,6 @@ and an `/** @internal */` tag alone, which enforces nothing.
   and `driver.ddp.open()` / `.subscriptions` / `.lastPing` / `.send()` in its
   integration tests. That app types this SDK through a loose module declaration,
   so a rename does not fail at compile time; it fails at runtime as `undefined`.
-  Both repos move together.
 - The app's integration tests move to bracket access for the Socket, so the
   rename touches one more file there than the field count suggests.
 - `connection` stays the Socket's field name for the Transport it owns. The
@@ -84,22 +84,3 @@ and an `/** @internal */` tag alone, which enforces nothing.
   `@rocket.chat/sdk/clients/Rocketchat`. Nothing in this repo or in
   Rocket.Chat.ReactNative uses it, and it carried no default export, so the
   root import is unaffected.
-- Until the app moves, the documentation is ahead of the code: CONTEXT.md
-  reserves `ddp` as a qualifier while `Driver.ddp` still exists. Issue #338
-  stays open until the renames land.
-
-## Migration
-
-Of the three renames, only `RocketChatClient.ddp` to `driver` reaches the app's
-production code. Making `Driver.ddp` private reaches only its integration tests,
-and dropping `implements ISocket` reaches nothing there. They land together
-anyway, so the vocabulary arrives in one piece.
-
-A follow-up SDK pull request carries all three, paired with one in the app:
-
-1. The SDK PR renames both fields and drops `implements ISocket`.
-2. The app PR pins that SDK commit and updates its readers in the same change —
-   `sdk.current?.ddp` becomes `sdk.current?.driver`, and its integration tests
-   move to `driver['socket']`.
-3. The app's pin does not move to the renamed SDK until its own PR is ready,
-   for the reason Consequences gives.

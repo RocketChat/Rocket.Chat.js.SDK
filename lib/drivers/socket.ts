@@ -333,8 +333,8 @@ export class Socket extends SDKEventEmitter {
     })
 
   /**
-   * Disconnect the DDP from server and forget every subscription locally: the
-   * close ends them on the server, so no `unsub` is sent. See ADR-0003.
+   * Close the Transport and forget every DDP subscription locally.
+   * See ADR-0009.
    */
   close = async (): Promise<void> => {
     this.cancelAnyReopen()
