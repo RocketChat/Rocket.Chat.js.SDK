@@ -28,7 +28,7 @@ export interface ISocket {
   disconnect (): Promise<ISocket>
   checkAndReopen (): void
   subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined>
-  subscribeRaw (...args: any[]): Promise<ISubscription | undefined>
+  subscribeRaw (name: string, params: any[]): Promise<ISubscription | undefined>
   unsubscribe (subscription: ISubscription): Promise<ISocket>
   unsubscribeAll (): Promise<void>
   resubscribeWhenRecorded (streams: IStream[], timeoutMs?: number): Promise<boolean>
