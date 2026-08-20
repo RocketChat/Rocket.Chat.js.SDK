@@ -34,7 +34,7 @@ describe('REST client', () => {
     })
 
     it('addresses the api version the caller asked for', async () => {
-      await api.get('rooms.info', {}, true, undefined, {}, 'v2')
+      await api.get('rooms.info', {}, undefined, {}, 'v2')
 
       expect(lastFetchCall().url).toBe('http://localhost:3000/api/v2/rooms.info?')
     })
@@ -113,7 +113,7 @@ describe('REST client', () => {
     })
 
     it('sends only the headers the caller passed as options', async () => {
-      await api.get('me', {}, true, undefined, { customHeaders: { 'X-Only': 'this' } })
+      await api.get('me', {}, undefined, { customHeaders: { 'X-Only': 'this' } })
 
       expect(lastFetchCall().init.headers).toEqual({ 'X-Only': 'this' })
     })
