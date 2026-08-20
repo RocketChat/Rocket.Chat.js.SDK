@@ -48,7 +48,7 @@ import * as settings from '../settings';
 //     if (currentLogin.username === user.username) return currentLogin.result
 //     else await logout()
 //   }
-//   const result = (await this.post('login', user, false) as ILoginResultAPI)
+//   const result = (await this.post('login', user) as ILoginResultAPI)
 //   if (result && result.data && result.data.authToken) {
 //     currentLogin = {
 //       result: result, // keep to return if login requested again for same user
@@ -71,7 +71,7 @@ import * as settings from '../settings';
 //     return Promise.resolve()
 //   }
 //   this.logger.info(`[API] Logging out ${ currentLogin.username }`)
-//   return this.get('logout', null, true).then(() => {
+//   return this.get('logout', null).then(() => {
 //     clearHeaders()
 //     currentLogin = null
 //   })
@@ -219,24 +219,18 @@ export default class Api extends SDKEventEmitter {
 	* @param method   Request method GET | POST | PUT | DEL
 	* @param endpoint The API endpoint (including version) e.g. `chat.update`
 	* @param data     Payload for POST request to endpoint
-	* @param auth     Require auth headers for endpoint, default true
 	* @param ignore   Allows certain matching error messages to not count as errors
 	*/
   request = async (
 		method: 'POST' | 'GET' | 'PUT' | 'DELETE',
 		endpoint: string,
 		data: any = {},
-		auth: boolean = true,
     ignore?: RegExp,
     options?: any,
     apiVersion: string = 'v1'
 	) => {
     this.logger?.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
-      if (auth && !this.loggedIn()) {
-        throw new Error(`API ${ method } ${ endpoint } requires a login`)
-      }
-
       const { signal } = this.controller;
       options = { ...options, signal };
 
@@ -259,16 +253,16 @@ export default class Api extends SDKEventEmitter {
     }
   }
 	/** Do a POST request to an API endpoint. */
-  post: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('POST', endpoint, data, auth, ignore, options, apiVersion)
+  post: IAPIRequest = (endpoint, data, ignore, options = {}, apiVersion) => this.request('POST', endpoint, data, ignore, options, apiVersion)
 
 	/** Do a GET request to an API endpoint. */
-  get: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('GET', endpoint, data, auth, ignore, options, apiVersion)
+  get: IAPIRequest = (endpoint, data, ignore, options = {}, apiVersion) => this.request('GET', endpoint, data, ignore, options, apiVersion)
 
 	/** Do a PUT request to an API endpoint. */
-  put: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('PUT', endpoint, data, auth, ignore, options, apiVersion)
+  put: IAPIRequest = (endpoint, data, ignore, options = {}, apiVersion) => this.request('PUT', endpoint, data, ignore, options, apiVersion)
 
 	/** Do a DELETE request to an API endpoint. */
-  del: IAPIRequest = (endpoint, data, auth, ignore, options = {}, apiVersion) => this.request('DELETE', endpoint, data, auth, ignore, options, apiVersion)
+  del: IAPIRequest = (endpoint, data, ignore, options = {}, apiVersion) => this.request('DELETE', endpoint, data, ignore, options, apiVersion)
 
   /** Abort all current API requests, leaving the next request free to run. */
   abort = (): void => {
@@ -287,7 +281,7 @@ export default class Api extends SDKEventEmitter {
   }
 
   async login (credentials: ILoginCredentials, args?: any): Promise<ILoginData | ILoginResult | null> {
-    const { data }: { data: ILoginData } = await this.post('login', { ...credentials, ...args }, false)
+    const { data }: { data: ILoginData } = await this.post('login', { ...credentials, ...args })
     this.setLogin({
       username: data.me.username ?? null,
       userId: data.userId,
@@ -333,7 +327,7 @@ export default class Api extends SDKEventEmitter {
     if (!this.currentLogin) {
       return null
     }
-    const result = await this.post('logout', {}, true)
+    const result = await this.post('logout', {})
     this.clearLogin()
     return result
   }
