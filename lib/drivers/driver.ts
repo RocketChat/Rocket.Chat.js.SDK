@@ -218,13 +218,26 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
   onMessage = (cb: ICallback): void => {
-    this.socket.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(this.ejsonMessage(message)))
+    this.socket.on('stream-room-messages', (frame: any) => {
+      const [message] = this.streamArgs('stream-room-messages', frame)
+      if (message === undefined) return
+      cb(this.ejsonMessage(message))
+    })
   }
 
-  onTyping = (cb: ICallback): Promise<any > => {
-    return this.socket.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
+  onTyping = (cb: ICallback): void => {
+    this.socket.on('stream-notify-room', (frame: any) => {
+      const [username, isTyping] = this.streamArgs('stream-notify-room', frame)
+      if (username === undefined) return
       cb(username, isTyping)
-    }) as any
+    })
+  }
+
+  private streamArgs = (stream: string, frame: any): any[] => {
+    const args = frame && frame.fields && frame.fields.args
+    if (Array.isArray(args)) return args
+    this.logger.error(`[driver] Dropped a ${ stream } frame without fields.args: ${ JSON.stringify(frame) }`)
+    return []
   }
 
   notifyVisitorTyping = (rid: string, username: string, typing: boolean, token: string) => {
