@@ -99,7 +99,7 @@ describe('REST client', () => {
     it('drops the auth headers on a logout and keeps resolving the custom ones', async () => {
       jest.replaceProperty(settings, 'customHeaders', { 'X-Custom': 'first' })
       await api.logout()
-      await api.get('settings.public', {}, false)
+      await api.get('settings.public', {})
 
       expect(lastFetchCall().init.headers).toEqual({
         'Content-Type': 'application/json',
@@ -107,7 +107,7 @@ describe('REST client', () => {
       })
 
       jest.replaceProperty(settings, 'customHeaders', { 'X-Custom': 'second' })
-      await api.get('settings.public', {}, false)
+      await api.get('settings.public', {})
 
       expect(lastFetchCall().init.headers).toMatchObject({ 'X-Custom': 'second' })
     })

@@ -85,7 +85,7 @@ describe('api', () => {
       const { api, restClient } = anonymousApiWithFakeClient()
       restClient.enqueueReply(emptySuccess())
 
-      await api.post('login', { username: 'user' }, false)
+      await api.post('login', { username: 'user' })
 
       expect(restClient.lastRequest()).toMatchObject({
         method: 'POST',
