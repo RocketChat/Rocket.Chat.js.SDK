@@ -60,7 +60,7 @@ describe('new Driver', () => {
 })
 
 describe('Driver.subscribe', () => {
-  it('reshapes its arguments and drops the id on the way through', async () => {
+  it('reshapes its arguments on the way through', async () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
 
@@ -69,29 +69,22 @@ describe('Driver.subscribe', () => {
     // What the caller passed and what goes on the wire differ: the event name
     // and a wrapper object become the two params, and the caller's extra
     // arguments are buried under `args`.
-    //
-    // The id is dropped on the way through — the socket's `subscribe` takes one,
-    // the Driver's does not and never passes it — so the frame carries a fresh
-    // send-time id instead. Resubscribing through this method therefore cannot
-    // reuse an existing subscription's id; `waitForNotifyUserMediaSubs` goes
-    // through the Socket for exactly that reason.
+    const { id } = transport.lastSent() as { id: string }
     expect(transport.lastSent()).toEqual({
       msg: 'sub',
-      id: 'ddp-1',
+      id,
       name: 'stream-notify-room',
       params: ['room-id/typing', { useCollection: false, args: [false] }]
     })
 
-    transport.receive({ msg: 'ready', subs: ['ddp-1'] })
+    transport.receive({ msg: 'ready', subs: [id] })
 
-    // And the subscription is filed under that send-time id, holding the
-    // reshaped params rather than the ones the caller passed.
     await expect(subscribing).resolves.toMatchObject({
-      id: 'ddp-1',
+      id,
       name: 'stream-notify-room',
       params: ['room-id/typing', { useCollection: false, args: [false] }]
     })
-    expect(Object.keys(driver['socket'].subscriptions)).toEqual(['ddp-1'])
+    expect(Object.keys(driver['socket'].subscriptions)).toEqual([id])
   })
 })
 
@@ -99,18 +92,23 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   const userId = 'user-id'
   const topic = 'stream-notify-user'
 
-  /** Register a subscription on the Socket under a given id, as a successful sub would. */
-  const addSub = async (driver: Driver, transport: FakeWebSocket, event: string, id: string) => {
-    // Through the Socket, with an explicit id: this is the shape the
-    // readiness poll looks for — `name` the topic, `params[0]` the user event.
-    const subscribing = driver['socket'].subscribe(topic, [event], undefined, id)
+  /**
+   * Register a subscription on the Socket, as a successful sub would, and
+   * return the id the driver derived for it. Through the Socket, so the entry
+   * has the shape the readiness poll looks for — `name` the topic, `params[0]`
+   * the user event.
+   */
+  const addSub = async (driver: Driver, transport: FakeWebSocket, ...params: any[]) => {
+    const subscribing = driver['socket'].subscribe(topic, params)
+    const { id } = transport.lastSent() as { id: string }
     transport.receive({ msg: 'ready', subs: [id] })
     await subscribing
+    return id
   }
 
   /** Register a media subscription on the Socket, as a successful sub would. */
   const addMediaSub = (driver: Driver, transport: FakeWebSocket, name: string) =>
-    addSub(driver, transport, `${userId}/${name}`, `sub-${name}`)
+    addSub(driver, transport, `${userId}/${name}`)
 
   it('resolves false without a logged-in user, before scheduling anything', async () => {
     const driver = createDriver()
@@ -130,8 +128,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
 
     // A real reopen: a second transport is constructed and handshaken, and the
     // subscription map survives it — which is what makes the resubscribe below
@@ -145,9 +143,9 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const waiting = driver.waitForNotifyUserMediaSubs()
     // The resubscribes go out on the new socket, not the dead one.
     expect(reopened.sent.map((frame) => JSON.parse(frame).id))
-      .toEqual(expect.arrayContaining(['sub-media-signal', 'sub-media-calls']))
-    reopened.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    reopened.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+      .toEqual(expect.arrayContaining([signalId, callsId]))
+    reopened.receive({ msg: 'ready', subs: [signalId] })
+    reopened.receive({ msg: 'ready', subs: [callsId] })
 
     await expect(waiting).resolves.toBe(true)
   })
@@ -156,8 +154,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
 
     const sentBefore = transport.sent.length
     const waiting = driver.waitForNotifyUserMediaSubs()
@@ -173,8 +171,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     expect(resolved).toBeUndefined()
 
     // Left settled so the pending timers do not outlive the test.
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    transport.receive({ msg: 'ready', subs: [signalId] })
+    transport.receive({ msg: 'ready', subs: [callsId] })
     await expect(waiting).resolves.toBe(true)
   })
 
@@ -194,11 +192,11 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     expect(resolved).toBeUndefined()
 
     // Half of what it waits for is not enough: the poll wants both.
-    await addMediaSub(driver, transport, 'media-signal')
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
     await jest.advanceTimersByTimeAsync(100)
     expect(resolved).toBeUndefined()
 
-    await addMediaSub(driver, transport, 'media-calls')
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
     const sentBefore = transport.sent.length
     await jest.advanceTimersByTimeAsync(100)
 
@@ -206,14 +204,14 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     // the same subscriptions rather than minting new ones.
     const resent = transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame))
     expect(resent).toEqual([
-      { msg: 'sub', id: 'sub-media-signal', name: topic, params: [`${userId}/media-signal`] },
-      { msg: 'sub', id: 'sub-media-calls', name: topic, params: [`${userId}/media-calls`] }
+      { msg: 'sub', id: signalId, name: topic, params: [`${userId}/media-signal`] },
+      { msg: 'sub', id: callsId, name: topic, params: [`${userId}/media-calls`] }
     ])
 
     // Still pending until the server acks both: readiness is the ack, not the send.
     expect(resolved).toBeUndefined()
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    transport.receive({ msg: 'ready', subs: [signalId] })
+    transport.receive({ msg: 'ready', subs: [callsId] })
 
     await expect(waiting).resolves.toBe(true)
   })
@@ -222,12 +220,12 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
 
     const waiting = driver.waitForNotifyUserMediaSubs()
-    transport.receive({ msg: 'nosub', id: 'sub-media-signal' })
-    transport.receive({ msg: 'nosub', id: 'sub-media-calls' })
+    transport.receive({ msg: 'nosub', id: signalId })
+    transport.receive({ msg: 'nosub', id: callsId })
 
     await expect(waiting).resolves.toBe(false)
   })
@@ -236,12 +234,12 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
 
     const waiting = driver.waitForNotifyUserMediaSubs()
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'nosub', id: 'sub-media-calls' })
+    transport.receive({ msg: 'ready', subs: [signalId] })
+    transport.receive({ msg: 'nosub', id: callsId })
 
     await expect(waiting).resolves.toBe(false)
   })
@@ -250,14 +248,14 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     // Answered, but carrying nothing to subscribe with: the stream is no more
     // restored than it is by a refusal.
-    transport.receive({ msg: 'ready', id: 'sub-media-signal', subs: [] })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    transport.receive({ msg: 'ready', id: signalId, subs: [] })
+    transport.receive({ msg: 'ready', subs: [callsId] })
 
     await expect(waiting).resolves.toBe(false)
   })
@@ -266,18 +264,18 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addSub(driver, transport, `${userId}/message`, 'sub-message')
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    await addSub(driver, transport, `${userId}/message`)
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
 
     const sentBefore = transport.sent.length
     const waiting = driver.waitForNotifyUserMediaSubs()
 
     const resent = transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame).id)
-    expect(resent).toEqual(['sub-media-signal', 'sub-media-calls'])
+    expect(resent).toEqual([signalId, callsId])
 
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    transport.receive({ msg: 'ready', subs: [signalId] })
+    transport.receive({ msg: 'ready', subs: [callsId] })
     await expect(waiting).resolves.toBe(true)
   })
 
@@ -285,8 +283,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addSub(driver, transport, 'other-user/media-signal', 'sub-other-signal')
-    await addSub(driver, transport, 'other-user/media-calls', 'sub-other-calls')
+    await addSub(driver, transport, 'other-user/media-signal')
+    await addSub(driver, transport, 'other-user/media-calls')
 
     const sentBefore = transport.sent.length
     const waiting = driver.waitForNotifyUserMediaSubs(500)
@@ -301,21 +299,22 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    // A second entry for the same stream — what an abandoned sub re-sent under a
-    // fresh id leaves behind. Every entry is re-sent, and one refusal is enough.
-    await addSub(driver, transport, `${userId}/media-signal`, 'sub-media-signal-again')
-    await addMediaSub(driver, transport, 'media-calls')
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
+    // A second entry the readiness poll finds for the same media stream: same
+    // event, different params, so a stream of its own. Every entry found is
+    // re-sent, and one refusal is enough.
+    const collectedSignalId = await addSub(driver, transport, `${userId}/media-signal`, false)
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
 
     const sentBefore = transport.sent.length
     const waiting = driver.waitForNotifyUserMediaSubs()
 
     const resent = transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame).id)
-    expect(resent).toEqual(['sub-media-signal', 'sub-media-signal-again', 'sub-media-calls'])
+    expect(resent).toEqual([signalId, collectedSignalId, callsId])
 
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'nosub', id: 'sub-media-signal-again' })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    transport.receive({ msg: 'ready', subs: [signalId] })
+    transport.receive({ msg: 'nosub', id: collectedSignalId })
+    transport.receive({ msg: 'ready', subs: [callsId] })
 
     await expect(waiting).resolves.toBe(false)
   })
@@ -335,17 +334,17 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     await driveToHandshake(reopened, 'reopened-session')
     await reopening
 
-    await addMediaSub(driver, reopened, 'media-signal')
-    await addMediaSub(driver, reopened, 'media-calls')
+    const signalId = await addMediaSub(driver, reopened, 'media-signal')
+    const callsId = await addMediaSub(driver, reopened, 'media-calls')
 
     const sentBefore = reopened.sent.length
     await jest.advanceTimersByTimeAsync(100)
 
     const resent = reopened.sent.slice(sentBefore).map((frame) => JSON.parse(frame).id)
-    expect(resent).toEqual(['sub-media-signal', 'sub-media-calls'])
+    expect(resent).toEqual([signalId, callsId])
 
-    reopened.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    reopened.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    reopened.receive({ msg: 'ready', subs: [signalId] })
+    reopened.receive({ msg: 'ready', subs: [callsId] })
     await expect(waiting).resolves.toBe(true)
   })
 
@@ -386,8 +385,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId
-    await addMediaSub(driver, transport, 'media-signal')
-    await addMediaSub(driver, transport, 'media-calls')
+    const signalId = await addMediaSub(driver, transport, 'media-signal')
+    const callsId = await addMediaSub(driver, transport, 'media-calls')
 
     // The socket's own ping timer is already pending and stays that way; only
     // what the wait itself scheduled has to be gone by the end.
@@ -395,8 +394,8 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     const waiting = driver.waitForNotifyUserMediaSubs()
     // The first attempt runs synchronously, so both resubscribes are already out.
-    transport.receive({ msg: 'ready', subs: ['sub-media-signal'] })
-    transport.receive({ msg: 'ready', subs: ['sub-media-calls'] })
+    transport.receive({ msg: 'ready', subs: [signalId] })
+    transport.receive({ msg: 'ready', subs: [callsId] })
     await expect(waiting).resolves.toBe(true)
 
     // Both the poll interval and the deadline are cleared: a leaked interval

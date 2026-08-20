@@ -48,9 +48,11 @@ refuses leaves none; the answer that never came is ADR-0006's.
   it with `instanceof`. A rejection the SDK originates under ADR-0003 is a plain
   `Error` and is therefore not a `DDPError`.
 - `subscribe` is the only writer of an entry, and where the server answers it
-  writes on the `ready` DDP response, under the id the server confirmed. A `sub`
-  the server refuses leaves nothing behind, and a `sub` sent under an existing id
-  that the server refuses forgets that entry: the server has answered, and
+  writes on the `ready` DDP response, under the id it derived for the stream and
+  sent the frame with (ADR-0011); the `ready` is read as the acknowledgement and
+  nothing else. A `sub` the server refuses leaves nothing behind, and a `sub`
+  sent under an existing id that the server refuses forgets that entry: the
+  server has answered, and
   nothing is streaming, so there is no stream for a later Login to re-establish.
   A `sub` whose response never arrives is settled by ADR-0006, which has
   `subscribe` write an entry the `ready` never arrived to write, because the

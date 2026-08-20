@@ -72,9 +72,12 @@ The server's answer decides; silence keeps the instruction.
   replacement connection, so the entry is written. `Socket.close()` is the same
   loss and keeps nothing: it drops the Transport, so the guard above finds no
   connection to instruct. ADR-0009 settles that path.
-- The rejection carries the id `send` minted for the wait. `send` mints it inside
-  its promise executor, after the wait on `open`, so no caller can compute it in
-  advance without racing another send for the same number. It names the request
+- The rejection carries the id the wait went out under. For a `method` that is
+  the id `send` mints inside its promise executor, after the wait on `open`, so
+  no caller can compute it in advance without racing another send for the same
+  number. For a `sub` it is the caller's own: derived from the stream before the
+  send (ADR-0011), which only strengthens the rule below — the entry is written
+  under the id the frame carried, and the caller knew it all along. It names the request
   only for the sends whose frame carries an id — `method` and `sub`; a `connect`
   or a `ping` is minted an id too, but its frame goes out without one and no
   caller reads it. `subscribe` is the only reader, and it reads it to name a `sub`

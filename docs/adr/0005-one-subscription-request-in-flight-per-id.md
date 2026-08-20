@@ -14,8 +14,8 @@ answered here.
 re-sends every entry under its own id, and `login` calls `subscribeAll`. A
 Login during that window therefore sends a `sub` carrying the id of a DDP
 subscription that is still being unsubscribed. The reverse pairing is reachable
-too: `subscribe` re-sends an existing entry under its own id, and `unsubscribe`
-can be called while that `sub` waits for its `ready`.
+too: `resubscribe` re-sends an existing entry under its own id, and
+`unsubscribe` can be called while that `sub` waits for its `ready`.
 
 `send` matches a DDP response to its request by id alone. It registers one
 listener under the id and settles on the first message that carries it, without
@@ -54,10 +54,12 @@ the first to have its DDP response before its own frame is written.
 
 - The wait is `queueSubscriptionRequest` on `Socket`, and `subscribe` and
   `unsubscribe` are its only callers. It holds one promise per id.
-- A request with no id does not queue. A first-time `subscribe` has no id to
-  collide on, and `send` writes its frame synchronously on an open connection,
-  so a hop through the queue would delay it by a turn of the microtask queue for
-  no gain.
+- Every subscription request has an id and queues under it. The id of a `sub` is
+  derived from the stream (ADR-0011), so a first-time `subscribe` knows its id
+  before it sends. Nothing is delayed by this: `queueSubscriptionRequest` runs
+  the request synchronously when no promise is registered under the id, and
+  different streams derive different ids, so no request waits that did not wait
+  before.
 - The wait ends on the response, whether it succeeded or carried a DDP error.
   Neither outcome is examined here — what a rejection does to the entry stays
   with ADR-0004.
@@ -79,9 +81,10 @@ the first to have its DDP response before its own frame is written.
   answers a refused `sub` as well as an `unsub`, so the two stay ambiguous
   whenever both are in flight. Keeping one on the wire removes the ambiguity
   rather than resolving it.
-- Two `sub`s under one id, and two `unsub`s under one id, serialise on the same
-  rule. Neither was known to lose data, but both left a second response with no
-  listener.
+- Two `sub`s for one stream carry one id and serialise on this rule, and the
+  second finds the record the first wrote and shares it rather than sending
+  (ADR-0011). Two `unsub`s under one id serialise on the same rule. Neither was
+  known to lose data, but both left a second response with no listener.
 - A Login that runs while an `unsub` is in flight re-establishes that stream
   after the server has ended it, rather than racing it. The end state is the one
   the entry describes.

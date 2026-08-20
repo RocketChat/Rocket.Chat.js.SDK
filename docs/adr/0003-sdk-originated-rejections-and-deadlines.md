@@ -180,7 +180,8 @@ an Error that the SDK writes.
   the global handler of the app.
 - A failed write of a `sub` DDP message leaves nothing in the subscription map.
   `send` never writes that map; `subscribe` is its only writer, and it writes an
-  entry on the confirmed `ready` id or on the two rejection types ADR-0006 names.
+  entry when the server answers with a `ready`, or on the two rejection types
+  ADR-0006 names, and under the id it derived for the stream (ADR-0011).
   The error the Transport threw is neither of those, so the map holds no entry for
   a DDP subscription the server never received. That is the rule ADR-0006 draws
   and not an accident of ordering: there is nothing for a later Login to

@@ -1,6 +1,7 @@
 import type WebSocketClient from 'universal-websocket-client'
 
 import type { Socket } from '../lib/drivers/socket'
+import type { ISocketMessageCallback } from '../interfaces'
 
 /**
  * The one and only way a spec gets a websocket: the transport module is mocked
@@ -201,4 +202,31 @@ export const driveToHandshake = async (transport: FakeWebSocket, session = 'fake
  */
 export const flushMicrotasks = async (): Promise<void> => {
   for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
+}
+
+export const subFrames = (frames: string[]) =>
+  frames.map((frame) => JSON.parse(frame)).filter((frame) => frame.msg === 'sub')
+
+export const lastSubId = (transport: FakeWebSocket): string => {
+  const { msg, id } = transport.lastSent() as { msg: string, id: string }
+  expect(msg).toBe('sub')
+  return id
+}
+
+/**
+ * The server's `ready` carries the subscription id in `subs[0]`, and the
+ * driver re-emits it under that id — so acknowledging a subscription means
+ * naming the id it was created with.
+ */
+export const subscribeAndAck = async (
+  socket: Socket,
+  transport: FakeWebSocket,
+  name: string,
+  params: any[],
+  callback?: ISocketMessageCallback
+) => {
+  const subscribing = socket.subscribe(name, params, callback)
+  const id = lastSubId(transport)
+  transport.receive({ msg: 'ready', subs: [id] })
+  return subscribing
 }

@@ -101,9 +101,9 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     return this.socket.subscribe(topic, [eventname, { 'useCollection': false, 'args': args }])
   }
 
-  subscribeRaw = (...args: any[]): Promise<ISubscription | undefined> => {
-    this.logger.info(`[DDP driver] Raw Subscribing to ${JSON.stringify(args)}`)
-    return this.socket.subscribe(...args as [string, any[]])
+  subscribeRaw = (name: string, params: any[]): Promise<ISubscription | undefined> => {
+    this.logger.info(`[DDP driver] Raw Subscribing to ${JSON.stringify([name, params])}`)
+    return this.socket.subscribe(name, params)
   }
 
   subscribeNotifyAll = (): Promise< any> => {
@@ -153,9 +153,9 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
    * Socket and resolve when the server acks them with `ready`. This gives the app
    * an observable readiness signal after a forced reconnect.
    *
-   * The Socket owns both the waiting and the re-sending: the re-send goes out under
-   * the ids the streams were first sent with, which this Driver's own `subscribe`
-   * would drop.
+   * The Socket owns both the waiting and the re-sending: it always sends, where
+   * this Driver's own `subscribe` wraps the params and so asks for a different
+   * stream entirely.
    */
   waitForNotifyUserMediaSubs = (timeoutMs = this.socket.config.timeout): Promise<boolean> => {
     if (!this.userId) {
