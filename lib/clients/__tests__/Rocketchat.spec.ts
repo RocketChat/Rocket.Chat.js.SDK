@@ -185,6 +185,14 @@ describe('client.logout', () => {
   it('reports itself logged out', async () => {
     expect((await loggedOutClient()).loggedIn()).toBe(false)
   })
+
+  it('still sends an Endpoint to the REST client', async () => {
+    const client = await loggedOutClient()
+
+    client.get('me', {})
+
+    expect(client.client.lastRequest().endpoint).toBe('me')
+  })
 })
 
 describe('client.logger', () => {
