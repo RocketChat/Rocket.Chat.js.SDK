@@ -645,7 +645,10 @@ export class Socket extends SDKEventEmitter {
   login = async (credentials: IRealtimeCredentials) => {
     const params = this.loginParams(credentials)
     this.resume = (await this.call('login', params) as ILoginResult)
-    this.subscribeAll().catch(console.log)
+    this.subscribeAll().catch((err) => {
+      this.logger.error(`[ddp] Resubscribe after login failed: ${err.message}`)
+      this.emit('resubscribe-error', err)
+    })
     this.emit('login', this.resume)
     return this.resume
   }
