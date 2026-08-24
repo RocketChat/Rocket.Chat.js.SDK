@@ -3,14 +3,14 @@ import { anonymousApiWithFakeClient, anonymousApiRocketChatWithFakeClient } from
 
 const infoResponse = () => ({ status: 200, data: { info: { version: '6.0.0' } } })
 
-describe('Api pre-login requests', () => {
-  it('reports not logged in with no login', () => {
+describe('Api with no Current login', () => {
+  it('reports no Current login', () => {
     const { api } = anonymousApiWithFakeClient()
 
     expect(api.loggedIn()).toBe(false)
   })
 
-  it('sends a pre-login request to the client with no login', async () => {
+  it('sends the Endpoint to the REST client with no Current login', async () => {
     const { api, restClient } = anonymousApiWithFakeClient()
 
     const pending = api.post('users.forgotPassword', { email: 'user@example.com' })
@@ -24,7 +24,7 @@ describe('Api pre-login requests', () => {
     })
   })
 
-  it('logs in with no prior login', async () => {
+  it('sets a Current login from a login with none held', async () => {
     const { api, restClient } = anonymousApiWithFakeClient()
 
     const pending = api.login({ username: 'user', password: 'pass' })
@@ -34,7 +34,7 @@ describe('Api pre-login requests', () => {
     expect(api.loggedIn()).toBe(true)
   })
 
-  it('allows info() with no login', async () => {
+  it('sends info() with no Current login', async () => {
     const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
     const pending = api.info()
@@ -43,7 +43,7 @@ describe('Api pre-login requests', () => {
     await expect(pending).resolves.toEqual({ version: '6.0.0' })
   })
 
-  it('sends info() authenticated once logged in', async () => {
+  it('sends info() with the auth headers once a Current login is held', async () => {
     const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
     const login = api.login({ username: 'user', password: 'pass' })
