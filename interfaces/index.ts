@@ -188,14 +188,12 @@ export type ILoginCredentials =
  * Common args for POST, GET, PUT, DELETE requests
  * @param endpoint The API endpoint (including version) e.g. `chat.update`
  * @param data     Payload for POST request to endpoint
- * @param auth     Require auth headers for endpoint, default true
  * @param ignore   Allows certain matching error messages to not count as errors
  */
 export interface IAPIRequest {
   (
     endpoint: string,
     data?: any,
-    auth?: boolean,
     ignore?: RegExp,
     options?: any,
     apiVersion?: string

@@ -3,27 +3,25 @@ import { anonymousApiWithFakeClient, anonymousApiRocketChatWithFakeClient } from
 
 const infoResponse = () => ({ status: 200, data: { info: { version: '6.0.0' } } })
 
-describe('Api auth guard', () => {
+describe('Api pre-login requests', () => {
   it('reports not logged in with no login', () => {
     const { api } = anonymousApiWithFakeClient()
 
     expect(api.loggedIn()).toBe(false)
   })
 
-  it('refuses an authenticated request with no login', async () => {
+  it('sends a pre-login request to the client with no login', async () => {
     const { api, restClient } = anonymousApiWithFakeClient()
 
-    await expect(api.get('me', {})).rejects.toThrow(/requires a login/)
-    expect(restClient.requests).toHaveLength(0)
-  })
+    const pending = api.post('users.forgotPassword', { email: 'user@example.com' })
+    restClient.lastRequest().resolve({ status: 200, data: { success: true } })
 
-  it('allows an unauthenticated request with no login', async () => {
-    const { api, restClient } = anonymousApiWithFakeClient()
-
-    const pending = api.get('settings.public', {}, false)
-    restClient.lastRequest().resolve({ status: 200, data: { settings: [] } })
-
-    await expect(pending).resolves.toEqual({ settings: [] })
+    await expect(pending).resolves.toEqual({ success: true })
+    expect(restClient.requests).toHaveLength(1)
+    expect(restClient.lastRequest()).toMatchObject({
+      endpoint: 'users.forgotPassword',
+      data: { email: 'user@example.com' }
+    })
   })
 
   it('logs in with no prior login', async () => {

@@ -182,11 +182,8 @@ describe('client.logout', () => {
     expect((await loggedOutClient()).client.headers).not.toHaveProperty('X-Auth-Token')
   })
 
-  it('leaves the guard refusing an authenticated request', async () => {
-    const client = await loggedOutClient()
-
-    expect(client.loggedIn()).toBe(false)
-    await expect(client.get('me', {})).rejects.toThrow(/requires a login/)
+  it('reports itself logged out', async () => {
+    expect((await loggedOutClient()).loggedIn()).toBe(false)
   })
 })
 
