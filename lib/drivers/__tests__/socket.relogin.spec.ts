@@ -19,7 +19,7 @@ const REOPEN_DELAY = 3000
 const resumeToken: ILoginResult = {
   id: 'user-id',
   token: 'resume-token',
-  createCipher: { $date: Date.now() + 60000 }
+  createCipher: { $date: 0 }
 }
 
 const createSocket = (logger: ILogger, resume: ILoginResult | null = null) => new Socket({

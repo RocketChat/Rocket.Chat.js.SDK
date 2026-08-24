@@ -186,7 +186,7 @@ export class Socket extends SDKEventEmitter {
   private resumeLoginInBackground = () => {
     if (!this.resume) return
     this.login(this.resume).catch((err) =>
-      this.logger.error(`[ddp] Resume login did not complete: ${(err as Error).message}`)
+      this.logger.error(`[ddp] Resume did not complete: ${(err as Error).message}`)
     )
   }
 
