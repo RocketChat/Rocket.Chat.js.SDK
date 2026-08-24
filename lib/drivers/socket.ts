@@ -730,7 +730,9 @@ export class Socket extends SDKEventEmitter {
    * reached the wire, and one whose connection is gone leave nothing behind, and
    * a resubscribe under an existing id that the server refuses forgets that
    * entry. A second call for a stream already recorded shares that record and
-   * sends nothing. See ADR-0004, ADR-0006 and ADR-0011.
+   * sends nothing. The caller is handed a subscription exactly when an entry
+   * was written, so every recorded stream can be unsubscribed from.
+   * See ADR-0004, ADR-0006, ADR-0011 and ADR-0012.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
@@ -758,10 +760,9 @@ export class Socket extends SDKEventEmitter {
     .catch((err) => {
       this.logger.error(`[ddp] Subscribe error: ${err.message}`)
       if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
-        this.rememberSubscription(stream, callback)
-      } else if (err instanceof DDPError) {
-        this.forgetSubscription(stream.id)
+        return this.rememberSubscription(stream, callback)
       }
+      if (err instanceof DDPError) this.forgetSubscription(stream.id)
       return undefined
     })
 

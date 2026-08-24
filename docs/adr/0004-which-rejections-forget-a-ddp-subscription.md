@@ -91,8 +91,8 @@ refuses leaves none; the answer that never came is ADR-0006's.
   without it.
 - The rule governs the writing of an entry as well as its removal, so a refused
   resubscribe is forgotten and later Logins do not re-request it. `subscribe`
-  still swallows its own failure and resolves `undefined` rather than re-throwing.
-  A separate issue tracks that.
+  still swallows its own failure rather than re-throwing, and resolves with the
+  entry where one was written and `undefined` where none was, under ADR-0012.
 - Whether a `sub` may be sent for an id whose `unsub` is still in flight is
   settled by ADR-0005, which also draws the bound on the rule above: a DDP
   response names what the server holds as long as one request is in flight under

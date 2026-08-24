@@ -201,6 +201,18 @@ describe('Socket subscription bookkeeping', () => {
       await expect(waiting).resolves.toBe(false)
     })
 
+    it('resolves true when a reopen abandons the resubscribes, since each one is recorded', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal'])
+      await subscribe('stream-notify-user', ['uid/media-calls'])
+
+      const waiting = socket.resubscribeWhenRecorded(streams)
+      await jest.advanceTimersByTimeAsync(100)
+
+      socket.reopenNow()
+
+      await expect(waiting).resolves.toBe(true)
+    })
+
     it('resolves false when the server refuses one of the resubscribes', async () => {
       const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
       const callsId = await subscribe('stream-notify-user', ['uid/media-calls'])
@@ -223,7 +235,7 @@ describe('Socket subscription bookkeeping', () => {
       const id = lastSubId(transport)
 
       socket.reopenNow()
-      await expect(subscribing).resolves.toBeUndefined()
+      expect(await subscribing).toBe(socket.subscriptions[id])
 
       expect(Object.keys(socket.subscriptions)).toEqual([id])
       expect(socket.subscriptions[id]).toMatchObject({
@@ -282,7 +294,7 @@ describe('Socket subscription bookkeeping', () => {
     const id = lastSubId(transport)
 
     transport.close()
-    await expect(subscribing).resolves.toBeUndefined()
+    expect(await subscribing).toBe(socket.subscriptions[id])
 
     expect(socket.subscriptions[id]).toMatchObject({
       id,
@@ -297,13 +309,54 @@ describe('Socket subscription bookkeeping', () => {
       const id = lastSubId(transport)
 
       await jest.advanceTimersByTimeAsync(socket.config.timeout)
-      await expect(subscribing).resolves.toBeUndefined()
+      expect(await subscribing).toBe(socket.subscriptions[id])
 
       expect(socket.subscriptions[id]).toMatchObject({
         id,
         name: 'stream-room-messages',
         params: ['GENERAL']
       })
+    })
+  })
+
+  describe('the handle the caller is given', () => {
+    const subscribeAbandoned = async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      const id = lastSubId(transport)
+      socket.reopenNow()
+      return { id, subscription: await subscribing }
+    }
+
+    it('tears the abandoned entry down through the handle alone', async () => {
+      const { id, subscription } = await subscribeAbandoned()
+
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+
+      const unsubscribing = subscription!.unsubscribe()
+      await flushMicrotasks()
+      expect(reopened.lastSent()).toEqual({ msg: 'unsub', id })
+
+      reopened.receive({ msg: 'result', id, result: true })
+      await unsubscribing
+
+      expect(socket.subscriptions).toEqual({})
+    })
+
+    it('is the entry the server acknowledged with a ready', async () => {
+      const acked = await subscribeAndAck(socket, transport, 'stream-room-messages', ['GENERAL'])
+
+      expect(acked).toBe(socket.subscriptions[acked!.id])
+    })
+
+    it('is withheld when a success response names no subs', async () => {
+      const subscribing = socket.subscribe('stream-notify-user', ['id/message'])
+      const id = lastSubId(transport)
+
+      transport.receive({ msg: 'result', id, result: true })
+
+      await expect(subscribing).resolves.toBeUndefined()
+      expect(socket.subscriptions[id]).toBeUndefined()
     })
   })
 
@@ -449,6 +502,16 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('closing the connection', () => {
+    it('hands back no subscription for a `sub` it abandoned, and records none', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      const id = lastSubId(transport)
+
+      await socket.close()
+
+      await expect(subscribing).resolves.toBeUndefined()
+      expect(socket.subscriptions[id]).toBeUndefined()
+    })
+
     it('forgets every subscription locally without sending an unsubscribe', async () => {
       await subscribe('stream-room-messages', ['GENERAL'])
       await subscribe('stream-notify-user', ['alice/message'])
