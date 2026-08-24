@@ -223,7 +223,7 @@ describe('Socket subscription bookkeeping', () => {
       const id = lastSubId(transport)
 
       socket.reopenNow()
-      await expect(subscribing).resolves.toBeUndefined()
+      expect(await subscribing).toBe(socket.subscriptions[id])
 
       expect(Object.keys(socket.subscriptions)).toEqual([id])
       expect(socket.subscriptions[id]).toMatchObject({
@@ -282,7 +282,7 @@ describe('Socket subscription bookkeeping', () => {
     const id = lastSubId(transport)
 
     transport.close()
-    await expect(subscribing).resolves.toBeUndefined()
+    expect(await subscribing).toBe(socket.subscriptions[id])
 
     expect(socket.subscriptions[id]).toMatchObject({
       id,
@@ -297,13 +297,65 @@ describe('Socket subscription bookkeeping', () => {
       const id = lastSubId(transport)
 
       await jest.advanceTimersByTimeAsync(socket.config.timeout)
-      await expect(subscribing).resolves.toBeUndefined()
+      expect(await subscribing).toBe(socket.subscriptions[id])
 
       expect(socket.subscriptions[id]).toMatchObject({
         id,
         name: 'stream-room-messages',
         params: ['GENERAL']
       })
+    })
+  })
+
+  describe('the handle the caller is given', () => {
+    // A handle exists exactly when an entry does. A recorded stream the caller
+    // holds nothing for can never be unsubscribed from, so it is re-established
+    // on every reconnect for the life of the session.
+    const subscribeAbandoned = async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      const id = lastSubId(transport)
+      socket.reopenNow()
+      return { id, subscription: await subscribing }
+    }
+
+    it('tears the abandoned entry down through the handle alone', async () => {
+      const { id, subscription } = await subscribeAbandoned()
+
+      const reopened = fakeSockets[1]
+      await driveToHandshake(reopened)
+
+      const unsubscribing = subscription!.unsubscribe()
+      await flushMicrotasks()
+      expect(reopened.lastSent()).toEqual({ msg: 'unsub', id })
+
+      reopened.receive({ msg: 'result', id, result: true })
+      await unsubscribing
+
+      expect(socket.subscriptions).toEqual({})
+    })
+
+    it('is the entry itself when the deadline expires', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      const id = lastSubId(transport)
+
+      await jest.advanceTimersByTimeAsync(socket.config.timeout)
+
+      expect(await subscribing).toBe(socket.subscriptions[id])
+    })
+
+    it('is withheld only where no entry was written', async () => {
+      const acked = await subscribeAndAck(socket, transport, 'stream-room-messages', ['GENERAL'])
+      expect(acked).toBe(socket.subscriptions[acked!.id])
+
+      const withoutSubs = socket.subscribe('stream-notify-user', ['id/message'])
+      const withoutSubsId = lastSubId(transport)
+      transport.receive({ msg: 'result', id: withoutSubsId, result: true })
+      await expect(withoutSubs).resolves.toBeUndefined()
+      expect(socket.subscriptions[withoutSubsId]).toBeUndefined()
+
+      const unopened = createSocket()
+      await expect(unopened.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+      expect(unopened.subscriptions).toEqual({})
     })
   })
 
