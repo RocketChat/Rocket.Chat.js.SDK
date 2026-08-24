@@ -182,10 +182,7 @@ export class Socket extends SDKEventEmitter {
     return this.connection
   }
 
-  /**
-   * Resume the Login on this connection when a token is held, without the open
-   * waiting on it. A websocket callback has nowhere to put a throw.
-   */
+  /** Not awaited: a websocket callback has nowhere to put a throw. */
   private resumeLoginInBackground = () => {
     if (!this.resume) return
     this.login(this.resume).catch((err) =>
@@ -213,7 +210,7 @@ export class Socket extends SDKEventEmitter {
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
     resolve(this.connection)
-    return this.resumeLoginInBackground()
+    this.resumeLoginInBackground()
   }
 
   onClose = (e: any, closedConnection?: WebSocket) => {

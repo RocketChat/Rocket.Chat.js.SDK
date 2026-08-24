@@ -15,7 +15,6 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 useFakeClockAndSocketRegistry()
 
 const REOPEN_DELAY = 3000
-const TIMEOUT = 7000
 
 const resumeToken: ILoginResult = {
   id: 'user-id',
@@ -27,9 +26,21 @@ const createSocket = (logger: ILogger, resume: ILoginResult | null = null) => ne
   host: 'localhost:3000',
   logger,
   reopen: REOPEN_DELAY,
-  timeout: TIMEOUT,
+  timeout: 7000,
   ping: 10 * 60 * 1000
 }, resume)
+
+const reopenAfterDrop = async (transport: FakeWebSocket) => {
+  transport.close(1006)
+  await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+
+  const reopened = fakeSockets[1]
+  expect(reopened).toBeDefined()
+  await driveToHandshake(reopened)
+  await flushMicrotasks()
+
+  return reopened
+}
 
 const loginFrames = (transport: FakeWebSocket) =>
   transport.sent
@@ -52,13 +63,7 @@ describe('Resume on reopen', () => {
     const socket = createSocket(logger, resumeToken)
     const transport = await openFakeConnection(socket)
 
-    transport.close(1006)
-    await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
-
-    const reopened = fakeSockets[1]
-    expect(reopened).toBeDefined()
-    await driveToHandshake(reopened)
-    await flushMicrotasks()
+    const reopened = await reopenAfterDrop(transport)
 
     expect(loginFrames(reopened)).toHaveLength(1)
     expect(loginFrames(reopened)[0].params).toEqual([{ resume: resumeToken.token }])
@@ -68,12 +73,7 @@ describe('Resume on reopen', () => {
     const socket = createSocket(logger)
     const transport = await openFakeConnection(socket)
 
-    transport.close(1006)
-    await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
-
-    const reopened = fakeSockets[1]
-    await driveToHandshake(reopened)
-    await flushMicrotasks()
+    const reopened = await reopenAfterDrop(transport)
 
     expect(loginFrames(reopened)).toHaveLength(0)
   })
@@ -96,12 +96,7 @@ describe('Resume on reopen', () => {
     const socket = createSocket(logger, resumeToken)
     const transport = await openFakeConnection(socket)
 
-    transport.close(1006)
-    await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
-
-    const reopened = fakeSockets[1]
-    await driveToHandshake(reopened)
-    await flushMicrotasks()
+    const reopened = await reopenAfterDrop(transport)
 
     expect(socket.loggedIn).toBe(false)
 
