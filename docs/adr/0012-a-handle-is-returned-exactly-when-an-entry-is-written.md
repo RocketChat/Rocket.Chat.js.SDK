@@ -57,8 +57,8 @@ exists if and only if an entry does.
   it, so an abandoned `sub` no longer leaks a stream for the life of the Socket.
 - The invariant holds at hand-out time only. Under ADR-0004 a resubscribe the
   server refuses calls `forgetSubscription` and deletes an entry the caller still
-  holds a handle for; `unsubscribe` on that handle then rejects with
-  `[ddp] No subscription to unsubscribe from`. That is the same visible edge
+  holds a handle for; `unsubscribe` on that handle then rejects, naming the id it
+  found no subscription for. That is the same visible edge
   ADR-0011 describes for a second holder of a shared record, reached by a second
   route.
 - A caller that treated a resolved value as proof the server acknowledged the
