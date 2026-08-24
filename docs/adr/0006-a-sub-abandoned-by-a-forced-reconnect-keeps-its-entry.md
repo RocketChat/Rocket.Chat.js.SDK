@@ -1,6 +1,6 @@
 # ADR-0006: A `sub` abandoned by a forced reconnect keeps its entry
 
-**Status:** Superseded by ADR-0012
+**Status:** Accepted
 
 **Succeeds:** ADR-0005
 
@@ -91,8 +91,9 @@ The server's answer decides; silence keeps the instruction.
   discriminator is unchanged, and it carries no server reason, so ADR-0003 is
   unchanged. What it adds over the bare `AbandonedWait` is the id, and nothing
   else.
-- `subscribe` still resolves `undefined` on every failure. This ADR governs the
-  bookkeeping only. What a caller receives is unchanged.
+- `subscribe` resolves with the entry this ADR writes, and `undefined` where it
+  writes none. This ADR governs the bookkeeping; ADR-0012 reads its result to
+  decide what a caller receives.
 
 ## Consequences
 
@@ -110,8 +111,8 @@ The server's answer decides; silence keeps the instruction.
   polls `subscriptions` for the two media entries, and an entry written on an
   abandoned `sub` ends that poll instead of keeping it waiting. Readiness itself
   is unchanged: the poll only decides when to re-send, and the gate resolves on
-  whether that resubscribe was acknowledged. An abandoned one resolves
-  `undefined`, which the gate counts as unacknowledged.
+  whether that resubscribe was acknowledged, which ADR-0012 settles for an
+  abandoned one.
 - `unsubscribe` already keeps its entry on the same class of rejection, so a
   forced reconnect that abandons an `unsub` and a `sub` together leaves both, and
   `subscribeAll` re-sends the `sub` at the next Login under an id whose `unsub`
@@ -127,6 +128,6 @@ The server's answer decides; silence keeps the instruction.
   expires keeps its entry, and `subscribe` tests for it as positively as it tests
   for an `AbandonedRequest`. It is an `ExpiredWait`, not an `AbandonedWait`,
   because no connection went away — but `subscribe` asks nothing for a Reopen
-  either way: it swallows the rejection to `undefined`. Where that decision is
-  made, in `ping` and in the retry inside `reopen`, an expired wait does Reopen
-  and an abandoned one does not.
+  either way: it swallows the rejection and resolves with the entry. Where that
+  decision is made, in `ping` and in the retry inside `reopen`, an expired wait
+  does Reopen and an abandoned one does not.

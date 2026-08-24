@@ -44,10 +44,9 @@ exists if and only if an entry does.
 - A `sub` the server refused with a DDP error, and one that never reached the
   Transport, are unchanged: they write nothing under ADR-0004 and ADR-0006, and
   they resolve `undefined`.
-- The rule replaces ADR-0006's closing statement that a caller receives
-  `undefined` on every failure. The bookkeeping that ADR governs is untouched:
-  which paths write an entry, and under which id, is still its rule, and this ADR
-  reads the result of it rather than changing it.
+- The bookkeeping ADR-0006 governs is untouched: which paths write an entry, and
+  under which id, is still its rule, and this ADR reads the result of it rather
+  than changing it.
 - `subscribe` still resolves rather than re-throwing. A caller distinguishes the
   two outcomes by whether it received a subscription, not by a rejection, so
   nothing that awaits `subscribe` today changes shape.

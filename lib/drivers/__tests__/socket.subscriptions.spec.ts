@@ -201,6 +201,18 @@ describe('Socket subscription bookkeeping', () => {
       await expect(waiting).resolves.toBe(false)
     })
 
+    it('resolves true when a reopen abandons the resubscribes, since each one is recorded', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal'])
+      await subscribe('stream-notify-user', ['uid/media-calls'])
+
+      const waiting = socket.resubscribeWhenRecorded(streams)
+      await jest.advanceTimersByTimeAsync(100)
+
+      socket.reopenNow()
+
+      await expect(waiting).resolves.toBe(true)
+    })
+
     it('resolves false when the server refuses one of the resubscribes', async () => {
       const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
       const callsId = await subscribe('stream-notify-user', ['uid/media-calls'])
@@ -308,8 +320,6 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('the handle the caller is given', () => {
-    // A recorded stream the caller holds no handle for is re-established on
-    // every reconnect for the life of the session.
     const subscribeAbandoned = async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
       const id = lastSubId(transport)
@@ -492,6 +502,16 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('closing the connection', () => {
+    it('hands back no subscription for a `sub` it abandoned, and records none', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      const id = lastSubId(transport)
+
+      await socket.close()
+
+      await expect(subscribing).resolves.toBeUndefined()
+      expect(socket.subscriptions[id]).toBeUndefined()
+    })
+
     it('forgets every subscription locally without sending an unsubscribe', async () => {
       await subscribe('stream-room-messages', ['GENERAL'])
       await subscribe('stream-notify-user', ['alice/message'])
