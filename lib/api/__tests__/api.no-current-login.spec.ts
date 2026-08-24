@@ -3,30 +3,28 @@ import { anonymousApiWithFakeClient, anonymousApiRocketChatWithFakeClient } from
 
 const infoResponse = () => ({ status: 200, data: { info: { version: '6.0.0' } } })
 
-describe('Api auth guard', () => {
-  it('reports not logged in with no login', () => {
+describe('Api with no Current login', () => {
+  it('reports no Current login', () => {
     const { api } = anonymousApiWithFakeClient()
 
     expect(api.loggedIn()).toBe(false)
   })
 
-  it('refuses an authenticated request with no login', async () => {
+  it('sends the Endpoint to the REST client with no Current login', async () => {
     const { api, restClient } = anonymousApiWithFakeClient()
 
-    await expect(api.get('me', {})).rejects.toThrow(/requires a login/)
-    expect(restClient.requests).toHaveLength(0)
+    const pending = api.post('users.forgotPassword', { email: 'user@example.com' })
+    restClient.lastRequest().resolve({ status: 200, data: { success: true } })
+
+    await expect(pending).resolves.toEqual({ success: true })
+    expect(restClient.requests).toHaveLength(1)
+    expect(restClient.lastRequest()).toMatchObject({
+      endpoint: 'users.forgotPassword',
+      data: { email: 'user@example.com' }
+    })
   })
 
-  it('allows an unauthenticated request with no login', async () => {
-    const { api, restClient } = anonymousApiWithFakeClient()
-
-    const pending = api.get('settings.public', {}, false)
-    restClient.lastRequest().resolve({ status: 200, data: { settings: [] } })
-
-    await expect(pending).resolves.toEqual({ settings: [] })
-  })
-
-  it('logs in with no prior login', async () => {
+  it('sets a Current login from a login with none held', async () => {
     const { api, restClient } = anonymousApiWithFakeClient()
 
     const pending = api.login({ username: 'user', password: 'pass' })
@@ -36,7 +34,7 @@ describe('Api auth guard', () => {
     expect(api.loggedIn()).toBe(true)
   })
 
-  it('allows info() with no login', async () => {
+  it('sends info() with no Current login', async () => {
     const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
     const pending = api.info()
@@ -45,7 +43,7 @@ describe('Api auth guard', () => {
     await expect(pending).resolves.toEqual({ version: '6.0.0' })
   })
 
-  it('sends info() authenticated once logged in', async () => {
+  it('sends info() with the auth headers once a Current login is held', async () => {
     const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
     const login = api.login({ username: 'user', password: 'pass' })

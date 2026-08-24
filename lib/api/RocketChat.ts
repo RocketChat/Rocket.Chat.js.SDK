@@ -28,33 +28,33 @@ export default class ApiRocketChat extends ApiBase {
       online: (fields: any = userFields) => this.get('users.list', { fields, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users),
       onlineNames: () => this.get('users.list', { fields: { 'username': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)),
       onlineIds: () => this.get('users.list', { fields: { '_id': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)),
-      info: async (username: string): Promise<IUserAPI> => (await this.get('users.info', { username }, true)).user
+      info: async (username: string): Promise<IUserAPI> => (await this.get('users.info', { username })).user
     }
   }
 
   get rooms (): any {
     return {
-      info: ({ rid }: any) => this.get('rooms.info', { rid }, true)
+      info: ({ rid }: any) => this.get('rooms.info', { rid })
     }
   }
 
 	// editMessage(message: IMessage) chat.update
-  joinRoom ({ rid }: any) { return this.post('channels.join', { roomId: rid }, true) }
+  joinRoom ({ rid }: any) { return this.post('channels.join', { roomId: rid }) }
 
-  async info () { return (await this.get('info', {}, this.loggedIn())).info }
+  async info () { return (await this.get('info', {})).info }
 	/**
 	 * Send a prepared message object (with pre-defined room ID).
 	 * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
 	 */
-  async sendMessage (message: IMessage | string, rid: string): Promise<IMessageReceipt> { return (await this.post('chat.sendMessage', { message: this.prepareMessage(message, rid) }, true)).message }
-  getRoomIdByNameOrId (name: string): Promise<RID> { return this.get('chat.getRoomIdByNameOrId', { name }, true) }
+  async sendMessage (message: IMessage | string, rid: string): Promise<IMessageReceipt> { return (await this.post('chat.sendMessage', { message: this.prepareMessage(message, rid) })).message }
+  getRoomIdByNameOrId (name: string): Promise<RID> { return this.get('chat.getRoomIdByNameOrId', { name }) }
   getRoomNameById (rid: RID): Promise<string> { return this.getRoomName(rid) }
   async getRoomName (rid: string): Promise<string> {
-    const room = await this.get('chat.getRoomNameById', { rid }, true)
+    const room = await this.get('chat.getRoomNameById', { rid })
     return room.name
   }
-  getRoomId (name: string) { return this.get('chat.find', { name }, true) }
-  async createDirectMessage (username: string) { return (await this.post('im.create', { username }, true)).room }
+  getRoomId (name: string) { return this.get('chat.find', { name }) }
+  async createDirectMessage (username: string) { return (await this.post('im.create', { username })).room }
 
 /**
  * Edit an existing message, replacing any attributes with those provided.
@@ -68,7 +68,7 @@ export default class ApiRocketChat extends ApiBase {
 	 * @param emoji     Accepts string like `:thumbsup:` to add 👍 reaction
 	 * @param messageId ID for a previously sent message
 	 */
-  setReaction (emoji: string, messageId: string) { return this.post('chat.react', { emoji, messageId }, true) }
+  setReaction (emoji: string, messageId: string) { return this.post('chat.react', { emoji, messageId }) }
 
 	// TODO fix this methods
 
@@ -76,7 +76,7 @@ export default class ApiRocketChat extends ApiBase {
     updated: IMessage[],
     deleted: IMessage[]
   }> {
-    return (await this.get('chat.syncMessages', { roomId: rid, lastUpdate: lastUpdate.toISOString() }, true)).result
+    return (await this.get('chat.syncMessages', { roomId: rid, lastUpdate: lastUpdate.toISOString() })).result
   }
 	/** Exit a room the bot has joined */
   leaveRoom (rid: string): Promise<RID> {
@@ -85,11 +85,11 @@ export default class ApiRocketChat extends ApiBase {
 
 	/** Get information about a public group */
   async channelInfo (query: { roomName?: string, roomId?: string }) {
-    return (await this.get('channels.info', query, true)).channel as Promise<IChannelAPI>
+    return (await this.get('channels.info', query)).channel as Promise<IChannelAPI>
   }
 
 	/** Get information about a private group */
   async privateInfo (query: { roomName?: string, roomId?: string }) {
-    return (await this.get('groups.info', query, true)).group as Promise<IGroupAPI>
+    return (await this.get('groups.info', query)).group as Promise<IGroupAPI>
   }
 }
