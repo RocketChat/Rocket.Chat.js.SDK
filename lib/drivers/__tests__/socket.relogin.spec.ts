@@ -20,8 +20,8 @@ const TIMEOUT = 7000
 const resumeToken: ILoginResult = {
   id: 'user-id',
   token: 'resume-token',
-  tokenExpires: { $date: Date.now() + 60000 }
-} as ILoginResult
+  createCipher: { $date: Date.now() + 60000 }
+}
 
 const createSocket = (logger: ILogger, resume: ILoginResult | null = null) => new Socket({
   host: 'localhost:3000',

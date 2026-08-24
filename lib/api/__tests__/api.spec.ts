@@ -85,7 +85,7 @@ describe('api', () => {
       const { api, restClient } = anonymousApiWithFakeClient()
       restClient.enqueueReply(emptySuccess())
 
-      await api.post('login', { username: 'user' }, false)
+      await api.post('login', { username: 'user' })
 
       expect(restClient.lastRequest()).toMatchObject({
         method: 'POST',
@@ -125,10 +125,10 @@ describe('api', () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())
 
-      await api.get('chat.getMessage', {}, true, undefined, {}, 'v2')
-      await api.post('chat.postMessage', {}, true, undefined, {}, 'v2')
-      await api.put('chat.update', {}, true, undefined, {}, 'v2')
-      await api.del('chat.delete', {}, true, undefined, {}, 'v2')
+      await api.get('chat.getMessage', {}, undefined, {}, 'v2')
+      await api.post('chat.postMessage', {}, undefined, {}, 'v2')
+      await api.put('chat.update', {}, undefined, {}, 'v2')
+      await api.del('chat.delete', {}, undefined, {}, 'v2')
 
       expect(restClient.requests.map((request) => request.apiVersion)).toEqual([
         'v2', 'v2', 'v2', 'v2'
@@ -169,7 +169,7 @@ describe('api', () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply({ status: 400, data: { error: 'nope' } })
 
-      await expect(api.get('me', {}, true, /400/)).resolves.toEqual({ error: 'nope' })
+      await expect(api.get('me', {}, /400/)).resolves.toEqual({ error: 'nope' })
     })
 
     it('throws when the restClient answers nothing at all', async () => {
