@@ -179,11 +179,15 @@ describe('client.logout', () => {
   }
 
   it('clears the REST auth headers', async () => {
-    expect((await loggedOutClient()).client.client.headers).not.toHaveProperty('X-Auth-Token')
+    const { client } = await loggedOutClient()
+
+    expect(client.client.headers).not.toHaveProperty('X-Auth-Token')
   })
 
   it('reports itself logged out', async () => {
-    expect((await loggedOutClient()).client.loggedIn()).toBe(false)
+    const { client } = await loggedOutClient()
+
+    expect(client.loggedIn()).toBe(false)
   })
 
   it('still sends an Endpoint to the REST client', async () => {
