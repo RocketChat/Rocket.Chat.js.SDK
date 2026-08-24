@@ -1,6 +1,6 @@
 # ADR-0006: A `sub` abandoned by a forced reconnect keeps its entry
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0012
 
 **Succeeds:** ADR-0005
 

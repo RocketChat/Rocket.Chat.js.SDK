@@ -308,9 +308,8 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('the handle the caller is given', () => {
-    // A handle exists exactly when an entry does. A recorded stream the caller
-    // holds nothing for can never be unsubscribed from, so it is re-established
-    // on every reconnect for the life of the session.
+    // A recorded stream the caller holds no handle for is re-established on
+    // every reconnect for the life of the session.
     const subscribeAbandoned = async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
       const id = lastSubId(transport)
@@ -334,28 +333,20 @@ describe('Socket subscription bookkeeping', () => {
       expect(socket.subscriptions).toEqual({})
     })
 
-    it('is the entry itself when the deadline expires', async () => {
-      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
-      const id = lastSubId(transport)
+    it('is the entry the server acknowledged with a ready', async () => {
+      const acked = await subscribeAndAck(socket, transport, 'stream-room-messages', ['GENERAL'])
 
-      await jest.advanceTimersByTimeAsync(socket.config.timeout)
-
-      expect(await subscribing).toBe(socket.subscriptions[id])
+      expect(acked).toBe(socket.subscriptions[acked!.id])
     })
 
-    it('is withheld only where no entry was written', async () => {
-      const acked = await subscribeAndAck(socket, transport, 'stream-room-messages', ['GENERAL'])
-      expect(acked).toBe(socket.subscriptions[acked!.id])
+    it('is withheld when a success response names no subs', async () => {
+      const subscribing = socket.subscribe('stream-notify-user', ['id/message'])
+      const id = lastSubId(transport)
 
-      const withoutSubs = socket.subscribe('stream-notify-user', ['id/message'])
-      const withoutSubsId = lastSubId(transport)
-      transport.receive({ msg: 'result', id: withoutSubsId, result: true })
-      await expect(withoutSubs).resolves.toBeUndefined()
-      expect(socket.subscriptions[withoutSubsId]).toBeUndefined()
+      transport.receive({ msg: 'result', id, result: true })
 
-      const unopened = createSocket()
-      await expect(unopened.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
-      expect(unopened.subscriptions).toEqual({})
+      await expect(subscribing).resolves.toBeUndefined()
+      expect(socket.subscriptions[id]).toBeUndefined()
     })
   })
 

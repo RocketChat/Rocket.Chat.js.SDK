@@ -187,9 +187,10 @@ an Error that the SDK writes.
   and not an accident of ordering: there is nothing for a later Login to
   re-establish.
 - Results do not cross a Reopen; the caller receives a rejection. `subscribe`
-  turns each rejection into `undefined`, and what `unsubscribeAll` does with one
-  is settled by ADR-0004, so the DDP subscription paths do not change for a
-  caller. A Method call issued in the window between a drop and the next open
+  turns each rejection into a resolved value — the entry where one was written
+  and `undefined` where none was, under ADR-0012 — and what `unsubscribeAll` does
+  with one is settled by ADR-0004, so no DDP subscription path raises a rejection
+  to a caller. A Method call issued in the window between a drop and the next open
   fails: the consuming app decides
   whether to call again. Without the rejection, it has no basis for that
   decision.

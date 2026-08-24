@@ -729,7 +729,7 @@ export class Socket extends SDKEventEmitter {
    * entry. A second call for a stream already recorded shares that record and
    * sends nothing. The caller is handed a subscription exactly when an entry
    * was written, so every recorded stream can be unsubscribed from.
-   * See ADR-0004, ADR-0006 and ADR-0011.
+   * See ADR-0004, ADR-0006, ADR-0011 and ADR-0012.
    * @param name      Stream name to subscribe to
    * @param params    Params sent to the subscription request
    */
