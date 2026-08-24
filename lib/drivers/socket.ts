@@ -92,6 +92,7 @@ export class Socket extends SDKEventEmitter {
   session?: string
   logger: ILogger
   reopenPromise?: Promise<void>
+  private authenticated = false
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
@@ -152,6 +153,7 @@ export class Socket extends SDKEventEmitter {
         }
       }
       this.connection = connection
+      this.authenticated = false
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
       this.connection.onopen = this.onOpen.bind(this, resolve, reject)
@@ -162,7 +164,6 @@ export class Socket extends SDKEventEmitter {
   /**
    * Open websocket connection.
    * Stores connection, setting up handlers for open/close/message events.
-   * Resumes login if given token.
    */
   open = async (): Promise<any> => {
     if (this.connected) {
@@ -181,7 +182,21 @@ export class Socket extends SDKEventEmitter {
     return this.connection
   }
 
-  /** Send handshake message to confirm connection, start pinging. */
+  /**
+   * Resume the Login on this connection when a token is held, without the open
+   * waiting on it. A websocket callback has nowhere to put a throw.
+   */
+  private resumeLogin = () => {
+    if (!this.resume) return
+    this.login(this.resume).catch((err) =>
+      this.logger.error(`[ddp] the resume login did not complete: ${(err as Error).message}`)
+    )
+  }
+
+  /**
+   * Send handshake message to confirm connection, start pinging, and resume the
+   * Login if a token is held.
+   */
   onOpen = async (resolve: Function, reject: Function) => {
     this.lastPing = Date.now()
 
@@ -200,7 +215,8 @@ export class Socket extends SDKEventEmitter {
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
-    return resolve(this.connection)
+    resolve(this.connection)
+    return this.resumeLogin()
   }
 
   onClose = (e: any, closedConnection?: WebSocket) => {
@@ -208,6 +224,7 @@ export class Socket extends SDKEventEmitter {
     if (closedConnection && closedConnection !== this.connection) {
       return
     }
+    this.authenticated = false
     this.emit('close', e)
     try {
       if (e?.code !== userDisconnectCloseCode) {
@@ -483,7 +500,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   get loggedIn () {
-    return (this.connected && !!this.resume)
+    return (this.connected && this.authenticated)
   }
 
   /**
@@ -645,6 +662,7 @@ export class Socket extends SDKEventEmitter {
   login = async (credentials: IRealtimeCredentials) => {
     const params = this.loginParams(credentials)
     this.resume = (await this.call('login', params) as ILoginResult)
+    this.authenticated = true
     this.subscribeAll().catch(console.log)
     this.emit('login', this.resume)
     return this.resume
@@ -678,6 +696,7 @@ export class Socket extends SDKEventEmitter {
   /** Logout the current User from the server via Socket. */
   logout = () => {
     this.resume = null
+    this.authenticated = false
     return this.unsubscribeAll()
 			.then(() => this.call('logout'))
   }
