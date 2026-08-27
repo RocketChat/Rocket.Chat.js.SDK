@@ -28,7 +28,13 @@ import {
 
 import { IStream, RecordedDDPSubscription, IDDPSubscriptionRequest } from './definitions'
 import { DDPError } from './ddpError'
-import { AbandonedRequest, AbandonedWait, DDPRequests, ExpiredWait } from './ddpRequests'
+import {
+  AbandonedRequest,
+  abandonedWaitMessages,
+  AbandonedWait,
+  DDPRequests,
+  ExpiredWait
+} from './ddpRequests'
 import { sha256 } from 'js-sha256'
 
 function hostToWS (host: string, ssl = false) {
@@ -41,10 +47,6 @@ const socketOpen = 1;
 const socketClosed = 3;
 
 const socketDeadlineMs = 2000;
-
-const abandonedByClose = '[ddp] connection closed before the response arrived'
-const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
-const abandonedBeforeOpen = '[ddp] connection closed before it opened'
 
 /** See ADR-0011. */
 const subscriptionId = (name: string, params: any[]) =>
@@ -82,11 +84,16 @@ export class Socket extends SDKEventEmitter {
       ping: options.ping || timeout,
       timeout
     }
-    this.requests = new DDPRequests(this, () => this.logger, (id) => {
-      const nextId = id || `ddp-${this.sent}`
-      this.sent += 1
-      return nextId
-    }, this.config.timeout)
+    this.requests = new DDPRequests({
+      emitter: this,
+      getLogger: () => this.logger,
+      nextId: (id) => {
+        const nextId = id || `ddp-${this.sent}`
+        this.sent += 1
+        return nextId
+      },
+      deadlineMs: this.config.timeout
+    })
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
 
@@ -237,7 +244,7 @@ export class Socket extends SDKEventEmitter {
   private detach = (connection: WebSocket) => {
     const rejectPendingOpen = this.pendingOpenRejects.get(connection)
     this.pendingOpenRejects.delete(connection)
-    Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedBeforeOpen)))
+    Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedWaitMessages.connectionClosedBeforeOpen)))
     connection.onopen = null as any
     connection.onmessage = null as any
     connection.onerror = null as any
@@ -512,12 +519,12 @@ export class Socket extends SDKEventEmitter {
     const connection = this.connection
     if (!this.transportOpen) {
       await this.waitForOpen()
-      if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)
+      if (this.connection !== connection) throw new AbandonedWait(abandonedWaitMessages.connectionReplacedBeforeWrite)
       // The wait resolves a microtask before the listeners below are attached, so
       // a connection lost in that window would be missed by all three of them.
       // `readyState` rather than `connected`: in that window the events have not
       // been delivered, so only the transport knows whether the connection went away.
-      if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
+      if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedWaitMessages.responseClosed)
     }
 
     return this.requests.send(obj, connection.send.bind(connection), deadlineMs)

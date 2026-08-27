@@ -3,9 +3,21 @@ import { ILogger } from '../../interfaces'
 import { SDKEventEmitter } from '../emitter'
 import { toError } from './ddpError'
 
-const abandonedByReopen = '[ddp] connection reopened before the response arrived'
-const abandonedByClose = '[ddp] connection closed before the response arrived'
 const deadlineExpired = '[ddp] no response arrived before the deadline'
+
+export const abandonedWaitMessages = {
+  responseReopened: '[ddp] connection reopened before the response arrived',
+  responseClosed: '[ddp] connection closed before the response arrived',
+  connectionReplacedBeforeWrite: '[ddp] connection replaced before the message was written',
+  connectionClosedBeforeOpen: '[ddp] connection closed before it opened'
+}
+
+interface DDPRequestsOptions {
+  emitter: SDKEventEmitter
+  getLogger: () => ILogger
+  nextId: (id?: string) => string
+  deadlineMs: number
+}
 
 export class AbandonedWait extends Error {
   constructor (message?: string) {
@@ -29,12 +41,17 @@ export class ExpiredWait extends Error {
 }
 
 export class DDPRequests {
-  constructor (
-    private emitter: SDKEventEmitter,
-    private getLogger: () => ILogger,
-    private nextId: (id?: string) => string,
-    private deadlineMs: number
-  ) {}
+  private emitter: SDKEventEmitter
+  private getLogger: () => ILogger
+  private nextId: (id?: string) => string
+  private deadlineMs: number
+
+  constructor ({ emitter, getLogger, nextId, deadlineMs }: DDPRequestsOptions) {
+    this.emitter = emitter
+    this.getLogger = getLogger
+    this.nextId = nextId
+    this.deadlineMs = deadlineMs
+  }
 
   send = (message: any, write: (value: string) => void, deadlineMs = this.deadlineMs): Promise<any> =>
     new Promise<any>((resolve, reject) => {
@@ -46,17 +63,17 @@ export class DDPRequests {
 
       try {
         write(serialized)
-      } catch (err) {
+      } catch (error) {
         this.getLogger().error(`[ddp] the transport failed to write the message: ${serialized}`)
-        return reject(err)
+        return reject(error)
       }
 
       if (!listener) return resolve(undefined)
 
       const abandonListeners = [
-        { event: 'disconnected', message: abandonedByReopen },
-        { event: 'connecting', message: abandonedByReopen },
-        { event: 'close', message: abandonedByClose }
+        { event: 'disconnected', message: abandonedWaitMessages.responseReopened },
+        { event: 'connecting', message: abandonedWaitMessages.responseReopened },
+        { event: 'close', message: abandonedWaitMessages.responseClosed }
       ].map(({ event, message }) => ({
         event,
         onAbandon: () => {
