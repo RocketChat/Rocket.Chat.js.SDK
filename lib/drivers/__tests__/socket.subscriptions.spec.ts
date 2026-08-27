@@ -201,8 +201,8 @@ describe('Socket subscription bookkeeping', () => {
       await expect(waiting).resolves.toBe(false)
     })
 
-    it('resolves true when a reopen abandons the resubscribes, since each one is recorded', async () => {
-      await subscribe('stream-notify-user', ['uid/media-signal'])
+    it('resolves false when a forced reconnect abandons the resubscribe waits before a DDP response', async () => {
+      const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
       await subscribe('stream-notify-user', ['uid/media-calls'])
 
       const waiting = socket.resubscribeWhenRecorded(streams)
@@ -210,7 +210,22 @@ describe('Socket subscription bookkeeping', () => {
 
       socket.reopenNow()
 
-      await expect(waiting).resolves.toBe(true)
+      await expect(waiting).resolves.toBe(false)
+      expect(socket.subscriptions[signalId]).toBeDefined()
+    })
+
+    it('resolves false when a resubscribe wait expires before a DDP response', async () => {
+      const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
+      const callsId = await subscribe('stream-notify-user', ['uid/media-calls'])
+
+      const waiting = socket.resubscribeWhenRecorded(streams, socket.config.timeout * 4)
+      await jest.advanceTimersByTimeAsync(100)
+      transport.receive({ msg: 'ready', subs: [signalId] })
+
+      await jest.advanceTimersByTimeAsync(socket.config.timeout)
+
+      await expect(waiting).resolves.toBe(false)
+      expect(socket.subscriptions[callsId]).toBeDefined()
     })
 
     it('resolves false when the server refuses one of the resubscribes', async () => {

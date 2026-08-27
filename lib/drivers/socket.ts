@@ -26,7 +26,7 @@ import {
 	ILogger
 } from '../../interfaces'
 
-import { IStream, RecordedDDPSubscription, IDDPSubscriptionRequest } from './definitions'
+import { IStream, RecordedDDPSubscription, IDDPSubscriptionRequest, DDPSubscriptionAttempt } from './definitions'
 import { DDPError, toError } from './ddpError'
 import { sha256 } from 'js-sha256'
 
@@ -741,7 +741,10 @@ export class Socket extends SDKEventEmitter {
     const id = subscriptionId(name, params)
     return this.queueSubscriptionRequest(id, () => {
       const shared = this.subscriptions[id]
-      if (!shared) return this.sendSubscription({ id, name, params }, callback)
+      if (!shared) {
+        return this.sendSubscription({ id, name, params }, callback)
+          .then(({ subscription }) => subscription)
+      }
       if (callback) shared.onEvent(callback)
       return Promise.resolve(shared)
     })
@@ -753,17 +756,19 @@ export class Socket extends SDKEventEmitter {
   private sendSubscription = (
     stream: IDDPSubscriptionRequest,
     callback?: ISocketMessageCallback
-  ) => this.send({ msg: 'sub', ...stream })
+  ): Promise<DDPSubscriptionAttempt> => this.send({ msg: 'sub', ...stream })
     .then((result) => {
-      if (result.subs?.length) return this.rememberSubscription(stream, callback)
+      if (!result.subs?.length) return { acknowledged: false }
+      const subscription = this.rememberSubscription(stream, callback)
+      return { subscription, acknowledged: !!subscription }
     })
     .catch((err) => {
       this.logger.error(`[ddp] Subscribe error: ${err.message}`)
       if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
-        return this.rememberSubscription(stream, callback)
+        return { subscription: this.rememberSubscription(stream, callback), acknowledged: false }
       }
       if (err instanceof DDPError) this.forgetSubscription(stream.id)
-      return undefined
+      return { acknowledged: false }
     })
 
   /**
@@ -815,7 +820,7 @@ export class Socket extends SDKEventEmitter {
       subs.map((sub) => this.resubscribe(sub))
     )
       .then((results) => {
-        const unacknowledged = subs.filter((_, index) => !results[index])
+        const unacknowledged = subs.filter((_, index) => !results[index].acknowledged)
         unacknowledged.forEach((sub) => this.logger.error(
           `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
         ))

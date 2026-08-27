@@ -1,6 +1,6 @@
 # ADR-0012: A handle is returned exactly when an entry is written
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0013
 
 **Succeeds:** ADR-0006
 
