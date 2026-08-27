@@ -113,9 +113,16 @@ describe('Socket connection lifecycle', () => {
       expect(socket.openTimeout).toBeDefined()
     })
 
-    it(`schedules no reopen for the intentional code ${INTENTIONAL_CLOSE}`, () => {
+    it(`schedules a reopen for code ${INTENTIONAL_CLOSE} when the server sent it`, () => {
       transport.close(INTENTIONAL_CLOSE)
 
+      expect(socket.openTimeout).toBeDefined()
+    })
+
+    it(`schedules no reopen for code ${INTENTIONAL_CLOSE} when the driver asked for the close`, async () => {
+      await socket.close()
+
+      expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
       expect(socket.openTimeout).toBeUndefined()
     })
 

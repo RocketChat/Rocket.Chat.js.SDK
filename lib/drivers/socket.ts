@@ -69,6 +69,11 @@ class AbandonedRequest extends AbandonedWait {
   }
 }
 
+interface PendingOpen {
+  reject: (err: Error) => void
+  awaitedByOpen: boolean
+}
+
 /**
  * The wait for a DDP response ended by its Deadline, carrying the id so a caller
  * can name what the server may still have acted on. See ADR-0003 and ADR-0006.
@@ -93,7 +98,9 @@ export class Socket extends SDKEventEmitter {
   logger: ILogger
   reopenPromise?: Promise<void>
   private settleReopen?: () => void
-  private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
+  private pendingOpens = new WeakMap<WebSocket, PendingOpen>()
+  private driverClosedConnection?: WebSocket
+  private pingInFlightConnection?: WebSocket
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   /** Create a websocket handler */
@@ -127,14 +134,17 @@ export class Socket extends SDKEventEmitter {
    * Create a new WebSocket, tear down any previous one, and wire up handlers.
    * Emits 'connecting' exactly once per actual new socket.
    */
-  private createConnection = (): Promise<WebSocket> => {
+  private createConnection = (awaitedByOpen = false): Promise<WebSocket> => {
     return new Promise((resolve, reject) => {
       let connection: WebSocket
 
       try {
         connection = new WebSocket(this.host, null, { headers: settings.customHeaders })
-        connection.onerror = reject
-        this.pendingOpenRejects.set(connection, reject)
+        this.pendingOpens.set(connection, { reject, awaitedByOpen })
+        connection.onerror = (err: any) => {
+          this.forgetPendingOpen(connection)
+          reject(err)
+        }
       } catch (err) {
         this.logger.error(err)
         return reject(err)
@@ -154,7 +164,7 @@ export class Socket extends SDKEventEmitter {
       this.connection = connection
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
-      this.connection.onopen = this.onOpen.bind(this, resolve, reject)
+      this.connection.onopen = this.onOpen.bind(this, resolve, reject, connection)
       this.emit('connecting')
     })
   }
@@ -171,18 +181,17 @@ export class Socket extends SDKEventEmitter {
 
     if (this.reopenPromise) {
       await this.reopenPromise
-      if (!this.connected) {
-        await this.createConnection()
+      if (this.connected) {
+        return this.connection
       }
-      return this.connection
     }
 
-    await this.createConnection()
+    await this.createConnection(true)
     return this.connection
   }
 
   /** Send handshake message to confirm connection, start pinging. */
-  onOpen = async (resolve: Function, reject: Function) => {
+  onOpen = async (resolve: Function, reject: Function, openedConnection: WebSocket) => {
     this.lastPing = Date.now()
 
     // `onopen` is a websocket callback, so a throw here has nowhere to go.
@@ -195,10 +204,13 @@ export class Socket extends SDKEventEmitter {
       })
     } catch (err) {
       this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
+      this.reopenUnlessAbandoned(err)
       return reject(err)
+    } finally {
+      this.forgetPendingOpen(openedConnection)
     }
     this.session = connected.session
-    this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
+    this.armLivenessChain()
     this.emit('open')
     return resolve(this.connection)
   }
@@ -208,9 +220,11 @@ export class Socket extends SDKEventEmitter {
     if (closedConnection && closedConnection !== this.connection) {
       return
     }
+    const closedByDriver = closedConnection !== undefined &&
+      closedConnection === this.driverClosedConnection
     this.emit('close', e)
     try {
-      if (e?.code !== userDisconnectCloseCode) {
+      if (e?.code !== userDisconnectCloseCode || !closedByDriver) {
         this.reopen()
       }
       this.logger.info(`[ddp] Close (${e?.code})${e?.reason ? `: ${e.reason}` : ''}`)
@@ -252,6 +266,10 @@ export class Socket extends SDKEventEmitter {
     if (data.id) this.emit(data.id, data)
   }
 
+  private forgetPendingOpen = (connection: WebSocket) => {
+    this.pendingOpens.delete(connection)
+  }
+
   /**
    * Closing the socket is a separate obligation, left to the caller.
    *
@@ -259,9 +277,9 @@ export class Socket extends SDKEventEmitter {
    * so a handshake rejection already in flight settles it first.
    */
   private detach = (connection: WebSocket) => {
-    const rejectPendingOpen = this.pendingOpenRejects.get(connection)
-    this.pendingOpenRejects.delete(connection)
-    Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedBeforeOpen)))
+    const pendingOpen = this.pendingOpens.get(connection)
+    this.forgetPendingOpen(connection)
+    Promise.resolve().then(() => pendingOpen?.reject(new AbandonedWait(abandonedBeforeOpen)))
     connection.onopen = null as any
     connection.onmessage = null as any
     connection.onerror = null as any
@@ -303,6 +321,7 @@ export class Socket extends SDKEventEmitter {
       }
 
       connection.onclose = onTransportClose
+      this.driverClosedConnection = connection
       const deadline = setTimeout(
         () => answerCloseOurselves('the transport did not answer the close'),
         deadlineMs
@@ -321,30 +340,35 @@ export class Socket extends SDKEventEmitter {
    * See ADR-0009.
    */
   close = async (): Promise<void> => {
-    this.settleReopen?.()
+    this.cancelAnyReopen()
 
-    const connection = this.connection
+    while (this.connection) {
+      const connection = this.connection
+      await this.letGoOfConnection(connection)
 
-    if (connection && connection.readyState !== socketClosed) {
+      if (!this.replaced(connection)) break
+      if (this.supersededByWatchedConnection(this.connection)) return
+    }
+
+    this.cancelLivenessChain()
+    this.lastPing = 0
+    delete this.connection
+    this.forgetAllSubscriptions()
+  }
+
+  private letGoOfConnection = async (connection: WebSocket) => {
+    if (connection.readyState !== socketClosed) {
       await this.waitForClose(connection, socketDeadlineMs)
     }
 
-    if (this.replaced(connection)) return
-
-    this.cancelScheduledReopen()
-    if (this.pingTimeout) {
-      clearTimeout(this.pingTimeout as any)
-      delete this.pingTimeout
-    }
-    this.lastPing = 0
-
-    if (connection) {
-      this.detach(connection)
-      delete this.connection
-    }
-
-    this.forgetAllSubscriptions()
+    delete this.driverClosedConnection
+    this.cancelAnyReopen()
+    this.detach(connection)
   }
+
+  private supersededByWatchedConnection = (connection?: WebSocket) =>
+    connection !== undefined &&
+    (this.livenessChainArmed() || this.pendingOpens.get(connection)?.awaitedByOpen === true)
 
   /** Drop one DDP subscription. */
   forgetSubscription = (id: string) => {
@@ -360,12 +384,20 @@ export class Socket extends SDKEventEmitter {
   checkAndReopen = () => {
     if (!this.connected) {
       this.cancelScheduledReopen()
-      this.open().catch((err) => this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`))
+      this.open().catch((err) => {
+        this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`)
+        this.reopenUnlessAbandoned(err)
+      })
     }
   }
 
   private reopenUnlessAbandoned = (err: unknown) => {
     if (!(err instanceof AbandonedWait)) this.reopen()
+  }
+
+  private cancelAnyReopen = () => {
+    this.settleReopen?.()
+    this.cancelScheduledReopen()
   }
 
   private cancelScheduledReopen = () => {
@@ -377,16 +409,12 @@ export class Socket extends SDKEventEmitter {
   /** Clear connection and try to connect again. */
   reopen = () => {
     if (this.openTimeout) return
-    this.openTimeout = setTimeout(async() => {
-      delete this.openTimeout
+    this.openTimeout = setTimeout(this.fireScheduledReopen, this.config.reopen)
+  }
 
-      try {
-        await this.open()
-      } catch (err) {
-        this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
-        this.reopenUnlessAbandoned(err);
-      }
-    }, this.config.reopen);
+  private fireScheduledReopen = () => {
+    delete this.openTimeout
+    this.reopenNow()
   }
 
   /**
@@ -406,8 +434,13 @@ export class Socket extends SDKEventEmitter {
 
     this.reopenPromise = new Promise<void>(resolve => {
       this.cancelScheduledReopen()
+      this.cancelScheduledPing()
       this.lastPing = 0
-      this.emit('disconnected')
+      try {
+        this.emit('disconnected')
+      } catch (err) {
+        this.logger.error(`[ddp] Disconnected listener error: ${(err as Error).message}`)
+      }
 
       let settled = false
       const cleanup = () => {
@@ -417,6 +450,7 @@ export class Socket extends SDKEventEmitter {
         if (timeout) clearTimeout(timeout as any)
         delete this.reopenPromise
         delete this.settleReopen
+        this.rearmLivenessChain()
         resolve()
       }
 
@@ -425,10 +459,7 @@ export class Socket extends SDKEventEmitter {
 
       this.createConnection().catch(() => {})
 
-      const timeout = setTimeout(() => {
-        cleanup()
-        this.reopen()
-      }, this.config.timeout)
+      const timeout = setTimeout(cleanup, this.config.timeout)
     })
 
     return this.reopenPromise
@@ -472,6 +503,25 @@ export class Socket extends SDKEventEmitter {
         resolve(false)
       }
     })
+  }
+
+  private livenessChainArmed = () =>
+    !!this.pingTimeout ||
+    (this.pingInFlightConnection !== undefined && this.pingInFlightConnection === this.connection)
+
+  private rearmLivenessChain = () => {
+    if (!this.livenessChainArmed()) this.reopen()
+  }
+
+  private cancelLivenessChain = () => {
+    delete this.pingInFlightConnection
+    this.cancelScheduledPing()
+  }
+
+  private cancelScheduledPing = () => {
+    if (!this.pingTimeout) return
+    clearTimeout(this.pingTimeout as any)
+    delete this.pingTimeout
   }
 
   get transportOpen () {
@@ -602,18 +652,29 @@ export class Socket extends SDKEventEmitter {
     })
   }
 
-  private reopenAndKeepPinging = (err: unknown) => {
-    this.reopenUnlessAbandoned(err)
-    if (this.connection) this.ping()
+  private armLivenessChain = (pingedConnection = this.connection) => {
+    if (pingedConnection !== this.connection) return
+    if (this.transportOpen) {
+      this.cancelScheduledReopen()
+    }
+    this.scheduleNextPing()
   }
 
-  /** Send ping, record time, re-open if nothing comes back, repeat */
-  ping = async () => {
-    if (this.pingTimeout) clearTimeout(this.pingTimeout as any)
+  private scheduleNextPing = () => {
+    this.cancelLivenessChain()
     this.pingTimeout = setTimeout(() => {
+      delete this.pingTimeout
+      const pingedConnection = this.connection
+      this.pingInFlightConnection = pingedConnection
+
       this.send({ msg: 'ping' }, this.config.ping)
-        .then(() => this.ping())
-        .catch(this.reopenAndKeepPinging)
+        .then(() => this.armLivenessChain(pingedConnection))
+        .catch(this.reopenUnlessAbandoned)
+        .finally(() => {
+          if (this.pingInFlightConnection === pingedConnection) {
+            delete this.pingInFlightConnection
+          }
+        })
     }, this.config.ping)
   }
 

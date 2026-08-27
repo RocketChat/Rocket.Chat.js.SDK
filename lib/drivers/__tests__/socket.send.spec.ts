@@ -397,6 +397,8 @@ describe('Socket.send with several listeners on one event', () => {
       await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
       await rejections
 
+      await driveToHandshake(fakeSockets[1])
+
       expect(listenerCounts()).toEqual(before)
     })
 

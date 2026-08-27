@@ -43,12 +43,14 @@ The Socket bounds the close, and answers it itself when the Transport does not.
   itself by feeding a close event with the user-disconnect code through `onClose`,
   rather than emitting `close` directly. `onClose` therefore stays the sole owner
   of the identity guard, the emit, the Reopen decision — code 4000 skips the
-  Reopen — and the log line, and an in-flight `send` learns its connection ended
+  Reopen when the driver itself started the close, under ADR-0003 — and the log
+  line, and an in-flight `send` learns its connection ended
   on the same event the Transport would have used.
 - `close` does not unsubscribe. Closing the connection ends every stream on the
   server, so `close` forgets its DDP subscriptions locally and sends no `unsub`,
-  unless a replacement Transport landed during the wait, in which case the close
-  is superseded and the entries that connection filled are left as they are.
+  unless a replacement Transport landed during the wait and something still
+  answers for it, in which case the close is superseded under ADR-0003 and the
+  entries that connection filled are left as they are.
   `logout` is the deliberate exception: it stays on the same connection, so it
   awaits its own `unsubscribeAll`.
 - The reject of an open that has not landed yet is held per Transport, because a
