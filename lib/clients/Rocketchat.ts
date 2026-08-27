@@ -4,7 +4,6 @@ import ApiRocketChat from '../api/RocketChat'
 import { ILoginResult, ICallback, ISubscription, ILoginCredentials } from '../../interfaces'
 import { logger as Logger } from '../log'
 export default class RocketChatClient extends ApiRocketChat {
-  userId: string = ''
   driver: Driver
 
   constructor ({ logger = Logger, ...config }: any) {
@@ -19,7 +18,7 @@ export default class RocketChatClient extends ApiRocketChat {
   }
 
   async login (credentials: ILoginCredentials): Promise<ILoginResult | null> {
-    await super.login(credentials)
+    await this.loginWithRest(credentials)
     return this.currentLogin && this.resume({ token: this.currentLogin.authToken })
   }
 
