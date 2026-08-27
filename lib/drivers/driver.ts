@@ -6,7 +6,8 @@
 import { SDKEventEmitter } from '../emitter'
 import { logger as Logger } from '../log'
 import { Socket } from './socket'
-import type { ISocket, IDriver, IStream } from './definitions'
+import type { IDriver, IStream } from './definitions'
+import type { EventEmitter } from 'tiny-events'
 
 import {
   ISocketOptions,
@@ -17,7 +18,7 @@ import {
   ILogger
 } from '../../interfaces'
 
-export class Driver extends SDKEventEmitter implements ISocket, IDriver {
+export class Driver extends SDKEventEmitter implements IDriver {
   logger: ILogger
   config: ISocketOptions
   private readonly socket: Socket
@@ -72,7 +73,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     return !!this.socket.connected
   }
 
-  disconnect = (): Promise<any> => {
+  disconnect = (): Promise<void> => {
     return this.socket.close()
   }
 
@@ -106,7 +107,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     return this.socket.subscribe(name, params)
   }
 
-  subscribeNotifyAll = (): Promise< any> => {
+  subscribeNotifyAll = (): Promise<(ISubscription | undefined)[]> => {
     const topic = 'stream-notify-all'
     return Promise.all([
       'roles-change',
@@ -118,7 +119,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, event, false)))
   }
 
-  subscribeLoggedNotify = (): Promise<any> => {
+  subscribeLoggedNotify = (): Promise<(ISubscription | undefined)[]> => {
     const topic = 'stream-notify-logged'
     return Promise.all([
       'Users:NameChanged',
@@ -130,7 +131,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     ].map(event => this.subscribe(topic, event, false)))
   }
 
-  subscribeNotifyUser = (): Promise<any> => {
+  subscribeNotifyUser = (): Promise<(ISubscription | undefined)[]> => {
     const topic = 'stream-notify-user'
     return Promise.all([
       'message',
@@ -179,7 +180,7 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
   }
 
 	/** Login to Rocket.Chat via DDP */
-  login = async (credentials: IRealtimeCredentials, _args: any): Promise<any> => {
+  login = async (credentials: IRealtimeCredentials): Promise<ILoginResult> => {
     if (!this.socket || !this.socket.connected) {
       await this.connect()
     }
@@ -221,10 +222,10 @@ export class Driver extends SDKEventEmitter implements ISocket, IDriver {
     this.socket.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(this.ejsonMessage(message)))
   }
 
-  onTyping = (cb: ICallback): Promise<any > => {
+  onTyping = (cb: ICallback): EventEmitter => {
     return this.socket.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
       cb(username, isTyping)
-    }) as any
+    })
   }
 
   notifyVisitorTyping = (rid: string, username: string, typing: boolean, token: string) => {

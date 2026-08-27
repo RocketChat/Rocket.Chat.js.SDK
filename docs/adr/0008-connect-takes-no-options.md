@@ -23,7 +23,7 @@ absence of effect: its options stopped at the Client.
 ## Decision
 
 Connection configuration is constructor-only. `Driver.connect()` takes no
-arguments, `ISocket.connect()` in `lib/drivers/definitions.ts` declares none,
+arguments, `IDriver.connect()` in `lib/drivers/definitions.ts` declares none,
 and `Client.connect()` drops its parameter too. If a caller wants different
 connection settings, it constructs a Driver — or a Client — with them.
 

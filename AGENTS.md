@@ -4,7 +4,7 @@ Node/TypeScript SDK for Rocket.Chat. Ships as TypeScript source (`main` is `inde
 
 ## Architecture
 
-`ISocket` and `IDriver` in `lib/drivers/definitions.ts` are the definitions for the realtime layer — read them before touching the driver.
+`IDriver` in `lib/drivers/definitions.ts` defines the public Driver contract — read it before touching the driver.
 
 Config spreads into the REST base, `Driver` and `Socket`. Only `Socket` re-picks the keys it knows; `Driver` keeps the whole spread on its public `config`, so an unrecognized option silently reaches the driver — check that when adding one.
 
