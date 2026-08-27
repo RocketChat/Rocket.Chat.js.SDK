@@ -30,7 +30,6 @@ import { IStream, RecordedDDPSubscription, IDDPSubscriptionRequest } from './def
 import { DDPError } from './ddpError'
 import {
   AbandonedRequest,
-  abandonedWaitMessages,
   AbandonedWait,
   DDPRequests,
   ExpiredWait
@@ -244,7 +243,7 @@ export class Socket extends SDKEventEmitter {
   private detach = (connection: WebSocket) => {
     const rejectPendingOpen = this.pendingOpenRejects.get(connection)
     this.pendingOpenRejects.delete(connection)
-    Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedWaitMessages.connectionClosedBeforeOpen)))
+    Promise.resolve().then(() => rejectPendingOpen?.(AbandonedWait.connectionClosedBeforeOpen()))
     connection.onopen = null as any
     connection.onmessage = null as any
     connection.onerror = null as any
@@ -519,12 +518,12 @@ export class Socket extends SDKEventEmitter {
     const connection = this.connection
     if (!this.transportOpen) {
       await this.waitForOpen()
-      if (this.connection !== connection) throw new AbandonedWait(abandonedWaitMessages.connectionReplacedBeforeWrite)
+      if (this.connection !== connection) throw AbandonedWait.connectionReplacedBeforeWrite()
       // The wait resolves a microtask before the listeners below are attached, so
       // a connection lost in that window would be missed by all three of them.
       // `readyState` rather than `connected`: in that window the events have not
       // been delivered, so only the transport knows whether the connection went away.
-      if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedWaitMessages.responseClosed)
+      if (connection.readyState !== socketOpen) throw AbandonedWait.responseClosed()
     }
 
     return this.requests.send(obj, connection.send.bind(connection), deadlineMs)

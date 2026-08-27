@@ -5,12 +5,14 @@ import { toError } from './ddpError'
 
 const deadlineExpired = '[ddp] no response arrived before the deadline'
 
-export const abandonedWaitMessages = {
+const abandonedWaitMessages = {
   responseReopened: '[ddp] connection reopened before the response arrived',
   responseClosed: '[ddp] connection closed before the response arrived',
   connectionReplacedBeforeWrite: '[ddp] connection replaced before the message was written',
   connectionClosedBeforeOpen: '[ddp] connection closed before it opened'
-}
+} as const
+
+type AbandonedWaitMessage = typeof abandonedWaitMessages[keyof typeof abandonedWaitMessages]
 
 interface DDPRequestsOptions {
   emitter: SDKEventEmitter
@@ -20,14 +22,23 @@ interface DDPRequestsOptions {
 }
 
 export class AbandonedWait extends Error {
-  constructor (message?: string) {
+  static connectionClosedBeforeOpen = () =>
+    new AbandonedWait(abandonedWaitMessages.connectionClosedBeforeOpen)
+
+  static connectionReplacedBeforeWrite = () =>
+    new AbandonedWait(abandonedWaitMessages.connectionReplacedBeforeWrite)
+
+  static responseClosed = () =>
+    new AbandonedWait(abandonedWaitMessages.responseClosed)
+
+  protected constructor (message: AbandonedWaitMessage) {
     super(message)
     Object.setPrototypeOf(this, AbandonedWait.prototype)
   }
 }
 
 export class AbandonedRequest extends AbandonedWait {
-  constructor (public id: string, message: string) {
+  constructor (public id: string, message: AbandonedWaitMessage) {
     super(message)
     Object.setPrototypeOf(this, AbandonedRequest.prototype)
   }
