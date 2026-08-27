@@ -33,9 +33,9 @@ export default class RocketChatClient extends ApiRocketChat {
   async unsubscribeAll (): Promise<any> { return this.driver.unsubscribeAll() }
   async resubscribeWhenRecorded (streams: IStream[], timeoutMs?: number): Promise<boolean> { return this.driver.resubscribeWhenRecorded(streams, timeoutMs) }
   async subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]> { return this.driver.subscribeRoom(rid, ...args) }
-  async subscribeNotifyAll (): Promise<any> { return this.driver.subscribeNotifyAll() }
-  async subscribeLoggedNotify (): Promise<any> { return this.driver.subscribeLoggedNotify() }
-  async subscribeNotifyUser (): Promise<any> { return this.driver.subscribeNotifyUser() }
+  async subscribeNotifyAll (): Promise<(ISubscription | undefined)[]> { return this.driver.subscribeNotifyAll() }
+  async subscribeLoggedNotify (): Promise<(ISubscription | undefined)[]> { return this.driver.subscribeLoggedNotify() }
+  async subscribeNotifyUser (): Promise<(ISubscription | undefined)[]> { return this.driver.subscribeNotifyUser() }
   get url () {
     return Promise.resolve(this.driver.config.host)
   }

@@ -35,6 +35,7 @@ export interface IDriver {
   disconnect (): Promise<void>
   checkAndReopen (): void
   reopenNow (): Promise<void>
+  probe (deadlineMs?: number): Promise<boolean>
   lastPing: number
   pingInterval: number
   subscribe (topic: string, eventname: string, ...args: any[]): Promise<ISubscription | undefined>

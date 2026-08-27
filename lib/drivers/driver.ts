@@ -107,7 +107,7 @@ export class Driver extends SDKEventEmitter implements IDriver {
     return this.socket.subscribe(name, params)
   }
 
-  subscribeNotifyAll = (): Promise< any> => {
+  subscribeNotifyAll = (): Promise<(ISubscription | undefined)[]> => {
     const topic = 'stream-notify-all'
     return Promise.all([
       'roles-change',
@@ -119,7 +119,7 @@ export class Driver extends SDKEventEmitter implements IDriver {
     ].map(event => this.subscribe(topic, event, false)))
   }
 
-  subscribeLoggedNotify = (): Promise<any> => {
+  subscribeLoggedNotify = (): Promise<(ISubscription | undefined)[]> => {
     const topic = 'stream-notify-logged'
     return Promise.all([
       'Users:NameChanged',
@@ -131,7 +131,7 @@ export class Driver extends SDKEventEmitter implements IDriver {
     ].map(event => this.subscribe(topic, event, false)))
   }
 
-  subscribeNotifyUser = (): Promise<any> => {
+  subscribeNotifyUser = (): Promise<(ISubscription | undefined)[]> => {
     const topic = 'stream-notify-user'
     return Promise.all([
       'message',
