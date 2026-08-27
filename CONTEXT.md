@@ -127,8 +127,16 @@ Logging in again with the token from a previous login rather than with credentia
 _Avoid_: Reauth, refresh
 
 **Reopen**:
-A retry scheduled after a connection drops, waited out before a new Socket is built. Distinct from the immediate reconnect a caller forces, which skips the wait — the two are separate paths in the code, and the difference is how long an in-flight send waits before it is abandoned, not whether it is.
-_Avoid_: Reconnect (unqualified — say which of the two), retry
+Recovery delayed after a connection drops before a fresh Connection Attempt begins. Distinct from the immediate forced replacement a caller can request.
+_Avoid_: Reconnect (unqualified), retry
+
+**Connection work**:
+The mutually exclusive work a Socket may have pending: none, one scheduled Reopen, or one active Connection Attempt. An idle Socket has no connection work, but may still own an established Transport. Closing is tracked separately.
+_Avoid_: Connection state (that also suggests whether the Socket is connected), reconnect work
+
+**Connection Attempt**:
+One attempt by a Socket to establish a DDP connection. It begins when the Socket constructs one Transport and ends once when the DDP handshake succeeds, the attempt terminally fails, or the attempt is explicitly canceled. Every retry is a fresh Connection Attempt.
+_Avoid_: Reopen (that is the scheduled delay before an attempt), Transport connection
 
 **Connected echo**:
 The Driver re-emitting its Socket's open as a single `connected` event. One open means one `connected`, however many times a caller asked the Driver to connect.
