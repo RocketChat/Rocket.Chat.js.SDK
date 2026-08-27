@@ -27,7 +27,13 @@ import {
 } from '../../interfaces'
 
 import { IStream, RecordedDDPSubscription, IDDPSubscriptionRequest } from './definitions'
-import { DDPError, toError } from './ddpError'
+import { DDPError } from './ddpError'
+import {
+  AbandonedRequest,
+  AbandonedWait,
+  DDPRequests,
+  ExpiredWait
+} from './ddpRequests'
 import { sha256 } from 'js-sha256'
 
 function hostToWS (host: string, ssl = false) {
@@ -41,44 +47,9 @@ const socketClosed = 3;
 
 const socketDeadlineMs = 2000;
 
-const abandonedByReopen = '[ddp] connection reopened before the response arrived'
-const abandonedByClose = '[ddp] connection closed before the response arrived'
-const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
-const abandonedBeforeOpen = '[ddp] connection closed before it opened'
-const deadlineExpired = '[ddp] no response arrived before the deadline'
-
 /** See ADR-0011. */
 const subscriptionId = (name: string, params: any[]) =>
   `sub-${name}-${sha256(JSON.stringify(params))}`
-
-class AbandonedWait extends Error {
-  constructor (message?: string) {
-    super(message)
-    Object.setPrototypeOf(this, AbandonedWait.prototype)
-  }
-}
-
-/**
- * An `AbandonedWait` for a request whose frame was already written, carrying the
- * id so a caller can name what the server may have acted on. See ADR-0006.
- */
-class AbandonedRequest extends AbandonedWait {
-  constructor (public id: string, message: string) {
-    super(message)
-    Object.setPrototypeOf(this, AbandonedRequest.prototype)
-  }
-}
-
-/**
- * The wait for a DDP response ended by its Deadline, carrying the id so a caller
- * can name what the server may still have acted on. See ADR-0003 and ADR-0006.
- */
-class ExpiredWait extends Error {
-  constructor (public id: string) {
-    super(deadlineExpired)
-    Object.setPrototypeOf(this, ExpiredWait.prototype)
-  }
-}
 
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -95,6 +66,7 @@ export class Socket extends SDKEventEmitter {
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
+  private requests: DDPRequests
 
   /** Create a websocket handler */
   constructor (
@@ -111,6 +83,16 @@ export class Socket extends SDKEventEmitter {
       ping: options.ping || timeout,
       timeout
     }
+    this.requests = new DDPRequests({
+      emitter: this,
+      getLogger: () => this.logger,
+      nextId: (id) => {
+        const nextId = id || `ddp-${this.sent}`
+        this.sent += 1
+        return nextId
+      },
+      deadlineMs: this.config.timeout
+    })
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
 
@@ -261,7 +243,7 @@ export class Socket extends SDKEventEmitter {
   private detach = (connection: WebSocket) => {
     const rejectPendingOpen = this.pendingOpenRejects.get(connection)
     this.pendingOpenRejects.delete(connection)
-    Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedBeforeOpen)))
+    Promise.resolve().then(() => rejectPendingOpen?.(AbandonedWait.connectionClosedBeforeOpen()))
     connection.onopen = null as any
     connection.onmessage = null as any
     connection.onerror = null as any
@@ -536,70 +518,15 @@ export class Socket extends SDKEventEmitter {
     const connection = this.connection
     if (!this.transportOpen) {
       await this.waitForOpen()
-      if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)
+      if (this.connection !== connection) throw AbandonedWait.connectionReplacedBeforeWrite()
       // The wait resolves a microtask before the listeners below are attached, so
       // a connection lost in that window would be missed by all three of them.
       // `readyState` rather than `connected`: in that window the events have not
       // been delivered, so only the transport knows whether the connection went away.
-      if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
+      if (connection.readyState !== socketOpen) throw AbandonedWait.responseClosed()
     }
 
-    return new Promise<any>((resolve, reject) => {
-      const id = obj.id || `ddp-${ this.sent }`
-      this.sent += 1
-      const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
-      const stringdata = JSON.stringify(data)
-      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
-      this.logger.debug(`[ddp] sending message: ${stringdata}`)
-
-      try {
-        connection.send(stringdata)
-      } catch (err) {
-        this.logger.error(`[ddp] the transport failed to write the message: ${stringdata}`);
-        return reject(err)
-      }
-
-      // Before any listener is attached: a DDP message with no response to wait for —
-      // `pong` — would otherwise strand a `disconnected` listener forever.
-      if (!listener) {
-        return resolve(undefined)
-      }
-
-      // The DDP response can only arrive on the connection this message went out
-      // on, so every event that ends that connection ends this wait.
-      const abandonListeners = [
-        { event: 'disconnected', message: abandonedByReopen },
-        { event: 'connecting', message: abandonedByReopen },
-        { event: 'close', message: abandonedByClose }
-      ].map(({ event, message }) => ({
-        event,
-        onAbandon: () => {
-          removeListeners()
-          reject(new AbandonedRequest(id, message))
-        }
-      }))
-
-      let deadlineTimer: NodeJS.Timer | number | undefined
-
-      const removeListeners = () => {
-        clearTimeout(deadlineTimer as any)
-        this.off(listener, onResponse)
-        abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
-      }
-
-      deadlineTimer = setTimeout(() => {
-        removeListeners()
-        reject(new ExpiredWait(id))
-      }, deadlineMs)
-
-      const onResponse = (result: any) => {
-        removeListeners()
-        return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
-      }
-
-      abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
-      this.once(listener, onResponse)
-    })
+    return this.requests.send(obj, connection.send.bind(connection), deadlineMs)
   }
 
   private reopenAndKeepPinging = (err: unknown) => {
