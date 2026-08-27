@@ -27,7 +27,7 @@ describe('Api with no Current login', () => {
   it('sets a Current login from a login with none held', async () => {
     const { api, restClient } = anonymousApiWithFakeClient()
 
-    const pending = api.login({ username: 'user', password: 'pass' })
+    const pending = api.loginWithRest({ username: 'user', password: 'pass' })
     restClient.lastRequest().resolve(loginResponse())
 
     await expect(pending).resolves.toMatchObject({ userId: 'fake-user-id' })
@@ -46,7 +46,7 @@ describe('Api with no Current login', () => {
   it('sends info() with the auth headers once a Current login is held', async () => {
     const { api, restClient } = anonymousApiRocketChatWithFakeClient()
 
-    const login = api.login({ username: 'user', password: 'pass' })
+    const login = api.loginWithRest({ username: 'user', password: 'pass' })
     restClient.lastRequest().resolve(loginResponse())
     await login
 

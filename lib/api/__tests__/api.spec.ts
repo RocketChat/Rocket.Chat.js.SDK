@@ -43,7 +43,7 @@ describe('api', () => {
       const { api, restClient } = anonymousApiWithFakeClient()
       restClient.enqueueReply(loginResponse())
 
-      await api.login({ resume: 'fake-token' })
+      await api.loginWithRest({ resume: 'fake-token' })
 
       expect(restClient.requests[0].data).toEqual({ resume: 'fake-token' })
       expect(api.userId).toBe('fake-user-id')

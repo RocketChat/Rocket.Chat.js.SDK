@@ -6,8 +6,7 @@ import {
 	IAPIRequest,
 	IMessage,
 	ILoginCredentials,
-	ILoginData,
-	ILoginResult
+	ILoginData
 } from '../../interfaces'
 
 import { SDKEventEmitter } from '../emitter'
@@ -216,8 +215,8 @@ export default class Api extends SDKEventEmitter {
 		) ? true : false
   }
 
-  async login (credentials: ILoginCredentials, args?: any): Promise<ILoginData | ILoginResult | null> {
-    const { data }: { data: ILoginData } = await this.post('login', { ...credentials, ...args })
+  async loginWithRest (credentials: ILoginCredentials, loginFields?: any): Promise<ILoginData> {
+    const { data }: { data: ILoginData } = await this.post('login', { ...credentials, ...loginFields })
     this.setLogin({
       username: data.me.username ?? null,
       userId: data.userId,
