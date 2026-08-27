@@ -1,5 +1,5 @@
 import { Rocketchat } from '../index'
-import type { IDriver, ISocket } from '../index'
+import type { IDriver } from '../index'
 import type { ICallback, ILoginResult, IRealtimeCredentials, ISocketOptions, ISubscription } from '../interfaces'
 import type { EventEmitter } from 'tiny-events'
 
@@ -28,8 +28,7 @@ export type DriverContractAssertions = [
   Expect<Equal<InstanceType<typeof Rocketchat>['driver']['subscribeNotifyAll'], () => Promise<(ISubscription | undefined)[]>>>,
   Expect<Equal<InstanceType<typeof Rocketchat>['driver']['subscribeLoggedNotify'], () => Promise<(ISubscription | undefined)[]>>>,
   Expect<Equal<InstanceType<typeof Rocketchat>['driver']['subscribeNotifyUser'], () => Promise<(ISubscription | undefined)[]>>>,
-  Expect<Equal<IDriver['onTyping'], (cb: ICallback) => EventEmitter>>,
-  Expect<Equal<ISocket, IDriver>>
+  Expect<Equal<IDriver['onTyping'], (cb: ICallback) => EventEmitter>>
 ]
 
 declare const driver: IDriver

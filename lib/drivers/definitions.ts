@@ -62,5 +62,3 @@ export interface IDriver {
   ejsonMessage (message: any): any
   methodCall (method: string, ...args: any[]): Promise<any>
 }
-
-export type ISocket = IDriver

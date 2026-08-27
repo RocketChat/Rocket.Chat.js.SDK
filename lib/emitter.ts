@@ -16,7 +16,7 @@ const registeredListener = (listener: Function): Function =>
   (listener as any).listener || listener
 
 /**
- * `tiny-events` has no `removeAllListeners`, but `ISocket` advertises one. This
+ * `tiny-events` has no `removeAllListeners`, but `IDriver` advertises one. This
  * class owns it, so the capability travels with the SDK's own emitters instead
  * of being installed onto the shared `tiny-events` prototype — which reached
  * every emitter in the host process, including ones the SDK never created.
