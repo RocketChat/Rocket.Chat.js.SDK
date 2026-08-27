@@ -127,6 +127,27 @@ describe('Socket.send', () => {
       transport.receive({ msg: 'result', id: 'ddp-2' })
       await sending
     })
+
+    it('keeps the public request counter writable', async () => {
+      expect(Object.hasOwn(socket, 'sent')).toBe(true)
+      socket.sent = 40
+
+      const sending = socket.send({ msg: 'method', method: 'ping', params: [] })
+      expect(transport.lastSent().id).toBe('ddp-40')
+
+      transport.receive({ msg: 'result', id: 'ddp-40' })
+      await sending
+      expect(socket.sent).toBe(41)
+    })
+  })
+
+  it('uses a replacement logger for request messages', async () => {
+    const logger = createSilentLogger()
+    socket.logger = logger
+
+    await socket.send({ msg: 'pong' })
+
+    expect(logger.debug).toHaveBeenCalledWith('[ddp] sending message: {"msg":"pong"}')
   })
 
   describe('reply matching', () => {
