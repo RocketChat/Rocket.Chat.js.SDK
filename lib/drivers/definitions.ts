@@ -4,7 +4,9 @@ import {
   ICallback,
   ISubscription,
   ISocketMessageCallback,
-  IRealtimeCredentials
+  IRealtimeCredentials,
+  ILoginResult,
+  ISocketOptions
 } from '../../interfaces'
 
 export interface IDDPSubscriptionRequest {
@@ -22,43 +24,42 @@ export interface IStream {
   params?: any[]
 }
 
-export interface ISocket {
+export interface IDriver {
   logger: ILogger
+  config: ISocketOptions
+  messages: ISubscription | undefined
+  userId: string
+  joinedIds: string[]
   connect (): Promise<IDriver>
-  disconnect (): Promise<ISocket>
+  connected: boolean
+  disconnect (): Promise<void>
   checkAndReopen (): void
-  subscribe (topic: string, ...args: any[]): Promise<ISubscription | undefined>
+  reopenNow (): Promise<void>
+  lastPing: number
+  pingInterval: number
+  subscribe (topic: string, eventname: string, ...args: any[]): Promise<ISubscription | undefined>
   subscribeRaw (name: string, params: any[]): Promise<ISubscription | undefined>
-  unsubscribe (subscription: ISubscription): Promise<ISocket>
+  unsubscribe (subscription: ISubscription): Promise<any>
   unsubscribeAll (): Promise<void>
   resubscribeWhenRecorded (streams: IStream[], timeoutMs?: number): Promise<boolean>
-
   onStreamData (event: string, cb: ICallback): Promise<any>
-
   on (event: string, listener: Function): EventEmitter
   once (event: string, listener: Function): EventEmitter
   off (event?: string, listener?: Function): EventEmitter
   emit (event: string, ...args: any[]): EventEmitter
   removeAllListeners (event?: string): Function[]
-}
-
-export interface IDriver {
-  config: any
-  login (credentials: IRealtimeCredentials, args: any): Promise<any>
-
+  login (credentials: IRealtimeCredentials): Promise<ILoginResult>
+  logout (): Promise<any>
   subscribeRoom (rid: string, ...args: any[]): Promise<(ISubscription | undefined)[]>
-
   onMessage (cb: ICallback): void
-
-  subscribeNotifyAll (): Promise<any>
-
-  subscribeLoggedNotify (): Promise<any>
-
-  subscribeNotifyUser (): Promise<any>
-
-  onTyping (cb: ICallback): Promise<any>
-
+  subscribeNotifyAll (): Promise<(ISubscription | undefined)[]>
+  subscribeLoggedNotify (): Promise<(ISubscription | undefined)[]>
+  subscribeNotifyUser (): Promise<(ISubscription | undefined)[]>
+  waitForNotifyUserMediaSubs (timeoutMs?: number): Promise<boolean>
+  onTyping (cb: ICallback): EventEmitter
   notifyVisitorTyping (rid: string, username: string, typing: boolean, token: string): Promise<any>
-
+  ejsonMessage (message: any): any
   methodCall (method: string, ...args: any[]): Promise<any>
 }
+
+export type ISocket = IDriver

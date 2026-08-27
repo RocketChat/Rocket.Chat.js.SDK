@@ -97,7 +97,7 @@ describe('client.resume', () => {
 
     await client.resume({ token: 'fake-token' })
 
-    expect(ddpLogin).toHaveBeenCalledWith({ resume: 'fake-token' }, {})
+    expect(ddpLogin).toHaveBeenCalledWith({ resume: 'fake-token' })
   })
 
   it('leaves the client logged in for REST', async () => {

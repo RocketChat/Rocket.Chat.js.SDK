@@ -3,5 +3,5 @@
 	// the way a consuming app does, so a missing `/// <reference>` on an untyped
 	// dependency fails here.
 	"extends": "./tsconfig.json",
-	"files": ["index.ts"]
+	"files": ["index.ts", "consumer/driver-contract.ts"]
 }

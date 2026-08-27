@@ -13,7 +13,7 @@ export default class RocketChatClient extends ApiRocketChat {
   }
 
   async resume ({ token }: { token: string }) {
-    const login: ILoginResult = await this.driver.login({ resume: token }, {})
+    const login: ILoginResult = await this.driver.login({ resume: token })
     this.resumeLogin({ userId: login.id, authToken: login.token })
     return login
   }

@@ -87,6 +87,10 @@ _Avoid_: Socket (that is the DDP layer inside a Driver), Transport (that is the 
 The DDP layer inside a Driver — it performs the DDP handshake, runs the Liveness chain, holds the DDP subscriptions, and owns one Transport. A Driver owns a Socket and mirrors part of its surface, but is a layer above it.
 _Avoid_: Websocket (a Socket is not one; the Transport it owns is), Transport (that is the layer below), ddp
 
+**ISocket**:
+The legacy public type name for the Driver contract. It remains an alias of `IDriver` for consumers and does not describe the Socket layer inside a Driver.
+_Avoid_: Socket interface, DDP layer
+
 **Transport**:
 The raw websocket a Socket owns and writes its DDP messages to. The layer below a Socket, and the only one with no DDP vocabulary of its own.
 _Avoid_: Socket (that is the layer above), wire
