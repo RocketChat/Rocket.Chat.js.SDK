@@ -42,7 +42,7 @@ const CLOSE_DEADLINE = 2000
  * The ping interval is pushed far beyond every advance in this file on purpose:
  * a ping firing mid-test would move `lastPing` and send frames that none of the
  * assertions below are about. Nothing here is arithmetic about pinging — see
- * `ddp.liveness.spec.ts` for that.
+ * `socket.liveness.spec.ts` for that.
  */
 const createSocket = (logger: ILogger) => new Socket({
   host: 'localhost:3000',
