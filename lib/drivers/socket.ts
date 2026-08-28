@@ -56,7 +56,7 @@ export class Socket extends SDKEventEmitter {
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private requests: DDPRequests
-  private ddpSubscriptions: DDPSubscriptions
+  private readonly ddpSubscriptions: DDPSubscriptions
 
   get subscriptions (): { [id: string]: RecordedDDPSubscription } {
     return this.ddpSubscriptions.records

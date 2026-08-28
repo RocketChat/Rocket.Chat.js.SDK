@@ -227,12 +227,12 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records).toEqual({})
     })
 
-    it('drops one record and leaves the others', async () => {
+    it('unsubscribes one record and leaves the others', async () => {
       const { subscriptions } = createSubscriptions()
       const dropped = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       const kept = await subscriptions.subscribe('stream-notify-room', ['GENERAL/typing'])
 
-      subscriptions.forgetSubscription(dropped!.id)
+      await dropped!.unsubscribe()
 
       expect(Object.values(subscriptions.records)).toEqual([kept])
     })

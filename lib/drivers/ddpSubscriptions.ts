@@ -32,7 +32,7 @@ interface DDPSubscriptionsOptions {
  * See ADR-0004, ADR-0006, ADR-0011 and ADR-0012.
  */
 export class DDPSubscriptions {
-  records: { [id: string]: RecordedDDPSubscription } = {}
+  readonly records: { [id: string]: RecordedDDPSubscription } = {}
   private getLogger: () => ILogger
   private send: (message: any) => Promise<any>
   private onEvent: (name: string, listener: ISocketMessageCallback) => void
@@ -50,7 +50,7 @@ export class DDPSubscriptions {
     this.deadlineMs = deadlineMs
   }
 
-  forgetSubscription = (id: string) => {
+  private forgetSubscription = (id: string) => {
     delete this.records[id]
   }
 
