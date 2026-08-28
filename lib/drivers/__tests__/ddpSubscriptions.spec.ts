@@ -4,15 +4,9 @@ import { AbandonedRequest, ExpiredWait } from '../ddpRequests'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import { sha256 } from 'js-sha256'
 
-/**
- * DDPSubscriptions on its own, with the send, the event registry and the
- * connection state given as fakes. What the same contract looks like from the
- * outside, over a websocket, belongs to the ddp.subscription*.spec.ts files;
- * this one reaches the branches that are awkward to provoke through a socket.
- */
 const deadlineMs = 1000
 
-const idFor = (name: string, params: any[]) =>
+const subscriptionIdFor = (name: string, params: any[]) =>
   `sub-${name}-${sha256(JSON.stringify(params))}`
 
 const flushMicrotasks = () => Promise.resolve().then(() => undefined)
@@ -48,7 +42,7 @@ describe('DDPSubscriptions', () => {
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
-      const id = idFor('stream-room-messages', ['GENERAL'])
+      const id = subscriptionIdFor('stream-room-messages', ['GENERAL'])
       expect(send).toHaveBeenCalledWith({
         msg: 'sub',
         id,
@@ -79,8 +73,8 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records).toEqual({})
     })
 
-    it('records a stream whose answer was abandoned', async () => {
-      const id = idFor('stream-room-messages', ['GENERAL'])
+    it('records a stream after an Abandoned wait', async () => {
+      const id = subscriptionIdFor('stream-room-messages', ['GENERAL'])
       const { subscriptions } = createSubscriptions(jest.fn(() => Promise.reject(
         new AbandonedRequest(id, '[ddp] connection closed before the response arrived')
       )))
@@ -92,7 +86,7 @@ describe('DDPSubscriptions', () => {
     })
 
     it('records a stream whose wait expired', async () => {
-      const id = idFor('stream-room-messages', ['GENERAL'])
+      const id = subscriptionIdFor('stream-room-messages', ['GENERAL'])
       const { subscriptions } = createSubscriptions(
         jest.fn(() => Promise.reject(new ExpiredWait(id)))
       )
@@ -134,12 +128,12 @@ describe('DDPSubscriptions', () => {
       expect(onEvent).toHaveBeenCalledWith('stream-room-messages', callback)
     })
 
-    it('holds a second request for an id until the first has been answered', async () => {
+    it('holds a second request for an id until the first receives its DDP response', async () => {
       const { subscriptions, send } = createSubscriptions()
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
-      const unsub = deferred()
-      send.mockImplementation(() => unsub.promise)
+      const pendingUnsubscribeResponse = deferred()
+      send.mockImplementation(() => pendingUnsubscribeResponse.promise)
       send.mockClear()
       const unsubscribing = subscriptions.unsubscribe(subscription!.id).catch(() => undefined)
       const resubscribing = subscriptions.subscribeAll()
@@ -147,7 +141,7 @@ describe('DDPSubscriptions', () => {
       expect(send).toHaveBeenCalledTimes(1)
       expect(send).toHaveBeenLastCalledWith({ msg: 'unsub', id: subscription!.id })
 
-      unsub.settle({ result: 'unsubscribed' })
+      pendingUnsubscribeResponse.settle({ result: 'unsubscribed' })
       await unsubscribing
       await resubscribing
       expect(send.mock.lastCall[0]).toMatchObject({ msg: 'sub', id: subscription!.id })
@@ -184,7 +178,7 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records).toEqual({})
     })
 
-    it('forgets the record when the server refuses the unsub', async () => {
+    it('forgets the record when the server refuses the unsubscribe request', async () => {
       const { subscriptions, send } = createSubscriptions()
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.reject(new DDPError('nosub')))
@@ -194,7 +188,7 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records).toEqual({})
     })
 
-    it('keeps the record when the unsub fails without a server answer', async () => {
+    it('keeps the record when the unsubscribe wait expires', async () => {
       const { subscriptions, send } = createSubscriptions()
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.reject(new ExpiredWait(subscription!.id)))

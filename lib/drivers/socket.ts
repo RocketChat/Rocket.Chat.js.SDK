@@ -2,7 +2,7 @@
 /**
  * @module Socket
  * The DDP layer inside a Driver: it owns the Transport, performs the DDP
- * handshake, runs the Liveness chain and delegates the DDP subscriptions.
+ * handshake, runs the Liveness chain and holds the DDP subscriptions.
  */
 
 import WebSocket from 'universal-websocket-client'
