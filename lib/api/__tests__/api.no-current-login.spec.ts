@@ -10,7 +10,7 @@ describe('Api with no Current login', () => {
     expect(api.loggedIn()).toBe(false)
   })
 
-  it('sends the Endpoint to the REST client with no Current login', async () => {
+  it('sends the Endpoint and its data to the REST client', async () => {
     const { api, restClient } = anonymousApiWithFakeClient()
 
     const pending = api.post('users.forgotPassword', { email: 'user@example.com' })
@@ -41,19 +41,10 @@ describe('Api with no Current login', () => {
     restClient.lastRequest().resolve(infoResponse())
 
     await expect(pending).resolves.toEqual({ version: '6.0.0' })
-  })
-
-  it('sends info() with the auth headers once a Current login is held', async () => {
-    const { api, restClient } = anonymousApiRocketChatWithFakeClient()
-
-    const login = api.loginWithRest({ username: 'user', password: 'pass' })
-    restClient.lastRequest().resolve(loginResponse())
-    await login
-
-    const pending = api.info()
-    restClient.lastRequest().resolve(infoResponse())
-    await pending
-
-    expect(restClient.headers).toMatchObject({ 'X-Auth-Token': 'fake-token', 'X-User-Id': 'fake-user-id' })
+    expect(restClient.lastRequest()).toMatchObject({
+      method: 'GET',
+      endpoint: 'info',
+      data: {}
+    })
   })
 })

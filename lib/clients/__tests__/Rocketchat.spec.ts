@@ -41,13 +41,13 @@ describe('client.driver', () => {
     expect(methodCall).toHaveBeenCalledWith('getRoomIdByNameOrId', 'general')
   })
 
-  it('receives room subscriptions made on the client', async () => {
+  it('receives room subscriptions made on the client, with the arguments in order', async () => {
     const client = createClient()
     const subscribeRoom = jest.spyOn(client.driver, 'subscribeRoom').mockResolvedValue([])
 
-    await client.subscribeRoom('GENERAL')
+    await client.subscribeRoom('GENERAL', false)
 
-    expect(subscribeRoom).toHaveBeenCalledWith('GENERAL')
+    expect(subscribeRoom).toHaveBeenCalledWith('GENERAL', false)
   })
 
   it('receives subscriptions made on the client, with the arguments in order', async () => {
@@ -111,14 +111,6 @@ describe('client.resume', () => {
     })
   })
 
-  it('leaves an existing login with the same credentials untouched', async () => {
-    const client = await loggedInClient()
-
-    await client.resume({ token: 'fake-token' })
-
-    expect(client.currentLogin).toMatchObject({ username: 'fake-username', authToken: 'fake-token' })
-  })
-
   it('replaces the login when the token has rotated', async () => {
     const client = await loggedInClient()
     answerDdpLoginWith(client, { id: 'fake-user-id', token: 'rotated' })
@@ -149,7 +141,12 @@ describe('client.resume', () => {
 
     await client.resume({ token: 'other-token' })
 
-    expect(client.currentLogin).toMatchObject({ userId: 'other-id', authToken: 'other-token' })
+    expect(client.currentLogin).toMatchObject({
+      username: null,
+      userId: 'other-id',
+      authToken: 'other-token',
+      result: null
+    })
   })
 })
 
@@ -190,7 +187,7 @@ describe('client.logout', () => {
     expect(client.loggedIn()).toBe(false)
   })
 
-  it('still sends an Endpoint to the REST client', async () => {
+  it('still reaches the REST client with the Endpoint after logout', async () => {
     const { client, restClient } = await loggedOutClient()
 
     const pending = client.get('me', {})

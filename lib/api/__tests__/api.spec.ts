@@ -81,7 +81,7 @@ describe('api', () => {
   })
 
   describe('request', () => {
-    it('reaches the restClient for an unauthenticated request when logged out', async () => {
+    it('reaches the restClient with the method and data it was given', async () => {
       const { api, restClient } = anonymousApiWithFakeClient()
       restClient.enqueueReply(emptySuccess())
 
@@ -121,7 +121,7 @@ describe('api', () => {
       expect(restClient.lastRequest().data).toEqual({ msg: 'edited' })
     })
 
-    it('passes the api version through to the restClient on every method', async () => {
+    it('passes an explicit api version through to the restClient on every method', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())
 
