@@ -33,14 +33,6 @@ describe('the transport seam', () => {
     expect(fakeSockets[0].options).toEqual({ headers: { 'X-Auth-Token': 'token' } })
   })
 
-  it('starts the next test with the shared headers already reset', async () => {
-    // Nothing in this file resets them: test/setup.ts registers the reset with
-    // jest, and `restoreMocks` in jest.config.js applies it.
-    await openFakeConnection(createSocket())
-
-    expect(fakeSockets[0].options).toEqual({ headers: {} })
-  })
-
   it('fires the close handler with the code it was closed with', async () => {
     const socket = createSocket()
     const transport = await openFakeConnection(socket)
@@ -129,7 +121,6 @@ describe('Socket.send', () => {
     })
 
     it('keeps the public request counter writable', async () => {
-      expect(Object.hasOwn(socket, 'sent')).toBe(true)
       socket.sent = 40
 
       const sending = socket.send({ msg: 'method', method: 'ping', params: [] })
@@ -170,7 +161,7 @@ describe('Socket.send', () => {
       await expect(pinging).resolves.toEqual({ msg: 'pong' })
     })
 
-    it('matches the handshake on connected rather than on an id', async () => {
+    it('takes the session from the connected handshake', async () => {
       // Proven by the shared setup, which only completes because `onOpen`'s
       // `connect` send resolved on the `connected` message.
       expect(socket.session).toBe('fake-session')

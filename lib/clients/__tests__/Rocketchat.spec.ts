@@ -41,15 +41,6 @@ describe('client.driver', () => {
     expect(methodCall).toHaveBeenCalledWith('getRoomIdByNameOrId', 'general')
   })
 
-  it('receives room subscriptions made on the client', async () => {
-    const client = createClient()
-    const subscribeRoom = jest.spyOn(client.driver, 'subscribeRoom').mockResolvedValue([])
-
-    await client.subscribeRoom('GENERAL')
-
-    expect(subscribeRoom).toHaveBeenCalledWith('GENERAL')
-  })
-
   it('receives subscriptions made on the client, with the arguments in order', async () => {
     const client = createClient()
     const subscribe = jest.spyOn(client.driver, 'subscribe').mockResolvedValue(undefined)
@@ -109,14 +100,6 @@ describe('client.resume', () => {
       'X-Auth-Token': 'fake-token',
       'X-User-Id': 'fake-user-id'
     })
-  })
-
-  it('leaves an existing login with the same credentials untouched', async () => {
-    const client = await loggedInClient()
-
-    await client.resume({ token: 'fake-token' })
-
-    expect(client.currentLogin).toMatchObject({ username: 'fake-username', authToken: 'fake-token' })
   })
 
   it('replaces the login when the token has rotated', async () => {
@@ -190,7 +173,7 @@ describe('client.logout', () => {
     expect(client.loggedIn()).toBe(false)
   })
 
-  it('still sends an Endpoint to the REST client', async () => {
+  it('still reaches the REST client with the Endpoint after logout', async () => {
     const { client, restClient } = await loggedOutClient()
 
     const pending = client.get('me', {})

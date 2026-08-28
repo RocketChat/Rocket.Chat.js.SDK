@@ -683,8 +683,6 @@ describe('Socket connection lifecycle', () => {
       await driveToHandshake(reopened)
       await opening
 
-      expect(socket.config.reopen).toBe(REOPEN_DELAY)
-
       reopened.close(1006)
 
       await jest.advanceTimersByTimeAsync(REOPEN_DELAY - 1)

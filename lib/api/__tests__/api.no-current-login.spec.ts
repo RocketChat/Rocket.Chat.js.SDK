@@ -10,7 +10,7 @@ describe('Api with no Current login', () => {
     expect(api.loggedIn()).toBe(false)
   })
 
-  it('sends the Endpoint to the REST client with no Current login', async () => {
+  it('sends the Endpoint and its data to the REST client', async () => {
     const { api, restClient } = anonymousApiWithFakeClient()
 
     const pending = api.post('users.forgotPassword', { email: 'user@example.com' })
