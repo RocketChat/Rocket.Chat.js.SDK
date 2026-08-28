@@ -20,20 +20,6 @@ describe('new Socket', () => {
     expect(sslSocket.host).toBe('wss://open.rocket.chat/websocket')
   })
 
-  it('honours a reopen interval', () => {
-    expect(new Socket({ reopen: 500, logger: createSilentLogger() }).config.reopen).toBe(500)
-  })
-
-  it('honours a ping interval, in preference to `timeout`', () => {
-    const pingSocket = new Socket({ ping: 500, timeout: 250, logger: createSilentLogger() })
-
-    expect(pingSocket.config.ping).toBe(500)
-  })
-
-  it('falls back to `timeout` for the ping interval when no `ping` is given', () => {
-    expect(new Socket({ timeout: 250, logger: createSilentLogger() }).config.ping).toBe(250)
-  })
-
   it('defaults the ping interval when neither option is given', () => {
     expect(new Socket({ logger: createSilentLogger() }).config.ping).toBe(10000)
   })

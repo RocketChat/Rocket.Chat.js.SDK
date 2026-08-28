@@ -1,4 +1,5 @@
 import { Socket } from '../socket'
+import { DDPError } from '../ddpError'
 import * as settings from '../../settings'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
@@ -312,6 +313,7 @@ describe('Socket.send with several listeners on one event', () => {
     // caller's `err.message` threw from inside its own `catch`.
     const rejections = sends.flatMap(sending => [
       expect(sending).rejects.toBeInstanceOf(Error),
+      expect(sending).rejects.not.toBeInstanceOf(DDPError),
       expect(sending).rejects.toThrow('[ddp] connection reopened before the response arrived')
     ])
 

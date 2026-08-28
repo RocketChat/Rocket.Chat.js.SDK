@@ -64,11 +64,6 @@ describe('toError', () => {
     it('is still an Error', () => {
       expect(toError('you must be logged in')).toBeInstanceOf(Error)
     })
-
-    it('does not catch a rejection the SDK originated', () => {
-      expect(new Error('[ddp] connection reopened before the response arrived'))
-        .not.toBeInstanceOf(DDPError)
-    })
   })
 
   describe('a DDP error that is not an object', () => {

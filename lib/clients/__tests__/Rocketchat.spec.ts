@@ -41,6 +41,15 @@ describe('client.driver', () => {
     expect(methodCall).toHaveBeenCalledWith('getRoomIdByNameOrId', 'general')
   })
 
+  it('receives room subscriptions made on the client, with the arguments in order', async () => {
+    const client = createClient()
+    const subscribeRoom = jest.spyOn(client.driver, 'subscribeRoom').mockResolvedValue([])
+
+    await client.subscribeRoom('GENERAL', false)
+
+    expect(subscribeRoom).toHaveBeenCalledWith('GENERAL', false)
+  })
+
   it('receives subscriptions made on the client, with the arguments in order', async () => {
     const client = createClient()
     const subscribe = jest.spyOn(client.driver, 'subscribe').mockResolvedValue(undefined)
@@ -132,7 +141,12 @@ describe('client.resume', () => {
 
     await client.resume({ token: 'other-token' })
 
-    expect(client.currentLogin).toMatchObject({ userId: 'other-id', authToken: 'other-token' })
+    expect(client.currentLogin).toMatchObject({
+      username: null,
+      userId: 'other-id',
+      authToken: 'other-token',
+      result: null
+    })
   })
 })
 

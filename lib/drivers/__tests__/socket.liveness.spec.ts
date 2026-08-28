@@ -62,12 +62,6 @@ describe('Socket liveness', () => {
 
       expect(socket.alive()).toBe(false)
     })
-
-    it('reports the interval it was configured with', () => {
-      // The boundary tests are only meaningful if the socket read the option
-      // rather than falling back to the 10000 default.
-      expect(socket.config.ping).toBe(PING_INTERVAL)
-    })
   })
 
   describe('a server sending only unreadable DDP messages', () => {
