@@ -11,7 +11,8 @@ rejection that the SDK originates itself. Both ADRs settle what a caller
 receives. Neither settles what the Socket does with its own bookkeeping when a
 rejection happens. `unsubscribe` is where that question first has consequences.
 
-The Socket holds its DDP subscriptions in `Socket.subscriptions`, keyed by id.
+The Socket holds its DDP subscriptions in `DDPSubscriptions.records`, reached as
+`Socket.subscriptions` and keyed by id.
 `subscribeAll` rebuilds every one of them from that object, and `login` calls
 `subscribeAll`. An entry is therefore not a record of the past. An entry is an
 instruction to re-establish that stream at the next Login.
@@ -72,9 +73,9 @@ refuses leaves none; the answer that never came is ADR-0006's.
   `subscribeAll` restore the streams after the next Login. This half of the rule
   is expressed by the absence of any removal on that path.
 - The removals are `forgetSubscription(id)` and `forgetAllSubscriptions()` on
-  `Socket`. `forgetAllSubscriptions` removes one key at a time from the same
-  object, and it does so by calling `forgetSubscription` for each id, so a single
-  removal and a clear leave through one path.
+  `DDPSubscriptions`. `forgetAllSubscriptions` removes one key at a time from
+  the same object, and it does so by calling `forgetSubscription` for each id,
+  so a single removal and a clear leave through one path.
 
 ## Consequences
 

@@ -52,7 +52,7 @@ return that would otherwise drop it in silence, and is answered with its own
 One `sub` or `unsub` is in flight per DDP subscription id. A second waits for
 the first to have its DDP response before its own frame is written.
 
-- The wait is `queueSubscriptionRequest` on `Socket`, and `subscribe` and
+- The wait is `queueSubscriptionRequest` on `DDPSubscriptions`, and `subscribe` and
   `unsubscribe` are its only callers. It holds one promise per id.
 - Every subscription request has an id and queues under it. The id of a `sub` is
   derived from the stream (ADR-0011), so a first-time `subscribe` knows its id
