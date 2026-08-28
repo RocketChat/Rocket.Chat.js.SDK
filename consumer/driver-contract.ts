@@ -15,7 +15,6 @@ export type DriverContractAssertions = [
   Expect<Equal<IDriver['connect'], () => Promise<IDriver>>>,
   Expect<Equal<IDriver['connected'], boolean>>,
   Expect<Equal<IDriver['disconnect'], () => Promise<void>>>,
-  Expect<Equal<IDriver['checkAndReopen'], () => void>>,
   Expect<Equal<IDriver['reopenNow'], () => Promise<void>>>,
   Expect<Equal<IDriver['probe'], (deadlineMs?: number) => Promise<boolean>>>,
   Expect<Equal<IDriver['lastPing'], number>>,
@@ -28,7 +27,17 @@ export type DriverContractAssertions = [
   Expect<Equal<InstanceType<typeof Rocketchat>['driver']['subscribeNotifyAll'], () => Promise<(ISubscription | undefined)[]>>>,
   Expect<Equal<InstanceType<typeof Rocketchat>['driver']['subscribeLoggedNotify'], () => Promise<(ISubscription | undefined)[]>>>,
   Expect<Equal<InstanceType<typeof Rocketchat>['driver']['subscribeNotifyUser'], () => Promise<(ISubscription | undefined)[]>>>,
-  Expect<Equal<IDriver['onTyping'], (cb: ICallback) => EventEmitter>>
+  Expect<Equal<IDriver['onTyping'], (cb: ICallback) => EventEmitter>>,
+  Expect<Equal<IDriver['waitForNotifyUserMediaSubs'], (timeoutMs?: number) => Promise<boolean>>>,
+  Expect<Equal<IDriver['onStreamData'], (event: string, cb: ICallback) => Promise<any>>>,
+  Expect<Equal<IDriver['on'], (event: string, listener: Function) => EventEmitter>>,
+  Expect<Equal<IDriver['once'], (event: string, listener: Function) => EventEmitter>>,
+  Expect<Equal<IDriver['off'], (event?: string, listener?: Function) => EventEmitter>>,
+  Expect<Equal<IDriver['emit'], (event: string, ...args: any[]) => EventEmitter>>,
+  Expect<Equal<IDriver['removeAllListeners'], (event?: string) => Function[]>>,
+  Expect<Equal<'checkAndReopen' extends keyof IDriver ? true : false, false>>,
+  Expect<Equal<'checkAndReopen' extends keyof InstanceType<typeof Rocketchat> ? true : false, false>>,
+  Expect<Equal<'close' extends keyof ISocketOptions ? true : false, false>>
 ]
 
 declare const driver: IDriver

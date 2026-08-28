@@ -1,6 +1,6 @@
 # ADR-0003: Rejections that the SDK makes, and the Deadlines that cause them
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0014
 
 **Succeeds:** ADR-0001
 

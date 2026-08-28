@@ -16,15 +16,15 @@ const createSubscriptions = (
 ) => {
   const logger = createSilentLogger()
   const onEvent = jest.fn()
-  const hasConnection = jest.fn(() => true)
+  const closesTaken = jest.fn(() => 0)
   const subscriptions = new DDPSubscriptions({
     getLogger: () => logger,
     send,
     onEvent,
-    hasConnection,
+    closesTaken,
     deadlineMs
   })
-  return { subscriptions, send, onEvent, hasConnection, logger }
+  return { subscriptions, send, onEvent, closesTaken, logger }
 }
 
 const deferred = () => {
@@ -97,9 +97,9 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records[id]).toBe(subscription)
     })
 
-    it('records nothing when the connection is gone', async () => {
-      const { subscriptions, hasConnection } = createSubscriptions()
-      hasConnection.mockReturnValue(false)
+    it('records nothing when a close took the socket while the sub was in flight', async () => {
+      const { subscriptions, closesTaken } = createSubscriptions()
+      closesTaken.mockReturnValueOnce(0).mockReturnValue(1)
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 

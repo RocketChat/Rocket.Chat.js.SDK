@@ -204,6 +204,33 @@ export const flushMicrotasks = async (): Promise<void> => {
   for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
 }
 
+/**
+ * The Connection work a Socket is doing, by name. Read from the private fields
+ * through element access, so no spec-only surface has to exist in the source:
+ * `closing` is the only one production exposes, and it cannot tell a Scheduled
+ * Reopen from Idle.
+ */
+export const connectionWork = (socket: Socket): 'idle' | 'scheduled' | 'attempting' | 'closing' => {
+  const work = socket['connectionWork']
+  if (work['closeOwned']) return 'closing'
+  if (work['attempt']) return 'attempting'
+  if (work['scheduledReopen']) return 'scheduled'
+  return 'idle'
+}
+
+export const hasScheduledReopen = (socket: Socket): boolean =>
+  connectionWork(socket) === 'scheduled'
+
+/**
+ * Every fake still wired to the Socket. Both letting a Transport go and losing
+ * an established one null all four handlers, so this answers "can it still
+ * reach the Socket", not "does the Socket still hold it". That second question
+ * is `socket.connection`, and the two diverge for a lost-but-retained Transport.
+ */
+export const wiredTransports = (): FakeWebSocket[] =>
+  fakeSockets.filter(({ onopen, onmessage, onerror, onclose }) =>
+    !!(onopen || onmessage || onerror || onclose))
+
 export const subFrames = (frames: string[]) =>
   frames.map((frame) => JSON.parse(frame)).filter((frame) => frame.msg === 'sub')
 

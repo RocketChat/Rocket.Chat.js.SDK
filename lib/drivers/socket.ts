@@ -2,7 +2,8 @@
 /**
  * @module Socket
  * The DDP layer inside a Driver: it owns the Transport, performs the DDP
- * handshake, runs the Liveness chain and holds the DDP subscriptions.
+ * handshake, runs the Liveness chain and holds the DDP subscriptions. Which
+ * Connection work it is allowed to do belongs to the Connection it composes.
  */
 
 import WebSocket from 'universal-websocket-client'
@@ -27,7 +28,20 @@ import {
 } from '../../interfaces'
 
 import { IStream, RecordedDDPSubscription } from './definitions'
-import { AbandonedWait, DDPRequests } from './ddpRequests'
+import {
+  abandonedWaitMessages,
+  AbandonedWait,
+  DDPRequests,
+  FailedConnectionAttempt
+} from './ddpRequests'
+import {
+  Connection,
+  ConnectionAttempt,
+  intentionalCloseCode,
+  Transport,
+  transportClosedState,
+  transportOpenState
+} from './connection'
 import { DDPSubscriptions } from './ddpSubscriptions'
 import { sha256 } from 'js-sha256'
 
@@ -36,27 +50,26 @@ function hostToWS (host: string, ssl = false) {
   return `ws${ssl ? 's' : ''}://${host}`
 }
 
-const userDisconnectCloseCode = 4000;
-const socketOpen = 1;
-const socketClosed = 3;
-
 const socketDeadlineMs = 2000;
+
+const endedByOwnershipChange = (error: Error) => error instanceof AbandonedWait;
 
 export class Socket extends SDKEventEmitter {
   sent = 0
   host: string
   lastPing = Date.now()
   config: ISocketConfig
-  openTimeout?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
-  connection?: WebSocket
   session?: string
   logger: ILogger
-  reopenPromise?: Promise<void>
-  private settleReopen?: () => void
-  private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private requests: DDPRequests
   private readonly ddpSubscriptions: DDPSubscriptions
+  private readonly connectionWork: Connection
+  private readonly waitsForOpen = new Set<(error: Error) => void>()
+
+  get connection (): Transport | undefined {
+    return this.connectionWork.attachedTransport
+  }
 
   get subscriptions (): { [id: string]: RecordedDDPSubscription } {
     return this.ddpSubscriptions.records
@@ -91,8 +104,20 @@ export class Socket extends SDKEventEmitter {
       getLogger: () => this.logger,
       send: (message) => this.send(message),
       onEvent: (name, listener) => this.onEvent(name, listener),
-      hasConnection: () => !!this.connection,
+      closesTaken: () => this.connectionWork.closesTaken,
       deadlineMs: this.config.timeout
+    })
+    this.connectionWork = new Connection({
+      getLogger: () => this.logger,
+      reopenDelayMs: this.config.reopen,
+      deadlineMs: this.config.timeout,
+      hasUsableTransport: () => this.connected,
+      constructTransport: (attempt) => this.constructTransport(attempt),
+      awaitTransportClose: (transport) => this.letTransportClose(transport),
+      abandonWrittenWaits: (message) => this.requests.abandonAll(message),
+      refuseEveryWait: () => this.refuseEveryWait(),
+      forgetConnection: () => this.forgetConnection(),
+      emit: (event, ...args) => this.emit(event, ...args)
     })
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
@@ -106,69 +131,26 @@ export class Socket extends SDKEventEmitter {
     this.on('ready', (data: any) => this.emit(data.subs[0], data))
   }
 
-  /**
-   * Create a new WebSocket, tear down any previous one, and wire up handlers.
-   * Emits 'connecting' exactly once per actual new socket.
-   */
-  private createConnection = (): Promise<WebSocket> => {
-    return new Promise((resolve, reject) => {
-      let connection: WebSocket
-
-      try {
-        connection = new WebSocket(this.host, null, { headers: settings.customHeaders })
-        connection.onerror = reject
-        this.pendingOpenRejects.set(connection, reject)
-      } catch (err) {
-        this.logger.error(err)
-        return reject(err)
-      }
-      // Tear down the previous connection before replacing it.
-      // Callers only reach here when the existing socket isn't healthy, so
-      // detaching its handlers and closing it stops a stale or still-connecting
-      // socket from later firing onClose and clobbering the live connection.
-      if (this.connection) {
-        try {
-          this.detach(this.connection)
-          this.connection.close(userDisconnectCloseCode)
-        } catch (err) {
-          this.logger.debug(`[ddp] open: previous connection teardown failed: ${(err as Error).message}`)
-        }
-      }
-      this.connection = connection
-      this.connection.onmessage = this.onMessage.bind(this)
-      this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
-      this.connection.onopen = this.onOpen.bind(this, resolve, reject)
-      this.emit('connecting')
-    })
-  }
-
-  /**
-   * Open websocket connection.
-   * Stores connection, setting up handlers for open/close/message events.
-   * Resumes login if given token.
-   */
-  open = async (): Promise<any> => {
-    if (this.connected) {
-      return undefined
+  private constructTransport = (attempt: ConnectionAttempt): Transport => {
+    let transport: Transport
+    try {
+      transport = new WebSocket(this.host, null, { headers: settings.customHeaders })
+    } catch (err) {
+      this.logger.error(err)
+      throw err
     }
 
-    if (this.reopenPromise) {
-      await this.reopenPromise
-      if (!this.connected) {
-        await this.createConnection()
-      }
-      return this.connection
-    }
-
-    await this.createConnection()
-    return this.connection
+    transport.onmessage = this.onMessage.bind(this)
+    transport.onerror = () =>
+      this.connectionWork.fail(attempt, FailedConnectionAttempt.transportFailed())
+    transport.onclose = (ev: any) => this.onClose(ev, transport)
+    transport.onopen = () => this.handshake(attempt, transport)
+    return transport
   }
 
-  /** Send handshake message to confirm connection, start pinging. */
-  onOpen = async (resolve: Function, reject: Function) => {
+  private handshake = async (attempt: ConnectionAttempt, transport: Transport) => {
     this.lastPing = Date.now()
 
-    // `onopen` is a websocket callback, so a throw here has nowhere to go.
     let connected
     try {
       connected = await this.send({
@@ -178,28 +160,19 @@ export class Socket extends SDKEventEmitter {
       })
     } catch (err) {
       this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
-      return reject(err)
+      return this.connectionWork.fail(attempt, err)
     }
+
+    if (!this.connectionWork.isCurrent(attempt) || this.connection !== transport) return
+
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
-    this.emit('open')
-    return resolve(this.connection)
+    this.connectionWork.succeed(attempt)
   }
 
-  onClose = (e: any, closedConnection?: WebSocket) => {
-    // A detached socket's late close would clobber the live connection.
-    if (closedConnection && closedConnection !== this.connection) {
-      return
-    }
-    this.emit('close', e)
-    try {
-      if (e?.code !== userDisconnectCloseCode) {
-        this.reopen()
-      }
-      this.logger.info(`[ddp] Close (${e?.code})${e?.reason ? `: ${e.reason}` : ''}`)
-    } catch (error) {
-      this.logger.error(error)
-    }
+  private onClose = (e: any, closedTransport: Transport) => {
+    this.logger.info(`[ddp] Close (${e?.code})${e?.reason ? `: ${e.reason}` : ''}`)
+    this.connectionWork.transportLost(closedTransport, e, e?.code !== intentionalCloseCode)
   }
 
   /**
@@ -235,34 +208,38 @@ export class Socket extends SDKEventEmitter {
     if (data.id) this.emit(data.id, data)
   }
 
-  /**
-   * Closing the socket is a separate obligation, left to the caller.
-   *
-   * An open of this socket that is still pending is abandoned on a microtask,
-   * so a handshake rejection already in flight settles it first.
-   */
-  private detach = (connection: WebSocket) => {
-    const rejectPendingOpen = this.pendingOpenRejects.get(connection)
-    this.pendingOpenRejects.delete(connection)
-    Promise.resolve().then(() => rejectPendingOpen?.(AbandonedWait.connectionClosedBeforeOpen()))
-    connection.onopen = null as any
-    connection.onmessage = null as any
-    connection.onerror = null as any
-    connection.onclose = null as any
+  /** End every wait a Close ends: those for an open, and those for a response. */
+  private refuseEveryWait = () => {
+    const refused = [...this.waitsForOpen]
+    this.waitsForOpen.clear()
+    refused.forEach((reject) => reject(AbandonedWait.responseClosed()))
+    this.requests.abandonAll(abandonedWaitMessages.responseClosed)
   }
 
-  private replaced = (connection?: WebSocket) =>
-    this.connection !== undefined && this.connection !== connection
+  private forgetConnection = () => {
+    if (this.pingTimeout) {
+      clearTimeout(this.pingTimeout as any)
+      delete this.pingTimeout
+    }
+    this.lastPing = 0
+    delete this.session
+    this.ddpSubscriptions.forgetAllSubscriptions()
+  }
+
+  private letTransportClose = async (transport: Transport) => {
+    if (transport.readyState === transportClosedState) return
+    await this.waitForClose(transport, socketDeadlineMs)
+  }
 
   /**
-   * The wait ends on this socket's `onclose` rather than on the driver's
+   * The wait ends on this Transport's `onclose` rather than on the Socket's
    * `close` event: a close emitted for the connection that replaced this one
-   * says nothing about the socket being closed here.
+   * says nothing about the Transport being closed here.
    */
-  private waitForClose = (connection: WebSocket, deadlineMs: number) =>
+  private waitForClose = (transport: Transport, deadlineMs: number) =>
     new Promise<void>((resolve) => {
       let settled = false
-      const driverOnClose = connection.onclose
+      const socketOnClose = transport.onclose
 
       const settle = () => {
         if (settled) return
@@ -272,140 +249,40 @@ export class Socket extends SDKEventEmitter {
       }
 
       const onTransportClose = (e: any) => {
-        driverOnClose?.(e)
+        socketOnClose?.(e)
         settle()
       }
 
       const answerCloseOurselves = (reason: string) => {
         // Null rather than restore: a transport close that lands after this
-        // would otherwise re-enter onClose, emit a second close and arm a
-        // reopen for a socket the driver is already letting go.
-        if (connection.onclose === onTransportClose) connection.onclose = null as any
-        this.onClose({ code: userDisconnectCloseCode, reason, wasClean: false }, connection)
+        // would otherwise re-enter onClose and emit a second close for a
+        // connection the Socket is already letting go.
+        if (transport.onclose === onTransportClose) transport.onclose = null as any
+        this.onClose({ code: intentionalCloseCode, reason, wasClean: false }, transport)
         settle()
       }
 
-      connection.onclose = onTransportClose
+      transport.onclose = onTransportClose
       const deadline = setTimeout(
         () => answerCloseOurselves('the transport did not answer the close'),
         deadlineMs
       )
 
       try {
-        connection.close(userDisconnectCloseCode)
+        transport.close(intentionalCloseCode)
       } catch (err) {
         this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
         answerCloseOurselves('the transport refused to close')
       }
     })
 
-  /**
-   * Close the Transport and forget every DDP subscription locally.
-   * See ADR-0009.
-   */
-  close = async (): Promise<void> => {
-    this.settleReopen?.()
+  open = (): Promise<void> => this.connectionWork.open()
 
-    const connection = this.connection
+  reopen = () => this.connectionWork.reopen()
 
-    if (connection && connection.readyState !== socketClosed) {
-      await this.waitForClose(connection, socketDeadlineMs)
-    }
+  reopenNow = (): Promise<void> => this.connectionWork.reopenNow()
 
-    if (this.replaced(connection)) return
-
-    this.cancelScheduledReopen()
-    if (this.pingTimeout) {
-      clearTimeout(this.pingTimeout as any)
-      delete this.pingTimeout
-    }
-    this.lastPing = 0
-
-    if (connection) {
-      this.detach(connection)
-      delete this.connection
-    }
-
-    this.ddpSubscriptions.forgetAllSubscriptions()
-  }
-
-  // Call open directly, so it skips openTimeout
-  checkAndReopen = () => {
-    if (!this.connected) {
-      this.cancelScheduledReopen()
-      this.open().catch((err) => this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`))
-    }
-  }
-
-  private reopenUnlessAbandoned = (err: unknown) => {
-    if (!(err instanceof AbandonedWait)) this.reopen()
-  }
-
-  private cancelScheduledReopen = () => {
-    if (!this.openTimeout) return
-    clearTimeout(this.openTimeout as any)
-    delete this.openTimeout
-  }
-
-  /** Clear connection and try to connect again. */
-  reopen = () => {
-    if (this.openTimeout) return
-    this.openTimeout = setTimeout(async() => {
-      delete this.openTimeout
-
-      try {
-        await this.open()
-      } catch (err) {
-        this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
-        this.reopenUnlessAbandoned(err);
-      }
-    }, this.config.reopen);
-  }
-
-  /**
-   * Force an immediate reconnect. Shared across concurrent callers so only one
-   * new WebSocket is created. Emits 'disconnected' to unblock in-flight sends,
-   * then creates the connection directly so a concurrent open() cannot tear it
-   * down. Unhandled creation errors are swallowed because cleanup already runs
-   * via the open/timeout paths.
-   *
-   * Past the deadline the promise resolves and `reopenPromise` is cleared even
-   * though the connection may still be down.
-   */
-  reopenNow = (): Promise<void> => {
-    if (this.reopenPromise) {
-      return this.reopenPromise
-    }
-
-    this.reopenPromise = new Promise<void>(resolve => {
-      this.cancelScheduledReopen()
-      this.lastPing = 0
-      this.emit('disconnected')
-
-      let settled = false
-      const cleanup = () => {
-        if (settled) return
-        settled = true
-        this.off('open', cleanup)
-        if (timeout) clearTimeout(timeout as any)
-        delete this.reopenPromise
-        delete this.settleReopen
-        resolve()
-      }
-
-      this.settleReopen = cleanup
-      this.once('open', cleanup)
-
-      this.createConnection().catch(() => {})
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        this.reopen()
-      }, this.config.timeout)
-    })
-
-    return this.reopenPromise
-  }
+  close = (): Promise<void> => this.connectionWork.close()
 
   /**
    * Bounded liveness check for a socket in the gray zone. Returns true only if
@@ -413,8 +290,8 @@ export class Socket extends SDKEventEmitter {
    */
   probe = (deadlineMs = socketDeadlineMs): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
-      const connection = this.connection
-      if (!connection || connection.readyState !== socketOpen) {
+      const transport = this.connection
+      if (!transport || transport.readyState !== transportOpenState || this.connectionWork.closing) {
         return resolve(false)
       }
 
@@ -439,7 +316,7 @@ export class Socket extends SDKEventEmitter {
       }, deadlineMs)
 
       try {
-        connection.send(JSON.stringify({ msg: 'ping' }))
+        transport.send(JSON.stringify({ msg: 'ping' }))
       } catch {
         cleanup()
         resolve(false)
@@ -448,7 +325,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   get transportOpen () {
-    return !!(this.connection && this.connection.readyState === socketOpen)
+    return !!(this.connection && this.connection.readyState === transportOpenState)
   }
 
   get connected () {
@@ -462,9 +339,10 @@ export class Socket extends SDKEventEmitter {
   /**
    * Wait for the socket to open, bounded by the reopen interval. Rejects on the
    * deadline so a send issued while the socket is down fails the caller rather
-   * than hanging for the life of the process.
+   * than hanging for the life of the process. Close ownership refuses the wait
+   * outright, because nothing will open while a close holds the Socket.
    *
-   * The default is twice `config.reopen`, not `config.reopen`: `reopen()` only
+   * The default is twice `config.reopen`, not `config.reopen`: a Reopen only
    * *schedules* the retry at that interval, so a deadline of exactly `reopen`
    * expires as the reconnect begins and every send issued at a drop fails.
    */
@@ -472,6 +350,7 @@ export class Socket extends SDKEventEmitter {
     return new Promise<void>((resolve, reject) => {
       const cleanup = () => {
         this.off('open', onOpen)
+        this.waitsForOpen.delete(refuse)
         clearTimeout(timeout as any)
       }
 
@@ -480,7 +359,13 @@ export class Socket extends SDKEventEmitter {
         resolve()
       }
 
+      const refuse = (error: Error) => {
+        cleanup()
+        reject(error)
+      }
+
       this.once('open', onOpen)
+      this.waitsForOpen.add(refuse)
 
       const timeout = setTimeout(() => {
         cleanup()
@@ -503,6 +388,7 @@ export class Socket extends SDKEventEmitter {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
+    if (this.connectionWork.closing) throw AbandonedWait.responseClosed()
     // A message belongs to the connection that was current when it was sent. It
     // is never written to a successor: the DDP session, and any Login on it, is
     // the old connection's.
@@ -510,18 +396,20 @@ export class Socket extends SDKEventEmitter {
     if (!this.transportOpen) {
       await this.waitForOpen()
       if (this.connection !== connection) throw AbandonedWait.connectionReplacedBeforeWrite()
+      if (this.connectionWork.closing) throw AbandonedWait.responseClosed()
       // The wait resolves a microtask before the listeners below are attached, so
       // a connection lost in that window would be missed by all three of them.
       // `readyState` rather than `connected`: in that window the events have not
       // been delivered, so only the transport knows whether the connection went away.
-      if (connection.readyState !== socketOpen) throw AbandonedWait.responseClosed()
+      if (connection.readyState !== transportOpenState) throw AbandonedWait.responseClosed()
     }
 
     return this.requests.send(obj, connection.send.bind(connection), deadlineMs)
   }
 
-  private reopenAndKeepPinging = (err: unknown) => {
-    this.reopenUnlessAbandoned(err)
+  private recoverAndKeepPinging = (error: Error) => {
+    if (endedByOwnershipChange(error)) return
+    this.reopen()
     if (this.connection) this.ping()
   }
 
@@ -531,7 +419,7 @@ export class Socket extends SDKEventEmitter {
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.ping())
-        .catch(this.reopenAndKeepPinging)
+        .catch(this.recoverAndKeepPinging)
     }, this.config.ping)
   }
 
@@ -596,8 +484,20 @@ export class Socket extends SDKEventEmitter {
     return params
   }
 
-  /** Logout the current User from the server via Socket. */
+  /**
+   * Logout the current User from the server via Socket.
+   *
+   * A Logout needs a connection to write on. Without one it is a no-op, unless a
+   * Close is what took the connection away, which the caller hears about rather
+   * than reading a silent success.
+   */
   logout = () => {
+    if (this.connectionWork.closing) return Promise.reject(AbandonedWait.responseClosed())
+    if (!this.connection) {
+      return this.connectionWork.closesTaken
+        ? Promise.reject(AbandonedWait.responseClosed())
+        : Promise.resolve(undefined)
+    }
     this.resume = null
     return this.unsubscribeAll()
 			.then(() => this.call('logout'))

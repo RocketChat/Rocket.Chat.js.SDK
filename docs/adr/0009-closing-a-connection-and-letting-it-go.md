@@ -1,6 +1,6 @@
 # ADR-0009: Closing a connection, and letting it go
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0015
 
 **Succeeds:** ADR-0003
 

@@ -8,6 +8,7 @@ import {
   OPEN,
   driveToHandshake,
   fakeSockets,
+  hasScheduledReopen,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -208,29 +209,32 @@ describe('Socket.send', () => {
 
     it('sends once the connection opens inside the deadline', async () => {
       transport.readyState = CLOSED
+      const opening = socket.open()
+      const attempting = fakeSockets[1]
 
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
-      // `open` is emitted at the end of the handshake, so the whole reopen has to
-      // run before the waiting send can go out.
-      await driveToHandshake(transport)
+      // `open` is emitted at the end of the handshake, so the whole attempt has
+      // to succeed before the waiting send can go out.
+      await driveToHandshake(attempting)
+      await opening
       await jest.advanceTimersByTimeAsync(0)
 
-      // `onOpen` sends its own handshake on the same tick, so the waiting send is
-      // not necessarily the last frame — only that it was written at all.
-      expect(transport.sent.map(frame => JSON.parse(frame)))
+      // The handshake writes on the same tick, so the waiting send is not
+      // necessarily the last frame, only written at all.
+      expect(attempting.sent.map(frame => JSON.parse(frame)))
         .toContainEqual({ msg: 'method', method: 'login', params: [], id: 'ddp-2' })
-      transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+      attempting.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
       await expect(sending).resolves.toMatchObject({ result: 'ok' })
     })
 
     it('sends on the open socket it already has when the last ping has gone stale', async () => {
       // An unanswered ping lapses `alive()` and schedules a reopen, while the
-      // transport stays open. The pending `openTimeout` suppresses any further
-      // reopen, so no `open` event is coming for a send to wait on.
+      // transport stays open. No attempt is running, so no `open` event is
+      // coming for a send to wait on.
       await jest.advanceTimersByTimeAsync(socket.config.ping * 2 + 1)
 
-      expect(socket.openTimeout).toBeDefined()
+      expect(hasScheduledReopen(socket)).toBe(true)
       expect(socket.connected).toBe(false)
       expect(socket.transportOpen).toBe(true)
       expect(fakeSockets).toHaveLength(1)
@@ -285,18 +289,21 @@ describe('Socket.send with several listeners on one event', () => {
 
   it('writes every send that was waiting on open, not just one', async () => {
     transport.readyState = CLOSED
+    const opening = socket.open()
+    const attempting = fakeSockets[1]
 
     const sends = [1, 2, 3].map(() =>
       socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
     )
 
-    await driveToHandshake(transport)
+    await driveToHandshake(attempting)
+    await opening
     await jest.advanceTimersByTimeAsync(0)
 
-    const written = transport.sent.map(frame => JSON.parse(frame))
+    const written = attempting.sent.map(frame => JSON.parse(frame))
     for (const id of ['ddp-2', 'ddp-3', 'ddp-4']) {
       expect(written).toContainEqual({ msg: 'method', method: 'getUsersOfRoom', params: [], id })
-      transport.receive({ msg: 'result', id, result: 'ok' })
+      attempting.receive({ msg: 'result', id, result: 'ok' })
     }
 
     await expect(Promise.all(sends)).resolves.toHaveLength(3)
@@ -308,9 +315,7 @@ describe('Socket.send with several listeners on one event', () => {
     )
 
     // Both halves, as ADR-0001 established: an `Error`, and the message the
-    // caller will actually read. `disconnected` is emitted with no arguments, so
-    // handing `reject` to it directly rejected with `undefined` and every
-    // caller's `err.message` threw from inside its own `catch`.
+    // caller will actually read, since callers up the stack log `err.message`.
     const rejections = sends.flatMap(sending => [
       expect(sending).rejects.toBeInstanceOf(Error),
       expect(sending).rejects.not.toBeInstanceOf(DDPError),
@@ -330,7 +335,7 @@ describe('Socket.send with several listeners on one event', () => {
     transport.sendError = failure
 
     await expect(socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] }))
-      .rejects.toBe(failure)
+      .rejects.toThrow('transport write failed')
   })
 
   describe('when the connection the send went out on goes away', () => {
@@ -478,16 +483,17 @@ describe('Socket.send with several listeners on one event', () => {
       expect(reopened.sent.map((frame: string) => JSON.parse(frame).msg)).not.toContain('method')
     })
 
-    it('fails the open when the handshake is abandoned', async () => {
-      // The handshake is the one send with no caller of its own, and `open()`
-      // waits on it.
+    it('fails the open when the transport drops mid-handshake', async () => {
+      // The handshake is the one send with no caller of its own: what `open()`
+      // reports is the verdict on the attempt, not the abandoned wait.
       const opening = createSocket().open()
       const handshaking = fakeSockets[1]
       handshaking.readyState = OPEN
       handshaking.onopen?.({})
       await jest.advanceTimersByTimeAsync(0)
 
-      const rejected = expect(opening).rejects.toThrow(CLOSED_MESSAGE)
+      const rejected = expect(opening).rejects
+        .toThrow('[ddp] transport failed during the connection attempt')
       handshaking.close(1006)
 
       await rejected

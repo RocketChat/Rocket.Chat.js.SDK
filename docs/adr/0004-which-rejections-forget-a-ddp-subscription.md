@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR-0001 governs the rejection that carries a DDP error. ADR-0003 governs the
+ADR-0001 governs the rejection that carries a DDP error. ADR-0014 governs the
 rejection that the SDK originates itself. Both ADRs settle what a caller
 receives. Neither settles what the Socket does with its own bookkeeping when a
 rejection happens. `unsubscribe` is where that question first has consequences.
@@ -46,7 +46,7 @@ refuses leaves none; the answer that never came is ADR-0006's.
   including the one it builds from a DDP error that arrived as a bare string.
   `toError` is the single place where a DDP error becomes an Error under
   ADR-0001, so the type marks provenance in the value itself, and a caller reads
-  it with `instanceof`. A rejection the SDK originates under ADR-0003 is a plain
+  it with `instanceof`. A rejection the SDK originates under ADR-0014 is a plain
   `Error` and is therefore not a `DDPError`.
 - `subscribe` is the only writer of an entry, and where the server answers it
   writes on the `ready` DDP response, under the id it derived for the stream and
@@ -66,7 +66,7 @@ refuses leaves none; the answer that never came is ADR-0006's.
 - `unsubscribeAll` decides nothing of its own. Each `unsubscribe` decides its own
   entry, and `unsubscribeAll` catches each failure so one refusal cannot stop the
   rest, or stop the Method call that `logout` makes after it.
-- What a close does to the entries is settled by ADR-0009: once the close has
+- What a close does to the entries is settled by ADR-0015: once the close has
   run, no DDP response can arrive and no per-entry decision can run. A Socket
   the consuming app closed keeps no instruction to re-establish anything.
 - A Reopen forgets nothing. Every entry survives, and that is what lets
@@ -100,5 +100,5 @@ refuses leaves none; the answer that never came is ADR-0006's.
   that id, and ADR-0005 keeps it to one.
 - Applying the rule to the write reopens, on the `sub` path, the case the Context
   describes for `unsubscribe`. A Reopen rejects a `sub` that is still in flight,
-  under ADR-0003, while the server may already be streaming. Which side to prefer
+  under ADR-0014, while the server may already be streaming. Which side to prefer
   when a `sub` response is abandoned rather than refused is settled by ADR-0006.
