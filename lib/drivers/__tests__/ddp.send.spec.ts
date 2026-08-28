@@ -121,7 +121,7 @@ describe('Socket.send', () => {
       await sending
     })
 
-    it('keeps the public request counter writable', async () => {
+    it('keeps the request counter writable', async () => {
       socket.sent = 40
 
       const sending = socket.send({ msg: 'method', method: 'ping', params: [] })
