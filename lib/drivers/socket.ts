@@ -53,6 +53,7 @@ export class Socket extends SDKEventEmitter {
   session?: string
   logger: ILogger
   reopenPromise?: Promise<void>
+  private loginConfirmed = false
   private settleReopen?: () => void
   private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
   private requests: DDPRequests
@@ -135,6 +136,7 @@ export class Socket extends SDKEventEmitter {
         }
       }
       this.connection = connection
+      this.loginConfirmed = false
       this.connection.onmessage = this.onMessage.bind(this)
       this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
       this.connection.onopen = this.onOpen.bind(this, resolve, reject)
@@ -145,7 +147,6 @@ export class Socket extends SDKEventEmitter {
   /**
    * Open websocket connection.
    * Stores connection, setting up handlers for open/close/message events.
-   * Resumes login if given token.
    */
   open = async (): Promise<any> => {
     if (this.connected) {
@@ -162,6 +163,14 @@ export class Socket extends SDKEventEmitter {
 
     await this.createConnection()
     return this.connection
+  }
+
+  /** Not awaited: a websocket callback has nowhere to put a throw. */
+  private resumeLoginInBackground = () => {
+    if (!this.resume) return
+    this.login(this.resume).catch((err) =>
+      this.logger.error(`[ddp] Resume did not complete: ${(err as Error).message}`)
+    )
   }
 
   /** Send handshake message to confirm connection, start pinging. */
@@ -183,7 +192,8 @@ export class Socket extends SDKEventEmitter {
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
     this.emit('open')
-    return resolve(this.connection)
+    resolve(this.connection)
+    this.resumeLoginInBackground()
   }
 
   onClose = (e: any, closedConnection?: WebSocket) => {
@@ -191,6 +201,7 @@ export class Socket extends SDKEventEmitter {
     if (closedConnection && closedConnection !== this.connection) {
       return
     }
+    this.loginConfirmed = false
     this.emit('close', e)
     try {
       if (e?.code !== userDisconnectCloseCode) {
@@ -456,7 +467,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   get loggedIn () {
-    return (this.connected && !!this.resume)
+    return (this.connected && this.loginConfirmed)
   }
 
   /**
@@ -563,6 +574,7 @@ export class Socket extends SDKEventEmitter {
   login = async (credentials: IRealtimeCredentials) => {
     const params = this.loginParams(credentials)
     this.resume = (await this.call('login', params) as ILoginResult)
+    this.loginConfirmed = true
     this.subscribeAll().catch((err) => {
       this.logger.error(`[ddp] Resubscribe after login failed: ${err.message}`)
       this.emit('resubscribe-error', err)
@@ -599,6 +611,7 @@ export class Socket extends SDKEventEmitter {
   /** Logout the current User from the server via Socket. */
   logout = () => {
     this.resume = null
+    this.loginConfirmed = false
     return this.unsubscribeAll()
 			.then(() => this.call('logout'))
   }
