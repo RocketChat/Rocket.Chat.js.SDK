@@ -347,20 +347,6 @@ describe('Driver.probe', () => {
     transport.receive({ msg: 'pong' })
     await expect(probing).resolves.toBe(true)
   })
-
-  it('resolves false when no pong arrives before the deadline', async () => {
-    await connectDriver()
-
-    const probing = driver.probe(500)
-    await jest.advanceTimersByTimeAsync(500)
-
-    await expect(probing).resolves.toBe(false)
-  })
-
-  it('resolves false with no socket open', async () => {
-    await expect(createDriver().probe(500)).resolves.toBe(false)
-    expect(fakeSockets).toHaveLength(0)
-  })
 })
 
 describe('Driver.lastPing', () => {

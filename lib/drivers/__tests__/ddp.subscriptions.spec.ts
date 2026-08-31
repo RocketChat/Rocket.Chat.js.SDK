@@ -178,10 +178,13 @@ describe('Socket subscription bookkeeping', () => {
     it('resolves false on its deadline, and stops polling', async () => {
       const waiting = socket.resubscribeWhenRecorded(streams, 500)
       const timersBefore = jest.getTimerCount()
+      const sentBefore = transport.sent.length
 
       await jest.advanceTimersByTimeAsync(500)
 
       await expect(waiting).resolves.toBe(false)
+      // Neither stream is recorded, so no poll may put a `sub` on the wire.
+      expect(transport.sent).toHaveLength(sentBefore)
       // Both the deadline and the poll interval are gone — a leaked interval
       // would keep resubscribing for the life of the process.
       expect(jest.getTimerCount()).toBe(timersBefore - 2)

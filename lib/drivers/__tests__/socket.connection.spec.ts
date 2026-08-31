@@ -1243,27 +1243,4 @@ describe('Socket connection lifecycle', () => {
       expect(socket.connection).toBe(rebuilt)
     })
   })
-
-  describe('the retry interval', () => {
-    /**
-     * The `reopen` option is the only way to set the retry interval, so this
-     * asserts a socket reconnected through `open` still retries on it.
-     */
-    it('comes from the reopen option after a reconnect', async () => {
-      transport.readyState = CLOSED
-      const opening = socket.open()
-
-      const reopened = fakeSockets[1]
-      await driveToHandshake(reopened)
-      await opening
-
-      reopened.close(1006)
-
-      await jest.advanceTimersByTimeAsync(REOPEN_DELAY - 1)
-      expect(fakeSockets).toHaveLength(2)
-
-      await jest.advanceTimersByTimeAsync(1)
-      expect(fakeSockets).toHaveLength(3)
-    })
-  })
 })

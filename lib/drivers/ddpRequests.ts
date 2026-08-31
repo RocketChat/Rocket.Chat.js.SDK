@@ -36,7 +36,6 @@ interface DDPRequestsOptions {
   emitter: SDKEventEmitter
   getLogger: () => ILogger
   nextId: (id?: string) => string
-  deadlineMs: number
 }
 
 export class FailedConnectionAttempt extends Error {
@@ -89,14 +88,12 @@ export class DDPRequests {
   private emitter: SDKEventEmitter
   private getLogger: () => ILogger
   private nextId: (id?: string) => string
-  private deadlineMs: number
   private written = new Set<(message: AbandonedWaitMessage) => void>()
 
-  constructor ({ emitter, getLogger, nextId, deadlineMs }: DDPRequestsOptions) {
+  constructor ({ emitter, getLogger, nextId }: DDPRequestsOptions) {
     this.emitter = emitter
     this.getLogger = getLogger
     this.nextId = nextId
-    this.deadlineMs = deadlineMs
   }
 
   abandonAll = (message: AbandonedWaitMessage) => {
@@ -105,7 +102,7 @@ export class DDPRequests {
     abandoning.forEach((abandon) => abandon(message))
   }
 
-  send = (message: any, write: (value: string) => void, deadlineMs = this.deadlineMs): Promise<any> =>
+  send = (message: any, write: (value: string) => void, deadlineMs: number): Promise<any> =>
     new Promise<any>((resolve, reject) => {
       const id = this.nextId(message.id)
       const carriesId = !carriesNoId(message.msg)

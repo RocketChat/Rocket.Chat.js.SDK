@@ -135,8 +135,7 @@ export class Socket extends SDKEventEmitter {
         const nextId = id || `ddp-${this.sent}`
         this.sent += 1
         return nextId
-      },
-      deadlineMs: this.config.timeout
+      }
     })
     this.ddpSubscriptions = new DDPSubscriptions({
       getLogger: () => this.logger,

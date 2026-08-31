@@ -111,6 +111,19 @@ describe('Socket.send', () => {
       expect(transport.lastSent()).toEqual({ msg: 'preconnect' })
     })
 
+    it('gives a message with no msg an id and matches its reply by that id', async () => {
+      const sending = socket.send({ method: 'getUsersOfRoom', params: [] })
+
+      expect(transport.lastSent()).toEqual({
+        method: 'getUsersOfRoom',
+        params: [],
+        id: 'ddp-1'
+      })
+
+      transport.receive({ msg: 'result', id: 'ddp-1', result: 'ok' })
+      await expect(sending).resolves.toMatchObject({ id: 'ddp-1', result: 'ok' })
+    })
+
     it('still counts the id-less frames', async () => {
       await socket.send({ msg: 'pong' })
 

@@ -54,13 +54,3 @@ describe('Driver.login', () => {
     expect(driver.userId).toBe('')
   })
 })
-
-describe('Driver.connect', () => {
-  it('returns without opening a second connection when already connected', async () => {
-    const driver = createDriver()
-    await openFakeConnection(driver['socket'])
-
-    await expect(driver.connect()).resolves.toBe(driver)
-    expect(fakeSockets).toHaveLength(1)
-  })
-})

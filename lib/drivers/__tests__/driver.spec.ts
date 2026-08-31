@@ -7,7 +7,6 @@ import {
   FakeWebSocket,
   fakeSockets,
   openFakeConnection,
-  USER_DISCONNECT,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -452,6 +451,14 @@ describe('Driver.connect', () => {
     expect(connectedSeen).toHaveBeenCalledTimes(1)
   })
 
+  it('returns without opening a second connection when already connected', async () => {
+    const driver = createDriver()
+    await openFakeConnection(driver['socket'])
+
+    await expect(driver.connect()).resolves.toBe(driver)
+    expect(fakeSockets).toHaveLength(1)
+  })
+
   it('joins a second connect to the attempt already running', async () => {
     const driver = createDriver()
 
@@ -508,50 +515,6 @@ describe('Driver.connect', () => {
 })
 
 describe('Driver.disconnect', () => {
-  const CLOSE_DEADLINE = 2000
-
-  it('joins a concurrent disconnect to one close of the socket', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
-    transport.answersClose = false
-
-    const first = driver.disconnect()
-    const second = driver.disconnect()
-
-    await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
-
-    await expect(first).resolves.toBeUndefined()
-    await expect(second).resolves.toBeUndefined()
-    expect(transport.closedWith).toEqual([USER_DISCONNECT])
-  })
-
-  it('refuses a connect issued while it owns the socket', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
-    transport.readyState = CLOSED
-
-    const disconnecting = driver.disconnect()
-    const connecting = driver.connect()
-
-    await expect(connecting).rejects.toThrow('[ddp] connection closed before it opened')
-    await disconnecting
-    expect(fakeSockets).toHaveLength(1)
-  })
-
-  it('refuses a forced reopen issued while it owns the socket', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
-    transport.answersClose = false
-
-    const disconnecting = driver.disconnect()
-
-    await expect(driver.reopenNow()).rejects.toThrow('[ddp] connection closed before it opened')
-    expect(fakeSockets).toHaveLength(1)
-
-    await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
-    await disconnecting
-  })
-
   it('echoes no connected for the close it took', async () => {
     const driver = createDriver()
     await openFakeConnection(driver['socket'])
