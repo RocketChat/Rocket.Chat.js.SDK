@@ -105,9 +105,7 @@ export class Socket extends SDKEventEmitter {
       send: (message) => this.send(message),
       onEvent: (name, listener) => this.onEvent(name, listener),
       getCloseGeneration: () => this.connectionWork.closesTaken,
-      hasNoAttachedTransportAndNoCloseOwner: () => (
-        !this.connection && !this.connectionWork.closing
-      ),
+      isOffline: () => !this.connection && !this.connectionWork.closing,
       deadlineMs: this.config.timeout
     })
     this.connectionWork = new Connection({
@@ -489,15 +487,13 @@ export class Socket extends SDKEventEmitter {
 
   logout = () => {
     if (this.connectionWork.closing) return Promise.reject(AbandonedWait.responseClosed())
-    if (!this.connection) {
-      if (this.connectionWork.closesTaken) return Promise.reject(AbandonedWait.responseClosed())
-      this.resume = null
-      this.ddpSubscriptions.forgetAllSubscriptions()
-      return Promise.resolve(undefined)
+    if (!this.connection && this.connectionWork.closesTaken) {
+      return Promise.reject(AbandonedWait.responseClosed())
     }
     this.resume = null
-    return this.unsubscribeAll()
-			.then(() => this.call('logout'))
+    const unsubscribed = this.unsubscribeAll()
+    if (!this.connection) return unsubscribed
+    return unsubscribed.then(() => this.call('logout'))
   }
 
   /** Register a callback to trigger on message events in subscription */

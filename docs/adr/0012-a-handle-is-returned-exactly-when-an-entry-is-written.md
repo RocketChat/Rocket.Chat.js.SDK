@@ -23,9 +23,7 @@ outlives every screen that wanted it.
 The register-side rule already reads as a single condition — an entry exists when
 there is an instruction to re-establish the stream, whether the server may be
 streaming it or has never been asked for it. Nothing about the caller's side
-needs a second rule; it needs the same one, which is why widening the entries
-ADR-0006 writes widens the handles handed out rather than opening a gap between
-them.
+needs a second rule; it needs the same one.
 
 ## Decision
 

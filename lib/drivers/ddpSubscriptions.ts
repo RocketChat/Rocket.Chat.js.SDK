@@ -17,7 +17,7 @@ interface DDPSubscriptionsOptions {
   send: (message: any) => Promise<any>
   onEvent: (name: string, listener: ISocketMessageCallback) => void
   getCloseGeneration: () => number
-  hasNoAttachedTransportAndNoCloseOwner: () => boolean
+  isOffline: () => boolean
   deadlineMs: number
 }
 
@@ -27,25 +27,18 @@ export class DDPSubscriptions {
   private send: (message: any) => Promise<any>
   private onEvent: (name: string, listener: ISocketMessageCallback) => void
   private getCloseGeneration: () => number
-  private hasNoAttachedTransportAndNoCloseOwner: () => boolean
+  private isOffline: () => boolean
   private deadlineMs: number
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   constructor (
-    {
-      getLogger,
-      send,
-      onEvent,
-      getCloseGeneration,
-      hasNoAttachedTransportAndNoCloseOwner,
-      deadlineMs
-    }: DDPSubscriptionsOptions
+    { getLogger, send, onEvent, getCloseGeneration, isOffline, deadlineMs }: DDPSubscriptionsOptions
   ) {
     this.getLogger = getLogger
     this.send = send
     this.onEvent = onEvent
     this.getCloseGeneration = getCloseGeneration
-    this.hasNoAttachedTransportAndNoCloseOwner = hasNoAttachedTransportAndNoCloseOwner
+    this.isOffline = isOffline
     this.deadlineMs = deadlineMs
   }
 
@@ -104,7 +97,7 @@ export class DDPSubscriptions {
         resolve(value)
       }
       const attempt = () => {
-        if (inFlight || this.hasNoAttachedTransportAndNoCloseOwner()) return
+        if (inFlight || this.isOffline()) return
         const subscriptionsPerStream = recordedPerStream()
         if (!subscriptionsPerStream.every((subscriptions) => subscriptions.length > 0)) return
         inFlight = true
@@ -131,7 +124,7 @@ export class DDPSubscriptions {
     if (!this.records[id]) {
       return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
     }
-    if (this.hasNoAttachedTransportAndNoCloseOwner()) {
+    if (this.isOffline()) {
       this.forgetSubscription(id)
       return Promise.resolve(undefined)
     }
@@ -174,7 +167,7 @@ export class DDPSubscriptions {
     callback?: ISocketMessageCallback
   ) => {
     const closesBefore = this.getCloseGeneration()
-    if (this.hasNoAttachedTransportAndNoCloseOwner()) {
+    if (this.isOffline()) {
       return Promise.resolve(this.rememberSubscription(stream, closesBefore, callback))
     }
     return this.send({ msg: 'sub', ...stream })

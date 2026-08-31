@@ -93,7 +93,6 @@ describe('Driver.subscribe', () => {
 describe('Driver.waitForNotifyUserMediaSubs', () => {
   const userId = 'user-id'
   const topic = 'stream-notify-user'
-  const ABNORMAL_CLOSE = 1006
 
   /**
    * Register a subscription on the Socket, as a successful sub would, and
@@ -149,7 +148,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     await addMediaSub(driver, transport, 'media-calls')
     const sentBefore = transport.sent.length
 
-    transport.close(ABNORMAL_CLOSE)
+    transport.close(1006)
 
     const waiting = driver.waitForNotifyUserMediaSubs(500)
     await jest.advanceTimersByTimeAsync(500)

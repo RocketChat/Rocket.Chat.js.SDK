@@ -65,22 +65,17 @@ silence keeps the instruction.
   Offline sub.
 - The predicate reads whether a Transport is attached, and nothing weaker. It is
   not a liveness question and not a Transport-open one. Widening it either way
-  reverses the expired-wait rule below — a send on an attached Transport that is
-  not open, or is open with the Liveness chain lapsed, would stop reaching the
-  wire and start recording without sending — and it would do so with a green
-  suite, because no test distinguishes an entry written after a write from one
-  written instead of a write.
+  reverses the expired-wait rule: a send on an attached Transport that is not
+  open, or is open with the Liveness chain lapsed, would stop reaching the wire
+  and start recording without sending.
 - The Socket itself is unchanged: `send` still refuses to write with no attached
   Transport. `subscribe` succeeding without one is not an inconsistency to be
   resolved by making `send` queue, because the subscription path does not reach
   `send` at all when there is no Transport. The entry it writes is the
   instruction, and `subscribeAll` is what issues it.
-- The expired-wait case and the no-Transport case are not one "no usable
-  connection" case with one answer. They are two cases with opposite outcomes: a
-  send that expired waiting for the connection to open had a Transport to wait
-  on and wrote nothing, so it leaves no entry; a `subscribe` with no attached
-  Transport wrote nothing because there was nothing to write to, and leaves an
-  entry.
+- The expired-wait case and the no-Transport case are two cases with opposite
+  outcomes, not one "no usable connection" case: a send that expired waiting for
+  the connection to open had a Transport to wait on, so it leaves no entry.
 - A Close is excluded. A Socket a Close owns has no Transport either, and it is
   the one loss that leaves nothing to instruct, so a `subscribe` there records
   nothing. That is the same rule the generation guard below draws, read at the
