@@ -6,8 +6,10 @@ import {
   connectionWork,
   driveToHandshake,
   fakeSockets,
+  flushMicrotasks,
   hasScheduledReopen,
   openFakeConnection,
+  subFrames,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -38,7 +40,9 @@ const methodCall = { msg: 'method', method: 'logout', params: [] }
 /**
  * A send issued after an unexpected transport loss, while the Socket is waiting
  * out a Scheduled Reopen. The lost Transport is released, so there is nothing
- * attached to write on and the send is refused rather than left waiting.
+ * attached to write on and the send is refused rather than left waiting. A
+ * `subscribe` is not a send on this path: with no Transport attached it composes
+ * no frame and is recorded for the replacement connection.
  */
 describe('a send issued during the delayed recovery window', () => {
   let socket: Socket
@@ -73,14 +77,26 @@ describe('a send issued during the delayed recovery window', () => {
     expect(replacement.sent.some((frame) => frame.includes('"method":"logout"'))).toBe(false)
   })
 
-  it('drops a subscribe silently: the write is refused and nothing is recorded', async () => {
-    const subscribing = socket.subscribe('stream-room-messages', ['__my_messages__'])
+  it('records a subscribe instead, and re-sends it on the replacement transport', async () => {
+    const subscription = await socket.subscribe('stream-room-messages', ['__my_messages__'])
+
+    expect(subscription).toMatchObject({ name: 'stream-room-messages' })
+    expect(socket.subscriptions[subscription!.id]).toBe(subscription)
 
     await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
-    await driveToHandshake(fakeSockets[1])
+    const replacement = fakeSockets[1]
+    await driveToHandshake(replacement)
+    const resubscribing = socket.subscribeAll()
+    await flushMicrotasks()
+    replacement.receive({ msg: 'ready', subs: [subscription!.id] })
+    await resubscribing
 
-    await expect(subscribing).resolves.toBeUndefined()
-    expect(socket.subscriptions).toEqual({})
+    expect(subFrames(replacement.sent)).toEqual([{
+      msg: 'sub',
+      id: subscription!.id,
+      name: 'stream-room-messages',
+      params: ['__my_messages__']
+    }])
   })
 })
 

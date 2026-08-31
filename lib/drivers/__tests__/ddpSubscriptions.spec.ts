@@ -11,20 +11,26 @@ const subscriptionIdFor = (name: string, params: any[]) =>
 
 const flushMicrotasks = () => Promise.resolve().then(() => undefined)
 
+interface SocketState {
+  closesTaken?: () => number
+  recordWithoutSending?: () => boolean
+}
+
 const createSubscriptions = (
-  send: jest.Mock = jest.fn((message: any) => Promise.resolve({ subs: [message.id] }))
+  send: jest.Mock = jest.fn((message: any) => Promise.resolve({ subs: [message.id] })),
+  { closesTaken = () => 0, recordWithoutSending = () => false }: SocketState = {}
 ) => {
   const logger = createSilentLogger()
   const onEvent = jest.fn()
-  const closesTaken = jest.fn(() => 0)
   const subscriptions = new DDPSubscriptions({
     getLogger: () => logger,
     send,
     onEvent,
     closesTaken,
+    recordWithoutSending,
     deadlineMs
   })
-  return { subscriptions, send, onEvent, closesTaken, logger }
+  return { subscriptions, send, onEvent, logger }
 }
 
 const deferred = () => {
@@ -85,7 +91,7 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records[id]).toBe(subscription)
     })
 
-    it('records a stream whose wait expired', async () => {
+    it('records a stream whose wait expired on an attached transport', async () => {
       const id = subscriptionIdFor('stream-room-messages', ['GENERAL'])
       const { subscriptions } = createSubscriptions(
         jest.fn(() => Promise.reject(new ExpiredWait(id)))
@@ -98,13 +104,64 @@ describe('DDPSubscriptions', () => {
     })
 
     it('records nothing when a close took the socket while the sub was in flight', async () => {
-      const { subscriptions, closesTaken } = createSubscriptions()
-      closesTaken.mockReturnValueOnce(0).mockReturnValue(1)
+      let closes = 0
+      const { subscriptions } = createSubscriptions(
+        jest.fn((message: any) => {
+          closes += 1
+          return Promise.resolve({ subs: [message.id] })
+        }),
+        { closesTaken: () => closes }
+      )
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
       expect(subscription).toBeUndefined()
       expect(subscriptions.records).toEqual({})
+    })
+
+    it('records a stream with no transport attached without composing a sub frame', async () => {
+      const { subscriptions, send } = createSubscriptions(undefined, {
+        recordWithoutSending: () => true
+      })
+
+      const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
+
+      const id = subscriptionIdFor('stream-room-messages', ['GENERAL'])
+      expect(send).not.toHaveBeenCalled()
+      expect(subscription).toMatchObject({ id, name: 'stream-room-messages', params: ['GENERAL'] })
+      expect(subscriptions.records[id]).toBe(subscription)
+    })
+
+    it('shares one entry between two subscribes made with no transport attached', async () => {
+      let attached = false
+      const { subscriptions, send } = createSubscriptions(undefined, {
+        recordWithoutSending: () => !attached
+      })
+
+      const first = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
+      const second = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
+      attached = true
+      await subscriptions.subscribeAll()
+
+      expect(second).toBe(first)
+      expect(send).toHaveBeenCalledTimes(1)
+      expect(send.mock.calls[0][0]).toMatchObject({
+        msg: 'sub',
+        id: first!.id,
+        name: 'stream-room-messages',
+        params: ['GENERAL']
+      })
+    })
+
+    it('registers the callback of a subscribe made with no transport attached', async () => {
+      const { subscriptions, onEvent } = createSubscriptions(undefined, {
+        recordWithoutSending: () => true
+      })
+      const callback = jest.fn()
+
+      await subscriptions.subscribe('stream-room-messages', ['GENERAL'], callback)
+
+      expect(onEvent).toHaveBeenCalledWith('stream-room-messages', callback)
     })
 
     it('registers the callback on the stream name', async () => {

@@ -17,6 +17,7 @@ interface DDPSubscriptionsOptions {
   send: (message: any) => Promise<any>
   onEvent: (name: string, listener: ISocketMessageCallback) => void
   closesTaken: () => number
+  recordWithoutSending: () => boolean
   deadlineMs: number
 }
 
@@ -26,16 +27,25 @@ export class DDPSubscriptions {
   private send: (message: any) => Promise<any>
   private onEvent: (name: string, listener: ISocketMessageCallback) => void
   private closesTaken: () => number
+  private recordWithoutSending: () => boolean
   private deadlineMs: number
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   constructor (
-    { getLogger, send, onEvent, closesTaken, deadlineMs }: DDPSubscriptionsOptions
+    {
+      getLogger,
+      send,
+      onEvent,
+      closesTaken,
+      recordWithoutSending,
+      deadlineMs
+    }: DDPSubscriptionsOptions
   ) {
     this.getLogger = getLogger
     this.send = send
     this.onEvent = onEvent
     this.closesTaken = closesTaken
+    this.recordWithoutSending = recordWithoutSending
     this.deadlineMs = deadlineMs
   }
 
@@ -160,6 +170,9 @@ export class DDPSubscriptions {
     callback?: ISocketMessageCallback
   ) => {
     const closesBefore = this.closesTaken()
+    if (this.recordWithoutSending()) {
+      return Promise.resolve(this.rememberSubscription(stream, closesBefore, callback))
+    }
     return this.send({ msg: 'sub', ...stream })
       .then((response) => {
         if (response.subs?.length) return this.rememberSubscription(stream, closesBefore, callback)

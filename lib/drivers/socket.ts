@@ -105,6 +105,7 @@ export class Socket extends SDKEventEmitter {
       send: (message) => this.send(message),
       onEvent: (name, listener) => this.onEvent(name, listener),
       closesTaken: () => this.connectionWork.closesTaken,
+      recordWithoutSending: () => !this.connection && !this.connectionWork.closing,
       deadlineMs: this.config.timeout
     })
     this.connectionWork = new Connection({
