@@ -25,20 +25,4 @@ class InternalLog implements ILogger {
 }
 
 /** Default basic console logging */
-export let logger: ILogger = new InternalLog()
-
-/** Substitute logging handler */
-export function replaceLog (externalLog: ILogger) {
-  logger = externalLog
-}
-
-/** Null all log outputs */
-export function silence () {
-  replaceLog({
-    debug: () => null,
-    info: () => null,
-    warn: () => null,
-    warning: () => null,
-    error: () => null
-  })
-}
+export const logger: ILogger = new InternalLog()
