@@ -114,8 +114,15 @@ One close takes the Socket, synchronously, and cannot be superseded.
   the end of.
 - A close does not unsubscribe. Closing the connection ends every stream on the
   server, so the Socket forgets its DDP subscriptions locally and sends no
-  `unsub`. `logout` is the deliberate exception, because it stays on the same
-  connection and awaits its own `unsubscribeAll` first.
+  `unsub`. `logout` on an attached Transport is the deliberate exception, because
+  it stays on the same connection and awaits its own `unsubscribeAll` first.
+- `logout` with no attached Transport and no close taken ends locally rather than
+  doing nothing. It forgets every entry and clears the stored Login, so the next
+  user inherits neither an instruction to re-establish the previous user's
+  streams nor a token to resume with. It writes no `unsub`: there is nothing to
+  write on, and the server has already lost every stream with the connection.
+  This is the same forgetting a close does, reached without a close, and it is
+  why an Offline sub does not outlive the Login that asked for it.
 
 ### Transport callbacks
 

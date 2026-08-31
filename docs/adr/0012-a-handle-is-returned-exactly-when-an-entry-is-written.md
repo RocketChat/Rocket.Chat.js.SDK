@@ -21,8 +21,11 @@ opens a room, the reconnect abandons the `sub`, and the stream it asked for
 outlives every screen that wanted it.
 
 The register-side rule already reads as a single condition — an entry exists when
-the server may be streaming. Nothing about the caller's side needs a second rule;
-it needs the same one.
+there is an instruction to re-establish the stream, whether the server may be
+streaming it or has never been asked for it. Nothing about the caller's side
+needs a second rule; it needs the same one, which is why widening the entries
+ADR-0006 writes widens the handles handed out rather than opening a gap between
+them.
 
 ## Decision
 
@@ -35,15 +38,17 @@ exists if and only if an entry does.
   an entry for, and the handle is what makes that entry reachable: the caller can
   `unsubscribe` from it without holding an id.
 - `rememberSubscription` returns what it wrote, and returns nothing when it wrote
-  nothing. A Socket holding no connection writes no entry under ADR-0006, so its
-  caller receives nothing — there is no instruction to a later Login and so
-  nothing to hand back.
+  nothing. A `subscribe` on a Socket holding no attached Transport writes its
+  entry under ADR-0006 without composing a `sub` frame, so its caller receives
+  that entry: the instruction to a later Login exists, and the handle is what
+  makes it reachable. Only a Close leaves a Socket with no connection and no
+  instruction, and there the caller receives nothing.
 - A success response that names no `subs` writes no entry and resolves
   `undefined`. The `ready` is the acknowledgement and the only writer under
   ADR-0004; a response that acknowledges no stream leaves nothing to hand out.
-- A `sub` the server refused with a DDP error, and one that never reached the
-  Transport, are unchanged: they write nothing under ADR-0004 and ADR-0006, and
-  they resolve `undefined`.
+- A `sub` the server refused with a DDP error, and one whose frame an attached
+  Transport never took, are unchanged: they write nothing under ADR-0004 and
+  ADR-0006, and they resolve `undefined`.
 - The bookkeeping ADR-0006 governs is untouched: which paths write an entry, and
   under which id, is still its rule, and this ADR reads the result of it rather
   than changing it.
@@ -62,9 +67,12 @@ exists if and only if an entry does.
   ADR-0011 describes for a second holder of a shared record, reached by a second
   route.
 - A caller that treated a resolved value as proof the server acknowledged the
-  stream is now wrong: a handle is also returned where the server never answered.
-  The distinction ADR-0006 draws — a recorded DDP subscription does not prove the
-  server confirmed it — is now visible to callers rather than internal.
+  stream is now wrong: a handle is also returned where the server never answered,
+  and where no `sub` frame was composed at all. The distinction ADR-0006 draws —
+  a recorded DDP subscription does not prove the server confirmed it — is now
+  visible to callers rather than internal. A handle for an Offline sub names a
+  stream that was never on the wire, and nothing in the Driver contract
+  distinguishes it from one the server acknowledged.
 - `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
   counts a resubscribe as acknowledged from what `resubscribe` resolves. An
   abandoned or expired resubscribe now resolves a subscription rather than

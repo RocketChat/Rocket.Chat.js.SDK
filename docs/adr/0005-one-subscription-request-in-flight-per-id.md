@@ -10,12 +10,16 @@ ADR-0004 left one question open: whether a `sub` may be sent for an id whose
 `unsub` is still in flight, and what the server does when it is. Both halves are
 answered here.
 
-`unsubscribe` keeps its entry until the DDP response arrives. `subscribeAll`
-re-sends every entry under its own id, and `login` calls `subscribeAll`. A
-Login during that window therefore sends a `sub` carrying the id of a DDP
-subscription that is still being unsubscribed. The reverse pairing is reachable
-too: `resubscribe` re-sends an existing entry under its own id, and
-`unsubscribe` can be called while that `sub` waits for its `ready`.
+An `unsubscribe` that writes an `unsub` keeps its entry until the DDP response
+arrives. `subscribeAll` re-sends every entry under its own id, and `login` calls
+`subscribeAll`. A Login during that window therefore sends a `sub` carrying the
+id of a DDP subscription that is still being unsubscribed. The reverse pairing
+is reachable too: `resubscribe` re-sends an existing entry under its own id, and
+`unsubscribe` can be called while that `sub` waits for its `ready`. Both
+pairings are between frames on the wire. An `unsubscribe` on a Socket with no
+attached Transport composes no frame at all — it forgets the entry and resolves
+under ADR-0006 — so it opens no window, queues under no id, and is not one of
+the requests this ADR orders.
 
 `send` matches a DDP response to its request by id alone. It registers one
 listener under the id and settles on the first message that carries it, without
@@ -83,8 +87,11 @@ the first to have its DDP response before its own frame is written.
   rather than resolving it.
 - Two `sub`s for one stream carry one id and serialise on this rule, and the
   second finds the record the first wrote and shares it rather than sending
-  (ADR-0011). Two `unsub`s under one id serialise on the same rule. Neither was
-  known to lose data, but both left a second response with no listener.
+  (ADR-0011). Two `unsub`s that both reach the wire under one id serialise on the
+  same rule. Neither was known to lose data, but both left a second response with
+  no listener. Where the first `unsubscribe` had no attached Transport it has
+  already forgotten the entry, so the second finds no DDP subscription to end and
+  rejects rather than queueing behind anything.
 - A Login that runs while an `unsub` is in flight re-establishes that stream
   after the server has ended it, rather than racing it. The end state is the one
   the entry describes.
@@ -93,10 +100,11 @@ the first to have its DDP response before its own frame is written.
   the same class of fault and it is not fixed here. Separate issues track it,
   along with a `ready` that names more than one subscription id.
 - A queued request is issued when it is released, not when it is queued, so it
-  is written on whatever connection is current at that moment. A `sub` released
-  onto a connection that has not logged in yet is refused, `subscribe` resolves
-  `undefined`, and the entry it would have written is already there and
-  survives. The next Login's `subscribeAll` re-establishes the stream.
+  is written on whatever connection is current at that moment, and a `sub`
+  released when no Transport is attached records without writing under ADR-0006.
+  A `sub` released onto a connection that has not logged in yet is refused,
+  `subscribe` resolves `undefined`, and the entry it would have written is
+  already there and survives. The next Login's `subscribeAll` re-establishes the stream.
 - A request that a Reopen abandons is not re-sent by the queue. The queue holds
   the order of requests and nothing else. `subscribeAll` re-establishes the DDP
   subscriptions after a Login, and that stays the one path that re-sends.

@@ -108,12 +108,16 @@ The error field of a failed DDP response, as the server sent it. What the SDK ra
 _Avoid_: Error (unqualified — that is the JavaScript one), payload, fault
 
 **DDP subscription**:
-A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry. A recorded DDP subscription does not prove the server confirmed it — see Abandoned sub and ADR-0006. One stream has one DDP subscription: every caller subscribing to it holds the same one, and the first `unsubscribe` ends it for all of them — see ADR-0011.
+A client's active registration on one stream, which can be ended on its own. Qualified because the server's own "subscription" means a user's membership of a room — a meaning this SDK does not carry. A recorded DDP subscription does not prove the server confirmed it — see Abandoned sub, Offline sub and ADR-0006. One stream has one DDP subscription: every caller subscribing to it holds the same one, and the first `unsubscribe` ends it for all of them — see ADR-0011.
 _Avoid_: Sub, subscription (unqualified), the map, the collection (that is a field on an incoming DDP message)
 
 **Abandoned sub**:
 A DDP subscription whose `sub` reached the wire but whose DDP response the connection ended before delivering. The server may have acted on it, so its entry is kept and re-established rather than forgotten.
 _Avoid_: Lost subscription, orphaned stream, phantom
+
+**Offline sub**:
+A DDP subscription recorded from a `subscribe` made while the Socket held no attached Transport. No `sub` frame was composed, so the entry is the instruction and nothing else, and `subscribeAll` issues it once a Transport is attached. See ADR-0006.
+_Avoid_: Pending sub, queued sub, deferred subscription
 
 **Method call**:
 A named server procedure invoked over the realtime connection, as opposed to a REST request.
