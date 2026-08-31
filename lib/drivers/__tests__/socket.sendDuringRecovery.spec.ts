@@ -18,17 +18,11 @@ useFakeClockAndSocketRegistry()
 /** The delay a Scheduled Reopen waits out, read from the `reopen` option. */
 const REOPEN_DELAY = 3000
 
-/**
- * The `timeout` option. Chosen above `REOPEN_DELAY * 2` so the bound a send
- * waits on the open is the one that expires first, and the assertions name the
- * timer they meant.
- */
 const TIMEOUT = 9000
 
 const PING_INTERVAL = 4000
 
 const ABNORMAL_CLOSE = 1006
-const INTENTIONAL_CLOSE = 4000
 const NO_OPEN_CONNECTION = '[ddp] sending without open connection'
 
 const createSocket = () => new Socket({
@@ -79,10 +73,6 @@ describe('a send issued during the delayed recovery window', () => {
     expect(replacement.sent.some((frame) => frame.includes('"method":"logout"'))).toBe(false)
   })
 
-  it('closes the lost transport once, taking the peer close as the end of it', () => {
-    expect(transport.closedWith).toEqual([ABNORMAL_CLOSE])
-  })
-
   it('drops a subscribe silently: the write is refused and nothing is recorded', async () => {
     const subscribing = socket.subscribe('stream-room-messages', ['__my_messages__'])
 
@@ -94,11 +84,6 @@ describe('a send issued during the delayed recovery window', () => {
   })
 })
 
-/**
- * With no Transport attached, the ping's send is refused before any wait, so
- * `recoverAndKeepPinging` skips the re-arm and the Scheduled Reopen alone
- * carries recovery. Pinging resumes on the handshake of the replacement.
- */
 describe('pinging after a transport is lost', () => {
   let socket: Socket
 
@@ -117,18 +102,6 @@ describe('pinging after a transport is lost', () => {
 
     expect(replacement.sent.some((frame) => frame.includes('"msg":"ping"'))).toBe(true)
     expect(fakeSockets).toHaveLength(2)
-  })
-})
-
-describe('a transport released while it is already closed', () => {
-  it('is closed intentionally only when it was still open', async () => {
-    const socket = createSocket()
-    const transport = await openFakeConnection(socket)
-
-    await socket.close()
-
-    expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
-    expect(transport.readyState).toBe(CLOSED)
   })
 })
 

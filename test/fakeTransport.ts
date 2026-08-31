@@ -87,8 +87,8 @@ export class FakeWebSocket {
    * already closed socket does nothing, as it does on a real WebSocket.
    */
   close (code?: number): void {
-    if (this.closeError) throw this.closeError
     if (this.readyState === CLOSED) return
+    if (this.closeError) throw this.closeError
     this.closedWith.push(code)
     if (!this.answersClose) return
     this.readyState = CLOSED

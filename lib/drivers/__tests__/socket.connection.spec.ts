@@ -627,7 +627,7 @@ describe('Socket connection lifecycle', () => {
 
       expect(fakeSockets).toHaveLength(2)
       expect(connectionWork(socket)).toBe('attempting')
-      expect(socket.connection).toBe(fakeSockets[1])
+      expect(wiredTransports()).toEqual([fakeSockets[1]])
 
       await driveToHandshake(fakeSockets[1])
       await expect(reopening).resolves.toBeUndefined()
