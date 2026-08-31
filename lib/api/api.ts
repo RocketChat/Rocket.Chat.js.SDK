@@ -150,15 +150,11 @@ export default class Api extends SDKEventEmitter {
     this.logger?.debug(`[API] ${ method } ${ endpoint }:`, data)
     try {
       const { signal } = this.controller;
-      options = { ...options, signal };
+      const requestOptions = { ...options, signal };
+      const verbs: { [key: string]: 'get' | 'put' | 'delete' } = { GET: 'get', PUT: 'put', DELETE: 'delete' }
+      const verb = verbs[method] ?? 'post'
 
-      let result
-      switch (method) {
-        case 'GET': result = await this.client.get(endpoint, data, options, apiVersion); break
-        case 'PUT': result = await this.client.put(endpoint, data, options, apiVersion); break
-        case 'DELETE': result = await this.client.delete(endpoint, data, options, apiVersion); break
-        case 'POST': default: result = await this.client.post(endpoint, data, options, apiVersion); break
-      }
+      const result = await this.client[verb](endpoint, data, requestOptions, apiVersion)
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
       this.logger?.debug(`[API] ${method} ${endpoint} result ${result.status}`)

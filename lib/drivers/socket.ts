@@ -53,12 +53,10 @@ function hostToWS (host: string, ssl = false) {
 
 const socketDeadlineMs = 2000;
 
-const endedByOwnershipChange = (error: Error) => error instanceof AbandonedWait;
-
 interface Latch<T> {
   settle: (value: T) => void
   refuse: (error: Error) => void
-  whenSettled: (cleanup: () => void) => void
+  undoOnSettle: (undo: () => void) => void
 }
 
 /**
@@ -85,7 +83,7 @@ const latchedByDeadline = <T>(
     const latch: Latch<T> = {
       settle: (value) => finish(() => resolve(value)),
       refuse: (error) => finish(() => reject(error)),
-      whenSettled: (undo) => { cleanup = undo }
+      undoOnSettle: (undo) => { cleanup = undo }
     }
 
     const deadline = setTimeout(() => onDeadline(latch), deadlineMs)
@@ -267,7 +265,7 @@ export class Socket extends SDKEventEmitter {
 
   private letTransportClose = async (transport: Transport) => {
     if (transport.readyState === transportClosedState) return
-    await this.waitForClose(transport, socketDeadlineMs)
+    await this.waitForClose(transport)
   }
 
   /**
@@ -275,7 +273,7 @@ export class Socket extends SDKEventEmitter {
    * `close` event: a close emitted for the connection that replaced this one
    * says nothing about the Transport being closed here.
    */
-  private waitForClose = (transport: Transport, deadlineMs: number) => {
+  private waitForClose = (transport: Transport) => {
     const socketOnClose = transport.onclose
     let onTransportClose: (e: any) => void
 
@@ -289,7 +287,7 @@ export class Socket extends SDKEventEmitter {
     }
 
     return latchedByDeadline<void>(
-      deadlineMs,
+      socketDeadlineMs,
       (latch) => answerCloseOurselves(latch, 'the transport did not answer the close'),
       (latch) => {
         onTransportClose = (e: any) => {
@@ -323,21 +321,9 @@ export class Socket extends SDKEventEmitter {
       return Promise.resolve(false)
     }
 
-    return latchedByDeadline<boolean>(
-      deadlineMs,
-      (latch) => latch.settle(false),
-      (latch) => {
-        const onPong = () => latch.settle(true)
-        latch.whenSettled(() => this.off('pong', onPong))
-        this.once('pong', onPong)
-
-        try {
-          transport.send(JSON.stringify({ msg: 'ping' }))
-        } catch {
-          latch.settle(false)
-        }
-      }
-    )
+    return this.requests
+      .send({ msg: 'ping' }, transport.send.bind(transport), deadlineMs)
+      .then(() => true, () => false)
   }
 
   get transportOpen () {
@@ -370,7 +356,7 @@ export class Socket extends SDKEventEmitter {
         const onOpen = () => latch.settle()
         const refuse = (error: Error) => latch.refuse(error)
 
-        latch.whenSettled(() => {
+        latch.undoOnSettle(() => {
           this.off('open', onOpen)
           this.waitsForOpen.delete(refuse)
         })
@@ -414,7 +400,7 @@ export class Socket extends SDKEventEmitter {
   }
 
   private recoverAndKeepPinging = (error: Error) => {
-    if (endedByOwnershipChange(error)) return
+    if (error instanceof AbandonedWait) return
     this.reopen()
     if (this.connection) this.ping()
   }
