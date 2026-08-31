@@ -1,6 +1,5 @@
 import { Driver } from '../driver'
 import { logger as defaultLogger } from '../../log'
-import { createSilentLogger } from '../../../test/createSilentLogger'
 import { createDriver } from '../../../test/createDriver'
 import {
   CLOSED,

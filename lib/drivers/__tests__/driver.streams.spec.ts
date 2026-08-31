@@ -62,8 +62,6 @@ describe('Driver.subscribeRaw', () => {
     transport.receive({ msg: 'ready', subs: [id] })
     const subscription = await subscribing
 
-    // The id is derived from the stream, so the second call finds the entry the
-    // first wrote and shares it: one stream is one DDP subscription.
     const shared = await driver.subscribeRaw('stream-notify-user', ['user-id/message', false])
 
     expect(shared).toBe(subscription)
@@ -139,8 +137,6 @@ describe('Driver.unsubscribe', () => {
     transport.receive({ msg: 'nosub', id })
     await unsubscribing
 
-    // The entry is gone, so a second holder of the same shared stream gets the
-    // only warning the shared lifetime offers.
     await expect(driver.unsubscribe(subscription!))
       .rejects.toThrow(`[ddp] No subscription to unsubscribe from: ${id}`)
   })
@@ -201,8 +197,6 @@ describe('Driver.onStreamData', () => {
     stop()
     transport.receive({ msg: 'changed', collection: 'stream-notify-logged', fields: { args: ['after'] } })
 
-    // A second stop removes nothing rather than splicing whatever sits last on
-    // the event, so the other caller still receives its frames.
     expect(stopped).not.toHaveBeenCalled()
     expect(kept).toHaveBeenCalledTimes(1)
   })
@@ -230,8 +224,6 @@ describe('Driver.removeAllListeners', () => {
     })
 
     expect(connectedSeen).not.toHaveBeenCalled()
-    // Stream data is delivered by the Socket's emitter, not the Driver's, so the
-    // Driver clearing its own listeners does not reach it: `stop` is what does.
     expect(streamSeen).toHaveBeenCalledTimes(1)
 
     stop()

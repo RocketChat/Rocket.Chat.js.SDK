@@ -65,7 +65,7 @@ describe('client.login', () => {
     })
   })
 
-  it('documents the split-brain: the REST token stays held after the realtime login fails', async () => {
+  it('keeps the REST token held after the realtime login fails', async () => {
     const restClient = new FakeClient()
     const client = createClient(restClient)
     jest.spyOn(client.driver, 'login').mockRejectedValue(new Error('realtime login failed'))

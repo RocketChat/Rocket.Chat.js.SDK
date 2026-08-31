@@ -48,4 +48,3 @@ describe('Api resumeLogin', () => {
     expect(api.currentLogin).toBe(held)
   })
 })
-
