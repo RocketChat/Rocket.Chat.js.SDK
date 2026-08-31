@@ -880,6 +880,8 @@ describe('Socket connection lifecycle', () => {
       expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
       expect(settled).toHaveBeenCalled()
       expect(socket.connection).toBeUndefined()
+      expect([transport.onopen, transport.onmessage, transport.onerror, transport.onclose])
+        .toEqual([null, null, null, null])
     })
 
     it('settles without waiting when the transport refuses to close', async () => {
@@ -1027,6 +1029,45 @@ describe('Socket connection lifecycle', () => {
 
         await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
         await closing
+      })
+
+      it('settles and announces one close when the transport reports the close it never answered', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+        const settled = jest.fn()
+
+        const closing = socket.close()
+        closing.then(settled, settled)
+        await jest.advanceTimersByTimeAsync(0)
+
+        transport.onclose?.({ code: 1006 })
+        await closing
+
+        expect(settled).toHaveBeenCalledTimes(1)
+        expect(closeSeen).toHaveBeenCalledTimes(1)
+        expect(closeSeen).toHaveBeenCalledWith({ code: 1006 })
+        expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
+        expect([transport.onopen, transport.onmessage, transport.onerror, transport.onclose])
+          .toEqual([null, null, null, null])
+      })
+
+      it('announces one close for a transport that reports its close twice', async () => {
+        const closeSeen = jest.fn()
+        socket.on('close', closeSeen)
+        const settled = jest.fn()
+
+        const closing = socket.close()
+        closing.then(settled, settled)
+        await jest.advanceTimersByTimeAsync(0)
+
+        const reportClose = transport.onclose!
+        reportClose({ code: 1006 })
+        reportClose({ code: 1006 })
+        await closing
+
+        expect(settled).toHaveBeenCalledTimes(1)
+        expect(closeSeen).toHaveBeenCalledTimes(1)
+        expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
       })
 
       it('refuses a send that was still waiting for the transport to open', async () => {

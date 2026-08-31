@@ -270,28 +270,38 @@ describe('DDPSubscriptions', () => {
     })
 
     it('resolves false when the server does not acknowledge a stream', async () => {
-      const { subscriptions, send } = createSubscriptions()
+      const { subscriptions, send, logger } = createSubscriptions()
       await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.resolve({ subs: [] }))
 
       await expect(subscriptions.resubscribeWhenRecorded([
         { name: 'stream-room-messages', params: ['GENERAL'] }
       ])).resolves.toBe(false)
+
+      expect(logger.error).toHaveBeenCalledWith('[ddp] Subscribe not acknowledged: GENERAL')
+    })
+
+    it('resolves true for a stream that is only recorded by a later poll', async () => {
+      const { subscriptions, send } = createSubscriptions()
+
+      const resubscribing = subscriptions.resubscribeWhenRecorded([
+        { name: 'stream-room-messages', params: ['GENERAL'] }
+      ])
+      await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
+      send.mockClear()
+
+      await expect(resubscribing).resolves.toBe(true)
+      expect(send).toHaveBeenCalledTimes(1)
     })
 
     it('sends nothing and resolves false when a stream is never recorded', async () => {
-      jest.useFakeTimers()
       const { subscriptions, send } = createSubscriptions()
 
-      const resubscribing = subscriptions.resubscribeWhenRecorded(
+      await expect(subscriptions.resubscribeWhenRecorded(
         [{ name: 'stream-room-messages', params: ['GENERAL'] }],
-        500
-      )
-      jest.advanceTimersByTime(500)
-
-      await expect(resubscribing).resolves.toBe(false)
+        20
+      )).resolves.toBe(false)
       expect(send).not.toHaveBeenCalled()
-      jest.useRealTimers()
     })
   })
 })

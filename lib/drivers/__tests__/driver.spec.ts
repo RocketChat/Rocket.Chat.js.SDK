@@ -1,6 +1,6 @@
 import { Driver } from '../driver'
-import { ISocketOptions } from '../../../interfaces'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { logger as defaultLogger } from '../../log'
+import { createDriver } from '../../../test/createDriver'
 import {
   CLOSED,
   driveToHandshake,
@@ -16,26 +16,6 @@ import {
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
-
-// Typed rather than `object`: the option names have to typecheck, or the pin on
-// the discarded timeout would go green against a typo.
-const createDriver = (options: ISocketOptions = {}) =>
-  new Driver({ host: 'localhost:3000', logger: createSilentLogger(), ...options })
-
-/**
- * Accepted gaps, on the record rather than silently skipped:
- *
- * - The fixed topic and event lists (`subscribeNotifyAll`, `subscribeLoggedNotify`,
- *   `subscribeNotifyUser`, `subscribeRoom`) are data, not behaviour. A test over
- *   them is a snapshot that goes red on every intentional product change, so the
- *   reshaping they all funnel through is pinned once, below, instead.
- * - The one-line pass-throughs (`probe`, `lastPing`, `pingInterval`,
- *   `subscribeRaw`, `unsubscribe`, `unsubscribeAll`, `methodCall`)
- *   forward their arguments to the socket and nothing else. They carry no
- *   logic, so a test over them asserts that a line of code exists. `disconnect`
- *   and `reopenNow` forward just as thinly, but what they forward to takes
- *   ownership of the socket, so the Driver-level races are pinned below.
- */
 
 describe('new Driver', () => {
   it('strips the protocol from the host it was given', () => {
@@ -54,6 +34,13 @@ describe('new Driver', () => {
 
     expect(driver.config.timeout).toBe(250)
     expect(driver['socket'].config.ping).toBe(250)
+  })
+
+  it('defaults the host and the logger when constructed with no options', () => {
+    const driver = new Driver()
+
+    expect(driver.config.host).toBe('localhost:3000')
+    expect(driver.logger).toBe(defaultLogger)
   })
 
   it('defaults the timeout to 10000 when the caller gives none', () => {

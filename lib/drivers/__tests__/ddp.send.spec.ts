@@ -134,7 +134,7 @@ describe('Socket.send', () => {
     })
   })
 
-  it('uses a replacement logger for request messages', async () => {
+  it('logs the sent message to the logger it was handed', async () => {
     const logger = createSilentLogger()
     socket.logger = logger
 
@@ -498,6 +498,24 @@ describe('Socket.send with several listeners on one event', () => {
 
       await rejected
     })
+  })
+
+  it('rejects a send waiting on open when a forced reopen replaced the connection, and writes nothing on the replacement', async () => {
+    transport.readyState = CLOSED
+    const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
+    await jest.advanceTimersByTimeAsync(0)
+
+    const rejected = expect(sending).rejects
+      .toThrow('[ddp] connection replaced before the message was written')
+
+    const reopening = socket.reopenNow()
+    const replacement = fakeSockets[1]
+    await driveToHandshake(replacement)
+    await reopening
+    await jest.advanceTimersByTimeAsync(0)
+
+    await rejected
+    expect(replacement.sent.map((frame: string) => JSON.parse(frame).msg)).not.toContain('method')
   })
 
   it('waits for open up to twice the reopen delay, and no longer', async () => {
