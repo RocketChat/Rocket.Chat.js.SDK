@@ -376,11 +376,6 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('a subscription that never reached the wire', () => {
-    // A `sub` composed on an attached Transport that the server never saw leaves
-    // no entry: the connection that carried it failed to deliver. A `sub` issued
-    // with no Transport attached composes no frame at all, and is recorded as an
-    // instruction to the next Login.
-
     it('holds nothing when the attached transport failed to write it', async () => {
       transport.sendError = new Error('socket closed under the write')
 
@@ -390,7 +385,6 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('holds nothing when the send expired on an attached transport', async () => {
-      // Attached and never opening: the send never gets to compose a frame.
       transport.readyState = CLOSED
 
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])

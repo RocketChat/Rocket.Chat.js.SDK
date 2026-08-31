@@ -37,13 +37,6 @@ const createSocket = () => new Socket({
 
 const methodCall = { msg: 'method', method: 'logout', params: [] }
 
-/**
- * A send issued after an unexpected transport loss, while the Socket is waiting
- * out a Scheduled Reopen. The lost Transport is released, so there is nothing
- * attached to write on and the send is refused rather than left waiting. A
- * `subscribe` is not a send on this path: with no Transport attached it composes
- * no frame and is recorded for the replacement connection.
- */
 describe('a send issued during the delayed recovery window', () => {
   let socket: Socket
   let transport: FakeWebSocket

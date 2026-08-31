@@ -130,8 +130,6 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   it('resolves false with no transport attached, though both media streams are recorded', async () => {
     const driver = createDriver()
     driver.userId = userId
-    // Recorded with nothing attached, which is how a subscribe made off the
-    // connection is kept: entries the poll finds, on a socket that can send none.
     await driver['socket'].subscribe(topic, [`${userId}/media-signal`])
     await driver['socket'].subscribe(topic, [`${userId}/media-calls`])
     const transportsBefore = fakeSockets.length

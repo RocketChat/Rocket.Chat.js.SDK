@@ -105,7 +105,9 @@ export class Socket extends SDKEventEmitter {
       send: (message) => this.send(message),
       onEvent: (name, listener) => this.onEvent(name, listener),
       closesTaken: () => this.connectionWork.closesTaken,
-      recordWithoutSending: () => !this.connection && !this.connectionWork.closing,
+      hasNoAttachedTransportAndNoCloseOwner: () => (
+        !this.connection && !this.connectionWork.closing
+      ),
       deadlineMs: this.config.timeout
     })
     this.connectionWork = new Connection({
@@ -485,15 +487,6 @@ export class Socket extends SDKEventEmitter {
     return params
   }
 
-  /**
-   * Logout the current User from the server via Socket.
-   *
-   * With no attached Transport there is nothing to write on, so the Logout ends
-   * locally: every entry is forgotten and the stored Login cleared, so the next
-   * user inherits neither. A Close that took the connection away is the
-   * exception, and the caller hears about it rather than reading a silent
-   * success.
-   */
   logout = () => {
     if (this.connectionWork.closing) return Promise.reject(AbandonedWait.responseClosed())
     if (!this.connection) {
