@@ -2,7 +2,7 @@ import { Socket } from '../socket'
 import { DDPError } from '../ddpError'
 import * as settings from '../../settings'
 import { createSilentLogger } from '../../../test/createSilentLogger'
-import { createSocket } from '../../../test/createSocket'
+import { createSocket, PING_INTERVAL_OUTSIDE_TEST_WINDOW, REOPEN_DELAY } from '../../../test/createSocket'
 import {
   CLOSED,
   FakeWebSocket,
@@ -10,6 +10,7 @@ import {
   driveToHandshake,
   fakeSockets,
   hasScheduledReopen,
+  INTENTIONAL_CLOSE,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -35,10 +36,10 @@ describe('the transport seam', () => {
     const closed = jest.fn()
     socket.on('close', closed)
 
-    transport.close(4000)
+    transport.close(INTENTIONAL_CLOSE)
 
-    expect(transport.closedWith).toEqual([4000])
-    expect(closed).toHaveBeenCalledWith({ code: 4000 })
+    expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
+    expect(closed).toHaveBeenCalledWith({ code: INTENTIONAL_CLOSE })
     expect(socket.connected).toBe(false)
   })
 })
@@ -239,13 +240,11 @@ describe('Socket.send', () => {
 })
 
 describe('Socket.send with several listeners on one event', () => {
-  const REOPEN_DELAY = 3000
-
   let socket: Socket
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = createSocket({ reopen: REOPEN_DELAY, ping: 10 * 60 * 1000 })
+    socket = createSocket({ reopen: REOPEN_DELAY, ping: PING_INTERVAL_OUTSIDE_TEST_WINDOW })
     transport = await openFakeConnection(socket)
   })
 
@@ -487,7 +486,6 @@ describe('Socket.send with several listeners on one event', () => {
 })
 
 describe('a send on a connection that stays up and stays silent', () => {
-  const REOPEN_DELAY = 3000
   const EXPIRED_MESSAGE = '[ddp] no response arrived before the deadline'
   const PATIENT_TIMEOUT = 30000
 
@@ -495,7 +493,7 @@ describe('a send on a connection that stays up and stays silent', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = createSocket({ reopen: REOPEN_DELAY, ping: 10 * 60 * 1000 })
+    socket = createSocket({ reopen: REOPEN_DELAY, ping: PING_INTERVAL_OUTSIDE_TEST_WINDOW })
     transport = await openFakeConnection(socket)
   })
 
@@ -519,7 +517,7 @@ describe('a send on a connection that stays up and stays silent', () => {
   })
 
   it('takes its bound from the timeout option', async () => {
-    const patient = createSocket({ reopen: REOPEN_DELAY, ping: 10 * 60 * 1000, timeout: PATIENT_TIMEOUT })
+    const patient = createSocket({ reopen: REOPEN_DELAY, ping: PING_INTERVAL_OUTSIDE_TEST_WINDOW, timeout: PATIENT_TIMEOUT })
     await openFakeConnection(patient)
 
     const sending = patient.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })

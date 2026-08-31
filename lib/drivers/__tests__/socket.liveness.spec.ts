@@ -9,7 +9,7 @@ import {
   hasScheduledReopen,
   OPEN,
   openFakeConnection,
-  USER_DISCONNECT,
+  INTENTIONAL_CLOSE,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -106,7 +106,7 @@ describe('Socket liveness', () => {
 
       await socket.close()
 
-      expect(transport.closedWith).toEqual([USER_DISCONNECT])
+      expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
       expect(transport.readyState).toBe(CLOSED)
     })
   })

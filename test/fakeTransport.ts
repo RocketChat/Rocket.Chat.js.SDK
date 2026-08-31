@@ -6,7 +6,8 @@ import type { ISocketMessageCallback } from '../interfaces'
 export const CONNECTING = 0
 export const OPEN = 1
 export const CLOSED = 3
-export const USER_DISCONNECT = 4000
+/** The code the SDK closes a transport with when it asked for the close. */
+export const INTENTIONAL_CLOSE = 4000
 
 export const fakeSockets: FakeWebSocket[] = []
 
@@ -145,7 +146,7 @@ export const subscribeAndAck = async (
   return subscribing
 }
 
-export const lastMethodCallId = (transport: FakeWebSocket): string => {
+const lastMethodCallId = (transport: FakeWebSocket): string => {
   const { msg, id } = transport.lastSent() as { msg: string, id: string }
   expect(msg).toBe('method')
   return id

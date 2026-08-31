@@ -20,31 +20,22 @@ export const userFields = { name: 1, username: 1, status: 1, type: 1 }
 /** Query helpers for user collection requests */
 export default class ApiRocketChat extends ApiBase {
 
-  private usersApi: any
-  private roomsApi: any
-
   get users (): any {
-    if (!this.usersApi) {
-      this.usersApi = {
-        all: (fields: any = userFields) => this.get('users.list', { fields }).then((r: any) => r.users),
-        allNames: () => this.get('users.list', { fields: { 'username': 1 } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)),
-        allIDs: () => this.get('users.list', { fields: { '_id': 1 } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)),
-        online: (fields: any = userFields) => this.get('users.list', { fields, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users),
-        onlineNames: () => this.get('users.list', { fields: { 'username': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)),
-        onlineIds: () => this.get('users.list', { fields: { '_id': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)),
-        info: async (username: string): Promise<IUserAPI> => (await this.get('users.info', { username })).user
-      }
+    return {
+      all: (fields: any = userFields) => this.get('users.list', { fields }).then((r: any) => r.users),
+      allNames: () => this.get('users.list', { fields: { 'username': 1 } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)),
+      allIDs: () => this.get('users.list', { fields: { '_id': 1 } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)),
+      online: (fields: any = userFields) => this.get('users.list', { fields, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users),
+      onlineNames: () => this.get('users.list', { fields: { 'username': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u.username)),
+      onlineIds: () => this.get('users.list', { fields: { '_id': 1 }, query: { 'status': { $ne: 'offline' } } }).then((r: any) => r.users.map((u: IUserAPI) => u._id)),
+      info: async (username: string): Promise<IUserAPI> => (await this.get('users.info', { username })).user
     }
-    return this.usersApi
   }
 
   get rooms (): any {
-    if (!this.roomsApi) {
-      this.roomsApi = {
-        info: ({ rid }: any) => this.get('rooms.info', { rid })
-      }
+    return {
+      info: ({ rid }: any) => this.get('rooms.info', { rid })
     }
-    return this.roomsApi
   }
 
 	// editMessage(message: IMessage) chat.update

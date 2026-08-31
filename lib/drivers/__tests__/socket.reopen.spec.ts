@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSocket } from '../../../test/createSocket'
+import { createSocket, REOPEN_DELAY, socketOptions } from '../../../test/createSocket'
 import {
   CLOSED,
   connectionWork,
@@ -7,6 +7,7 @@ import {
   FakeWebSocket,
   fakeSockets,
   hasScheduledReopen,
+  INTENTIONAL_CLOSE,
   wiredTransports,
   OPEN,
   openFakeConnection,
@@ -17,29 +18,7 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-/** The code the driver closes with when *it* asked for the close. */
-const INTENTIONAL_CLOSE = 4000
-
-/**
- * The delay a Scheduled Reopen waits out, read from the `reopen` option.
- * Deliberately *not* the 10000 default, and deliberately not the deadline below:
- * with either, a boundary assertion would pass whether or not the driver read
- * the option, and the two timers would be indistinguishable on the clock.
- */
-const REOPEN_DELAY = 3000
-
-/**
- * The `timeout` option: the Deadline of one Connection Attempt, and the bound a
- * send waits on its DDP response. Deliberately neither the 10000 default nor
- * `REOPEN_DELAY`, so the assertions distinguish all three.
- */
-const TIMEOUT = 7000
-
-const PING_INTERVAL_OUTSIDE_TEST_WINDOW = 10 * 60 * 1000
-
-const socketOptions = { reopen: REOPEN_DELAY, timeout: TIMEOUT, ping: PING_INTERVAL_OUTSIDE_TEST_WINDOW }
-
-describe('Socket connection lifecycle', () => {
+describe('Socket reopen', () => {
   let socket: Socket
   let transport: FakeWebSocket
 

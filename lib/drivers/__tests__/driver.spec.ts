@@ -10,8 +10,6 @@ import {
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
-// Same seam as the socket specs: the driver builds its Socket, the Socket builds
-// the fake through its normal code path. See test/fakeTransport.ts.
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()

@@ -1,7 +1,5 @@
 import { Socket } from '../socket'
-import { ILogger } from '../../../interfaces'
-import { createSilentLogger } from '../../../test/createSilentLogger'
-import { createSocket } from '../../../test/createSocket'
+import { createSocket, REOPEN_DELAY, socketOptions } from '../../../test/createSocket'
 import {
   CLOSED,
   CONNECTING,
@@ -9,6 +7,7 @@ import {
   FakeWebSocket,
   fakeSockets,
   hasScheduledReopen,
+  INTENTIONAL_CLOSE,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -17,41 +16,17 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-/** The code the driver closes with when *it* asked for the close. */
-const INTENTIONAL_CLOSE = 4000
-
-/**
- * The delay a Scheduled Reopen waits out, read from the `reopen` option.
- * Deliberately *not* the 10000 default, and deliberately not the deadline below:
- * with either, a boundary assertion would pass whether or not the driver read
- * the option, and the two timers would be indistinguishable on the clock.
- */
-const REOPEN_DELAY = 3000
-
-/**
- * The `timeout` option: the Deadline of one Connection Attempt, and the bound a
- * send waits on its DDP response. Deliberately neither the 10000 default nor
- * `REOPEN_DELAY`, so the assertions distinguish all three.
- */
-const TIMEOUT = 7000
-
-const PING_INTERVAL_OUTSIDE_TEST_WINDOW = 10 * 60 * 1000
-
 /** Mirrors the bound `close` waits on the transport's close event. */
 const CLOSE_DEADLINE = 2000
 
 const CLOSED_BEFORE_OPEN = '[ddp] connection closed before it opened'
 
-const socketOptions = { reopen: REOPEN_DELAY, timeout: TIMEOUT, ping: PING_INTERVAL_OUTSIDE_TEST_WINDOW }
-
-describe('Socket connection lifecycle', () => {
+describe('Socket close', () => {
   let socket: Socket
   let transport: FakeWebSocket
-  let logger: ILogger
 
   beforeEach(async () => {
-    logger = createSilentLogger()
-    socket = createSocket({ logger, ...socketOptions })
+    socket = createSocket(socketOptions)
     transport = await openFakeConnection(socket)
   })
 
@@ -131,7 +106,7 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('leaves a logout on a socket that never connected a no-op', async () => {
-      await expect(createSocket({ logger, ...socketOptions }).logout()).resolves.toBeUndefined()
+      await expect(createSocket(socketOptions).logout()).resolves.toBeUndefined()
     })
 
     it('admits connection work again once it has settled', async () => {

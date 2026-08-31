@@ -63,7 +63,7 @@ The server's answer decides; silence keeps the instruction.
   cancelled attempt detaches its Transport and drops the reference, so a forced
   Reopen that abandons an in-flight `sub` and then fails would record nothing,
   and that is exactly the case this ADR exists for. It also never answers the
-  question a Reopen raises: `attachTransport` installs the replacement before it
+  question a Reopen raises: `installTransport` installs the replacement before it
   releases the predecessor, so a Reopen leaves the Socket holding a connection
   by the time any rejection is delivered.
 - Asking whether a Close owns the Socket right now is close-specific and too

@@ -103,6 +103,8 @@ export interface IApiOptions {
 
 export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
 
+const clientVerbs: { [method: string]: 'get' | 'put' | 'delete' } = { GET: 'get', PUT: 'put', DELETE: 'delete' }
+
 const authTokenHeader = 'X-Auth-Token'
 const userIdHeader = 'X-User-Id'
 
@@ -151,8 +153,7 @@ export default class Api extends SDKEventEmitter {
     try {
       const { signal } = this.controller;
       const requestOptions = { ...options, signal };
-      const verbs: { [key: string]: 'get' | 'put' | 'delete' } = { GET: 'get', PUT: 'put', DELETE: 'delete' }
-      const verb = verbs[method] ?? 'post'
+      const verb = clientVerbs[method] ?? 'post'
 
       const result = await this.client[verb](endpoint, data, requestOptions, apiVersion)
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
