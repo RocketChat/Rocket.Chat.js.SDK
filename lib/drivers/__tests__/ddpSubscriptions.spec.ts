@@ -112,13 +112,8 @@ describe('DDPSubscriptions', () => {
     })
 
     it('records nothing when a close took the socket while the sub was in flight', async () => {
-      let closes = 0
       const { subscriptions } = createSubscriptions({
-        getCloseGeneration: () => closes,
-        send: jest.fn((message: any) => {
-          closes += 1
-          return Promise.resolve({ subs: [message.id] })
-        })
+        getCloseGeneration: jest.fn().mockReturnValueOnce(0).mockReturnValue(1)
       })
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])

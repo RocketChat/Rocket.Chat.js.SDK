@@ -166,11 +166,11 @@ export class DDPSubscriptions {
     stream: IDDPSubscriptionRequest,
     callback?: ISocketMessageCallback
   ) => {
-    const closesBefore = this.getCloseGeneration()
     if (this.isOffline()) {
       const recorded = this.records[stream.id]
-      return Promise.resolve(recorded || this.rememberSubscription(stream, closesBefore, callback))
+      return Promise.resolve(recorded || this.writeSubscription(stream, callback))
     }
+    const closesBefore = this.getCloseGeneration()
     return this.send({ msg: 'sub', ...stream })
       .then((response) => {
         if (response.subs?.length) return this.rememberSubscription(stream, closesBefore, callback)
@@ -186,11 +186,18 @@ export class DDPSubscriptions {
   }
 
   private rememberSubscription = (
-    { id, name, params }: IDDPSubscriptionRequest,
+    stream: IDDPSubscriptionRequest,
     closesBefore: number,
     callback?: ISocketMessageCallback
   ) => {
     if (this.getCloseGeneration() !== closesBefore) return
+    return this.writeSubscription(stream, callback)
+  }
+
+  private writeSubscription = (
+    { id, name, params }: IDDPSubscriptionRequest,
+    callback?: ISocketMessageCallback
+  ) => {
     const unsubscribe = this.unsubscribe.bind(this, id)
     const onEvent = (listener: ISocketMessageCallback) => this.onEvent(name, listener)
     const subscription = { id, name, params, unsubscribe, onEvent }

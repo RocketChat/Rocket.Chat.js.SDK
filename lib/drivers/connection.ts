@@ -81,6 +81,10 @@ export class Connection {
     return this.closes
   }
 
+  get offline () {
+    return !this.transport && !this.closeOwned
+  }
+
   isCurrent = (attempt: Attempt) => this.attempt === attempt
 
   open = (): Promise<void> => {
