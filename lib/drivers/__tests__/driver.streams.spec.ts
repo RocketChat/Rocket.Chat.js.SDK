@@ -34,14 +34,6 @@ const ackSubsSentSince = async (transport: FakeWebSocket, sentBefore: number) =>
   return frames
 }
 
-/**
- * Accepted gap, on the record rather than silently skipped: the fixed event lists
- * `subscribeNotifyAll`, `subscribeLoggedNotify` and `subscribeNotifyUser` send are
- * data, not behaviour. A test over them is a snapshot that goes red on every
- * intentional product change, so the reshaping they all funnel through is pinned
- * once, below, instead.
- */
-
 describe('Driver.subscribeRaw', () => {
   beforeEach(connectDriver)
 

@@ -13,7 +13,6 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-/** The delay a Scheduled Reopen waits out, read from the `reopen` option. */
 const REOPEN_DELAY = 3000
 
 const TIMEOUT = 9000
@@ -27,12 +26,7 @@ const socketOptions = { reopen: REOPEN_DELAY, timeout: TIMEOUT, ping: PING_INTER
 
 const methodCall = { msg: 'method', method: 'logout', params: [] }
 
-/**
- * A send issued after an unexpected transport loss, while the Socket is waiting
- * out a Scheduled Reopen. The lost Transport is released, so there is nothing
- * attached to write on and the send is refused rather than left waiting.
- */
-describe('a send issued during the delayed recovery window', () => {
+describe('a send issued after an unexpected close, while the scheduled reopen is pending', () => {
   let socket: Socket
   let transport: FakeWebSocket
 

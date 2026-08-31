@@ -14,17 +14,12 @@ import {
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
-// Hoisted above the imports by jest, so the driver's own `import WebSocket from
-// 'universal-websocket-client'` resolves to the fake. This is the whole seam:
-// the driver constructs the fake through its normal code path.
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
 describe('the transport seam', () => {
   it('constructs the transport with the driver arguments and the shared headers', async () => {
-    // Replaced rather than assigned, for the same reason test/setup.ts does it:
-    // jest owns the restore, so this cannot leak into the next test.
     jest.replaceProperty(settings, 'customHeaders', { 'X-Auth-Token': 'token' })
     await openFakeConnection(createSocket())
 
@@ -40,8 +35,6 @@ describe('the transport seam', () => {
     const closed = jest.fn()
     socket.on('close', closed)
 
-    // 4000 is the driver's own user-disconnect code; it is the branch that does
-    // *not* schedule a reopen, so closing with it leaves no timer behind here.
     transport.close(4000)
 
     expect(transport.closedWith).toEqual([4000])
@@ -61,7 +54,6 @@ describe('Socket.send', () => {
 
   describe('request ids', () => {
     it('numbers ids from the count of frames already sent', async () => {
-      // The handshake was frame 0, so the first send from a test is `ddp-1`.
       const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
 
       expect(transport.lastSent()).toEqual({
@@ -85,8 +77,6 @@ describe('Socket.send', () => {
     })
 
     it('sends the handshake, ping and pong without an id', async () => {
-      // The three DDP messages the protocol matches by `msg` alone. The
-      // handshake already proved `connect`; ping and pong are sent here.
       expect(JSON.parse(transport.sent[0])).toEqual({
         msg: 'connect',
         version: '1',
@@ -103,9 +93,6 @@ describe('Socket.send', () => {
     })
 
     it('strips the id from any msg merely containing connect, ping or pong', async () => {
-      // The guard is a substring regex, not an equality check, so a longer name
-      // is treated as one of the three. No DDP message today has such a name —
-      // pinned so that adding one is a visible decision rather than a surprise.
       await socket.send({ msg: 'preconnect' })
 
       expect(transport.lastSent()).toEqual({ msg: 'preconnect' })
@@ -156,34 +143,28 @@ describe('Socket.send', () => {
   })
 
   describe('reply matching', () => {
-    it('matches an ordinary request on its own id, and echoes the id back', async () => {
+    it('matches an ordinary request on its own id, ignores a reply carrying another id, and echoes the id back', async () => {
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
-      // Deliberately noisy: a reply carrying a different id must not resolve it.
       transport.receive({ msg: 'result', id: 'ddp-99', result: 'wrong' })
       transport.receive({ msg: 'result', id: 'ddp-1', result: 'right' })
 
       await expect(sending).resolves.toEqual({ id: 'ddp-1', result: 'right', error: undefined })
     })
 
-    it('matches a ping on pong rather than on an id', async () => {
+    it('matches a ping on pong rather than on an id, and resolves it without an id', async () => {
       const pinging = socket.send({ msg: 'ping' })
 
       transport.receive({ msg: 'pong' })
 
-      // No `id` in the resolved value: the id-less requests get no id back.
       await expect(pinging).resolves.toEqual({ msg: 'pong' })
     })
 
     it('takes the session from the connected handshake', async () => {
-      // Proven by the shared setup, which only completes because `onOpen`'s
-      // `connect` send resolved on the `connected` message.
       expect(socket.session).toBe('fake-session')
     })
 
     it('resolves undefined for a request with neither a reply event nor an id', async () => {
-      // `pong` is stripped of its id and is not itself awaited on `pong`, so
-      // there is no listener to register: it resolves as soon as it is written.
       await expect(socket.send({ msg: 'pong' })).resolves.toBeUndefined()
     })
   })
@@ -195,28 +176,23 @@ describe('Socket.send', () => {
       const error = { error: 403, reason: 'User not found', errorType: 'Meteor.Error' }
       transport.receive({ msg: 'result', id: 'ddp-1', error })
 
-      // Callers up the stack log `err.message`; the reason has to survive there.
       await expect(sending).rejects.toBeInstanceOf(Error)
       await expect(sending).rejects.toThrow('User not found')
-      // The DDP error's own fields stay readable, so a caller branching on
-      // `err.error` or `err.errorType` still works.
       await expect(sending).rejects.toMatchObject(error)
     })
   })
 
   describe('sending while the connection is not open', () => {
-    it('rejects on the deadline rather than waiting on open forever', async () => {
+    it('rejects on the deadline without writing the message, rather than waiting on open forever', async () => {
       transport.readyState = CLOSED
 
-      // Asserted before the clock moves: the rejection lands inside the advance,
-      // and an unattached handler at that point is an unhandled rejection.
       const rejected = expect(socket.send({ msg: 'method', method: 'login', params: [] }))
         .rejects.toThrow('[ddp] timed out waiting for the connection to open')
 
       await jest.advanceTimersByTimeAsync(10 * 60 * 1000)
 
       await rejected
-      expect(transport.sent).toHaveLength(1) // the handshake only
+      expect(transport.sent).toHaveLength(1)
     })
 
     it('sends once the connection opens inside the deadline', async () => {
@@ -226,14 +202,10 @@ describe('Socket.send', () => {
 
       const sending = socket.send({ msg: 'method', method: 'login', params: [] })
 
-      // `open` is emitted at the end of the handshake, so the whole attempt has
-      // to succeed before the waiting send can go out.
       await driveToHandshake(attempting)
       await opening
       await jest.advanceTimersByTimeAsync(0)
 
-      // The handshake writes on the same tick, so the waiting send is not
-      // necessarily the last frame, only written at all.
       expect(attempting.sent.map(frame => JSON.parse(frame)))
         .toContainEqual({ msg: 'method', method: 'login', params: [], id: 'ddp-2' })
       attempting.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
@@ -241,9 +213,6 @@ describe('Socket.send', () => {
     })
 
     it('sends on the open socket it already has when the last ping has gone stale', async () => {
-      // An unanswered ping lapses `alive()` and schedules a reopen, while the
-      // transport stays open. No attempt is running, so no `open` event is
-      // coming for a send to wait on.
       await jest.advanceTimersByTimeAsync(socket.config.ping * 2 + 1)
 
       expect(hasScheduledReopen(socket)).toBe(true)
@@ -263,24 +232,12 @@ describe('Socket.send', () => {
     })
 
     it('rejects the send when there is no connection at all', async () => {
-      // The guard used to sit inside an async promise executor, which dropped
-      // the throw as an unhandled rejection instead of failing the caller.
       await expect(createSocket().send({ msg: 'method', method: 'login', params: [] }))
         .rejects.toThrow('[ddp] sending without open connection')
     })
   })
 })
 
-/**
- * Every test below has more than one listener registered for the same event at
- * the same time — the shape `tiny-events` mishandled by mutating the listener
- * array by index. They are driver-level rather than emitter-level on purpose:
- * the emitter specs pin the mechanism, these pin that a send actually survives
- * it.
- *
- * The ping interval is pushed far beyond every advance here, so no ping frame
- * joins the ones being counted. The reopen delay is the arithmetic.
- */
 describe('Socket.send with several listeners on one event', () => {
   const REOPEN_DELAY = 3000
 
@@ -319,8 +276,6 @@ describe('Socket.send with several listeners on one event', () => {
       socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
     )
 
-    // Both halves, as ADR-0001 established: an `Error`, and the message the
-    // caller will actually read, since callers up the stack log `err.message`.
     const rejections = sends.flatMap(sending => [
       expect(sending).rejects.toBeInstanceOf(Error),
       expect(sending).rejects.not.toBeInstanceOf(DDPError),
@@ -333,9 +288,6 @@ describe('Socket.send with several listeners on one event', () => {
   })
 
   it('rejects the send when the transport throws on the write', async () => {
-    // A real websocket throws from `send` when the socket closed under it. The
-    // failure used to be logged and swallowed, leaving the caller's promise
-    // pending forever.
     const failure = new Error('transport write failed')
     transport.sendError = failure
 
@@ -377,8 +329,6 @@ describe('Socket.send with several listeners on one event', () => {
     })
 
     it('rejects every in-flight send when a scheduled reopen replaces the connection', async () => {
-      // The transport is not open any more, but nothing fired `onclose`, so the
-      // replacement announces itself only as `connecting`.
       const sends = inFlight()
       const rejections = expectAllToReject(sends, REOPENED_MESSAGE)
 
@@ -472,8 +422,6 @@ describe('Socket.send with several listeners on one event', () => {
     })
 
     it('refuses a send issued before the connection came back rather than writing it on the new one', async () => {
-      // The DDP session belongs to the connection the send was issued on. The
-      // new one has its own session and is not logged in yet.
       transport.close(1006)
 
       const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
@@ -489,8 +437,6 @@ describe('Socket.send with several listeners on one event', () => {
     })
 
     it('fails the open when the transport drops mid-handshake', async () => {
-      // The handshake is the one send with no caller of its own: what `open()`
-      // reports is the verdict on the attempt, not the abandoned wait.
       const opening = createSocket().open()
       const handshaking = fakeSockets[1]
       handshaking.readyState = OPEN
@@ -524,10 +470,6 @@ describe('Socket.send with several listeners on one event', () => {
   })
 
   it('waits for open up to twice the reopen delay, and no longer', async () => {
-    // The deadline has to outlast the retry `reopen()` merely *schedules* at
-    // `config.reopen`: at exactly `reopen` it expires as the reconnect begins,
-    // so every send issued at a drop fails. Both boundaries are asserted, so
-    // reverting the default to `config.reopen` fails here.
     transport.readyState = CLOSED
 
     const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })

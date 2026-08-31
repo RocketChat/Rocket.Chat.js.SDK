@@ -4,9 +4,6 @@ import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import { createSocket } from '../../../test/createSocket'
 
-// `loginParams` reads only its argument, so one Socket serves every case here.
-// Constructing a Socket opens no connection and starts no timer. Bound rather
-// than detached, so it keeps working if it ever reaches for the instance.
 const socket = createSocket()
 const loginParams = socket.loginParams.bind(socket)
 
