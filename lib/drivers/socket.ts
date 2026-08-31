@@ -488,16 +488,19 @@ export class Socket extends SDKEventEmitter {
   /**
    * Logout the current User from the server via Socket.
    *
-   * A Logout needs a connection to write on. Without one it is a no-op, unless a
-   * Close is what took the connection away, which the caller hears about rather
-   * than reading a silent success.
+   * With no attached Transport there is nothing to write on, so the Logout ends
+   * locally: every entry is forgotten and the stored Login cleared, so the next
+   * user inherits neither. A Close that took the connection away is the
+   * exception, and the caller hears about it rather than reading a silent
+   * success.
    */
   logout = () => {
     if (this.connectionWork.closing) return Promise.reject(AbandonedWait.responseClosed())
     if (!this.connection) {
-      return this.connectionWork.closesTaken
-        ? Promise.reject(AbandonedWait.responseClosed())
-        : Promise.resolve(undefined)
+      if (this.connectionWork.closesTaken) return Promise.reject(AbandonedWait.responseClosed())
+      this.resume = null
+      this.ddpSubscriptions.forgetAllSubscriptions()
+      return Promise.resolve(undefined)
     }
     this.resume = null
     return this.unsubscribeAll()
