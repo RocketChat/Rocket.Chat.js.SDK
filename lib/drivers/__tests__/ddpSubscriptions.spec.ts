@@ -14,11 +14,15 @@ const flushMicrotasks = () => Promise.resolve().then(() => undefined)
 interface SubscriptionState {
   getCloseGeneration?: () => number
   isOffline?: () => boolean
+  send?: jest.Mock
 }
 
 const createSubscriptions = (
-  { getCloseGeneration = () => 0, isOffline = () => false }: SubscriptionState = {},
-  send: jest.Mock = jest.fn((message: any) => Promise.resolve({ subs: [message.id] }))
+  {
+    getCloseGeneration = () => 0,
+    isOffline = () => false,
+    send = jest.fn((message: any) => Promise.resolve({ subs: [message.id] }))
+  }: SubscriptionState = {}
 ) => {
   const logger = createSilentLogger()
   const onEvent = jest.fn()
@@ -60,10 +64,9 @@ describe('DDPSubscriptions', () => {
     })
 
     it('records nothing for a stream the server refuses', async () => {
-      const { subscriptions } = createSubscriptions(
-        {},
-        jest.fn(() => Promise.resolve({ subs: [] }))
-      )
+      const { subscriptions } = createSubscriptions({
+        send: jest.fn(() => Promise.resolve({ subs: [] }))
+      })
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
@@ -72,10 +75,9 @@ describe('DDPSubscriptions', () => {
     })
 
     it('records nothing when the send is rejected', async () => {
-      const { subscriptions } = createSubscriptions(
-        {},
-        jest.fn(() => Promise.reject(new DDPError('refused')))
-      )
+      const { subscriptions } = createSubscriptions({
+        send: jest.fn(() => Promise.reject(new DDPError('refused')))
+      })
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
@@ -85,12 +87,11 @@ describe('DDPSubscriptions', () => {
 
     it('records a stream after an Abandoned wait', async () => {
       const id = subscriptionIdFor('stream-room-messages', ['GENERAL'])
-      const { subscriptions } = createSubscriptions(
-        {},
-        jest.fn(() => Promise.reject(
+      const { subscriptions } = createSubscriptions({
+        send: jest.fn(() => Promise.reject(
           new AbandonedRequest(id, '[ddp] connection closed before the response arrived')
         ))
-      )
+      })
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
@@ -100,10 +101,9 @@ describe('DDPSubscriptions', () => {
 
     it('records a stream whose response wait expired on an attached transport', async () => {
       const id = subscriptionIdFor('stream-room-messages', ['GENERAL'])
-      const { subscriptions } = createSubscriptions(
-        {},
-        jest.fn(() => Promise.reject(new ExpiredWait(id)))
-      )
+      const { subscriptions } = createSubscriptions({
+        send: jest.fn(() => Promise.reject(new ExpiredWait(id)))
+      })
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
@@ -113,15 +113,13 @@ describe('DDPSubscriptions', () => {
 
     it('records nothing when a close took the socket while the sub was in flight', async () => {
       let closes = 0
-      const { subscriptions } = createSubscriptions(
-        {
-          getCloseGeneration: () => closes
-        },
-        jest.fn((message: any) => {
+      const { subscriptions } = createSubscriptions({
+        getCloseGeneration: () => closes,
+        send: jest.fn((message: any) => {
           closes += 1
           return Promise.resolve({ subs: [message.id] })
         })
-      )
+      })
 
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
@@ -235,7 +233,7 @@ describe('DDPSubscriptions', () => {
       expect(send).not.toHaveBeenCalled()
     })
 
-    it('forgets the record and resolves with the response result on an attached transport', async () => {
+    it('forgets the record and resolves with the response result', async () => {
       const { subscriptions, send } = createSubscriptions()
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.resolve({ result: 'unsubscribed' }))
@@ -245,7 +243,7 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records).toEqual({})
     })
 
-    it('forgets the record when the server refuses the unsubscribe request on an attached transport', async () => {
+    it('forgets the record when the server refuses the unsubscribe', async () => {
       const { subscriptions, send } = createSubscriptions()
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.reject(new DDPError('nosub')))

@@ -75,6 +75,10 @@ export class Socket extends SDKEventEmitter {
     return this.ddpSubscriptions.records
   }
 
+  get offline () {
+    return !this.connection && !this.connectionWork.closing
+  }
+
   /** Create a websocket handler */
   constructor (
     options: ISocketOptions | any = {},
@@ -105,7 +109,7 @@ export class Socket extends SDKEventEmitter {
       send: (message) => this.send(message),
       onEvent: (name, listener) => this.onEvent(name, listener),
       getCloseGeneration: () => this.connectionWork.closesTaken,
-      isOffline: () => !this.connection && !this.connectionWork.closing,
+      isOffline: () => this.offline,
       deadlineMs: this.config.timeout
     })
     this.connectionWork = new Connection({
@@ -490,10 +494,10 @@ export class Socket extends SDKEventEmitter {
     if (!this.connection && this.connectionWork.closesTaken) {
       return Promise.reject(AbandonedWait.responseClosed())
     }
+    const offline = this.offline
     this.resume = null
     const unsubscribed = this.unsubscribeAll()
-    if (!this.connection) return unsubscribed
-    return unsubscribed.then(() => this.call('logout'))
+    return offline ? unsubscribed : unsubscribed.then(() => this.call('logout'))
   }
 
   /** Register a callback to trigger on message events in subscription */

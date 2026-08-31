@@ -395,7 +395,7 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
-  describe('a subscription issued with no transport attached', () => {
+  describe('with no transport attached', () => {
     let unopened: Socket
     let transportsBefore: number
 
@@ -404,130 +404,124 @@ describe('Socket subscription bookkeeping', () => {
       transportsBefore = fakeSockets.length
     })
 
-    it('is recorded under the id it will later be sent with, and reaches no wire', async () => {
-      const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+    describe('a subscription issued', () => {
+      it('is recorded under the id it will later be sent with, and reaches no wire', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
 
-      expect(subscription).toMatchObject({ name: 'stream-room-messages', params: ['GENERAL'] })
-      expect(unopened.subscriptions[subscription!.id]).toBe(subscription)
-      expect(fakeSockets).toHaveLength(transportsBefore)
-    })
-
-    it('is the same record every other caller for that stream holds', async () => {
-      const first = await unopened.subscribe('stream-room-messages', ['GENERAL'])
-      const second = await unopened.subscribe('stream-room-messages', ['GENERAL'])
-
-      expect(second).toBe(first)
-      expect(Object.keys(unopened.subscriptions)).toEqual([first!.id])
-    })
-
-    it('sends one sub frame for two callers once a transport is attached', async () => {
-      const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
-      await unopened.subscribe('stream-room-messages', ['GENERAL'])
-
-      const replacement = await openFakeConnection(unopened)
-      const resubscribing = unopened.subscribeAll()
-      await flushMicrotasks()
-      replacement.receive({ msg: 'ready', subs: [subscription!.id] })
-      await resubscribing
-
-      expect(subFrames(replacement.sent)).toEqual([{
-        msg: 'sub',
-        id: subscription!.id,
-        name: 'stream-room-messages',
-        params: ['GENERAL']
-      }])
-    })
-
-    it('is re-sent by the first login on the socket', async () => {
-      const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
-
-      const replacement = await openFakeConnection(unopened)
-      const loggingIn = unopened.login({ resume: 'resume-token' })
-      await flushMicrotasks()
-      replacement.receive({
-        msg: 'result',
-        id: replacement.lastSent().id,
-        result: { id: 'user-1', token: 'resume-token' }
-      })
-      await loggingIn
-      await flushMicrotasks()
-
-      expect(subFrames(replacement.sent)).toEqual([{
-        msg: 'sub',
-        id: subscription!.id,
-        name: 'stream-room-messages',
-        params: ['GENERAL']
-      }])
-    })
-
-    it('receives events on its callback once the stream is established', async () => {
-      const callback = jest.fn()
-      const subscription =
-        await unopened.subscribe('stream-room-messages', ['GENERAL'], callback)
-
-      const replacement = await openFakeConnection(unopened)
-      const resubscribing = unopened.subscribeAll()
-      await flushMicrotasks()
-      replacement.receive({ msg: 'ready', subs: [subscription!.id] })
-      await resubscribing
-      replacement.receive({
-        msg: 'changed',
-        collection: 'stream-room-messages',
-        fields: { eventName: 'GENERAL', args: ['a message'] }
+        expect(subscription).toMatchObject({ name: 'stream-room-messages', params: ['GENERAL'] })
+        expect(unopened.subscriptions[subscription!.id]).toBe(subscription)
+        expect(fakeSockets).toHaveLength(transportsBefore)
       })
 
-      expect(callback).toHaveBeenCalled()
+      it('is the same record every other caller for that stream holds', async () => {
+        const first = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+        const second = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        expect(second).toBe(first)
+        expect(Object.keys(unopened.subscriptions)).toEqual([first!.id])
+      })
+
+      it('sends one sub frame for two callers once a transport is attached', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+        await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        const replacement = await openFakeConnection(unopened)
+        const resubscribing = unopened.subscribeAll()
+        await flushMicrotasks()
+        replacement.receive({ msg: 'ready', subs: [subscription!.id] })
+        await resubscribing
+
+        expect(subFrames(replacement.sent)).toEqual([{
+          msg: 'sub',
+          id: subscription!.id,
+          name: 'stream-room-messages',
+          params: ['GENERAL']
+        }])
+      })
+
+      it('is re-sent by the first login on the socket', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        const replacement = await openFakeConnection(unopened)
+        const loggingIn = unopened.login({ resume: 'resume-token' })
+        await flushMicrotasks()
+        replacement.receive({
+          msg: 'result',
+          id: replacement.lastSent().id,
+          result: { id: 'user-1', token: 'resume-token' }
+        })
+        await loggingIn
+        await flushMicrotasks()
+
+        expect(subFrames(replacement.sent)).toEqual([{
+          msg: 'sub',
+          id: subscription!.id,
+          name: 'stream-room-messages',
+          params: ['GENERAL']
+        }])
+      })
+
+      it('receives events on its callback once the stream is established', async () => {
+        const callback = jest.fn()
+        const subscription =
+          await unopened.subscribe('stream-room-messages', ['GENERAL'], callback)
+
+        const replacement = await openFakeConnection(unopened)
+        const resubscribing = unopened.subscribeAll()
+        await flushMicrotasks()
+        replacement.receive({ msg: 'ready', subs: [subscription!.id] })
+        await resubscribing
+        replacement.receive({
+          msg: 'changed',
+          collection: 'stream-room-messages',
+          fields: { eventName: 'GENERAL', args: ['a message'] }
+        })
+
+        expect(callback).toHaveBeenCalled()
+      })
+
+      it('records nothing while a close owns the socket', async () => {
+        const closing = socket.close()
+
+        await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+        await closing
+
+        expect(socket.subscriptions).toEqual({})
+      })
+
+      it('is forgotten with every other entry when the socket is closed', async () => {
+        await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        await unopened.close()
+
+        expect(unopened.subscriptions).toEqual({})
+      })
     })
 
-    it('records nothing while a close owns the socket', async () => {
-      const closing = socket.close()
+    describe('unsubscribing', () => {
+      it('forgets the entry and resolves, reaching no wire', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
 
-      await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
-      await closing
+        await expect(unopened.unsubscribe(subscription!.id)).resolves.toBeUndefined()
 
-      expect(socket.subscriptions).toEqual({})
-    })
+        expect(unopened.subscriptions).toEqual({})
+        expect(fakeSockets).toHaveLength(transportsBefore)
+      })
 
-    it('is forgotten with every other entry when the socket is closed', async () => {
-      await unopened.subscribe('stream-room-messages', ['GENERAL'])
+      it('leaves nothing for a later login to re-establish', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+        await unopened.unsubscribe(subscription!.id)
 
-      await unopened.close()
+        const replacement = await openFakeConnection(unopened)
+        await unopened.subscribeAll()
 
-      expect(unopened.subscriptions).toEqual({})
-    })
-  })
+        expect(subFrames(replacement.sent)).toEqual([])
+      })
 
-  describe('unsubscribing with no transport attached', () => {
-    let unopened: Socket
-    let transportsBefore: number
-
-    beforeEach(() => {
-      unopened = createSocket()
-      transportsBefore = fakeSockets.length
-    })
-
-    it('forgets the entry and resolves, reaching no wire', async () => {
-      const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
-
-      await expect(unopened.unsubscribe(subscription!.id)).resolves.toBeUndefined()
-
-      expect(unopened.subscriptions).toEqual({})
-      expect(fakeSockets).toHaveLength(transportsBefore)
-    })
-
-    it('leaves nothing for a later login to re-establish', async () => {
-      const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
-      await unopened.unsubscribe(subscription!.id)
-
-      const replacement = await openFakeConnection(unopened)
-      await unopened.subscribeAll()
-
-      expect(subFrames(replacement.sent)).toEqual([])
-    })
-
-    it('rejects for an id that was never recorded', async () => {
-      await expect(unopened.unsubscribe('never-subscribed')).rejects.toThrow('never-subscribed')
-      expect(fakeSockets).toHaveLength(transportsBefore)
+      it('rejects for an id that was never recorded', async () => {
+        await expect(unopened.unsubscribe('never-subscribed')).rejects.toThrow('never-subscribed')
+        expect(fakeSockets).toHaveLength(transportsBefore)
+      })
     })
   })
 
