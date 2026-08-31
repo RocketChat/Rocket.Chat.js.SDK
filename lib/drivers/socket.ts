@@ -494,10 +494,10 @@ export class Socket extends SDKEventEmitter {
     if (!this.connection && this.connectionWork.closesTaken) {
       return Promise.reject(AbandonedWait.responseClosed())
     }
-    const offline = this.offline
+    const attached = this.connection
     this.resume = null
     const unsubscribed = this.unsubscribeAll()
-    return offline ? unsubscribed : unsubscribed.then(() => this.call('logout'))
+    return attached ? unsubscribed.then(() => this.call('logout')) : unsubscribed
   }
 
   /** Register a callback to trigger on message events in subscription */

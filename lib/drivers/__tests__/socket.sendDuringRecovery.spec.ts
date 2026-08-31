@@ -6,9 +6,9 @@ import {
   connectionWork,
   driveToHandshake,
   fakeSockets,
-  flushMicrotasks,
   hasScheduledReopen,
   openFakeConnection,
+  resubscribeAllAndAck,
   subFrames,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -79,10 +79,7 @@ describe('a send issued during the delayed recovery window', () => {
     await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
     const replacement = fakeSockets[1]
     await driveToHandshake(replacement)
-    const resubscribing = socket.subscribeAll()
-    await flushMicrotasks()
-    replacement.receive({ msg: 'ready', subs: [subscription!.id] })
-    await resubscribing
+    await resubscribeAllAndAck(socket, replacement, subscription!.id)
 
     expect(subFrames(replacement.sent)).toEqual([{
       msg: 'sub',

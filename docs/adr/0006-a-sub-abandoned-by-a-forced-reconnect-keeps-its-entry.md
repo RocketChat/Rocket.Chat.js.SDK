@@ -69,10 +69,9 @@ silence keeps the instruction.
   open, or is open with the Liveness chain lapsed, would stop reaching the wire
   and start recording without sending.
 - The Socket itself is unchanged: `send` still refuses to write with no attached
-  Transport. `subscribe` succeeding without one is not an inconsistency to be
-  resolved by making `send` queue, because the subscription path does not reach
-  `send` at all when there is no Transport. The entry it writes is the
-  instruction, and `subscribeAll` is what issues it.
+  Transport, and the subscription path does not reach `send` at all when there
+  is none. The entry it writes is the instruction, and `subscribeAll` is what
+  issues it.
 - The expired-wait case and the no-Transport case are two cases with opposite
   outcomes, not one "no usable connection" case: a send that expired waiting for
   the connection to open had a Transport to wait on, so it leaves no entry.
@@ -102,10 +101,7 @@ silence keeps the instruction.
   fails would record nothing, and that is exactly the case this ADR exists for.
   It also never answers the question a Reopen raises: `attachTransport` installs
   the replacement before it releases the predecessor, so a Reopen leaves the
-  Socket holding a connection by the time any rejection is delivered. That the
-  same question, asked before the send rather than after the rejection, decides
-  whether a frame is composed at all is a different decision on a different
-  moment.
+  Socket holding a connection by the time any rejection is delivered.
 - Asking whether a Close owns the Socket right now is close-specific and too
   short-lived. A `sub` a Close abandoned settles a few microtasks after the
   Close has released ownership, so the boolean reads false at the moment the

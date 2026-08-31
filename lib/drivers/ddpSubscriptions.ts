@@ -168,7 +168,8 @@ export class DDPSubscriptions {
   ) => {
     const closesBefore = this.getCloseGeneration()
     if (this.isOffline()) {
-      return Promise.resolve(this.rememberSubscription(stream, closesBefore, callback))
+      const recorded = this.records[stream.id]
+      return Promise.resolve(recorded || this.rememberSubscription(stream, closesBefore, callback))
     }
     return this.send({ msg: 'sub', ...stream })
       .then((response) => {

@@ -16,10 +16,7 @@ arrives. `subscribeAll` re-sends every entry under its own id, and `login` calls
 id of a DDP subscription that is still being unsubscribed. The reverse pairing
 is reachable too: `resubscribe` re-sends an existing entry under its own id, and
 `unsubscribe` can be called while that `sub` waits for its `ready`. Both
-pairings are between frames on the wire. An `unsubscribe` on a Socket with no
-attached Transport composes no frame at all — it forgets the entry and resolves
-under ADR-0006 — so it opens no window, queues under no id, and is not one of
-the requests this ADR orders.
+pairings are between frames on the wire, and this ADR orders nothing else.
 
 `send` matches a DDP response to its request by id alone. It registers one
 listener under the id and settles on the first message that carries it, without

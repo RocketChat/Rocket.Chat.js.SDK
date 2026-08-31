@@ -8,6 +8,7 @@ import {
   driveToHandshake,
   lastSubId,
   openFakeConnection,
+  resubscribeAllAndAck,
   subFrames,
   subscribeAndAck,
   useFakeClockAndSocketRegistry
@@ -426,10 +427,7 @@ describe('Socket subscription bookkeeping', () => {
         await unopened.subscribe('stream-room-messages', ['GENERAL'])
 
         const replacement = await openFakeConnection(unopened)
-        const resubscribing = unopened.subscribeAll()
-        await flushMicrotasks()
-        replacement.receive({ msg: 'ready', subs: [subscription!.id] })
-        await resubscribing
+        await resubscribeAllAndAck(unopened, replacement, subscription!.id)
 
         expect(subFrames(replacement.sent)).toEqual([{
           msg: 'sub',
@@ -467,10 +465,7 @@ describe('Socket subscription bookkeeping', () => {
           await unopened.subscribe('stream-room-messages', ['GENERAL'], callback)
 
         const replacement = await openFakeConnection(unopened)
-        const resubscribing = unopened.subscribeAll()
-        await flushMicrotasks()
-        replacement.receive({ msg: 'ready', subs: [subscription!.id] })
-        await resubscribing
+        await resubscribeAllAndAck(unopened, replacement, subscription!.id)
         replacement.receive({
           msg: 'changed',
           collection: 'stream-room-messages',
@@ -478,15 +473,6 @@ describe('Socket subscription bookkeeping', () => {
         })
 
         expect(callback).toHaveBeenCalled()
-      })
-
-      it('records nothing while a close owns the socket', async () => {
-        const closing = socket.close()
-
-        await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
-        await closing
-
-        expect(socket.subscriptions).toEqual({})
       })
 
       it('is forgotten with every other entry when the socket is closed', async () => {
@@ -634,6 +620,15 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('closing the connection', () => {
+    it('records nothing for a subscribe issued while a close owns the socket', async () => {
+      const closing = socket.close()
+
+      await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+      await closing
+
+      expect(socket.subscriptions).toEqual({})
+    })
+
     it('hands back no subscription for a `sub` it abandoned, and records none', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
       const id = lastSubId(transport)
