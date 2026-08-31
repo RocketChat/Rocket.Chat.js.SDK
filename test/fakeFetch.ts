@@ -9,6 +9,9 @@ export const installFakeFetch = () => Object.defineProperty(global, 'fetch', {
 export const answerFetchWith = (body: any) =>
   fakeFetch().mockResolvedValue({ status: 200, json: async () => body })
 
+export const answerFetchWithStatus = (status: number, body: any) =>
+  fakeFetch().mockResolvedValue({ status, json: async () => body })
+
 export const answerFetchWithUnparsableBody = () =>
   fakeFetch().mockResolvedValue({
     status: 204,

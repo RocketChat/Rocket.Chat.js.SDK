@@ -5,6 +5,7 @@ import {
   driveToHandshake,
   FakeWebSocket,
   fakeSockets,
+  flushMicrotasks,
   hasScheduledReopen,
   OPEN,
   openFakeConnection,
@@ -56,6 +57,12 @@ describe('Socket liveness', () => {
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
 
       expect(socket.alive()).toBe(true)
+    })
+
+    it('is not alive once close has cleared the last ping', async () => {
+      await socket.close()
+
+      expect(socket.alive()).toBe(false)
     })
 
     it('is not alive one millisecond past twice the ping interval', async () => {
@@ -164,6 +171,26 @@ describe('Socket liveness', () => {
       expect(jest.getTimerCount()).toBe(1)
     })
 
+    it('answers false without waiting out the deadline when the ping write throws', async () => {
+      transport.sendError = new Error('socket gone')
+
+      await expect(socket.probe()).resolves.toBe(false)
+
+      expect(jest.getTimerCount()).toBe(1)
+    })
+
+    it('ignores a pong that lands after it gave up on its deadline', async () => {
+      const probing = socket.probe(2000)
+      await jest.advanceTimersByTimeAsync(2000)
+
+      await expect(probing).resolves.toBe(false)
+      const timersAfterGivingUp = jest.getTimerCount()
+
+      transport.receive({ msg: 'pong' })
+
+      expect(jest.getTimerCount()).toBe(timersAfterGivingUp)
+    })
+
     it('succeeds when the pong lands after the clock has moved', async () => {
       // The millisecond advance is the whole test: without it this passes for the
       // wrong reason, resolving false on the timeout instead of true on the pong.
@@ -173,6 +200,15 @@ describe('Socket liveness', () => {
       transport.receive({ msg: 'pong' })
 
       await expect(probing).resolves.toBe(true)
+    })
+  })
+
+  describe('a server-sent ping', () => {
+    it('is answered with a pong', async () => {
+      transport.receive({ msg: 'ping' })
+      await flushMicrotasks()
+
+      expect(transport.lastSent()).toEqual({ msg: 'pong' })
     })
   })
 
