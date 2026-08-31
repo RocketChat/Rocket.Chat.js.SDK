@@ -487,7 +487,7 @@ export class Socket extends SDKEventEmitter {
 
   logout = () => {
     if (this.connectionWork.closing) return Promise.reject(AbandonedWait.responseClosed())
-    if (!this.connection && this.connectionWork.closesTaken) {
+    if (this.connectionWork.offline && this.connectionWork.closesTaken) {
       return Promise.reject(AbandonedWait.responseClosed())
     }
     this.resume = null

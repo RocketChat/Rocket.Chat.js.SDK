@@ -242,10 +242,6 @@ export const lastSubId = (transport: FakeWebSocket): string => {
   return id
 }
 
-/**
- * `subscribeAll` re-issues every recorded entry on the transport now attached,
- * and each one settles on the `ready` that names its id.
- */
 export const resubscribeAllAndAck = async (
   socket: Socket,
   transport: FakeWebSocket,
