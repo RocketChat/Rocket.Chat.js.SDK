@@ -99,7 +99,8 @@ export class DDPRequests {
   send = (message: any, write: (value: string) => void, deadlineMs = this.deadlineMs): Promise<any> =>
     new Promise<any>((resolve, reject) => {
       const id = this.nextId(message.id)
-      const outboundMessage = { ...message, ...(/connect|ping|pong/.test(message.msg) ? {} : { id }) }
+      const isHandshakeMessage = /connect|ping|pong/.test(message.msg)
+      const outboundMessage = { ...message, ...(isHandshakeMessage ? {} : { id }) }
       const serialized = JSON.stringify(outboundMessage)
       const listener = (outboundMessage.msg === 'ping' && 'pong') || (outboundMessage.msg === 'connect' && 'connected') || outboundMessage.id
       this.getLogger().debug(`[ddp] sending message: ${serialized}`)
@@ -135,7 +136,7 @@ export class DDPRequests {
         endWait()
         return response.error
           ? reject(toError(response.error))
-          : resolve({ ...(/connect|ping|pong/.test(message.msg) ? {} : { id }), ...response })
+          : resolve({ ...(isHandshakeMessage ? {} : { id }), ...response })
       }
 
       this.written.add(onAbandon)

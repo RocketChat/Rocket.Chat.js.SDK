@@ -23,13 +23,10 @@ export class Driver extends SDKEventEmitter implements IDriver {
   config: ISocketOptions
   private readonly socket: Socket
 
-	/** Save messages subscription to ensure only one created */
   messages: ISubscription | undefined
 
-	/** Current user object populated from resolved login */
   userId: string = ''
 
-	/** Array of joined room IDs (for reactive queries) */
   joinedIds: string[] = []
 
   constructor ({ host = 'localhost:3000', config, logger = Logger, ...moreConfigs }: any = {}) {

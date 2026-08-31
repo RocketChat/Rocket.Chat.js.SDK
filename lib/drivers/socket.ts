@@ -181,27 +181,29 @@ export class Socket extends SDKEventEmitter {
    * on whichever of the three it knows. Any frame at all also counts as a sign of
    * life and moves `lastPing`.
    */
+  private parseFrame = (raw: any) => {
+    let frame
+    try {
+      frame = JSON.parse(raw)
+    } catch (err) {
+      this.logger.error(`[ddp] JSON parse error on frame: ${raw} — ${(err as Error).message}`)
+      return undefined
+    }
+    if (!frame) {
+      this.logger.debug(`[ddp] empty frame dropped: ${raw}`)
+      return undefined
+    }
+    return frame
+  }
+
   onMessage = (e: any) => {
     if (!e.data) return
 
-    // The caller is the websocket's `onmessage`, which has nowhere to put a
-    // throw — a malformed frame is logged and dropped.
-    let data
-    try {
-      data = JSON.parse(e.data)
-    } catch (err) {
-      return this.logger.error(
-        `[ddp] JSON parse error on frame: ${e.data} — ${(err as Error).message}`
-      )
-    }
-
-    // A frame that parses to a falsy value — `null`, `0`, `""` — carries
-    // nothing to dispatch on.
-    if (!data) return this.logger.debug(`[ddp] empty frame dropped: ${e.data}`)
+    const data = this.parseFrame(e.data)
+    if (!data) return
 
     this.lastPing = Date.now()
 
-    this.logger.debug(data) // 👈  very useful for debugging missing responses
     this.logger.debug(`[ddp] messages received: ${e.data}`)
     if (data.collection) this.emit(data.collection, data)
     if (data.msg) this.emit(data.msg, data)
@@ -291,7 +293,7 @@ export class Socket extends SDKEventEmitter {
   probe = (deadlineMs = socketDeadlineMs): Promise<boolean> => {
     return new Promise<boolean>(resolve => {
       const transport = this.connection
-      if (!transport || transport.readyState !== transportOpenState || this.connectionWork.closing) {
+      if (!this.transportOpen || !transport || this.connectionWork.closing) {
         return resolve(false)
       }
 

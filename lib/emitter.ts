@@ -50,7 +50,7 @@ export class SDKEventEmitter extends EventEmitter {
 
     let index = listeners.indexOf(listener)
     if (index === -1) {
-      index = listeners.findIndex((registered: any) => registered.listener === listener)
+      index = listeners.findIndex((registered: any) => registeredListener(registered) === listener)
     }
     if (index === -1) return this
 
