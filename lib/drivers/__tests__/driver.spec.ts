@@ -7,6 +7,7 @@ import {
   FakeWebSocket,
   fakeSockets,
   openFakeConnection,
+  USER_DISCONNECT,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -28,11 +29,12 @@ const createDriver = (options: ISocketOptions = {}) =>
  *   `subscribeNotifyUser`, `subscribeRoom`) are data, not behaviour. A test over
  *   them is a snapshot that goes red on every intentional product change, so the
  *   reshaping they all funnel through is pinned once, below, instead.
- * - The one-line pass-throughs (`disconnect`, `checkAndReopen`, `reopenNow`,
- *   `probe`, `lastPing`, `pingInterval`, `subscribeRaw`, `unsubscribe`,
- *   `unsubscribeAll`, `methodCall`, `logout`) forward their arguments to the
- *   socket and nothing else. They carry no logic, so a test over them asserts
- *   that a line of code exists.
+ * - The one-line pass-throughs (`probe`, `lastPing`, `pingInterval`,
+ *   `subscribeRaw`, `unsubscribe`, `unsubscribeAll`, `methodCall`)
+ *   forward their arguments to the socket and nothing else. They carry no
+ *   logic, so a test over them asserts that a line of code exists. `disconnect`
+ *   and `reopenNow` forward just as thinly, but what they forward to takes
+ *   ownership of the socket, so the Driver-level races are pinned below.
  */
 
 describe('new Driver', () => {
@@ -408,32 +410,38 @@ describe('Driver.connect', () => {
   it('keeps echoing open after a send has waited on it', async () => {
     // The driver holds a long-lived `open` listener that echoes the socket's
     // open as its own `connected`. A send that waits on open registers a `once`
-    // beside it, and removing that `once` once it has fired used to take the
-    // echo down with it — leaving the driver permanently silent about every
-    // later Reopen.
+    // beside it, and removing that `once` once it has fired must not take the
+    // echo down with it, which would leave the driver permanently silent about
+    // every later Reopen.
     const driver = createDriver()
     const connecting = driver.connect()
-    const transport = fakeSockets[0]
 
-    await driveToHandshake(transport)
+    await driveToHandshake(fakeSockets[0])
     await connecting
 
     const connectedSeen = jest.fn()
     driver.on('connected', connectedSeen)
 
-    transport.readyState = CLOSED
+    fakeSockets[0].readyState = CLOSED
+    const reopening = driver['socket'].open()
+    const reopened = fakeSockets[1]
     const sending = driver['socket'].send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
 
-    await driveToHandshake(transport)
+    await driveToHandshake(reopened)
+    await reopening
     await jest.advanceTimersByTimeAsync(0)
-    transport.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
+    reopened.receive({ msg: 'result', id: 'ddp-2', result: 'ok' })
     await expect(sending).resolves.toMatchObject({ result: 'ok' })
 
-    // The reopen the send rode in on is one echo; the next open has to produce
+    // The open the send rode in on is one echo; the next open has to produce
     // another, which is what the dropped listener made impossible.
     expect(connectedSeen).toHaveBeenCalledTimes(1)
 
-    await driveToHandshake(transport)
+    reopened.readyState = CLOSED
+    const reopeningAgain = driver['socket'].open()
+    await driveToHandshake(fakeSockets[2])
+    await reopeningAgain
+
     expect(connectedSeen).toHaveBeenCalledTimes(2)
   })
 
@@ -460,16 +468,19 @@ describe('Driver.connect', () => {
     expect(connectedSeen).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects the connect whose socket was replaced mid-open', async () => {
+  it('joins a second connect to the attempt already running', async () => {
     const driver = createDriver()
 
-    const replaced = driver.connect()
-    const replacing = driver.connect()
+    const joining = driver.connect()
+    const joined = driver.connect()
 
-    await expect(replaced).rejects.toThrow('[ddp] connection closed before it opened')
+    // One attempt, so one transport: the second caller builds nothing of its own.
+    expect(fakeSockets).toHaveLength(1)
 
-    await driveToHandshake(fakeSockets[1])
-    await replacing
+    await driveToHandshake(fakeSockets[0])
+
+    await expect(joining).resolves.toBe(driver)
+    await expect(joined).resolves.toBe(driver)
   })
 
   const failConnects = async (driver: Driver, attempts: number) => {
@@ -477,7 +488,10 @@ describe('Driver.connect', () => {
       const socketsBeforeAttempt = fakeSockets.length
       const failing = driver.connect()
       fakeSockets[socketsBeforeAttempt].onerror?.(new Error('no route to host'))
-      await expect(failing).rejects.toThrow('no route to host')
+      // A transport error event carries no reason the caller could act on, so
+      // the attempt reports its own failure.
+      await expect(failing).rejects
+        .toThrow('[ddp] transport failed during the connection attempt')
     }
   }
 
@@ -506,5 +520,92 @@ describe('Driver.connect', () => {
     await connecting
 
     expect(connectedSeen).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Driver.disconnect', () => {
+  const CLOSE_DEADLINE = 2000
+
+  it('joins a concurrent disconnect to one close of the socket', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver['socket'])
+    transport.answersClose = false
+
+    const first = driver.disconnect()
+    const second = driver.disconnect()
+
+    await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+
+    await expect(first).resolves.toBeUndefined()
+    await expect(second).resolves.toBeUndefined()
+    expect(transport.closedWith).toEqual([USER_DISCONNECT])
+  })
+
+  it('refuses a connect issued while it owns the socket', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver['socket'])
+    transport.readyState = CLOSED
+
+    const disconnecting = driver.disconnect()
+    const connecting = driver.connect()
+
+    await expect(connecting).rejects.toThrow('[ddp] connection closed before it opened')
+    await disconnecting
+    expect(fakeSockets).toHaveLength(1)
+  })
+
+  it('refuses a forced reopen issued while it owns the socket', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver['socket'])
+    transport.answersClose = false
+
+    const disconnecting = driver.disconnect()
+
+    await expect(driver.reopenNow()).rejects.toThrow('[ddp] connection closed before it opened')
+    expect(fakeSockets).toHaveLength(1)
+
+    await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+    await disconnecting
+  })
+
+  it('echoes no connected for the close it took', async () => {
+    const driver = createDriver()
+    await openFakeConnection(driver['socket'])
+
+    const connectedSeen = jest.fn()
+    driver.on('connected', connectedSeen)
+
+    await driver.disconnect()
+
+    expect(connectedSeen).not.toHaveBeenCalled()
+  })
+
+  it('leaves the driver free to connect again once it has settled', async () => {
+    const driver = createDriver()
+    await openFakeConnection(driver['socket'])
+    await driver.disconnect()
+
+    const connecting = driver.connect()
+    await driveToHandshake(fakeSockets[1])
+
+    await expect(connecting).resolves.toBe(driver)
+    expect(driver.connected).toBe(true)
+  })
+})
+
+describe('Driver.logout', () => {
+  it('forwards a logout the socket must answer, however the socket reads', async () => {
+    // The socket owns the whole decision, so a close that already made the
+    // socket read as disconnected cannot turn a refusal into a silent success.
+    const driver = createDriver()
+    const connecting = driver.connect()
+    await driveToHandshake(fakeSockets[0])
+    await connecting
+
+    await driver.disconnect()
+    expect(driver.connected).toBe(false)
+
+    await expect(driver.logout())
+      .rejects.toThrow('[ddp] connection closed before the response arrived')
   })
 })

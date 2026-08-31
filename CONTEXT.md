@@ -126,16 +126,44 @@ Exchanging credentials — password, OAuth, or a token — for an authenticated 
 Logging in again with the token from a previous login rather than with credentials.
 _Avoid_: Reauth, refresh
 
+**Connection work**:
+What a Socket is doing about its connection, and exactly one thing at a time: Idle, one Scheduled Reopen, or one active Connection Attempt. A Socket has at most one attached Transport whatever its Connection work is. See ADR-0014.
+_Avoid_: Connection state (that reads as whether it is connected), connecting
+
+**Connection Attempt**:
+One attempt to establish a connection, spanning Transport construction through DDP handshake success. Transport open alone is not success. Every retry is a fresh attempt with a fresh Deadline, and callers asking for a connection while one is under way share it rather than starting another.
+_Avoid_: Connect, connection, attempt (unqualified)
+
+**Ordinary attempt**:
+A Connection Attempt started to establish a connection the Socket does not have, by internal `open()` or by a Reopen whose delay has been waited out. A forced attempt may replace it once.
+_Avoid_: Normal attempt, passive attempt
+
+**Forced attempt**:
+A Connection Attempt started by public `reopenNow()`, which replaces whatever Transport the Socket holds rather than retaining it. Repeated `reopenNow()` calls share the forced attempt instead of replacing it again, so no caller can churn Transports.
+_Avoid_: Immediate reconnect, hard reconnect, forced reopen
+
+**Idle**:
+The Connection work of a Socket that has neither a Scheduled Reopen nor an active Connection Attempt. An Idle Socket may still hold an established Transport, and so may one with a Scheduled Reopen; Idle describes what the Socket is doing, not whether it is connected.
+_Avoid_: Disconnected, quiet, inactive
+
 **Reopen**:
-A retry scheduled after a connection drops, waited out before a new Socket is built. Distinct from the immediate reconnect a caller forces, which skips the wait — the two are separate paths in the code, and the difference is how long an in-flight send waits before it is abandoned, not whether it is.
+The delayed retry after a connection is lost: waited out, then carried out as one Connection Attempt, unless the Transport is usable again by then, in which case it is retained and nothing is constructed. Distinct from the immediate replacement a caller forces through `reopenNow()`, which skips the wait.
 _Avoid_: Reconnect (unqualified — say which of the two), retry
+
+**Scheduled Reopen**:
+The Connection work of a Socket that owns a Reopen's delay and no Connection Attempt. It is taken on the evidence that the connection is gone and reads whether the Transport is usable again only when the delay is up, so it may hold a Transport that recovers in the meantime. Repeated requests share it without resetting its delay, and it is consumed or cancelled before any Connection Attempt begins.
+_Avoid_: Retry timer, pending reopen, backoff
+
+**Close ownership**:
+What a `close` takes of a Socket, synchronously and unsupersedably. It cancels the Connection work in progress, refuses new connection and DDP work, and leaves the Socket Idle with no Transport. A Connection operation cannot take it back. See ADR-0015.
+_Avoid_: Closing state, shutdown, teardown
 
 **Connected echo**:
 The Driver re-emitting its Socket's open as a single `connected` event. One open means one `connected`, however many times a caller asked the Driver to connect.
 _Avoid_: Connect event, ready
 
 **Transport open**:
-What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its Transport reports it open — not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive.
+What the websocket itself says about a Socket, before the Liveness chain is consulted. A Socket is Transport open when it exists and its Transport reports it open, not merely un-closed: one still connecting is not Transport open, and one that is Transport open may have nobody answering on it. Being connected is Transport open and alive, and a Connection Attempt is not successful merely by reaching this state.
 _Avoid_: Open (unqualified), ready, readyState
 
 **Liveness chain**:
@@ -155,7 +183,7 @@ A bound after which the SDK settles a wait itself instead of waiting on the serv
 _Avoid_: Timeout — that is a config option, and several Deadlines are derived from it
 
 **Abandoned wait**:
-A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline — no clock decides it, the connection does. A DDP message waiting to be written is abandoned on the same rule: it belongs to the connection it was issued on and is never written to the one that replaces it.
+A wait the SDK ends because the connection it depended on went away, so what it waited for can never arrive. Not a Deadline, because no clock decides it, the connection does. It ends on the ownership change itself, not on the lifecycle event that announces it. A DDP message waiting to be written is abandoned on the same rule: it belongs to the connection it was issued on and is never written to the one that replaces it.
 _Avoid_: Cancelled, timed out
 
 **Expired wait**:

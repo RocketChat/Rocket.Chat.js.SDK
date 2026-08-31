@@ -33,7 +33,6 @@ export interface IDriver {
   connect (): Promise<IDriver>
   connected: boolean
   disconnect (): Promise<void>
-  checkAndReopen (): void
   reopenNow (): Promise<void>
   probe (deadlineMs?: number): Promise<boolean>
   lastPing: number

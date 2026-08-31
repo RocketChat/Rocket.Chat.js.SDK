@@ -77,10 +77,6 @@ export class Driver extends SDKEventEmitter implements IDriver {
     return this.socket.close()
   }
 
-  checkAndReopen = (): void => {
-    return this.socket.checkAndReopen()
-  }
-
   reopenNow = (): Promise<void> => {
     return this.socket.reopenNow()
   }
@@ -190,10 +186,7 @@ export class Driver extends SDKEventEmitter implements IDriver {
     return login
   }
   logout = async () => {
-    if (this.socket && this.socket.connected) {
-      await this.socket.logout()
-    }
-
+    await this.socket.logout()
   }
 
   unsubscribe = (subscription: ISubscription) => {

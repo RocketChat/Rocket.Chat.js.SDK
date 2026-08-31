@@ -245,6 +245,20 @@ describe('Socket subscription bookkeeping', () => {
       })
     })
 
+    it('is kept when the attempt that abandoned it fails and detaches its transport', async () => {
+      const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
+      const id = lastSubId(transport)
+
+      socket.reopenNow().catch(() => undefined)
+      fakeSockets[1].onerror?.({})
+
+      // Nothing is attached by the time the abandoned `sub` settles, and the
+      // entry is still what the next attempt resubscribes from.
+      expect(socket.connection).toBeUndefined()
+      expect(await subscribing).toBe(socket.subscriptions[id])
+      expect(Object.keys(socket.subscriptions)).toEqual([id])
+    })
+
     it('is re-established under that same id at the next login', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
       const { id } = transport.lastSent()

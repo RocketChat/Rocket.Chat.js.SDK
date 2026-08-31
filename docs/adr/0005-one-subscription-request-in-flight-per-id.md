@@ -65,7 +65,7 @@ the first to have its DDP response before its own frame is written.
   with ADR-0004.
 - Nothing here bounds the wait but the request before it. The chain adds no
   Deadline and no bookkeeping about the connection of its own: a subscription
-  request is a send, so it carries the Deadline ADR-0003 gives every send, and a
+  request is a send, so it carries the Deadline ADR-0014 gives every send, and a
   send cannot outlive the connection it was issued on. Every request settles, and
   a chain always drains.
 - A request registers itself when it is queued, not when its frame is written. A
@@ -101,6 +101,7 @@ the first to have its DDP response before its own frame is written.
   the order of requests and nothing else. `subscribeAll` re-establishes the DDP
   subscriptions after a Login, and that stays the one path that re-sends.
 - No single place on `Socket` owns what happens to work in flight when the
-  connection changes. That knowledge is in the abandon listeners of `send`, in
-  `waitForOpen`, and in `reopenUnlessAbandoned`. This ADR removes one of the
-  places that held a piece of it.
+  connection changes. This ADR removed one of the places that held a piece of
+  it, and ADR-0014 gathered the rest: `DDPRequests.abandonAll` ends every
+  written wait on the ownership change, and `recoverAndKeepPinging` decides
+  which failures still ask for a Reopen.

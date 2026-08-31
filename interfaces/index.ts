@@ -11,11 +11,13 @@ export interface ILogger {
  * Connection options type
  * @param host        Host URL:PORT, converted to websocket protocol
  * @param useSsl      Use SSL (https/wss) to connect
- * @param timeout     How long to wait (ms) before abandoning connection, and
- *                    also how long any send that waits for a DDP response waits
- *                    for it once the message is written. The value several other
- *                    deadlines are derived from — each is documented where it
- *                    is used
+ * @param timeout     The Connection Attempt Deadline: one absolute budget (ms)
+ *                    spanning Transport construction through a successful DDP
+ *                    handshake, which callers joining the attempt inherit what
+ *                    is left of. Also how long any send waits for its DDP
+ *                    response once the message is written. Several other
+ *                    deadlines are derived from it, each documented where it is
+ *                    used
  * @param reopen      ms interval before attempting reopens on disconnect. Twice
  *                    this is also how long a send waits for the connection to
  *                    open before it is rejected, so the deadline outlasts the
@@ -24,7 +26,6 @@ export interface ILogger {
  *                    waits for its pong before the connection is reopened —
  *                    tightening it for liveness tightens that deadline too.
  *                    Defaults to `timeout`
- * @param close       ms interval to wait for socket close to succeed
  * @param integration Name added to message `bot` attribute to identify SDK use
  */
 export interface ISocketOptions {
@@ -33,14 +34,13 @@ export interface ISocketOptions {
   timeout?: number
   reopen?: number
   ping?: number
-  close?: number
   integration?: string
 }
 
 /**
  * The options the socket itself reads, after defaults are applied, so every
- * deadline read from it is a number. `close` and `integration` are left out
- * because the socket never reads them.
+ * deadline read from it is a number. `integration` is left out because the
+ * socket never reads it.
  */
 export type ISocketConfig = Required<Pick<ISocketOptions, 'host' | 'useSsl' | 'timeout' | 'reopen' | 'ping'>>
 

@@ -5,6 +5,7 @@ import {
   driveToHandshake,
   FakeWebSocket,
   fakeSockets,
+  hasScheduledReopen,
   OPEN,
   openFakeConnection,
   USER_DISCONNECT,
@@ -224,10 +225,10 @@ describe('Socket liveness', () => {
       expect(impatientTransport.lastSent()).toEqual({ msg: 'ping' })
 
       await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
-      expect(impatient.openTimeout).toBeUndefined()
+      expect(hasScheduledReopen(impatient)).toBe(false)
 
       await jest.advanceTimersByTimeAsync(1)
-      expect(impatient.openTimeout).toBeDefined()
+      expect(hasScheduledReopen(impatient)).toBe(true)
 
       await impatient.close()
     })
@@ -242,7 +243,7 @@ describe('Socket liveness', () => {
       await jest.advanceTimersByTimeAsync(PING_INTERVAL)
 
       expect(transport.sent).toHaveLength(1)
-      expect(socket.openTimeout).toBeUndefined()
+      expect(hasScheduledReopen(socket)).toBe(false)
 
       transport.readyState = OPEN
       socket.emit('open')
@@ -251,10 +252,10 @@ describe('Socket liveness', () => {
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
 
       await jest.advanceTimersByTimeAsync(PING_INTERVAL - 1)
-      expect(socket.openTimeout).toBeUndefined()
+      expect(hasScheduledReopen(socket)).toBe(false)
 
       await jest.advanceTimersByTimeAsync(1)
-      expect(socket.openTimeout).toBeDefined()
+      expect(hasScheduledReopen(socket)).toBe(true)
     })
 
     it('reconnects when one pong is withheld', async () => {
@@ -279,7 +280,7 @@ describe('Socket liveness', () => {
       // expired ping has scheduled the reopen.
       expect(socket.alive()).toBe(false)
       expect(socket.connected).toBe(false)
-      expect(socket.openTimeout).toBeDefined()
+      expect(hasScheduledReopen(socket)).toBe(true)
 
       // And the reopen actually builds a replacement transport once its delay
       // elapses — the socket is no longer abandoned open forever.
@@ -291,13 +292,13 @@ describe('Socket liveness', () => {
     })
 
     it('leaves the reconnect to the close when a ping is abandoned by it', async () => {
-      // A ping abandoned because its connection was replaced must not schedule a
-      // reopen of its own: the close that replaced it already scheduled one, and
-      // the replacement starts its own chain.
+      // A ping abandoned because its connection went away must not schedule a
+      // reopen of its own: the close already scheduled one, and the replacement
+      // starts its own chain.
       await tickWithPong()
+      await jest.advanceTimersToNextTimerAsync()
 
       transport.close(1006)
-      await jest.advanceTimersToNextTimerAsync()
 
       await jest.advanceTimersByTimeAsync(socket.config.reopen)
       expect(fakeSockets).toHaveLength(2)
@@ -318,7 +319,7 @@ describe('Socket liveness', () => {
       await socket.close()
       await jest.advanceTimersByTimeAsync(0)
 
-      expect(socket.openTimeout).toBeUndefined()
+      expect(hasScheduledReopen(socket)).toBe(false)
       expect(jest.getTimerCount()).toBe(0)
 
       // And no replacement is built once the reopen delay it might have scheduled
@@ -341,7 +342,7 @@ describe('Socket liveness', () => {
       // Nothing queued a reopen against the connection that just came back.
       expect(fakeSockets).toHaveLength(2)
       expect(socket.connected).toBe(true)
-      expect(socket.openTimeout).toBeUndefined()
+      expect(hasScheduledReopen(socket)).toBe(false)
     })
 
     it('reconnects when a server answers pings with nothing readable', async () => {
@@ -353,7 +354,7 @@ describe('Socket liveness', () => {
 
       expect(socket.alive()).toBe(false)
       expect(socket.connected).toBe(false)
-      expect(socket.openTimeout).toBeDefined()
+      expect(hasScheduledReopen(socket)).toBe(true)
 
       await jest.advanceTimersByTimeAsync(socket.config.reopen)
 
@@ -368,7 +369,7 @@ describe('Socket liveness', () => {
       // Named rather than merely counted, so the assertion still means "the ping
       // and the reopen" if some other timer ever joins the count.
       expect(socket.pingTimeout).toBeDefined()
-      expect(socket.openTimeout).toBeDefined()
+      expect(hasScheduledReopen(socket)).toBe(true)
       expect(jest.getTimerCount()).toBe(2)
 
       await socket.close()
@@ -380,7 +381,7 @@ describe('Socket liveness', () => {
       // The ping goes out, its reply deadline expires, and a reopen is scheduled.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
       expect(pingCount()).toBe(1)
-      expect(socket.openTimeout).toBeDefined()
+      expect(hasScheduledReopen(socket)).toBe(true)
 
       // A frame arriving late enough leaves the reopen nothing to build.
       await jest.advanceTimersByTimeAsync(socket.config.reopen - 1)
@@ -392,20 +393,6 @@ describe('Socket liveness', () => {
       const pingsBeforeIdle = pingCount()
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 3)
       expect(pingCount()).toBeGreaterThan(pingsBeforeIdle)
-    })
-
-    it('keeps pinging when the ping is abandoned and no reopen is asked for', async () => {
-      await jest.advanceTimersToNextTimerAsync()
-      expect(pingCount()).toBe(1)
-
-      // The event abandons the ping's wait, so `reopenUnlessAbandoned` declines.
-      socket.emit('disconnected')
-      await jest.advanceTimersByTimeAsync(0)
-
-      expect(socket.openTimeout).toBeUndefined()
-
-      await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
-      expect(pingCount()).toBeGreaterThan(1)
     })
   })
 })

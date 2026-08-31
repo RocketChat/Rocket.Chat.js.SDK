@@ -24,7 +24,6 @@ export default class RocketChatClient extends ApiRocketChat {
 
   async connect (): Promise<any> { return this.driver.connect() }
   async disconnect (): Promise<any> { return this.driver.disconnect() }
-  async checkAndReopen (): Promise<void> { return this.driver.checkAndReopen() }
   async onStreamData (event: string, cb: ICallback): Promise<any> { return this.driver.onStreamData(event, cb) }
   async subscribe (topic: string, eventname: string, ...args: any[]): Promise<ISubscription | undefined> { return this.driver.subscribe(topic, eventname, ...args) }
   async subscribeRaw (name: string, params: any[]): Promise<ISubscription | undefined> { return this.driver.subscribeRaw(name, params) }

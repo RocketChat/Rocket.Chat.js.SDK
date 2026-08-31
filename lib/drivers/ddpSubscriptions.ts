@@ -16,7 +16,7 @@ interface DDPSubscriptionsOptions {
   getLogger: () => ILogger
   send: (message: any) => Promise<any>
   onEvent: (name: string, listener: ISocketMessageCallback) => void
-  hasConnection: () => boolean
+  closesTaken: () => number
   deadlineMs: number
 }
 
@@ -25,17 +25,17 @@ export class DDPSubscriptions {
   private getLogger: () => ILogger
   private send: (message: any) => Promise<any>
   private onEvent: (name: string, listener: ISocketMessageCallback) => void
-  private hasConnection: () => boolean
+  private closesTaken: () => number
   private deadlineMs: number
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   constructor (
-    { getLogger, send, onEvent, hasConnection, deadlineMs }: DDPSubscriptionsOptions
+    { getLogger, send, onEvent, closesTaken, deadlineMs }: DDPSubscriptionsOptions
   ) {
     this.getLogger = getLogger
     this.send = send
     this.onEvent = onEvent
-    this.hasConnection = hasConnection
+    this.closesTaken = closesTaken
     this.deadlineMs = deadlineMs
   }
 
@@ -158,24 +158,28 @@ export class DDPSubscriptions {
   private sendSubscription = (
     stream: IDDPSubscriptionRequest,
     callback?: ISocketMessageCallback
-  ) => this.send({ msg: 'sub', ...stream })
-    .then((response) => {
-      if (response.subs?.length) return this.rememberSubscription(stream, callback)
-    })
-    .catch((error) => {
-      this.getLogger().error(`[ddp] Subscribe error: ${error.message}`)
-      if (error instanceof AbandonedRequest || error instanceof ExpiredWait) {
-        return this.rememberSubscription(stream, callback)
-      }
-      if (error instanceof DDPError) this.forgetSubscription(stream.id)
-      return undefined
-    })
+  ) => {
+    const closesBefore = this.closesTaken()
+    return this.send({ msg: 'sub', ...stream })
+      .then((response) => {
+        if (response.subs?.length) return this.rememberSubscription(stream, closesBefore, callback)
+      })
+      .catch((error) => {
+        this.getLogger().error(`[ddp] Subscribe error: ${error.message}`)
+        if (error instanceof AbandonedRequest || error instanceof ExpiredWait) {
+          return this.rememberSubscription(stream, closesBefore, callback)
+        }
+        if (error instanceof DDPError) this.forgetSubscription(stream.id)
+        return undefined
+      })
+  }
 
   private rememberSubscription = (
     { id, name, params }: IDDPSubscriptionRequest,
+    closesBefore: number,
     callback?: ISocketMessageCallback
   ) => {
-    if (!this.hasConnection()) return
+    if (this.closesTaken() !== closesBefore) return
     const unsubscribe = this.unsubscribe.bind(this, id)
     const onEvent = (listener: ISocketMessageCallback) => this.onEvent(name, listener)
     const subscription = { id, name, params, unsubscribe, onEvent }

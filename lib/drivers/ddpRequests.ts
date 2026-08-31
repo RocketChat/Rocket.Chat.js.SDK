@@ -5,20 +5,45 @@ import { toError } from './ddpError'
 
 const deadlineExpired = '[ddp] no response arrived before the deadline'
 
-const abandonedWaitMessages = {
+export const abandonedWaitMessages = {
   responseReopened: '[ddp] connection reopened before the response arrived',
   responseClosed: '[ddp] connection closed before the response arrived',
   connectionReplacedBeforeWrite: '[ddp] connection replaced before the message was written',
   connectionClosedBeforeOpen: '[ddp] connection closed before it opened'
 } as const
 
-type AbandonedWaitMessage = typeof abandonedWaitMessages[keyof typeof abandonedWaitMessages]
+export type AbandonedWaitMessage = typeof abandonedWaitMessages[keyof typeof abandonedWaitMessages]
+
+const failedConnectionAttemptMessages = {
+  superseded: '[ddp] connection attempt was superseded before it completed',
+  deadlineExpired: '[ddp] connection attempt did not complete before the deadline',
+  transportFailed: '[ddp] transport failed during the connection attempt'
+} as const
+
+type FailedConnectionAttemptMessage =
+  typeof failedConnectionAttemptMessages[keyof typeof failedConnectionAttemptMessages]
 
 interface DDPRequestsOptions {
   emitter: SDKEventEmitter
   getLogger: () => ILogger
   nextId: (id?: string) => string
   deadlineMs: number
+}
+
+export class FailedConnectionAttempt extends Error {
+  static superseded = () =>
+    new FailedConnectionAttempt(failedConnectionAttemptMessages.superseded)
+
+  static deadlineExpired = () =>
+    new FailedConnectionAttempt(failedConnectionAttemptMessages.deadlineExpired)
+
+  static transportFailed = () =>
+    new FailedConnectionAttempt(failedConnectionAttemptMessages.transportFailed)
+
+  protected constructor (message: FailedConnectionAttemptMessage) {
+    super(message)
+    Object.setPrototypeOf(this, FailedConnectionAttempt.prototype)
+  }
 }
 
 export class AbandonedWait extends Error {
@@ -56,12 +81,19 @@ export class DDPRequests {
   private getLogger: () => ILogger
   private nextId: (id?: string) => string
   private deadlineMs: number
+  private written = new Set<(message: AbandonedWaitMessage) => void>()
 
   constructor ({ emitter, getLogger, nextId, deadlineMs }: DDPRequestsOptions) {
     this.emitter = emitter
     this.getLogger = getLogger
     this.nextId = nextId
     this.deadlineMs = deadlineMs
+  }
+
+  abandonAll = (message: AbandonedWaitMessage) => {
+    const abandoning = [...this.written]
+    this.written.clear()
+    abandoning.forEach((abandon) => abandon(message))
   }
 
   send = (message: any, write: (value: string) => void, deadlineMs = this.deadlineMs): Promise<any> =>
@@ -81,39 +113,32 @@ export class DDPRequests {
 
       if (!listener) return resolve(undefined)
 
-      const abandonListeners = [
-        { event: 'disconnected', message: abandonedWaitMessages.responseReopened },
-        { event: 'connecting', message: abandonedWaitMessages.responseReopened },
-        { event: 'close', message: abandonedWaitMessages.responseClosed }
-      ].map(({ event, message }) => ({
-        event,
-        onAbandon: () => {
-          removeListeners()
-          reject(new AbandonedRequest(id, message))
-        }
-      }))
+      const onAbandon = (abandonedFor: AbandonedWaitMessage) => {
+        endWait()
+        reject(new AbandonedRequest(id, abandonedFor))
+      }
 
       let deadlineTimer: NodeJS.Timer | number | undefined
 
-      const removeListeners = () => {
+      const endWait = () => {
         clearTimeout(deadlineTimer as any)
+        this.written.delete(onAbandon)
         this.emitter.off(listener, onResponse)
-        abandonListeners.forEach(({ event, onAbandon }) => this.emitter.off(event, onAbandon))
       }
 
       deadlineTimer = setTimeout(() => {
-        removeListeners()
+        endWait()
         reject(new ExpiredWait(id))
       }, deadlineMs)
 
       const onResponse = (response: any) => {
-        removeListeners()
+        endWait()
         return response.error
           ? reject(toError(response.error))
           : resolve({ ...(/connect|ping|pong/.test(message.msg) ? {} : { id }), ...response })
       }
 
-      abandonListeners.forEach(({ event, onAbandon }) => this.emitter.once(event, onAbandon))
+      this.written.add(onAbandon)
       this.emitter.once(listener, onResponse)
     })
 }

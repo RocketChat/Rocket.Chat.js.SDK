@@ -82,10 +82,12 @@ export class FakeWebSocket {
   closeError: Error | null = null
 
   /**
-   * Closes and fires the close handler with the code it was given — code 4000
-   * versus anything else is a live branch in `onClose`.
+   * Closes and fires the close handler with the code it was given, code 4000
+   * versus anything else being a live branch in `onClose`. A close asked of an
+   * already closed socket does nothing, as it does on a real WebSocket.
    */
   close (code?: number): void {
+    if (this.readyState === CLOSED) return
     if (this.closeError) throw this.closeError
     this.closedWith.push(code)
     if (!this.answersClose) return
@@ -203,6 +205,33 @@ export const driveToHandshake = async (transport: FakeWebSocket, session = 'fake
 export const flushMicrotasks = async (): Promise<void> => {
   for (let turn = 0; turn < 10; turn += 1) await Promise.resolve()
 }
+
+/**
+ * The Connection work a Socket is doing, by name. Read from the private fields
+ * through element access, so no spec-only surface has to exist in the source:
+ * `closing` is the only one production exposes, and it cannot tell a Scheduled
+ * Reopen from Idle.
+ */
+export const connectionWork = (socket: Socket): 'idle' | 'scheduled' | 'attempting' | 'closing' => {
+  const work = socket['connectionWork']
+  if (work['closeOwned']) return 'closing'
+  if (work['attempt']) return 'attempting'
+  if (work['scheduledReopen']) return 'scheduled'
+  return 'idle'
+}
+
+export const hasScheduledReopen = (socket: Socket): boolean =>
+  connectionWork(socket) === 'scheduled'
+
+/**
+ * Every fake still wired to the Socket. Both letting a Transport go and losing
+ * an established one null all four handlers, so this answers "can it still
+ * reach the Socket", not "does the Socket still hold it". That second question
+ * is `socket.connection`, and the two diverge for a lost-but-retained Transport.
+ */
+export const wiredTransports = (): FakeWebSocket[] =>
+  fakeSockets.filter(({ onopen, onmessage, onerror, onclose }) =>
+    !!(onopen || onmessage || onerror || onclose))
 
 export const subFrames = (frames: string[]) =>
   frames.map((frame) => JSON.parse(frame)).filter((frame) => frame.msg === 'sub')
