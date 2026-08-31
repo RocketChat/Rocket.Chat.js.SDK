@@ -59,10 +59,6 @@ interface Latch<T> {
   undoOnSettle: (undo: () => void) => void
 }
 
-/**
- * One wait that ends exactly once, either from its wiring or on its deadline.
- * `wire` attaches the listeners the wait ends on and registers what to undo.
- */
 const latchedByDeadline = <T>(
   deadlineMs: number,
   onDeadline: (latch: Latch<T>) => void,
