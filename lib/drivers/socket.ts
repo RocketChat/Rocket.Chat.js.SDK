@@ -35,6 +35,7 @@ import {
   FailedConnectionAttempt
 } from './ddpRequests'
 import {
+  closeTransportIntentionally,
   Connection,
   ConnectionAttempt,
   intentionalCloseCode,
@@ -53,6 +54,43 @@ function hostToWS (host: string, ssl = false) {
 const socketDeadlineMs = 2000;
 
 const endedByOwnershipChange = (error: Error) => error instanceof AbandonedWait;
+
+interface Latch<T> {
+  settle: (value: T) => void
+  refuse: (error: Error) => void
+  whenSettled: (cleanup: () => void) => void
+}
+
+/**
+ * One wait that ends exactly once, either from its wiring or on its deadline.
+ * `wire` attaches the listeners the wait ends on and registers what to undo.
+ */
+const latchedByDeadline = <T>(
+  deadlineMs: number,
+  onDeadline: (latch: Latch<T>) => void,
+  wire: (latch: Latch<T>) => void
+): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    let settled = false
+    let cleanup = () => {}
+
+    const finish = (announce: () => void) => {
+      if (settled) return
+      settled = true
+      clearTimeout(deadline as any)
+      cleanup()
+      announce()
+    }
+
+    const latch: Latch<T> = {
+      settle: (value) => finish(() => resolve(value)),
+      refuse: (error) => finish(() => reject(error)),
+      whenSettled: (undo) => { cleanup = undo }
+    }
+
+    const deadline = setTimeout(() => onDeadline(latch), deadlineMs)
+    wire(latch)
+  })
 
 export class Socket extends SDKEventEmitter {
   sent = 0
@@ -238,45 +276,35 @@ export class Socket extends SDKEventEmitter {
    * `close` event: a close emitted for the connection that replaced this one
    * says nothing about the Transport being closed here.
    */
-  private waitForClose = (transport: Transport, deadlineMs: number) =>
-    new Promise<void>((resolve) => {
-      let settled = false
-      const socketOnClose = transport.onclose
+  private waitForClose = (transport: Transport, deadlineMs: number) => {
+    const socketOnClose = transport.onclose
+    let onTransportClose: (e: any) => void
 
-      const settle = () => {
-        if (settled) return
-        settled = true
-        clearTimeout(deadline as any)
-        resolve()
+    const answerCloseOurselves = (latch: Latch<void>, reason: string) => {
+      // Null rather than restore: a transport close that lands after this
+      // would otherwise re-enter onClose and emit a second close for a
+      // connection the Socket is already letting go.
+      if (transport.onclose === onTransportClose) transport.onclose = null as any
+      this.onClose({ code: intentionalCloseCode, reason, wasClean: false }, transport)
+      latch.settle()
+    }
+
+    return latchedByDeadline<void>(
+      deadlineMs,
+      (latch) => answerCloseOurselves(latch, 'the transport did not answer the close'),
+      (latch) => {
+        onTransportClose = (e: any) => {
+          socketOnClose?.(e)
+          latch.settle()
+        }
+        transport.onclose = onTransportClose
+
+        if (!closeTransportIntentionally(transport, this.logger)) {
+          answerCloseOurselves(latch, 'the transport refused to close')
+        }
       }
-
-      const onTransportClose = (e: any) => {
-        socketOnClose?.(e)
-        settle()
-      }
-
-      const answerCloseOurselves = (reason: string) => {
-        // Null rather than restore: a transport close that lands after this
-        // would otherwise re-enter onClose and emit a second close for a
-        // connection the Socket is already letting go.
-        if (transport.onclose === onTransportClose) transport.onclose = null as any
-        this.onClose({ code: intentionalCloseCode, reason, wasClean: false }, transport)
-        settle()
-      }
-
-      transport.onclose = onTransportClose
-      const deadline = setTimeout(
-        () => answerCloseOurselves('the transport did not answer the close'),
-        deadlineMs
-      )
-
-      try {
-        transport.close(intentionalCloseCode)
-      } catch (err) {
-        this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
-        answerCloseOurselves('the transport refused to close')
-      }
-    })
+    )
+  }
 
   open = (): Promise<void> => this.connectionWork.open()
 
@@ -291,39 +319,26 @@ export class Socket extends SDKEventEmitter {
    * the socket is open and the server answers the ping within the deadline.
    */
   probe = (deadlineMs = socketDeadlineMs): Promise<boolean> => {
-    return new Promise<boolean>(resolve => {
-      const transport = this.connection
-      if (!this.transportOpen || !transport || this.connectionWork.closing) {
-        return resolve(false)
+    const transport = this.connection
+    if (!this.transportOpen || !transport || this.connectionWork.closing) {
+      return Promise.resolve(false)
+    }
+
+    return latchedByDeadline<boolean>(
+      deadlineMs,
+      (latch) => latch.settle(false),
+      (latch) => {
+        const onPong = () => latch.settle(true)
+        latch.whenSettled(() => this.off('pong', onPong))
+        this.once('pong', onPong)
+
+        try {
+          transport.send(JSON.stringify({ msg: 'ping' }))
+        } catch {
+          latch.settle(false)
+        }
       }
-
-      let settled = false
-      const cleanup = () => {
-        if (settled) return
-        settled = true
-        this.off('pong', onPong)
-        if (timeout) clearTimeout(timeout as any)
-      }
-
-      const onPong = () => {
-        cleanup()
-        resolve(true)
-      }
-
-      this.once('pong', onPong)
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        resolve(false)
-      }, deadlineMs)
-
-      try {
-        transport.send(JSON.stringify({ msg: 'ping' }))
-      } catch {
-        cleanup()
-        resolve(false)
-      }
-    })
+    )
   }
 
   get transportOpen () {
@@ -348,33 +363,23 @@ export class Socket extends SDKEventEmitter {
    * *schedules* the retry at that interval, so a deadline of exactly `reopen`
    * expires as the reconnect begins, before the attempt it waits on can open.
    */
-  private waitForOpen = (deadlineMs = this.config.reopen * 2): Promise<void> => {
-    return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        this.off('open', onOpen)
-        this.waitsForOpen.delete(refuse)
-        clearTimeout(timeout as any)
+  private waitForOpen = (deadlineMs = this.config.reopen * 2): Promise<void> =>
+    latchedByDeadline<void>(
+      deadlineMs,
+      (latch) => latch.refuse(new Error('[ddp] timed out waiting for the connection to open')),
+      (latch) => {
+        const onOpen = () => latch.settle()
+        const refuse = (error: Error) => latch.refuse(error)
+
+        latch.whenSettled(() => {
+          this.off('open', onOpen)
+          this.waitsForOpen.delete(refuse)
+        })
+
+        this.once('open', onOpen)
+        this.waitsForOpen.add(refuse)
       }
-
-      const onOpen = () => {
-        cleanup()
-        resolve()
-      }
-
-      const refuse = (error: Error) => {
-        cleanup()
-        reject(error)
-      }
-
-      this.once('open', onOpen)
-      this.waitsForOpen.add(refuse)
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        reject(new Error('[ddp] timed out waiting for the connection to open'))
-      }, deadlineMs)
-    })
-  }
+    )
 
   /**
    * Send an object to the server via Socket. Adds handler to collection to

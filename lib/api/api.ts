@@ -147,7 +147,7 @@ export default class Api extends SDKEventEmitter {
     options?: any,
     apiVersion: string = 'v1'
 	) => {
-    this.logger?.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
+    this.logger?.debug(`[API] ${ method } ${ endpoint }:`, data)
     try {
       const { signal } = this.controller;
       options = { ...options, signal };
@@ -164,7 +164,7 @@ export default class Api extends SDKEventEmitter {
       this.logger?.debug(`[API] ${method} ${endpoint} result ${result.status}`)
       return method === 'DELETE' && !result.data ? result : result.data
     } catch (err) {
-      this.logger?.error(`[API] ${ method } error(${ endpoint }): ${ JSON.stringify(err) }`)
+      this.logger?.error(`[API] ${ method } error(${ endpoint }):`, err)
       throw err
     }
   }

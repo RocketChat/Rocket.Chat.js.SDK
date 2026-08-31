@@ -257,7 +257,7 @@ describe('api', () => {
 
       await api.get('me', {})
 
-      expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('[API] GET me'))
+      expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('[API] GET me'), expect.anything())
     })
 
     it('logs the failure to the logger it was handed', async () => {
@@ -267,7 +267,7 @@ describe('api', () => {
 
       await expect(api.get('me', {})).rejects.toBeDefined()
 
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('[API] GET error(me)'))
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('[API] GET error(me)'), expect.anything())
     })
   })
 })
