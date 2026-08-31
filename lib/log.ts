@@ -13,7 +13,6 @@ const noopLogger: ILogger = {
   error: () => null
 }
 
-/** Default basic console logging */
 export let logger: ILogger = noopLogger
 
 /** Substitute logging handler */

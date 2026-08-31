@@ -23,13 +23,14 @@ const failedConnectionAttemptMessages = {
 type FailedConnectionAttemptMessage =
   typeof failedConnectionAttemptMessages[keyof typeof failedConnectionAttemptMessages]
 
-const ownReplies: { [msg: string]: string | undefined } = {
+const replyEventByMessage: { [msg: string]: string | undefined } = {
   connect: 'connected',
   ping: 'pong',
   pong: undefined
 }
 
-const hasOwnReply = (msg: string) => Object.keys(ownReplies).some((name) => msg.includes(name))
+const carriesNoId = (msg: string = '') =>
+  Object.keys(replyEventByMessage).some((name) => msg.includes(name))
 
 interface DDPRequestsOptions {
   emitter: SDKEventEmitter
@@ -107,10 +108,10 @@ export class DDPRequests {
   send = (message: any, write: (value: string) => void, deadlineMs = this.deadlineMs): Promise<any> =>
     new Promise<any>((resolve, reject) => {
       const id = this.nextId(message.id)
-      const carriesId = !hasOwnReply(message.msg)
+      const carriesId = !carriesNoId(message.msg)
       const outboundMessage = { ...message, ...(carriesId ? { id } : {}) }
       const serialized = JSON.stringify(outboundMessage)
-      const listener = carriesId ? id : ownReplies[message.msg]
+      const listener = carriesId ? id : replyEventByMessage[message.msg]
       this.getLogger().debug(`[ddp] sending message: ${serialized}`)
 
       try {
