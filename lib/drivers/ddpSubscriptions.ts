@@ -16,7 +16,7 @@ interface DDPSubscriptionsOptions {
   getLogger: () => ILogger
   send: (message: any) => Promise<any>
   onEvent: (name: string, listener: ISocketMessageCallback) => void
-  closesTaken: () => number
+  getCloseGeneration: () => number
   hasNoAttachedTransportAndNoCloseOwner: () => boolean
   deadlineMs: number
 }
@@ -26,7 +26,7 @@ export class DDPSubscriptions {
   private getLogger: () => ILogger
   private send: (message: any) => Promise<any>
   private onEvent: (name: string, listener: ISocketMessageCallback) => void
-  private closesTaken: () => number
+  private getCloseGeneration: () => number
   private hasNoAttachedTransportAndNoCloseOwner: () => boolean
   private deadlineMs: number
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
@@ -36,7 +36,7 @@ export class DDPSubscriptions {
       getLogger,
       send,
       onEvent,
-      closesTaken,
+      getCloseGeneration,
       hasNoAttachedTransportAndNoCloseOwner,
       deadlineMs
     }: DDPSubscriptionsOptions
@@ -44,7 +44,7 @@ export class DDPSubscriptions {
     this.getLogger = getLogger
     this.send = send
     this.onEvent = onEvent
-    this.closesTaken = closesTaken
+    this.getCloseGeneration = getCloseGeneration
     this.hasNoAttachedTransportAndNoCloseOwner = hasNoAttachedTransportAndNoCloseOwner
     this.deadlineMs = deadlineMs
   }
@@ -173,7 +173,7 @@ export class DDPSubscriptions {
     stream: IDDPSubscriptionRequest,
     callback?: ISocketMessageCallback
   ) => {
-    const closesBefore = this.closesTaken()
+    const closesBefore = this.getCloseGeneration()
     if (this.hasNoAttachedTransportAndNoCloseOwner()) {
       return Promise.resolve(this.rememberSubscription(stream, closesBefore, callback))
     }
@@ -196,7 +196,7 @@ export class DDPSubscriptions {
     closesBefore: number,
     callback?: ISocketMessageCallback
   ) => {
-    if (this.closesTaken() !== closesBefore) return
+    if (this.getCloseGeneration() !== closesBefore) return
     const unsubscribe = this.unsubscribe.bind(this, id)
     const onEvent = (listener: ISocketMessageCallback) => this.onEvent(name, listener)
     const subscription = { id, name, params, unsubscribe, onEvent }

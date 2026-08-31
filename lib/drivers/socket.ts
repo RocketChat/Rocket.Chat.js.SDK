@@ -104,7 +104,7 @@ export class Socket extends SDKEventEmitter {
       getLogger: () => this.logger,
       send: (message) => this.send(message),
       onEvent: (name, listener) => this.onEvent(name, listener),
-      closesTaken: () => this.connectionWork.closesTaken,
+      getCloseGeneration: () => this.connectionWork.closesTaken,
       hasNoAttachedTransportAndNoCloseOwner: () => (
         !this.connection && !this.connectionWork.closing
       ),
