@@ -93,6 +93,7 @@ describe('Driver.subscribe', () => {
 describe('Driver.waitForNotifyUserMediaSubs', () => {
   const userId = 'user-id'
   const topic = 'stream-notify-user'
+  const ABNORMAL_CLOSE = 1006
 
   /**
    * Register a subscription on the Socket, as a successful sub would, and
@@ -124,6 +125,39 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     expect(transport.sent).toHaveLength(sentBefore)
     expect(jest.getTimerCount()).toBe(timersBefore)
+  })
+
+  it('resolves false with no transport attached, though both media streams are recorded', async () => {
+    const driver = createDriver()
+    driver.userId = userId
+    // Recorded with nothing attached, which is how a subscribe made off the
+    // connection is kept: entries the poll finds, on a socket that can send none.
+    await driver['socket'].subscribe(topic, [`${userId}/media-signal`])
+    await driver['socket'].subscribe(topic, [`${userId}/media-calls`])
+    const transportsBefore = fakeSockets.length
+
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
+
+    await expect(waiting).resolves.toBe(false)
+    expect(fakeSockets).toHaveLength(transportsBefore)
+  })
+
+  it('sends no sub frame while the transport it recorded on is gone', async () => {
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver['socket'])
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+    const sentBefore = transport.sent.length
+
+    transport.close(ABNORMAL_CLOSE)
+
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
+
+    await expect(waiting).resolves.toBe(false)
+    expect(transport.sent).toHaveLength(sentBefore)
   })
 
   it('resolves ready after an immediate reopen, on the socket the reopen built', async () => {

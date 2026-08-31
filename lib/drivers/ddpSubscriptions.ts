@@ -85,11 +85,11 @@ export class DDPSubscriptions {
       subscriptions.map((subscription) => this.resubscribe(subscription))
     )
       .then((responses) => {
-        const unacknowledged = subscriptions.filter((_, index) => !responses[index])
-        unacknowledged.forEach((subscription) => this.getLogger().error(
-          `[ddp] Subscribe not acknowledged: ${subscription.params?.[0]}`
+        const unrecorded = subscriptions.filter((_, index) => !responses[index])
+        unrecorded.forEach((subscription) => this.getLogger().error(
+          `[ddp] Subscribe not recorded: ${subscription.params?.[0]}`
         ))
-        return unacknowledged.length === 0
+        return unrecorded.length === 0
       })
       .catch(() => false)
 
@@ -104,7 +104,7 @@ export class DDPSubscriptions {
         resolve(value)
       }
       const attempt = () => {
-        if (inFlight) return
+        if (inFlight || this.recordWithoutSending()) return
         const subscriptionsPerStream = recordedPerStream()
         if (!subscriptionsPerStream.every((subscriptions) => subscriptions.length > 0)) return
         inFlight = true

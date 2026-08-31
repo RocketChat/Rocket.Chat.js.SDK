@@ -362,6 +362,24 @@ describe('DDPSubscriptions', () => {
       ])).resolves.toBe(false)
     })
 
+    it('sends nothing and resolves false with no transport attached, though recorded', async () => {
+      jest.useFakeTimers()
+      const { subscriptions, send } = createSubscriptions(undefined, {
+        recordWithoutSending: () => true
+      })
+      await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
+
+      const resubscribing = subscriptions.resubscribeWhenRecorded(
+        [{ name: 'stream-room-messages', params: ['GENERAL'] }],
+        500
+      )
+      jest.advanceTimersByTime(500)
+
+      await expect(resubscribing).resolves.toBe(false)
+      expect(send).not.toHaveBeenCalled()
+      jest.useRealTimers()
+    })
+
     it('sends nothing and resolves false when a stream is never recorded', async () => {
       jest.useFakeTimers()
       const { subscriptions, send } = createSubscriptions()
