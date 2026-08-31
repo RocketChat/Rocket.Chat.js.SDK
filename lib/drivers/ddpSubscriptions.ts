@@ -131,6 +131,10 @@ export class DDPSubscriptions {
     if (!this.records[id]) {
       return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
     }
+    if (this.recordWithoutSending()) {
+      this.forgetSubscription(id)
+      return Promise.resolve(undefined)
+    }
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((response: any) => {
         this.forgetSubscription(id)

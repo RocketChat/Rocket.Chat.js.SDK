@@ -503,6 +503,40 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
+  describe('unsubscribing with no transport attached', () => {
+    let unopened: Socket
+    let transportsBefore: number
+
+    beforeEach(() => {
+      unopened = createSocket()
+      transportsBefore = fakeSockets.length
+    })
+
+    it('forgets the entry and resolves, reaching no wire', async () => {
+      const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+      await expect(unopened.unsubscribe(subscription!.id)).resolves.toBeUndefined()
+
+      expect(unopened.subscriptions).toEqual({})
+      expect(fakeSockets).toHaveLength(transportsBefore)
+    })
+
+    it('leaves nothing for a later login to re-establish', async () => {
+      const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+      await unopened.unsubscribe(subscription!.id)
+
+      const replacement = await openFakeConnection(unopened)
+      await unopened.subscribeAll()
+
+      expect(subFrames(replacement.sent)).toEqual([])
+    })
+
+    it('rejects for an id that was never recorded', async () => {
+      await expect(unopened.unsubscribe('never-subscribed')).rejects.toThrow('never-subscribed')
+      expect(fakeSockets).toHaveLength(transportsBefore)
+    })
+  })
+
   it('rejects with an Error naming the id when unsubscribing from something not in the map', async () => {
     // Callers up the stack log `err.message`, so the rejection has to be an
     // Error that says which subscription was missing.

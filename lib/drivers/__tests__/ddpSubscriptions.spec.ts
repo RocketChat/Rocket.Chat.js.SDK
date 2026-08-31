@@ -225,7 +225,7 @@ describe('DDPSubscriptions', () => {
       expect(send).not.toHaveBeenCalled()
     })
 
-    it('forgets the record and resolves with the response result', async () => {
+    it('forgets the record and resolves with the response result on an attached transport', async () => {
       const { subscriptions, send } = createSubscriptions()
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.resolve({ result: 'unsubscribed' }))
@@ -235,7 +235,7 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records).toEqual({})
     })
 
-    it('forgets the record when the server refuses the unsubscribe request', async () => {
+    it('forgets the record when the server refuses the unsubscribe request on an attached transport', async () => {
       const { subscriptions, send } = createSubscriptions()
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.reject(new DDPError('nosub')))
@@ -245,7 +245,33 @@ describe('DDPSubscriptions', () => {
       expect(subscriptions.records).toEqual({})
     })
 
-    it('keeps the record when the unsubscribe wait expires', async () => {
+    it('forgets the record and resolves with no transport attached, sending nothing', async () => {
+      let attached = true
+      const { subscriptions, send } = createSubscriptions(undefined, {
+        recordWithoutSending: () => !attached
+      })
+      const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
+      attached = false
+      send.mockClear()
+
+      await expect(subscriptions.unsubscribe(subscription!.id)).resolves.toBeUndefined()
+
+      expect(send).not.toHaveBeenCalled()
+      expect(subscriptions.records).toEqual({})
+    })
+
+    it('rejects for an id that was never recorded with no transport attached', async () => {
+      const { subscriptions, send } = createSubscriptions(undefined, {
+        recordWithoutSending: () => true
+      })
+
+      await expect(subscriptions.unsubscribe('sub-unknown')).rejects.toThrow(
+        '[ddp] No subscription to unsubscribe from: sub-unknown'
+      )
+      expect(send).not.toHaveBeenCalled()
+    })
+
+    it('keeps the record when the unsubscribe wait expires on an attached transport', async () => {
       const { subscriptions, send } = createSubscriptions()
       const subscription = await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.reject(new ExpiredWait(subscription!.id)))
