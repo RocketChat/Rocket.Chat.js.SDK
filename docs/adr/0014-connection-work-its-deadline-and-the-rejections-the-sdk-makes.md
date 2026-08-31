@@ -61,6 +61,9 @@ ownership moves them.
 - A Socket has at most one attached Transport. A predecessor it detached may
   still be open to the peer, and is then a Detached socket: nothing it does
   afterwards reaches the Socket.
+- A Transport lost to the peer is released, not left attached. An attached
+  Transport is one the Socket could still write on, so a caller that reads
+  attachment reads it as such.
 - A Connection Attempt spans Transport construction through DDP handshake
   success. Transport open alone is not success. The handshake completes, the
   session is recorded, the Liveness chain starts, and only then has the attempt

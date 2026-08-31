@@ -82,11 +82,13 @@ export class FakeWebSocket {
   closeError: Error | null = null
 
   /**
-   * Closes and fires the close handler with the code it was given — code 4000
-   * versus anything else is a live branch in `onClose`.
+   * Closes and fires the close handler with the code it was given, code 4000
+   * versus anything else being a live branch in `onClose`. A close asked of an
+   * already closed socket does nothing, as it does on a real WebSocket.
    */
   close (code?: number): void {
     if (this.closeError) throw this.closeError
+    if (this.readyState === CLOSED) return
     this.closedWith.push(code)
     if (!this.answersClose) return
     this.readyState = CLOSED

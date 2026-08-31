@@ -344,7 +344,7 @@ export class Socket extends SDKEventEmitter {
    *
    * The default is twice `config.reopen`, not `config.reopen`: a Reopen only
    * *schedules* the retry at that interval, so a deadline of exactly `reopen`
-   * expires as the reconnect begins and every send issued at a drop fails.
+   * expires as the reconnect begins, before the attempt it waits on can open.
    */
   private waitForOpen = (deadlineMs = this.config.reopen * 2): Promise<void> => {
     return new Promise<void>((resolve, reject) => {

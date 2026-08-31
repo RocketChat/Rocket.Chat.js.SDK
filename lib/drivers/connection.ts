@@ -161,7 +161,7 @@ export class Connection {
     const lost = this.attempt
     if (lost) this.abandonAttempt(lost, abandonedWaitMessages.responseClosed)
     else {
-      this.makeInert(transport)
+      this.disposeLostTransport(transport)
       this.options.abandonWrittenWaits(abandonedWaitMessages.responseClosed)
     }
     if (lost ? lost.recovery : unexpected) this.reopen()
@@ -214,6 +214,11 @@ export class Connection {
   private reject = (attempt: Attempt, error: Error) => {
     attempt.waiters.forEach((waiter) => waiter.reject(error))
     attempt.waiters.length = 0
+  }
+
+  private disposeLostTransport = (transport: Transport) => {
+    if (this.closeOwned) this.makeInert(transport)
+    else this.release(transport)
   }
 
   private makeInert = (transport: Transport) => {

@@ -344,7 +344,7 @@ describe('Socket.send with several listeners on one event', () => {
     )
 
     const CLOSED_MESSAGE = '[ddp] connection closed before the response arrived'
-    const REPLACED_MESSAGE = '[ddp] connection replaced before the message was written'
+    const NO_CONNECTION_MESSAGE = '[ddp] sending without open connection'
     const REOPENED_MESSAGE = '[ddp] connection reopened before the response arrived'
 
     const expectAllToReject = (sends: Promise<any>[], message: string) =>
@@ -466,20 +466,20 @@ describe('Socket.send with several listeners on one event', () => {
       await rejections
     })
 
-    it('abandons a send issued before the connection came back rather than writing it on the new one', async () => {
+    it('refuses a send issued before the connection came back rather than writing it on the new one', async () => {
       // The DDP session belongs to the connection the send was issued on. The
       // new one has its own session and is not logged in yet.
       transport.close(1006)
 
       const sending = socket.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })
-      const abandoned = expect(sending).rejects.toThrow(REPLACED_MESSAGE)
+      const refused = expect(sending).rejects.toThrow(NO_CONNECTION_MESSAGE)
 
       await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
       const reopened = fakeSockets[1]
       await driveToHandshake(reopened)
       await jest.advanceTimersByTimeAsync(0)
 
-      await abandoned
+      await refused
       expect(reopened.sent.map((frame: string) => JSON.parse(frame).msg)).not.toContain('method')
     })
 

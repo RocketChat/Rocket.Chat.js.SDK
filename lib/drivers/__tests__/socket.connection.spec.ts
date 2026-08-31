@@ -134,14 +134,14 @@ describe('Socket connection lifecycle', () => {
       expect(closeSeen).toHaveBeenCalledTimes(1)
     })
 
-    it('keeps the closed transport as a reference no late frame can reach', async () => {
+    it('detaches the lost transport, so no late frame can reach the socket', async () => {
       await jest.advanceTimersByTimeAsync(1000)
       const pingBeforeClose = socket.lastPing
 
       transport.close(1006)
       await jest.advanceTimersByTimeAsync(1000)
 
-      expect(socket.connection).toBe(transport)
+      expect(socket.connection).toBeUndefined()
       expect([transport.onopen, transport.onmessage, transport.onerror, transport.onclose])
         .toEqual([null, null, null, null])
 
@@ -150,14 +150,14 @@ describe('Socket connection lifecycle', () => {
       expect(socket.lastPing).toBe(pingBeforeClose)
     })
 
-    it('lets the inert reference go once the scheduled reopen replaces it', async () => {
+    it('attaches the replacement the scheduled reopen builds', async () => {
       transport.close(1006)
-      expect(socket.connection).toBe(transport)
+      expect(socket.connection).toBeUndefined()
 
       await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
 
       expect(socket.connection).toBe(fakeSockets[1])
-      expect(transport.closedWith).toEqual([1006, INTENTIONAL_CLOSE])
+      expect(transport.closedWith).toEqual([1006])
       expect(wiredTransports()).toEqual([fakeSockets[1]])
     })
 
@@ -298,14 +298,15 @@ describe('Socket connection lifecycle', () => {
       expect(fakeSockets).toHaveLength(2)
     })
 
-    it('retains a transport that recovered before the scheduled reopen was consumed', async () => {
+    it('builds a replacement for a lost transport even if it reports itself open again', async () => {
       transport.close(1006)
       transport.readyState = OPEN
 
-      await expect(socket.open()).resolves.toBeUndefined()
+      const opening = socket.open()
 
-      expect(fakeSockets).toHaveLength(1)
-      expect(connectionWork(socket)).toBe('idle')
+      expect(fakeSockets).toHaveLength(2)
+      await driveToHandshake(fakeSockets[1])
+      await expect(opening).resolves.toBeUndefined()
     })
 
     it('builds nothing for a recovery request during an ordinary attempt, and reopens once it fails', async () => {
@@ -626,7 +627,7 @@ describe('Socket connection lifecycle', () => {
 
       expect(fakeSockets).toHaveLength(2)
       expect(connectionWork(socket)).toBe('attempting')
-      expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
+      expect(socket.connection).toBe(fakeSockets[1])
 
       await driveToHandshake(fakeSockets[1])
       await expect(reopening).resolves.toBeUndefined()
