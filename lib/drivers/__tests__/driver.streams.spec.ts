@@ -1,4 +1,4 @@
-import { createDriver } from '../../../test/createDriver'
+import { createConnectedDriver, createDriver } from '../../../test/createDriver'
 import {
   answerLastMethodCall,
   driveToHandshake,
@@ -6,7 +6,6 @@ import {
   FakeWebSocket,
   fakeSockets,
   flushMicrotasks,
-  openFakeConnection,
   subFrames,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -35,8 +34,7 @@ const ackSubsSentSince = async (transport: FakeWebSocket, sentBefore: number) =>
 
 describe('Driver.subscribeRaw', () => {
   it('sends the params it was given without wrapping them', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const subscribing = driver.subscribeRaw('stream-notify-user', ['user-id/message', false])
     const { id } = transport.lastSent() as { id: string }
@@ -53,8 +51,7 @@ describe('Driver.subscribeRaw', () => {
   })
 
   it('answers a repeated subscribe for the same stream with the record already on the wire', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
     const sentBefore = transport.sent.length
 
     const subscribing = driver.subscribeRaw('stream-notify-user', ['user-id/message', false])
@@ -71,8 +68,7 @@ describe('Driver.subscribeRaw', () => {
 
 describe('Driver.subscribeNotifyUser', () => {
   it('leaves the prefix empty when no login has set a user id', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
     const sentBefore = transport.sent.length
 
     const subscribing = driver.subscribeNotifyUser()
@@ -86,8 +82,7 @@ describe('Driver.subscribeNotifyUser', () => {
 
 describe('Driver.subscribeRoom', () => {
   it('subscribes to the room messages and the room typing and delete streams', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
     const sentBefore = transport.sent.length
 
     const subscribing = driver.subscribeRoom('room-id', false)
@@ -105,8 +100,7 @@ describe('Driver.subscribeRoom', () => {
 
 describe('Driver.unsubscribe', () => {
   it('unsubscribes the id carried by the subscription it was handed', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const subscribing = driver.subscribe('stream-notify-room', 'room-id/typing', false)
     const { id } = transport.lastSent() as { id: string }
@@ -124,8 +118,7 @@ describe('Driver.unsubscribe', () => {
   })
 
   it('rejects an id it has already unsubscribed, naming that id', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const subscribing = driver.subscribe('stream-notify-room', 'room-id/typing', false)
     const { id } = transport.lastSent() as { id: string }
@@ -144,8 +137,7 @@ describe('Driver.unsubscribe', () => {
 
 describe('Driver.unsubscribeAll', () => {
   it('unsubscribes every recorded subscription', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const subscribedBefore = transport.sent.length
     const subscribing = driver.subscribeRoom('room-id', false)
@@ -168,8 +160,7 @@ describe('Driver.unsubscribeAll', () => {
 
 describe('Driver.onStreamData', () => {
   it('calls back on every frame the socket emits for the event, until stopped', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const received = jest.fn()
     const { stop } = await driver.onStreamData('stream-notify-logged', received)
@@ -185,8 +176,7 @@ describe('Driver.onStreamData', () => {
   })
 
   it('keeps another listener on the event when one caller stops twice', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const stopped = jest.fn()
     const kept = jest.fn()
@@ -204,8 +194,7 @@ describe('Driver.onStreamData', () => {
 
 describe('Driver.removeAllListeners', () => {
   it('stops the connected echo and leaves a stream-data callback receiving', async () => {
-    const driver = createDriver()
-    await openFakeConnection(driver['socket'])
+    const { driver } = await createConnectedDriver()
 
     const connectedSeen = jest.fn()
     const streamSeen = jest.fn()
@@ -239,8 +228,7 @@ describe('Driver.removeAllListeners', () => {
 
 describe('Driver.onMessage', () => {
   it('calls back with the first arg of a room message, its timestamp parsed', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const received = jest.fn()
     driver.onMessage(received)
@@ -258,8 +246,7 @@ describe('Driver.onMessage', () => {
 
 describe('Driver.onTyping', () => {
   it('calls back with the username and the typing flag from the room notification', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const received = jest.fn()
     driver.onTyping(received)
@@ -276,8 +263,7 @@ describe('Driver.onTyping', () => {
 
 describe('Driver.notifyVisitorTyping', () => {
   it('calls the room typing stream with the visitor token', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const notifying = driver.notifyVisitorTyping('room-id', 'visitor', true, 'visitor-token')
     const { id } = transport.lastSent() as { id: string }
@@ -309,8 +295,7 @@ describe('Driver.ejsonMessage', () => {
 
 describe('Driver.methodCall', () => {
   it('calls the method with the arguments it was given and resolves with the result', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const calling = driver.methodCall('getUsersOfRoom', 'room-id', true)
     const { id } = transport.lastSent() as { id: string }
@@ -327,8 +312,7 @@ describe('Driver.methodCall', () => {
   })
 
   it('rejects with the error the server answered', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const calling = driver.methodCall('getUsersOfRoom', 'room-id')
     errorLastMethodCall(transport, { error: 400, message: 'bad request' })
@@ -339,8 +323,7 @@ describe('Driver.methodCall', () => {
 
 describe('Driver.probe', () => {
   it('resolves true when the server pongs within the deadline', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     const probing = driver.probe(500)
     expect(transport.lastSent()).toEqual({ msg: 'ping' })
@@ -350,8 +333,7 @@ describe('Driver.probe', () => {
   })
 
   it('resolves false when no pong arrives before the deadline', async () => {
-    const driver = createDriver()
-    await openFakeConnection(driver['socket'])
+    const { driver } = await createConnectedDriver()
 
     const probing = driver.probe(500)
     await jest.advanceTimersByTimeAsync(500)
@@ -367,8 +349,7 @@ describe('Driver.probe', () => {
 
 describe('Driver.lastPing', () => {
   it('reports the time of the last frame the socket saw', async () => {
-    const driver = createDriver()
-    const transport = await openFakeConnection(driver['socket'])
+    const { driver, transport } = await createConnectedDriver()
 
     await jest.advanceTimersByTimeAsync(5000)
     transport.receive({ msg: 'pong' })
