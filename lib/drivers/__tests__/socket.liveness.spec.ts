@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   CLOSED,
   driveToHandshake,
@@ -24,12 +24,6 @@ useFakeClockAndSocketRegistry()
  */
 const PING_INTERVAL = 3000
 
-const createSocket = () => new Socket({
-  host: 'localhost:3000',
-  logger: createSilentLogger(),
-  timeout: PING_INTERVAL
-})
-
 /**
  * The rule for this file: `lastPing` is never assigned. It moves only by driving
  * the clock and delivering pongs through the incoming-message path, because the
@@ -45,7 +39,7 @@ describe('Socket liveness', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = createSocket()
+    socket = createSocket({ timeout: PING_INTERVAL })
     transport = await openFakeConnection(socket)
   })
 
@@ -249,12 +243,7 @@ describe('Socket liveness', () => {
     })
 
     it('bounds the wait for the pong by the ping interval, not the timeout', async () => {
-      const impatient = new Socket({
-        host: 'localhost:3000',
-        logger: createSilentLogger(),
-        ping: PING_INTERVAL,
-        timeout: PING_INTERVAL * 10
-      })
+      const impatient = createSocket({ ping: PING_INTERVAL, timeout: PING_INTERVAL * 10 })
       const impatientTransport = await openFakeConnection(impatient)
 
       await jest.advanceTimersByTimeAsync(PING_INTERVAL)

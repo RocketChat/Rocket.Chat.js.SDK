@@ -2,6 +2,7 @@ import { Socket } from '../socket'
 import { DDPError } from '../ddpError'
 import * as settings from '../../settings'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   CLOSED,
   FakeWebSocket,
@@ -19,8 +20,6 @@ import {
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
-
-const createSocket = () => new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
 
 describe('the transport seam', () => {
   it('constructs the transport with the driver arguments and the shared headers', async () => {
@@ -275,15 +274,8 @@ describe('Socket.send with several listeners on one event', () => {
   let socket: Socket
   let transport: FakeWebSocket
 
-  const createSocket = () => new Socket({
-    host: 'localhost:3000',
-    logger: createSilentLogger(),
-    reopen: REOPEN_DELAY,
-    ping: 10 * 60 * 1000
-  })
-
   beforeEach(async () => {
-    socket = createSocket()
+    socket = createSocket({ reopen: REOPEN_DELAY, ping: 10 * 60 * 1000 })
     transport = await openFakeConnection(socket)
   })
 
@@ -548,12 +540,7 @@ describe('a send on a connection that stays up and stays silent', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = new Socket({
-      host: 'localhost:3000',
-      logger: createSilentLogger(),
-      reopen: REOPEN_DELAY,
-      ping: 10 * 60 * 1000
-    })
+    socket = createSocket({ reopen: REOPEN_DELAY, ping: 10 * 60 * 1000 })
     transport = await openFakeConnection(socket)
   })
 
@@ -577,13 +564,7 @@ describe('a send on a connection that stays up and stays silent', () => {
   })
 
   it('takes its bound from the timeout option', async () => {
-    const patient = new Socket({
-      host: 'localhost:3000',
-      logger: createSilentLogger(),
-      reopen: REOPEN_DELAY,
-      ping: 10 * 60 * 1000,
-      timeout: PATIENT_TIMEOUT
-    })
+    const patient = createSocket({ reopen: REOPEN_DELAY, ping: 10 * 60 * 1000, timeout: PATIENT_TIMEOUT })
     await openFakeConnection(patient)
 
     const sending = patient.send({ msg: 'method', method: 'getUsersOfRoom', params: [] })

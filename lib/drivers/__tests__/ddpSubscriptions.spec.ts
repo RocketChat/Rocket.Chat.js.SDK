@@ -2,14 +2,13 @@ import { DDPSubscriptions } from '../ddpSubscriptions'
 import { DDPError } from '../ddpError'
 import { AbandonedRequest, ExpiredWait } from '../ddpRequests'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { flushMicrotasks } from '../../../test/fakeTransport'
 import { sha256 } from 'js-sha256'
 
 const deadlineMs = 1000
 
 const subscriptionIdFor = (name: string, params: any[]) =>
   `sub-${name}-${sha256(JSON.stringify(params))}`
-
-const flushMicrotasks = () => Promise.resolve().then(() => undefined)
 
 const createSubscriptions = (
   send: jest.Mock = jest.fn((message: any) => Promise.resolve({ subs: [message.id] }))

@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   CLOSED,
   FakeWebSocket,
@@ -19,7 +19,7 @@ describe('Socket login', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
+    socket = createSocket()
     transport = await openFakeConnection(socket)
   })
 

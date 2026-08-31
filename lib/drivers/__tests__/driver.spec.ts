@@ -29,7 +29,7 @@ describe('new Driver', () => {
     expect(createDriver().config.host).toBe('localhost:3000')
   })
 
-  it('keeps the caller\'s timeout, and the socket pings on it', () => {
+  it('sets both the config timeout and the socket ping to the caller\'s timeout', () => {
     const driver = createDriver({ timeout: 250 })
 
     expect(driver.config.timeout).toBe(250)
@@ -49,15 +49,12 @@ describe('new Driver', () => {
 })
 
 describe('Driver.subscribe', () => {
-  it('reshapes its arguments on the way through', async () => {
+  it('sends the event name and a wrapper object as the two sub params, burying the caller\'s extra arguments under `args`', async () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
 
     const subscribing = driver.subscribe('stream-notify-room', 'room-id/typing', false)
 
-    // What the caller passed and what goes on the wire differ: the event name
-    // and a wrapper object become the two params, and the caller's extra
-    // arguments are buried under `args`.
     const { id } = transport.lastSent() as { id: string }
     expect(transport.lastSent()).toEqual({
       msg: 'sub',

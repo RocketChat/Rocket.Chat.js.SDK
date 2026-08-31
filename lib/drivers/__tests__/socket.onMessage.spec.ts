@@ -1,5 +1,6 @@
 import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import { ILogger } from '../../../interfaces'
 
 // `onMessage` is handed frames directly — no socket is constructed and no timer
@@ -18,7 +19,7 @@ describe('Socket.onMessage', () => {
 
   beforeEach(() => {
     logger = createSilentLogger()
-    socket = new Socket({ host: 'localhost:3000', logger })
+    socket = createSocket({ logger })
   })
 
   it('emits the collection, the message type and the id from a single frame', () => {

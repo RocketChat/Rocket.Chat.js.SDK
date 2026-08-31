@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   CLOSED,
   FakeWebSocket,
@@ -25,13 +25,7 @@ const PING_INTERVAL = 4000
 const ABNORMAL_CLOSE = 1006
 const NO_OPEN_CONNECTION = '[ddp] sending without open connection'
 
-const createSocket = () => new Socket({
-  host: 'localhost:3000',
-  logger: createSilentLogger(),
-  reopen: REOPEN_DELAY,
-  timeout: TIMEOUT,
-  ping: PING_INTERVAL
-})
+const socketOptions = { reopen: REOPEN_DELAY, timeout: TIMEOUT, ping: PING_INTERVAL }
 
 const methodCall = { msg: 'method', method: 'logout', params: [] }
 
@@ -45,7 +39,7 @@ describe('a send issued during the delayed recovery window', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = createSocket()
+    socket = createSocket(socketOptions)
     transport = await openFakeConnection(socket)
     transport.close(ABNORMAL_CLOSE)
   })
@@ -88,7 +82,7 @@ describe('pinging after a transport is lost', () => {
   let socket: Socket
 
   beforeEach(async () => {
-    socket = createSocket()
+    socket = createSocket(socketOptions)
     const transport = await openFakeConnection(socket)
     transport.close(ABNORMAL_CLOSE)
   })
@@ -107,7 +101,7 @@ describe('pinging after a transport is lost', () => {
 
 describe('a send issued with no transport attached at all', () => {
   it('is refused before any wait', async () => {
-    const socket = createSocket()
+    const socket = createSocket(socketOptions)
 
     await expect(socket.send(methodCall)).rejects.toThrow(NO_OPEN_CONNECTION)
     expect(fakeSockets).toHaveLength(0)

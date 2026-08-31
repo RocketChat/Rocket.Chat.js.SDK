@@ -21,19 +21,6 @@ describe('Api abort', () => {
     await expect(second).rejects.toMatchObject({ name: 'AbortError' })
   })
 
-  it('lets a request made after an abort succeed', async () => {
-    const { api, restClient } = await loggedInApiWithFakeClient()
-
-    const aborted = api.get('channels.list', {})
-    api.abort()
-    await expect(aborted).rejects.toMatchObject({ name: 'AbortError' })
-
-    const pending = api.get('channels.list', {})
-    restClient.lastRequest().resolve({ status: 200, data: { channels: [] } })
-
-    await expect(pending).resolves.toEqual({ channels: [] })
-  })
-
   it('gives a request made after an abort a signal that is not already aborted', async () => {
     const { api, restClient } = await loggedInApiWithFakeClient()
 

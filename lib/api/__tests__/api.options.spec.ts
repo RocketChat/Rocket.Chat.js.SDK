@@ -28,8 +28,6 @@ describe('Api options', () => {
 
   it('rejects an unrecognized option, which only typecheck can fail on', () => {
     // @ts-expect-error
-    const api = new Api({ client: new FakeClient(), loggr: createSilentLogger() })
-
-    expect(api).toBeInstanceOf(Api)
+    new Api({ client: new FakeClient(), loggr: createSilentLogger() })
   })
 })

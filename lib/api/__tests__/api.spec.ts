@@ -113,18 +113,6 @@ describe('api', () => {
   })
 
   describe('request', () => {
-    it('reaches the restClient with the method and data it was given', async () => {
-      const { api, restClient } = anonymousApiWithFakeClient()
-      restClient.enqueueReply(emptySuccess())
-
-      await api.post('login', { username: 'user' })
-
-      expect(restClient.lastRequest()).toMatchObject({
-        method: 'POST',
-        data: { username: 'user' }
-      })
-    })
-
     it('routes each method to its own restClient call', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())

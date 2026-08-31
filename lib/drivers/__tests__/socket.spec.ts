@@ -2,11 +2,12 @@ import { sha256 } from 'js-sha256'
 
 import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 
 // `loginParams` reads only its argument, so one Socket serves every case here.
 // Constructing a Socket opens no connection and starts no timer. Bound rather
 // than detached, so it keeps working if it ever reaches for the instance.
-const socket = new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
+const socket = createSocket()
 const loginParams = socket.loginParams.bind(socket)
 
 describe('new Socket', () => {
@@ -15,7 +16,7 @@ describe('new Socket', () => {
   })
 
   it('derives a wss host from an explicit host and useSsl', () => {
-    const sslSocket = new Socket({ host: 'https://open.rocket.chat', useSsl: true, logger: createSilentLogger() })
+    const sslSocket = createSocket({ host: 'https://open.rocket.chat', useSsl: true })
 
     expect(sslSocket.host).toBe('wss://open.rocket.chat/websocket')
   })

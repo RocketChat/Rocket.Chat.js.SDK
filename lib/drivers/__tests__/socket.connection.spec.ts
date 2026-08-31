@@ -1,6 +1,7 @@
 import { Socket } from '../socket'
 import { ILogger } from '../../../interfaces'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   CLOSED,
   CONNECTING,
@@ -48,13 +49,7 @@ const ATTEMPT_DEADLINE = '[ddp] connection attempt did not complete before the d
 const TRANSPORT_FAILED = '[ddp] transport failed during the connection attempt'
 const CLOSED_BEFORE_OPEN = '[ddp] connection closed before it opened'
 
-const createSocket = (logger: ILogger) => new Socket({
-  host: 'localhost:3000',
-  logger,
-  reopen: REOPEN_DELAY,
-  timeout: TIMEOUT,
-  ping: PING_INTERVAL_OUTSIDE_TEST_WINDOW
-})
+const socketOptions = { reopen: REOPEN_DELAY, timeout: TIMEOUT, ping: PING_INTERVAL_OUTSIDE_TEST_WINDOW }
 
 /**
  * Connecting and reconnecting. Unless a test needs a connection that never
@@ -76,7 +71,7 @@ describe('Socket connection lifecycle', () => {
 
   beforeEach(async () => {
     logger = createSilentLogger()
-    socket = createSocket(logger)
+    socket = createSocket({ logger, ...socketOptions })
     transport = await openFakeConnection(socket)
   })
 
@@ -216,7 +211,7 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('rejects the superseded attempt rather than leaving it pending', async () => {
-      const stillConnecting = createSocket(logger)
+      const stillConnecting = createSocket({ logger, ...socketOptions })
       const superseded = stillConnecting.open()
       const socketsBeforeReplacement = fakeSockets.length
 
@@ -231,7 +226,7 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('schedules no Reopen for the superseded attempt', async () => {
-      const stillConnecting = createSocket(logger)
+      const stillConnecting = createSocket({ logger, ...socketOptions })
       const superseded = stillConnecting.open()
       const socketsBeforeReplacement = fakeSockets.length
 
@@ -529,7 +524,7 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('announces no close for a socket that never owned a transport', async () => {
-      const untouched = createSocket(logger)
+      const untouched = createSocket({ logger, ...socketOptions })
       const closeSeen = jest.fn()
       untouched.on('close', closeSeen)
 
@@ -946,7 +941,7 @@ describe('Socket connection lifecycle', () => {
     })
 
     it('leaves a logout on a socket that never connected a no-op', async () => {
-      await expect(createSocket(logger).logout()).resolves.toBeUndefined()
+      await expect(createSocket({ logger, ...socketOptions }).logout()).resolves.toBeUndefined()
     })
 
     it('admits connection work again once it has settled', async () => {
