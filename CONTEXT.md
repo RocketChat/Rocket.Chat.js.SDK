@@ -116,7 +116,7 @@ A DDP subscription whose `sub` reached the wire but whose DDP response the conne
 _Avoid_: Lost subscription, orphaned stream, phantom
 
 **Offline sub**:
-A DDP subscription recorded from a `subscribe` made while the Socket held no attached Transport. No `sub` frame was composed, so the entry is the instruction and nothing else, and `subscribeAll` issues it once a Transport is attached. See ADR-0006.
+A DDP subscription recorded from a `subscribe` made while the Socket held no attached Transport. No `sub` message was composed, so the entry is the instruction and nothing else, and `subscribeAll` issues it once a Transport is attached. See ADR-0006.
 _Avoid_: Pending sub, queued sub, deferred subscription
 
 **Method call**:

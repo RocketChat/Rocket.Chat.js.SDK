@@ -8,7 +8,7 @@ import {
   driveToHandshake,
   lastSubId,
   openFakeConnection,
-  resubscribeAllAndAck,
+  resubscribeAllAndReceiveReady,
   subFrames,
   subscribeAndAck,
   useFakeClockAndSocketRegistry
@@ -422,12 +422,12 @@ describe('Socket subscription bookkeeping', () => {
         expect(Object.keys(unopened.subscriptions)).toEqual([first!.id])
       })
 
-      it('sends one sub frame for two callers once a transport is attached', async () => {
+      it('sends one sub message for two callers once a transport is attached', async () => {
         const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
         await unopened.subscribe('stream-room-messages', ['GENERAL'])
 
         const replacement = await openFakeConnection(unopened)
-        await resubscribeAllAndAck(unopened, replacement, subscription!.id)
+        await resubscribeAllAndReceiveReady(unopened, replacement, subscription!.id)
 
         expect(subFrames(replacement.sent)).toEqual([{
           msg: 'sub',
@@ -465,7 +465,7 @@ describe('Socket subscription bookkeeping', () => {
           await unopened.subscribe('stream-room-messages', ['GENERAL'], callback)
 
         const replacement = await openFakeConnection(unopened)
-        await resubscribeAllAndAck(unopened, replacement, subscription!.id)
+        await resubscribeAllAndReceiveReady(unopened, replacement, subscription!.id)
         replacement.receive({
           msg: 'changed',
           collection: 'stream-room-messages',

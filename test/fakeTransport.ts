@@ -242,7 +242,7 @@ export const lastSubId = (transport: FakeWebSocket): string => {
   return id
 }
 
-export const resubscribeAllAndAck = async (
+export const resubscribeAllAndReceiveReady = async (
   socket: Socket,
   transport: FakeWebSocket,
   id: string

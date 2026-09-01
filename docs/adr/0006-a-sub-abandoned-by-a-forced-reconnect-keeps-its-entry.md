@@ -60,7 +60,7 @@ silence keeps the instruction.
 ### No attached Transport
 
 - A `subscribe` on a Socket that holds no attached Transport composes no `sub`
-  frame at all. It writes the entry and resolves it, and `subscribeAll` issues
+  message at all. It writes the entry and resolves it, and `subscribeAll` issues
   the `sub` once a Transport is attached. The glossary calls that entry an
   Offline sub.
 - The predicate reads whether a Transport is attached, and nothing weaker. It is
@@ -156,20 +156,20 @@ silence keeps the instruction.
   under the id it was first sent with, so the server is never asked for the same
   stream twice under two names.
 - An entry may name a `sub` the server never received — if the forced reconnect
-  abandoned the wait before the server read the frame, or if no `sub` frame was
+  abandoned the wait before the server read the DDP message, or if no `sub` message was
   ever composed because no Transport was attached. `subscribeAll` re-sends it
   and the entry becomes real. This is the phantom the question weighed, and it
-  costs one redundant `sub` frame at the next Login.
+  costs one redundant `sub` message at the next Login.
 - A consuming app that subscribes across a suspend and resume keeps its streams.
   What it does not get is any signal that the stream is not yet on the wire: an
   Offline sub is indistinguishable, from outside the SDK, from one the server
   acknowledged.
-- `unsubscribeAll` acts on these entries and sends `unsub` frames for them, on
+- `unsubscribeAll` acts on these entries and sends `unsub` messages for them, on
   the terms ADR-0004 sets. `Socket.close()` forgets them all and sends nothing,
   under ADR-0015.
 - An `unsubscribe` on a Socket with no attached Transport is the mirror of the
   Offline sub: the entry is the whole of what exists, so forgetting it ends the
-  DDP subscription outright and the caller resolves without a frame being
+  DDP subscription outright and the caller resolves without a DDP message being
   composed. Nothing is left for `subscribeAll` to re-establish, and no `unsub`
   enters the wire, so the pairings ADR-0005 serialises are not among the cases it
   reaches.
@@ -178,7 +178,7 @@ silence keeps the instruction.
   abandoned `sub` ends that poll instead of keeping it waiting. Readiness itself
   is unchanged: the poll only decides when to re-send, and the gate resolves on
   whether that resubscribe was acknowledged, which ADR-0012 settles for an
-  abandoned one. An Offline sub would end the poll on an entry no `sub` frame
+  abandoned one. An Offline sub would end the poll on an entry no `sub` message
   backs, so the gate does not attempt a resubscribe at all while no Transport is
   attached, and waits for one instead of reporting ready on its own instruction.
 - `unsubscribe` already keeps its entry on the same class of rejection, so a

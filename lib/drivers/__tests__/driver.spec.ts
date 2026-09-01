@@ -142,7 +142,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     expect(fakeSockets).toHaveLength(transportsBefore)
   })
 
-  it('sends no sub frame while the transport it recorded on is gone', async () => {
+  it('sends no sub message while the transport it recorded on is gone', async () => {
     const driver = createDriver()
     const transport = await openFakeConnection(driver['socket'])
     driver.userId = userId

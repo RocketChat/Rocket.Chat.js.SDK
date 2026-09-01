@@ -37,14 +37,14 @@ exists if and only if an entry does.
   `unsubscribe` from it without holding an id.
 - `rememberSubscription` returns what it wrote, and returns nothing when it wrote
   nothing. A `subscribe` on a Socket holding no attached Transport writes its
-  entry under ADR-0006 without composing a `sub` frame, so its caller receives
+  entry under ADR-0006 without composing a `sub` message, so its caller receives
   that entry: the instruction to a later Login exists, and the handle is what
   makes it reachable. Only a Close leaves a Socket with no connection and no
   instruction, and there the caller receives nothing.
 - A success response that names no `subs` writes no entry and resolves
   `undefined`. The `ready` is the acknowledgement and the only writer under
   ADR-0004; a response that acknowledges no stream leaves nothing to hand out.
-- A `sub` the server refused with a DDP error, and one whose frame an attached
+- A `sub` the server refused with a DDP error, and one whose DDP message an attached
   Transport never took, are unchanged: they write nothing under ADR-0004 and
   ADR-0006, and they resolve `undefined`.
 - The bookkeeping ADR-0006 governs is untouched: which paths write an entry, and
@@ -66,7 +66,7 @@ exists if and only if an entry does.
   route.
 - A caller that treated a resolved value as proof the server acknowledged the
   stream is now wrong: a handle is also returned where the server never answered,
-  and where no `sub` frame was composed at all. The distinction ADR-0006 draws —
+  and where no `sub` message was composed at all. The distinction ADR-0006 draws —
   a recorded DDP subscription does not prove the server confirmed it — is now
   visible to callers rather than internal. A handle for an Offline sub names a
   stream that was never on the wire, and nothing in the Driver contract
