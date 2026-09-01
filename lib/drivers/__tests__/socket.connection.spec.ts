@@ -945,8 +945,16 @@ describe('Socket connection lifecycle', () => {
         .rejects.toThrow('[ddp] connection closed before the response arrived')
     })
 
-    it('leaves a logout on a socket that never connected a no-op', async () => {
-      await expect(createSocket(logger).logout()).resolves.toBeUndefined()
+    it('forgets every entry and the login when the socket never connected', async () => {
+      const unopened = createSocket(logger)
+      const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+      unopened.resume = { id: 'user-id', token: 'resume-token', createCipher: { $date: 0 } }
+      expect(unopened.subscriptions[subscription!.id]).toBe(subscription)
+
+      await expect(unopened.logout()).resolves.toBeUndefined()
+
+      expect(unopened.subscriptions).toEqual({})
+      expect(unopened.resume).toBeNull()
     })
 
     it('admits connection work again once it has settled', async () => {

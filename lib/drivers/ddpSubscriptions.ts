@@ -16,7 +16,8 @@ interface DDPSubscriptionsOptions {
   getLogger: () => ILogger
   send: (message: any) => Promise<any>
   onEvent: (name: string, listener: ISocketMessageCallback) => void
-  closesTaken: () => number
+  getCloseGeneration: () => number
+  isOffline: () => boolean
   deadlineMs: number
 }
 
@@ -25,17 +26,19 @@ export class DDPSubscriptions {
   private getLogger: () => ILogger
   private send: (message: any) => Promise<any>
   private onEvent: (name: string, listener: ISocketMessageCallback) => void
-  private closesTaken: () => number
+  private getCloseGeneration: () => number
+  private isOffline: () => boolean
   private deadlineMs: number
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   constructor (
-    { getLogger, send, onEvent, closesTaken, deadlineMs }: DDPSubscriptionsOptions
+    { getLogger, send, onEvent, getCloseGeneration, isOffline, deadlineMs }: DDPSubscriptionsOptions
   ) {
     this.getLogger = getLogger
     this.send = send
     this.onEvent = onEvent
-    this.closesTaken = closesTaken
+    this.getCloseGeneration = getCloseGeneration
+    this.isOffline = isOffline
     this.deadlineMs = deadlineMs
   }
 
@@ -75,11 +78,11 @@ export class DDPSubscriptions {
       subscriptions.map((subscription) => this.resubscribe(subscription))
     )
       .then((responses) => {
-        const unacknowledged = subscriptions.filter((_, index) => !responses[index])
-        unacknowledged.forEach((subscription) => this.getLogger().error(
-          `[ddp] Subscribe not acknowledged: ${subscription.params?.[0]}`
+        const unrecorded = subscriptions.filter((_, index) => !responses[index])
+        unrecorded.forEach((subscription) => this.getLogger().error(
+          `[ddp] Subscribe not recorded: ${subscription.params?.[0]}`
         ))
-        return unacknowledged.length === 0
+        return unrecorded.length === 0
       })
       .catch(() => false)
 
@@ -94,7 +97,7 @@ export class DDPSubscriptions {
         resolve(value)
       }
       const attempt = () => {
-        if (inFlight) return
+        if (inFlight || this.isOffline()) return
         const subscriptionsPerStream = recordedPerStream()
         if (!subscriptionsPerStream.every((subscriptions) => subscriptions.length > 0)) return
         inFlight = true
@@ -120,6 +123,10 @@ export class DDPSubscriptions {
   unsubscribe = (id: string) => {
     if (!this.records[id]) {
       return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
+    }
+    if (this.isOffline()) {
+      this.forgetSubscription(id)
+      return Promise.resolve(undefined)
     }
     return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
       .then((response: any) => {
@@ -159,7 +166,11 @@ export class DDPSubscriptions {
     stream: IDDPSubscriptionRequest,
     callback?: ISocketMessageCallback
   ) => {
-    const closesBefore = this.closesTaken()
+    if (this.isOffline()) {
+      const recorded = this.records[stream.id]
+      return Promise.resolve(recorded || this.writeSubscription(stream, callback))
+    }
+    const closesBefore = this.getCloseGeneration()
     return this.send({ msg: 'sub', ...stream })
       .then((response) => {
         if (response.subs?.length) return this.rememberSubscription(stream, closesBefore, callback)
@@ -175,11 +186,18 @@ export class DDPSubscriptions {
   }
 
   private rememberSubscription = (
-    { id, name, params }: IDDPSubscriptionRequest,
+    stream: IDDPSubscriptionRequest,
     closesBefore: number,
     callback?: ISocketMessageCallback
   ) => {
-    if (this.closesTaken() !== closesBefore) return
+    if (this.getCloseGeneration() !== closesBefore) return
+    return this.writeSubscription(stream, callback)
+  }
+
+  private writeSubscription = (
+    { id, name, params }: IDDPSubscriptionRequest,
+    callback?: ISocketMessageCallback
+  ) => {
     const unsubscribe = this.unsubscribe.bind(this, id)
     const onEvent = (listener: ISocketMessageCallback) => this.onEvent(name, listener)
     const subscription = { id, name, params, unsubscribe, onEvent }

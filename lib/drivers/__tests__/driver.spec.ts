@@ -93,9 +93,11 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     return id
   }
 
+  const mediaEvent = (name: string) => `${userId}/${name}`
+
   /** Register a media subscription on the Socket, as a successful sub would. */
   const addMediaSub = (driver: Driver, transport: FakeWebSocket, name: string) =>
-    addSub(driver, transport, `${userId}/${name}`)
+    addSub(driver, transport, mediaEvent(name))
 
   it('resolves false without a logged-in user, before scheduling anything', async () => {
     const { driver, transport } = await createConnectedDriver()
@@ -108,6 +110,36 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     expect(transport.sent).toHaveLength(sentBefore)
     expect(jest.getTimerCount()).toBe(timersBefore)
+  })
+
+  it('resolves false with no transport attached, though both streams are recorded', async () => {
+    const driver = createDriver()
+    driver.userId = userId
+    await driver['socket'].subscribe(topic, [mediaEvent('media-signal')])
+    await driver['socket'].subscribe(topic, [mediaEvent('media-calls')])
+    const transportsBefore = fakeSockets.length
+
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
+
+    await expect(waiting).resolves.toBe(false)
+    expect(fakeSockets).toHaveLength(transportsBefore)
+  })
+
+  it('sends no sub message while the transport it recorded on is gone', async () => {
+    const { driver, transport } = await createConnectedDriver()
+    driver.userId = userId
+    await addMediaSub(driver, transport, 'media-signal')
+    await addMediaSub(driver, transport, 'media-calls')
+    const sentBefore = transport.sent.length
+
+    transport.close(1006)
+
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
+
+    await expect(waiting).resolves.toBe(false)
+    expect(transport.sent).toHaveLength(sentBefore)
   })
 
   it('resolves ready after an immediate reopen, on the socket the reopen built', async () => {

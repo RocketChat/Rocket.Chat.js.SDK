@@ -242,6 +242,17 @@ export const lastSubId = (transport: FakeWebSocket): string => {
   return id
 }
 
+export const resubscribeAllAndReceiveReady = async (
+  socket: Socket,
+  transport: FakeWebSocket,
+  id: string
+) => {
+  const resubscribing = socket.subscribeAll()
+  await flushMicrotasks()
+  transport.receive({ msg: 'ready', subs: [id] })
+  return resubscribing
+}
+
 /**
  * The server's `ready` carries the subscription id in `subs[0]`, and the
  * driver re-emits it under that id — so acknowledging a subscription means

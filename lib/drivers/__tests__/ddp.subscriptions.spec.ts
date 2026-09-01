@@ -8,6 +8,8 @@ import {
   driveToHandshake,
   lastSubId,
   openFakeConnection,
+  resubscribeAllAndReceiveReady,
+  subFrames,
   subscribeAndAck,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -375,11 +377,7 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('a subscription that never reached the wire', () => {
-    // Three ways a `sub` fails without the server seeing it. None can leave a
-    // stream behind, so none may leave an entry — only a connection that ends
-    // *after* the frame went out does.
-
-    it('holds nothing when the transport failed to write it', async () => {
+    it('holds nothing when the attached transport failed to write it', async () => {
       transport.sendError = new Error('socket closed under the write')
 
       await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
@@ -387,8 +385,7 @@ describe('Socket subscription bookkeeping', () => {
       expect(socket.subscriptions).toEqual({})
     })
 
-    it('holds nothing when the send expired waiting for the connection', async () => {
-      // Not connected and never opening: the send never gets to compose a frame.
+    it('holds nothing when the send expired on an attached transport', async () => {
       transport.readyState = CLOSED
 
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
@@ -397,13 +394,120 @@ describe('Socket subscription bookkeeping', () => {
       await expect(subscribing).resolves.toBeUndefined()
       expect(socket.subscriptions).toEqual({})
     })
+  })
 
-    it('holds nothing when the socket was never opened', async () => {
-      const unopened = createSocket()
+  describe('with no transport attached', () => {
+    let unopened: Socket
+    let transportsBefore: number
 
-      await expect(unopened.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+    beforeEach(() => {
+      unopened = createSocket()
+      transportsBefore = fakeSockets.length
+    })
 
-      expect(unopened.subscriptions).toEqual({})
+    describe('a subscription issued', () => {
+      it('is recorded under the id it will later be sent with, and reaches no wire', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        expect(subscription).toMatchObject({ name: 'stream-room-messages', params: ['GENERAL'] })
+        expect(unopened.subscriptions[subscription!.id]).toBe(subscription)
+        expect(fakeSockets).toHaveLength(transportsBefore)
+      })
+
+      it('is the same record every other caller for that stream holds', async () => {
+        const first = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+        const second = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        expect(second).toBe(first)
+        expect(Object.keys(unopened.subscriptions)).toEqual([first!.id])
+      })
+
+      it('sends one sub message for two callers once a transport is attached', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+        await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        const replacement = await openFakeConnection(unopened)
+        await resubscribeAllAndReceiveReady(unopened, replacement, subscription!.id)
+
+        expect(subFrames(replacement.sent)).toEqual([{
+          msg: 'sub',
+          id: subscription!.id,
+          name: 'stream-room-messages',
+          params: ['GENERAL']
+        }])
+      })
+
+      it('is re-sent by the first login on the socket', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        const replacement = await openFakeConnection(unopened)
+        const loggingIn = unopened.login({ resume: 'resume-token' })
+        await flushMicrotasks()
+        replacement.receive({
+          msg: 'result',
+          id: replacement.lastSent().id,
+          result: { id: 'user-1', token: 'resume-token' }
+        })
+        await loggingIn
+        await flushMicrotasks()
+
+        expect(subFrames(replacement.sent)).toEqual([{
+          msg: 'sub',
+          id: subscription!.id,
+          name: 'stream-room-messages',
+          params: ['GENERAL']
+        }])
+      })
+
+      it('receives events on its callback once the stream is established', async () => {
+        const callback = jest.fn()
+        const subscription =
+          await unopened.subscribe('stream-room-messages', ['GENERAL'], callback)
+
+        const replacement = await openFakeConnection(unopened)
+        await resubscribeAllAndReceiveReady(unopened, replacement, subscription!.id)
+        replacement.receive({
+          msg: 'changed',
+          collection: 'stream-room-messages',
+          fields: { eventName: 'GENERAL', args: ['a message'] }
+        })
+
+        expect(callback).toHaveBeenCalled()
+      })
+
+      it('is forgotten with every other entry when the socket is closed', async () => {
+        await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        await unopened.close()
+
+        expect(unopened.subscriptions).toEqual({})
+      })
+    })
+
+    describe('unsubscribing', () => {
+      it('forgets the entry and resolves, reaching no wire', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+
+        await expect(unopened.unsubscribe(subscription!.id)).resolves.toBeUndefined()
+
+        expect(unopened.subscriptions).toEqual({})
+        expect(fakeSockets).toHaveLength(transportsBefore)
+      })
+
+      it('leaves nothing for a later login to re-establish', async () => {
+        const subscription = await unopened.subscribe('stream-room-messages', ['GENERAL'])
+        await unopened.unsubscribe(subscription!.id)
+
+        const replacement = await openFakeConnection(unopened)
+        await unopened.subscribeAll()
+
+        expect(subFrames(replacement.sent)).toEqual([])
+      })
+
+      it('rejects for an id that was never recorded', async () => {
+        await expect(unopened.unsubscribe('never-subscribed')).rejects.toThrow('never-subscribed')
+        expect(fakeSockets).toHaveLength(transportsBefore)
+      })
     })
   })
 
@@ -516,6 +620,15 @@ describe('Socket subscription bookkeeping', () => {
   })
 
   describe('closing the connection', () => {
+    it('records nothing for a subscribe issued while a close owns the socket', async () => {
+      const closing = socket.close()
+
+      await expect(socket.subscribe('stream-room-messages', ['GENERAL'])).resolves.toBeUndefined()
+      await closing
+
+      expect(socket.subscriptions).toEqual({})
+    })
+
     it('hands back no subscription for a `sub` it abandoned, and records none', async () => {
       const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
       const id = lastSubId(transport)
