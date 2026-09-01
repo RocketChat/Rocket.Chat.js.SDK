@@ -1,6 +1,7 @@
 import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
+  CLOSED,
   FakeWebSocket,
   flushMicrotasks,
   openFakeConnection,
@@ -28,6 +29,28 @@ describe('Socket login', () => {
     transport.receive({ msg: 'result', id: transport.lastSent().id, result })
     return logging
   }
+
+  describe('loggedIn', () => {
+    it('is not logged in on a connection that is merely connected', () => {
+      expect(socket.connected).toBe(true)
+      expect(socket.loggedIn).toBe(false)
+    })
+
+    it('is logged in once the login result is stored', async () => {
+      await loginAndAck()
+
+      expect(socket.loggedIn).toBe(true)
+    })
+
+    it('is not logged in when the connection is gone, however recent the login', async () => {
+      await loginAndAck()
+
+      transport.readyState = CLOSED
+
+      expect(socket.resume).not.toBeNull()
+      expect(socket.loggedIn).toBe(false)
+    })
+  })
 
   describe('when the resubscribe after login fails', () => {
     const failResubscribe = (message: string) => jest

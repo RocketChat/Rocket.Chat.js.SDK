@@ -140,15 +140,15 @@ export const fakeTransportModule = {
  * timers, and the clock is only ever driven through the async advance calls —
  * the sync ones stall at the first pending promise, and the test then asserts
  * nothing while still passing.
+ *
+ * There is no restore: jest.useRealTimers() on Node 26 leaves the timer globals
+ * deleted rather than restored, so a file that restores breaks whatever runs
+ * next. Each test re-arms the clock instead.
  */
 export const useFakeClockAndSocketRegistry = (): void => {
   beforeEach(() => {
     jest.useFakeTimers()
     fakeSockets.length = 0
-  })
-
-  afterEach(() => {
-    jest.useRealTimers()
   })
 }
 
@@ -269,4 +269,18 @@ export const subscribeAndAck = async (
   const id = lastSubId(transport)
   transport.receive({ msg: 'ready', subs: [id] })
   return subscribing
+}
+
+export const lastMethodCallId = (transport: FakeWebSocket): string => {
+  const { msg, id } = transport.lastSent() as { msg: string, id: string }
+  expect(msg).toBe('method')
+  return id
+}
+
+export const answerLastMethodCall = (transport: FakeWebSocket, result: any) => {
+  transport.receive({ msg: 'result', id: lastMethodCallId(transport), result })
+}
+
+export const errorLastMethodCall = (transport: FakeWebSocket, error: any) => {
+  transport.receive({ msg: 'result', id: lastMethodCallId(transport), error })
 }

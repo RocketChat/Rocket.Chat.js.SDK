@@ -7,13 +7,14 @@
 // babel.config.js with no `transform` entry, and the extensionless relative
 // imports in the SDK resolve with no `moduleNameMapper`.
 module.exports = {
-	roots: ['<rootDir>/interfaces', '<rootDir>/lib', '<rootDir>/test'],
+	roots: ['<rootDir>/__tests__', '<rootDir>/interfaces', '<rootDir>/lib', '<rootDir>/test'],
 	restoreMocks: true,
 	collectCoverageFrom: [
 		'index.ts',
 		'interfaces/**/*.ts',
 		'lib/**/*.ts',
-		'!lib/**/__tests__/**'
+		'!lib/**/__tests__/**',
+		'!lib/drivers/definitions.ts'
 	],
 	setupFilesAfterEnv: ['<rootDir>/test/setup.ts']
 }

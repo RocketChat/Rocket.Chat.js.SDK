@@ -368,46 +368,51 @@ describe('DDPSubscriptions', () => {
     })
 
     it('resolves false when the server does not acknowledge a stream', async () => {
-      const { subscriptions, send } = createSubscriptions(withAttachedTransport)
+      const { subscriptions, send, logger } = createSubscriptions(withAttachedTransport)
       await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
       send.mockImplementation(() => Promise.resolve({ subs: [] }))
 
       await expect(subscriptions.resubscribeWhenRecorded([
         { name: 'stream-room-messages', params: ['GENERAL'] }
       ])).resolves.toBe(false)
+
+      expect(logger.error).toHaveBeenCalledWith('[ddp] Subscribe not recorded: GENERAL')
+    })
+
+    it('resolves true for a stream that is only recorded by a later poll', async () => {
+      const { subscriptions, send } = createSubscriptions(withAttachedTransport)
+
+      const resubscribing = subscriptions.resubscribeWhenRecorded([
+        { name: 'stream-room-messages', params: ['GENERAL'] }
+      ])
+      await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
+      send.mockClear()
+
+      await expect(resubscribing).resolves.toBe(true)
+      expect(send).toHaveBeenCalledTimes(1)
     })
 
     it('sends nothing and resolves false with no transport attached, though recorded', async () => {
-      jest.useFakeTimers()
       const { subscriptions, send } = createSubscriptions({
         isOffline: () => true
       })
       await subscriptions.subscribe('stream-room-messages', ['GENERAL'])
 
-      const resubscribing = subscriptions.resubscribeWhenRecorded(
+      await expect(subscriptions.resubscribeWhenRecorded(
         [{ name: 'stream-room-messages', params: ['GENERAL'] }],
-        500
-      )
-      jest.advanceTimersByTime(500)
-
-      await expect(resubscribing).resolves.toBe(false)
+        20
+      )).resolves.toBe(false)
       expect(send).not.toHaveBeenCalled()
-      jest.useRealTimers()
     })
 
     it('sends nothing and resolves false when a stream is never recorded', async () => {
-      jest.useFakeTimers()
       const { subscriptions, send } = createSubscriptions(withAttachedTransport)
 
-      const resubscribing = subscriptions.resubscribeWhenRecorded(
+      await expect(subscriptions.resubscribeWhenRecorded(
         [{ name: 'stream-room-messages', params: ['GENERAL'] }],
-        500
-      )
-      jest.advanceTimersByTime(500)
-
-      await expect(resubscribing).resolves.toBe(false)
+        20
+      )).resolves.toBe(false)
       expect(send).not.toHaveBeenCalled()
-      jest.useRealTimers()
     })
   })
 })
