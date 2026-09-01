@@ -24,7 +24,6 @@ export const intentionalCloseCode = 4000
 export const transportOpenState = 1
 export const transportClosedState = 3
 
-/** Ask a Transport to close on the SDK's behalf. False when it refused. */
 export const closeTransportIntentionally = (transport: Transport, logger: ILogger): boolean => {
   try {
     transport.close(intentionalCloseCode)

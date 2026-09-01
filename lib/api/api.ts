@@ -1,4 +1,4 @@
-import { logger as Logger } from '../log'
+import { isLoggerSilent, logger as Logger } from '../log'
 
 import {
 	ILogger,
@@ -149,7 +149,7 @@ export default class Api extends SDKEventEmitter {
     options?: any,
     apiVersion: string = 'v1'
 	) => {
-    this.logger?.debug(`[API] ${ method } ${ endpoint }:`, data)
+    if (!isLoggerSilent(this.logger)) this.logger.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
       const { signal } = this.controller;
       const requestOptions = { ...options, signal };
@@ -161,7 +161,7 @@ export default class Api extends SDKEventEmitter {
       this.logger?.debug(`[API] ${method} ${endpoint} result ${result.status}`)
       return method === 'DELETE' && !result.data ? result : result.data
     } catch (err) {
-      this.logger?.error(`[API] ${ method } error(${ endpoint }):`, err)
+      if (!isLoggerSilent(this.logger)) this.logger.error(`[API] ${ method } error(${ endpoint }): ${ JSON.stringify(err) }`)
       throw err
     }
   }

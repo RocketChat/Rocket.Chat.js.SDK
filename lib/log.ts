@@ -13,6 +13,8 @@ const noopLogger: ILogger = {
   error: () => null
 }
 
+export const isLoggerSilent = (candidate: ILogger) => candidate === noopLogger
+
 export let logger: ILogger = noopLogger
 
 /** Substitute logging handler */
