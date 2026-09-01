@@ -6,6 +6,8 @@ import {
   driveToHandshake,
   fakeSockets,
   openFakeConnection,
+  resubscribeAllAndReceiveReady,
+  subFrames,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -52,14 +54,23 @@ describe('a send issued after an unexpected close, while the scheduled reopen is
     expect(replacement.sent.some((frame) => frame.includes('"method":"logout"'))).toBe(false)
   })
 
-  it('drops a subscribe silently: the write is refused and nothing is recorded', async () => {
-    const subscribing = socket.subscribe('stream-room-messages', ['__my_messages__'])
+  it('records a subscribe instead, and re-sends it on the replacement transport', async () => {
+    const subscription = await socket.subscribe('stream-room-messages', ['__my_messages__'])
+
+    expect(subscription).toMatchObject({ name: 'stream-room-messages' })
+    expect(socket.subscriptions[subscription!.id]).toBe(subscription)
 
     await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
-    await driveToHandshake(fakeSockets[1])
+    const replacement = fakeSockets[1]
+    await driveToHandshake(replacement)
+    await resubscribeAllAndReceiveReady(socket, replacement, subscription!.id)
 
-    await expect(subscribing).resolves.toBeUndefined()
-    expect(socket.subscriptions).toEqual({})
+    expect(subFrames(replacement.sent)).toEqual([{
+      msg: 'sub',
+      id: subscription!.id,
+      name: 'stream-room-messages',
+      params: ['__my_messages__']
+    }])
   })
 })
 

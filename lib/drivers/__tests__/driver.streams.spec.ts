@@ -1,5 +1,5 @@
 import { Driver } from '../driver'
-import { createDriver } from '../../../test/createDriver'
+import { createConnectedDriver, createDriver } from '../../../test/createDriver'
 import {
   answerLastMethodCall,
   driveToHandshake,
@@ -7,7 +7,6 @@ import {
   FakeWebSocket,
   fakeSockets,
   flushMicrotasks,
-  openFakeConnection,
   subFrames,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
@@ -20,8 +19,7 @@ let driver: Driver
 let transport: FakeWebSocket
 
 const connectDriver = async () => {
-  driver = createDriver()
-  transport = await openFakeConnection(driver['socket'])
+  ({ driver, transport } = await createConnectedDriver())
 }
 
 const wrapped = (event: string, ...args: any[]) =>

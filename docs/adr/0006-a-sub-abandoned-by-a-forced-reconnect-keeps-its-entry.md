@@ -36,6 +36,15 @@ silently dropped stream and a phantom, and the phantom is the cheaper of the
 two. A phantom entry is self-correcting: `subscribeAll` re-sends it, and the
 server either establishes the stream the app asked for or answers `nosub`.
 
+The same reasoning reaches further than the abandoned `sub` it was raised for. A
+`subscribe` made while the Socket holds no attached Transport had nothing to
+write on, so it dropped the stream in exactly the silent way described above, on
+the one occasion a consuming app is most likely to ask: a mobile app returning
+to the foreground, before the connection it was suspended with has been
+replaced. The Socket has no connection to lose the request on, and no server
+answer is pending, so nothing about the entry is provisional — it is purely the
+instruction, waiting for a Transport.
+
 ADR-0004 already defines an entry as an instruction to re-establish a stream,
 not a record of a stream that existed. Read against that definition, the write
 rule should turn on whether the server refused, not on whether the server
@@ -44,7 +53,34 @@ its entry on exactly this class of rejection.
 
 ## Decision
 
-The server's answer decides; silence keeps the instruction.
+An entry is written when the Socket held no attached Transport at the moment of
+the send. Where a Transport was attached, the server's answer decides, and
+silence keeps the instruction.
+
+### No attached Transport
+
+- A `subscribe` on a Socket that holds no attached Transport composes no `sub`
+  message at all. It writes the entry and resolves it, and `subscribeAll` issues
+  the `sub` once a Transport is attached. The glossary calls that entry an
+  Offline sub.
+- The predicate reads whether a Transport is attached, and nothing weaker. It is
+  not a liveness question and not a Transport-open one. Widening it either way
+  reverses the expired-wait rule: a send on an attached Transport that is not
+  open, or is open with the Liveness chain lapsed, would stop reaching the wire
+  and start recording without sending.
+- The Socket itself is unchanged: `send` still refuses to write with no attached
+  Transport, and the subscription path does not reach `send` at all when there
+  is none. The entry it writes is the instruction, and `subscribeAll` is what
+  issues it.
+- The expired-wait case and the no-Transport case are two cases with opposite
+  outcomes, not one "no usable connection" case: a send that expired waiting for
+  the connection to open had a Transport to wait on, so it leaves no entry.
+- A Close is excluded. A Socket a Close owns has no Transport either, and it is
+  the one loss that leaves nothing to instruct, so a `subscribe` there records
+  nothing. That is the same rule the generation guard below draws, read at the
+  moment of the send rather than at the moment of the write.
+
+### An answer that never came
 
 - `subscribe` writes its entry on the `ready` DDP response, under the id the
   server confirmed, and also when the connection ended before the answer came,
@@ -73,10 +109,10 @@ The server's answer decides; silence keeps the instruction.
   `forgetAllSubscriptions` has already run. Only a count that never goes down
   answers correctly for a request that settles later than the event which ended
   it.
-- A `sub` that was never written to the Transport leaves nothing behind. A failed
-  write, and a send that expired waiting for the connection to open, are both
-  cases where the server cannot have acted on the request. The entry is written
-  only when the DDP message was written to the Transport and no answer came.
+- A `sub` that reached the Transport and was not written leaves nothing behind. A
+  failed write, and a send that expired waiting for the connection to open, are
+  both cases where the server cannot have acted on the request and a Transport
+  was there to write to.
 - Written to the Transport is not the same as delivered. A send on a Socket that
   is Transport open while the Liveness chain has lapsed writes a DDP message the
   peer may never read, and that write keeps an entry. The entry is an
@@ -120,18 +156,31 @@ The server's answer decides; silence keeps the instruction.
   under the id it was first sent with, so the server is never asked for the same
   stream twice under two names.
 - An entry may name a `sub` the server never received — if the forced reconnect
-  abandoned the wait before the server read the frame. `subscribeAll` re-sends it
+  abandoned the wait before the server read the DDP message, or if no `sub` message was
+  ever composed because no Transport was attached. `subscribeAll` re-sends it
   and the entry becomes real. This is the phantom the question weighed, and it
-  costs one redundant `sub` frame at the next Login.
-- `unsubscribeAll` acts on these entries and sends `unsub` frames for them, on
+  costs one redundant `sub` message at the next Login.
+- A consuming app that subscribes across a suspend and resume keeps its streams.
+  What it does not get is any signal that the stream is not yet on the wire: an
+  Offline sub is indistinguishable, from outside the SDK, from one the server
+  acknowledged.
+- `unsubscribeAll` acts on these entries and sends `unsub` messages for them, on
   the terms ADR-0004 sets. `Socket.close()` forgets them all and sends nothing,
   under ADR-0015.
+- An `unsubscribe` on a Socket with no attached Transport is the mirror of the
+  Offline sub: the entry is the whole of what exists, so forgetting it ends the
+  DDP subscription outright and the caller resolves without a DDP message being
+  composed. Nothing is left for `subscribeAll` to re-establish, and no `unsub`
+  enters the wire, so the pairings ADR-0005 serialises are not among the cases it
+  reaches.
 - `Socket.resubscribeWhenRecorded`, behind `Driver.waitForNotifyUserMediaSubs`,
   polls `subscriptions` for the two media entries, and an entry written on an
   abandoned `sub` ends that poll instead of keeping it waiting. Readiness itself
   is unchanged: the poll only decides when to re-send, and the gate resolves on
   whether that resubscribe was acknowledged, which ADR-0012 settles for an
-  abandoned one.
+  abandoned one. An Offline sub would end the poll on an entry no `sub` message
+  backs, so the gate does not attempt a resubscribe at all while no Transport is
+  attached, and waits for one instead of reporting ready on its own instruction.
 - `unsubscribe` already keeps its entry on the same class of rejection, so a
   forced reconnect that abandons an `unsub` and a `sub` together leaves both, and
   `subscribeAll` re-sends the `sub` at the next Login under an id whose `unsub`

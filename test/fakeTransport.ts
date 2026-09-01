@@ -133,6 +133,17 @@ export const lastSubId = (transport: FakeWebSocket): string => {
   return id
 }
 
+export const resubscribeAllAndReceiveReady = async (
+  socket: Socket,
+  transport: FakeWebSocket,
+  id: string
+) => {
+  const resubscribing = socket.subscribeAll()
+  await flushMicrotasks()
+  transport.receive({ msg: 'ready', subs: [id] })
+  return resubscribing
+}
+
 export const subscribeAndAck = async (
   socket: Socket,
   transport: FakeWebSocket,

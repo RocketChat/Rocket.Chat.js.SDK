@@ -1,6 +1,6 @@
 import { Driver } from '../driver'
 import { logger as defaultLogger } from '../../log'
-import { createDriver } from '../../../test/createDriver'
+import { createConnectedDriver, createDriver } from '../../../test/createDriver'
 import {
   CLOSED,
   driveToHandshake,
@@ -20,8 +20,7 @@ let transport: FakeWebSocket
 const newDriver = () => { driver = createDriver() }
 
 const connectDriver = async () => {
-  newDriver()
-  transport = await openFakeConnection(driver['socket'])
+  ({ driver, transport } = await createConnectedDriver())
 }
 
 describe('new Driver', () => {

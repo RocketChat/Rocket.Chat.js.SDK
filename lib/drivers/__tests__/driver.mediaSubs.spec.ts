@@ -1,5 +1,5 @@
 import { Driver } from '../driver'
-import { createDriver } from '../../../test/createDriver'
+import { createConnectedDriver, createDriver } from '../../../test/createDriver'
 import {
   driveToHandshake,
   FakeWebSocket,
@@ -20,8 +20,7 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    driver = createDriver()
-    transport = await openFakeConnection(driver['socket'])
+    ({ driver, transport } = await createConnectedDriver())
     driver.userId = userId
   })
 
@@ -59,6 +58,33 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
 
     expect(transport.sent).toHaveLength(sentBefore)
     expect(jest.getTimerCount()).toBe(timersBefore)
+  })
+
+  it('resolves false with no transport attached, though both streams are recorded', async () => {
+    driver = createDriver()
+    driver.userId = userId
+    await driver['socket'].subscribe(topic, [`${userId}/media-signal`])
+    await driver['socket'].subscribe(topic, [`${userId}/media-calls`])
+    const transportsBefore = fakeSockets.length
+
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
+
+    await expect(waiting).resolves.toBe(false)
+    expect(fakeSockets).toHaveLength(transportsBefore)
+  })
+
+  it('sends no sub message while the transport it recorded on is gone', async () => {
+    await addMediaSubs()
+    const sentBefore = transport.sent.length
+
+    transport.close(1006)
+
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
+
+    await expect(waiting).resolves.toBe(false)
+    expect(transport.sent).toHaveLength(sentBefore)
   })
 
   it('resolves ready after an immediate reopen, on the socket the reopen built', async () => {

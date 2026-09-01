@@ -135,7 +135,8 @@ export class Socket extends SDKEventEmitter {
       getLogger: () => this.logger,
       send: (message) => this.send(message),
       onEvent: (name, listener) => this.onEvent(name, listener),
-      closesTaken: () => this.connectionWork.closesTaken,
+      getCloseGeneration: () => this.connectionWork.closesTaken,
+      isOffline: () => this.connectionWork.offline,
       deadlineMs: this.config.timeout
     })
     this.connectionWork = new Connection({
@@ -472,23 +473,14 @@ export class Socket extends SDKEventEmitter {
     return params
   }
 
-  /**
-   * Logout the current User from the server via Socket.
-   *
-   * A Logout needs a connection to write on. Without one it is a no-op, unless a
-   * Close is what took the connection away, which the caller hears about rather
-   * than reading a silent success.
-   */
   logout = () => {
     if (this.connectionWork.closing) return Promise.reject(AbandonedWait.responseClosed())
-    if (!this.connection) {
-      return this.connectionWork.closesTaken
-        ? Promise.reject(AbandonedWait.responseClosed())
-        : Promise.resolve(undefined)
+    if (this.connectionWork.offline && this.connectionWork.closesTaken) {
+      return Promise.reject(AbandonedWait.responseClosed())
     }
     this.resume = null
-    return this.unsubscribeAll()
-			.then(() => this.call('logout'))
+    if (this.connectionWork.offline) return this.unsubscribeAll()
+    return this.unsubscribeAll().then(() => this.call('logout'))
   }
 
   /** Register a callback to trigger on message events in subscription */
