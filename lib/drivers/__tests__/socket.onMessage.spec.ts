@@ -1,24 +1,17 @@
 import { Socket } from '../socket'
 import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import { ILogger } from '../../../interfaces'
-
-// `onMessage` is handed frames directly — no socket is constructed and no timer
-// is started, so this file runs on Jest's default real timers.
-//
-// Frames whose `msg` is `ping` are avoided here: the constructor's own `ping`
-// listener calls `send`, which reaches for a connection that does not exist.
 
 const frame = (payload: any) => ({ data: JSON.stringify(payload) })
 
 describe('Socket.onMessage', () => {
-  // A fresh Socket per test: every case attaches listeners, and the emitter
-  // keeps them for the life of the instance.
   let socket: Socket
   let logger: ILogger
 
   beforeEach(() => {
     logger = createSilentLogger()
-    socket = new Socket({ host: 'localhost:3000', logger })
+    socket = createSocket({ logger })
   })
 
   it('emits the collection, the message type and the id from a single frame', () => {
@@ -60,11 +53,6 @@ describe('Socket.onMessage', () => {
   })
 
   it('emits the id twice for a reply frame, reshaped first and raw second', () => {
-    // Two paths reach the same event name. The constructor listens for `result`
-    // and re-emits `data.id` with a reshaped payload; `onMessage` then emits
-    // `data.id` again with the frame as it arrived. The constructor's listener
-    // runs during the `msg` emit, which is before the `id` emit — so the
-    // reshaped payload is always the one that arrives first.
     const payload = { msg: 'result', id: 'call-id', result: 'the-result' }
     const received: any[] = []
     socket.on('call-id', (data: any) => received.push(data))
@@ -87,8 +75,6 @@ describe('Socket.onMessage', () => {
   })
 
   it('emits only the first subscription id of a ready frame', () => {
-    // A `ready` frame has no `id` of its own, so unlike `result` its
-    // re-emit is the only one the subscription listener sees.
     const payload = { msg: 'ready', subs: ['sub-id', 'ignored-sub-id'] }
     const received: any[] = []
     const ignored = jest.fn()
@@ -102,8 +88,6 @@ describe('Socket.onMessage', () => {
   })
 
   it('logs and swallows a malformed frame instead of throwing', () => {
-    // In production the caller is the websocket's `onmessage`, which has
-    // nowhere to put a throw.
     const listener = jest.fn()
     socket.on('changed', listener)
 

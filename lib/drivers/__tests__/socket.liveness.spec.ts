@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   CLOSED,
   driveToHandshake,
@@ -9,7 +9,7 @@ import {
   hasScheduledReopen,
   OPEN,
   openFakeConnection,
-  USER_DISCONNECT,
+  INTENTIONAL_CLOSE,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -17,43 +17,19 @@ jest.mock('universal-websocket-client', () => require('../../../test/fakeTranspo
 
 useFakeClockAndSocketRegistry()
 
-/**
- * The interval the whole file is arithmetic about. Deliberately *not* the 10000
- * default: with the default, every boundary assertion below would pass whether
- * or not the socket read the option at all.
- */
 const PING_INTERVAL = 3000
 
-const createSocket = () => new Socket({
-  host: 'localhost:3000',
-  logger: createSilentLogger(),
-  timeout: PING_INTERVAL
-})
-
-/**
- * The rule for this file: `lastPing` is never assigned. It moves only by driving
- * the clock and delivering pongs through the incoming-message path, because the
- * arithmetic under test is exactly the distance between that stamp and now.
- * Assigning it would make every assertion below vacuous.
- *
- * A pong is therefore always delivered with `transport.receive`, never with
- * `socket.emit('pong')`: emitting resolves a pending send but never touches the
- * stamp, so the chain dies a few ticks later with every earlier assertion green.
- */
 describe('Socket liveness', () => {
   let socket: Socket
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = createSocket()
+    socket = createSocket({ timeout: PING_INTERVAL })
     transport = await openFakeConnection(socket)
   })
 
   describe('alive', () => {
     it('is alive exactly up to twice the ping interval since the last ping', async () => {
-      // The handshake stamped `lastPing`. The chain's ping does go out during
-      // this advance, but nothing answers it — and only a pong moves the stamp —
-      // so the clock alone walks the socket to the boundary.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
 
       expect(socket.alive()).toBe(true)
@@ -130,7 +106,7 @@ describe('Socket liveness', () => {
 
       await socket.close()
 
-      expect(transport.closedWith).toEqual([USER_DISCONNECT])
+      expect(transport.closedWith).toEqual([INTENTIONAL_CLOSE])
       expect(transport.readyState).toBe(CLOSED)
     })
   })
@@ -158,7 +134,7 @@ describe('Socket liveness', () => {
       await expect(probing).resolves.toBe(true)
     })
 
-    it('still settles on a later pong after one lands in the probe millisecond', async () => {
+    it('still settles on a later pong after one lands in the probe millisecond, leaving no deadline timer behind', async () => {
       const probing = socket.probe(2000)
 
       transport.receive({ msg: 'pong' })
@@ -167,7 +143,6 @@ describe('Socket liveness', () => {
 
       await expect(probing).resolves.toBe(true)
 
-      // Only the ping chain's timer: the probe's deadline was cleared.
       expect(jest.getTimerCount()).toBe(1)
     })
 
@@ -192,8 +167,6 @@ describe('Socket liveness', () => {
     })
 
     it('succeeds when the pong lands after the clock has moved', async () => {
-      // The millisecond advance is the whole test: without it this passes for the
-      // wrong reason, resolving false on the timeout instead of true on the pong.
       const probing = socket.probe(2000)
 
       await jest.advanceTimersByTimeAsync(1)
@@ -213,16 +186,6 @@ describe('Socket liveness', () => {
   })
 
   describe('the ping chain', () => {
-    /**
-     * One turn of the chain: fire the pending ping timer, answer it through the
-     * incoming-message path, then flush so the reschedule — which sits behind a
-     * promise — has actually happened before anything is asserted.
-     *
-     * Driven tick by tick rather than by one big advance on purpose: a single
-     * large jump fires exactly one ping, because the next timer only exists once
-     * the pong resolves. Running all timers is worse still — a self-rescheduling
-     * chain hits the runner's timer-count abort.
-     */
     const tick = async (deliver?: () => void) => {
       await jest.advanceTimersToNextTimerAsync()
       deliver?.()
@@ -241,7 +204,6 @@ describe('Socket liveness', () => {
       for (let turn = 1; turn <= 5; turn += 1) {
         await tickWithPong()
 
-        // The invariant that stops a silently dead chain from passing green.
         expect(jest.getTimerCount()).toBe(1)
         expect(transport.lastSent()).toEqual({ msg: 'ping' })
         expect(socket.connected).toBe(true)
@@ -249,12 +211,7 @@ describe('Socket liveness', () => {
     })
 
     it('bounds the wait for the pong by the ping interval, not the timeout', async () => {
-      const impatient = new Socket({
-        host: 'localhost:3000',
-        logger: createSilentLogger(),
-        ping: PING_INTERVAL,
-        timeout: PING_INTERVAL * 10
-      })
+      const impatient = createSocket({ ping: PING_INTERVAL, timeout: PING_INTERVAL * 10 })
       const impatientTransport = await openFakeConnection(impatient)
 
       await jest.advanceTimersByTimeAsync(PING_INTERVAL)
@@ -295,31 +252,19 @@ describe('Socket liveness', () => {
     })
 
     it('reconnects when one pong is withheld', async () => {
-      // This test used to pin the opposite: the chain died for good, because the
-      // ping's send went out while `connected` was still true, waited forever on
-      // a pong reply, and the `.catch(() => this.reopen())` behind it never ran.
-      // `ping` now races its send against a deadline of its own, so the withheld
-      // pong is what triggers the reconnect rather than what prevents it.
       await tickWithPong()
       await tickWithPong()
 
       await tickWithoutPong()
 
-      // The deadline the ping gave its send, the one timer it leaves behind.
       expect(jest.getTimerCount()).toBe(1)
 
-      // One millisecond past the deadline, which is also one past the aliveness
-      // boundary — the stamp last moved on the pong two ticks ago.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL + 1)
 
-      // The stamp is stale by now, so the socket reads as disconnected, and the
-      // expired ping has scheduled the reopen.
       expect(socket.alive()).toBe(false)
       expect(socket.connected).toBe(false)
       expect(hasScheduledReopen(socket)).toBe(true)
 
-      // And the reopen actually builds a replacement transport once its delay
-      // elapses — the socket is no longer abandoned open forever.
       await jest.advanceTimersByTimeAsync(socket.config.reopen)
 
       expect(fakeSockets).toHaveLength(2)
@@ -328,9 +273,6 @@ describe('Socket liveness', () => {
     })
 
     it('leaves the reconnect to the close when a ping is abandoned by it', async () => {
-      // A ping abandoned because its connection went away must not schedule a
-      // reopen of its own: the close already scheduled one, and the replacement
-      // starts its own chain.
       await tickWithPong()
       await jest.advanceTimersToNextTimerAsync()
 
@@ -357,9 +299,6 @@ describe('Socket liveness', () => {
 
       expect(hasScheduledReopen(socket)).toBe(false)
       expect(jest.getTimerCount()).toBe(0)
-
-      // And no replacement is built once the reopen delay it might have scheduled
-      // would have elapsed.
       await jest.advanceTimersByTimeAsync(socket.config.reopen * 2)
       expect(fakeSockets).toHaveLength(1)
     })
@@ -368,14 +307,11 @@ describe('Socket liveness', () => {
       await jest.advanceTimersToNextTimerAsync()
       expect(transport.lastSent()).toEqual({ msg: 'ping' })
 
-      // No close event, and inside the ping's own deadline, so `connecting` from
-      // the replacement is the only thing that can end the ping's wait.
       transport.readyState = CLOSED
+
       const opening = socket.open()
       await driveToHandshake(fakeSockets[1])
       await opening
-
-      // Nothing queued a reopen against the connection that just came back.
       expect(fakeSockets).toHaveLength(2)
       expect(socket.connected).toBe(true)
       expect(hasScheduledReopen(socket)).toBe(false)
@@ -398,12 +334,8 @@ describe('Socket liveness', () => {
     })
 
     it('clears both the ping and the reopen timer on close', async () => {
-      // A close the driver did not ask for schedules a reopen, so both of the
-      // socket's timers are pending at once.
       transport.close(1006)
 
-      // Named rather than merely counted, so the assertion still means "the ping
-      // and the reopen" if some other timer ever joins the count.
       expect(socket.pingTimeout).toBeDefined()
       expect(hasScheduledReopen(socket)).toBe(true)
       expect(jest.getTimerCount()).toBe(2)
@@ -414,12 +346,10 @@ describe('Socket liveness', () => {
     })
 
     it('keeps pinging when the reopen it asked for finds the socket healthy again', async () => {
-      // The ping goes out, its reply deadline expires, and a reopen is scheduled.
       await jest.advanceTimersByTimeAsync(PING_INTERVAL * 2)
       expect(pingCount()).toBe(1)
       expect(hasScheduledReopen(socket)).toBe(true)
 
-      // A frame arriving late enough leaves the reopen nothing to build.
       await jest.advanceTimersByTimeAsync(socket.config.reopen - 1)
       transport.receive({ msg: 'updated' })
       await jest.advanceTimersByTimeAsync(1)

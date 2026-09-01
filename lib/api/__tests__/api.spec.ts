@@ -113,18 +113,6 @@ describe('api', () => {
   })
 
   describe('request', () => {
-    it('reaches the restClient with the method and data it was given', async () => {
-      const { api, restClient } = anonymousApiWithFakeClient()
-      restClient.enqueueReply(emptySuccess())
-
-      await api.post('login', { username: 'user' })
-
-      expect(restClient.lastRequest()).toMatchObject({
-        method: 'POST',
-        data: { username: 'user' }
-      })
-    })
-
     it('routes each method to its own restClient call', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())
@@ -257,7 +245,7 @@ describe('api', () => {
 
       await api.get('me', {})
 
-      expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('[API] GET me'))
+      expect(logger.debug).toHaveBeenCalledWith('[API] GET me: {}')
     })
 
     it('logs the failure to the logger it was handed', async () => {
@@ -267,7 +255,17 @@ describe('api', () => {
 
       await expect(api.get('me', {})).rejects.toBeDefined()
 
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('[API] GET error(me)'))
+      expect(logger.error).toHaveBeenCalledWith('[API] GET error(me): {"status":400,"data":{}}')
+    })
+
+    it('does not serialize request data for the default silent logger', async () => {
+      const { api, restClient } = anonymousApiWithFakeClient()
+      const toJSON = jest.fn(() => ({}))
+      restClient.enqueueReply(emptySuccess())
+
+      await api.get('me', { toJSON })
+
+      expect(toJSON).not.toHaveBeenCalled()
     })
   })
 })

@@ -1,4 +1,4 @@
-import { ILogger } from '../../interfaces'
+import { createSilentLogger } from '../../test/createSilentLogger'
 
 import * as log from '../log'
 import { replaceLog } from '../log'
@@ -20,13 +20,7 @@ describe('log', () => {
 
   describe('replaceLog', () => {
     it('makes the exported logger the given one', () => {
-      const externalLogger: ILogger = {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warning: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn()
-      }
+      const externalLogger = createSilentLogger()
 
       replaceLog(externalLogger)
 

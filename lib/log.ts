@@ -5,27 +5,17 @@
 
 import { ILogger } from '../interfaces'
 
-/** Temp logging, should override form adapter's log */
-class InternalLog implements ILogger {
-  debug (..._args: any[]) {
-    // console.log(...args)
-  }
-  info (..._args: any[]) {
-    // console.log(...args)
-  }
-  warning (..._args: any[]) {
-    // console.log(...args)
-  }
-  warn (...args: any[]) { // legacy method
-    return this.warning(...args)
-  }
-  error (..._args: any[]) {
-    // console.log(...args)
-  }
+const noopLogger: ILogger = {
+  debug: () => null,
+  info: () => null,
+  warning: () => null,
+  warn (...args: any[]) { return this.warning(...args) },
+  error: () => null
 }
 
-/** Default basic console logging */
-export let logger: ILogger = new InternalLog()
+export const isLoggerSilent = (candidate: ILogger) => candidate === noopLogger
+
+export let logger: ILogger = noopLogger
 
 /** Substitute logging handler */
 export function replaceLog (externalLog: ILogger) {
@@ -34,11 +24,5 @@ export function replaceLog (externalLog: ILogger) {
 
 /** Null all log outputs */
 export function silence () {
-  replaceLog({
-    debug: () => null,
-    info: () => null,
-    warn: () => null,
-    warning: () => null,
-    error: () => null
-  })
+  replaceLog(noopLogger)
 }

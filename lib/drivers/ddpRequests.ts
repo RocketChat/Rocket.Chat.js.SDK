@@ -23,11 +23,20 @@ const failedConnectionAttemptMessages = {
 type FailedConnectionAttemptMessage =
   typeof failedConnectionAttemptMessages[keyof typeof failedConnectionAttemptMessages]
 
+const messagesWithoutId = ['connect', 'ping', 'pong']
+
+const responseEventByMessage: { [msg: string]: string | undefined } = {
+  connect: 'connected',
+  ping: 'pong'
+}
+
+const carriesNoId = (msg: string = '') =>
+  messagesWithoutId.some((name) => msg.includes(name))
+
 interface DDPRequestsOptions {
   emitter: SDKEventEmitter
   getLogger: () => ILogger
   nextId: (id?: string) => string
-  deadlineMs: number
 }
 
 export class FailedConnectionAttempt extends Error {
@@ -80,14 +89,12 @@ export class DDPRequests {
   private emitter: SDKEventEmitter
   private getLogger: () => ILogger
   private nextId: (id?: string) => string
-  private deadlineMs: number
   private written = new Set<(message: AbandonedWaitMessage) => void>()
 
-  constructor ({ emitter, getLogger, nextId, deadlineMs }: DDPRequestsOptions) {
+  constructor ({ emitter, getLogger, nextId }: DDPRequestsOptions) {
     this.emitter = emitter
     this.getLogger = getLogger
     this.nextId = nextId
-    this.deadlineMs = deadlineMs
   }
 
   abandonAll = (message: AbandonedWaitMessage) => {
@@ -96,12 +103,13 @@ export class DDPRequests {
     abandoning.forEach((abandon) => abandon(message))
   }
 
-  send = (message: any, write: (value: string) => void, deadlineMs = this.deadlineMs): Promise<any> =>
+  send = (message: any, write: (value: string) => void, deadlineMs: number): Promise<any> =>
     new Promise<any>((resolve, reject) => {
       const id = this.nextId(message.id)
-      const outboundMessage = { ...message, ...(/connect|ping|pong/.test(message.msg) ? {} : { id }) }
+      const carriesId = !carriesNoId(message.msg)
+      const outboundMessage = { ...message, ...(carriesId ? { id } : {}) }
       const serialized = JSON.stringify(outboundMessage)
-      const listener = (outboundMessage.msg === 'ping' && 'pong') || (outboundMessage.msg === 'connect' && 'connected') || outboundMessage.id
+      const listener = carriesId ? id : responseEventByMessage[message.msg]
       this.getLogger().debug(`[ddp] sending message: ${serialized}`)
 
       try {
@@ -135,7 +143,7 @@ export class DDPRequests {
         endWait()
         return response.error
           ? reject(toError(response.error))
-          : resolve({ ...(/connect|ping|pong/.test(message.msg) ? {} : { id }), ...response })
+          : resolve({ ...(carriesId ? { id } : {}), ...response })
       }
 
       this.written.add(onAbandon)

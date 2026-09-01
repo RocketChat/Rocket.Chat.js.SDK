@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   CLOSED,
   FakeWebSocket,
@@ -8,8 +8,6 @@ import {
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
-// Hoisted above the imports by jest, so the driver's own `import WebSocket from
-// 'universal-websocket-client'` resolves to the fake. See test/fakeTransport.ts.
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
@@ -19,7 +17,7 @@ describe('Socket login', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
+    socket = createSocket()
     transport = await openFakeConnection(socket)
   })
 

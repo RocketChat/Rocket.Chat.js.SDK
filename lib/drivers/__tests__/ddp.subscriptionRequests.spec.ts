@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   FakeWebSocket,
   flushMicrotasks,
@@ -7,26 +7,17 @@ import {
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
-// Hoisted above the imports by jest, so the driver's own `import WebSocket from
-// 'universal-websocket-client'` resolves to the fake. See test/fakeTransport.ts.
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
-/**
- * A `sub` and an `unsub` for one DDP subscription carry the same id, and `send`
- * matches a DDP response to its request by id alone. Two of them in flight at
- * once therefore leave one DDP response settling both sends. This file is about
- * keeping one request per id on the wire; what the subscription map holds
- * afterwards belongs to ddp.subscriptions.spec.ts.
- */
 describe('one sub or unsub in flight per DDP subscription', () => {
   let socket: Socket
   let transport: FakeWebSocket
   let id: string
 
   beforeEach(async () => {
-    socket = new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
+    socket = createSocket()
     transport = await openFakeConnection(socket)
     const subscribing = socket.subscribe('stream-room-messages', ['GENERAL'])
     id = transport.lastSent().id as string
@@ -35,9 +26,6 @@ describe('one sub or unsub in flight per DDP subscription', () => {
   })
 
   it('holds a sub until the unsub before it has been answered', async () => {
-    // `login` calls `subscribeAll`, and `unsubscribe` keeps its entry until the
-    // DDP response arrives — so the resubscribe reaches an id that is still
-    // being unsubscribed.
     const unsubscribing = socket.unsubscribe(id).catch(() => undefined)
     await flushMicrotasks()
     expect(transport.lastSent()).toEqual({ msg: 'unsub', id })
@@ -66,7 +54,6 @@ describe('one sub or unsub in flight per DDP subscription', () => {
     expect(await unsubscribing).toBe('unsubscribed')
     await flushMicrotasks()
 
-    // Only now does the `sub` go out, so its `ready` cannot reach the `unsub`.
     transport.receive({ msg: 'ready', subs: [id] })
     await resubscribing
 
@@ -125,9 +112,6 @@ describe('one sub or unsub in flight per DDP subscription', () => {
   })
 
   it('releases a request queued behind one the dropped socket left unanswered', async () => {
-    // The queued request would otherwise never be written and its caller would
-    // never settle. `logout` waits on `unsubscribeAll`, so that is a Logout that
-    // can never complete.
     socket.unsubscribe(id).catch(() => undefined)
     await flushMicrotasks()
 
@@ -156,8 +140,6 @@ describe('one sub or unsub in flight per DDP subscription', () => {
     await flushMicrotasks()
     expect(reopened.lastSent()).toMatchObject({ msg: 'sub', id })
 
-    // The released `sub` registered itself on the new socket as it went out, so
-    // this waits rather than joining it there.
     socket.unsubscribe(id).catch(() => undefined)
     await flushMicrotasks()
     expect(reopened.lastSent()).toMatchObject({ msg: 'sub', id })

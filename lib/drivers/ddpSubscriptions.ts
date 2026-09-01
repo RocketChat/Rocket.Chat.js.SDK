@@ -101,10 +101,7 @@ export class DDPSubscriptions {
         const subscriptionsPerStream = recordedPerStream()
         if (!subscriptionsPerStream.every((subscriptions) => subscriptions.length > 0)) return
         inFlight = true
-        const recorded = subscriptionsPerStream.reduce(
-          (all, perStream) => all.concat(perStream),
-          [] as RecordedDDPSubscription[]
-        )
+        const recorded = subscriptionsPerStream.flat()
         resubscribeAll(recorded).then((value) => {
           inFlight = false
           finish(value)

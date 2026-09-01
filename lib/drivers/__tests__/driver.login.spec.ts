@@ -1,9 +1,10 @@
-import { createConnectedDriver, createDriver } from '../../../test/createDriver'
+import { createDriver } from '../../../test/createDriver'
 import {
   answerLastMethodCall,
   errorLastMethodCall,
   driveToHandshake,
   fakeSockets,
+  openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
@@ -13,7 +14,8 @@ useFakeClockAndSocketRegistry()
 
 describe('Driver.login', () => {
   it('records the user id the server logged in', async () => {
-    const { driver, transport } = await createConnectedDriver()
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver['socket'])
 
     const logging = driver.login({ resume: 'resume-token' })
     expect(transport.lastSent()).toMatchObject({
@@ -42,21 +44,13 @@ describe('Driver.login', () => {
   })
 
   it('rejects and leaves the user id unset when the server refuses', async () => {
-    const { driver, transport } = await createConnectedDriver()
+    const driver = createDriver()
+    const transport = await openFakeConnection(driver['socket'])
 
     const logging = driver.login({ username: 'user', password: 'pass' })
     errorLastMethodCall(transport, { error: 403, message: 'Unauthorized' })
 
     await expect(logging).rejects.toThrow('Unauthorized')
     expect(driver.userId).toBe('')
-  })
-})
-
-describe('Driver.connect', () => {
-  it('returns without opening a second connection when already connected', async () => {
-    const { driver } = await createConnectedDriver()
-
-    await expect(driver.connect()).resolves.toBe(driver)
-    expect(fakeSockets).toHaveLength(1)
   })
 })

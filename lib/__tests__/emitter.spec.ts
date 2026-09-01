@@ -2,13 +2,6 @@ import { EventEmitter } from 'tiny-events'
 
 import { SDKEventEmitter } from '../emitter'
 
-/**
- * `removeAllListeners` is not upstream API — `tiny-events` ships only
- * on/once/off/emit. It used to be installed onto that package's prototype at
- * module load, so it reached every emitter in the host process. These specs pin
- * the two halves of the replacement: the capability belongs to the SDK's own
- * emitters, and nothing outside them is touched.
- */
 describe('SDKEventEmitter.removeAllListeners', () => {
   let emitter: SDKEventEmitter
 
@@ -17,8 +10,6 @@ describe('SDKEventEmitter.removeAllListeners', () => {
   })
 
   it('does not reach emitters the SDK did not create', () => {
-    // The guarantee the old prototype patch broke. `tiny-events` has no
-    // `removeAllListeners`, and importing the SDK must not give it one.
     expect((new EventEmitter() as any).removeAllListeners).toBeUndefined()
   })
 

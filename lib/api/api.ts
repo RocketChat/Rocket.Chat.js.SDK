@@ -1,4 +1,4 @@
-import { logger as Logger } from '../log'
+import { isLoggerSilent, logger as Logger } from '../log'
 
 import {
 	ILogger,
@@ -24,17 +24,10 @@ export interface IClient {
 class Client implements IClient {
   host: string
 
-  _headers: any = {}
+  headers: any = {}
 
   constructor ({ host = 'http://localhost:3000' }: { host?: string }) {
     this.host = host
-  }
-
-  set headers (obj: any) {
-    this._headers = obj
-  }
-  get headers (): any {
-    return this._headers
   }
 
   getHeaders (options?: any) {
@@ -43,7 +36,7 @@ class Client implements IClient {
       {
         'Content-Type': 'application/json',
         ...settings.customHeaders,
-        ...this._headers
+        ...this.headers
       }
   }
 
@@ -57,37 +50,27 @@ class Client implements IClient {
     return options && options.signal;
   }
 
-  get (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}?${this.getParams(data)}`, {
-      method: 'GET',
-      headers: this.getHeaders(options),
-      signal: this.getSignal(options)
-    }).then(this.handle)
-  }
-  post (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
-      method: 'POST',
-      body: this.getBody(data),
-      headers: this.getHeaders(options),
-      signal: this.getSignal(options)
-    }).then(this.handle)
-  }
-  put (endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
-      method: 'PUT',
-      body: this.getBody(data),
+  private request (method: 'GET' | 'POST' | 'PUT' | 'DELETE', endpoint: string, data: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
+    const query = method === 'GET' ? `?${this.getParams(data)}` : ''
+    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}${query}`, {
+      method,
+      ...(method === 'GET' ? {} : { body: this.getBody(data) }),
       headers: this.getHeaders(options),
       signal: this.getSignal(options)
     }).then(this.handle)
   }
 
-  delete (endpoint: string, data?: any, options?: any, apiVersion: string = 'v1'): Promise<any> {
-    return fetch(`${this.host}/api/${apiVersion}/${encodeURI(endpoint)}`, {
-      method: 'DELETE',
-      body: this.getBody(data),
-      headers: this.getHeaders(options),
-      signal: this.getSignal(options)
-    }).then(this.handle)
+  get (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.request('GET', endpoint, data, options, apiVersion)
+  }
+  post (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.request('POST', endpoint, data, options, apiVersion)
+  }
+  put (endpoint: string, data: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.request('PUT', endpoint, data, options, apiVersion)
+  }
+  delete (endpoint: string, data?: any, options?: any, apiVersion?: string): Promise<any> {
+    return this.request('DELETE', endpoint, data, options, apiVersion)
   }
   private async handle (r: any) {
     const { status } = r
@@ -119,6 +102,8 @@ export interface IApiOptions {
 }
 
 export const regExpSuccess = /(?!([45][0-9][0-9]))\d{3}/
+
+const clientVerbs: { [method: string]: 'get' | 'put' | 'delete' } = { GET: 'get', PUT: 'put', DELETE: 'delete' }
 
 const authTokenHeader = 'X-Auth-Token'
 const userIdHeader = 'X-User-Id'
@@ -164,26 +149,19 @@ export default class Api extends SDKEventEmitter {
     options?: any,
     apiVersion: string = 'v1'
 	) => {
-    this.logger?.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
+    if (!isLoggerSilent(this.logger)) this.logger.debug(`[API] ${ method } ${ endpoint }: ${ JSON.stringify(data) }`)
     try {
       const { signal } = this.controller;
-      options = { ...options, signal };
+      const requestOptions = { ...options, signal };
+      const verb = clientVerbs[method] ?? 'post'
 
-      let result
-      switch (method) {
-        case 'GET': result = await this.client.get(endpoint, data, options, apiVersion); break
-        case 'PUT': result = await this.client.put(endpoint, data, options, apiVersion); break
-        case 'DELETE': result = await this.client.delete(endpoint, data, options, apiVersion); break
-        default:
-        case 'POST': result = await this.client.post(endpoint, data, options, apiVersion); break
-      }
+      const result = await this.client[verb](endpoint, data, requestOptions, apiVersion)
       if (!result) throw new Error(`API ${ method } ${ endpoint } result undefined`)
       if (!this.success(result, ignore)) throw result
       this.logger?.debug(`[API] ${method} ${endpoint} result ${result.status}`)
-      const hasDataInsideResult = result && !result.data
-      return (method === 'DELETE') && hasDataInsideResult ? result : result.data
+      return method === 'DELETE' && !result.data ? result : result.data
     } catch (err) {
-      this.logger?.error(`[API] ${ method } error(${ endpoint }): ${ JSON.stringify(err) }`)
+      if (!isLoggerSilent(this.logger)) this.logger.error(`[API] ${ method } error(${ endpoint }): ${ JSON.stringify(err) }`)
       throw err
     }
   }
@@ -208,11 +186,11 @@ export default class Api extends SDKEventEmitter {
 
 	/** Check result data for success, allowing override to ignore some errors */
   success (result: any, ignore?: RegExp) {
-    return (
+    return Boolean(
 			typeof result.status === 'undefined' ||
 			(result.status && regExpSuccess.test(result.status)) ||
 			(result.status && ignore && ignore.test(result.status))
-		) ? true : false
+		)
   }
 
   async loginWithRest (credentials: ILoginCredentials, loginFields?: any): Promise<ILoginData> {
