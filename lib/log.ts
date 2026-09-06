@@ -13,6 +13,10 @@ const noopLogger: ILogger = {
   error: () => null
 }
 
+
+/** Default basic console logging */
+export const logger: ILogger = new InternalLog()
+=======
 export const isLoggerSilent = (candidate: ILogger) => candidate === noopLogger
 
 export let logger: ILogger = noopLogger
@@ -26,3 +30,4 @@ export function replaceLog (externalLog: ILogger) {
 export function silence () {
   replaceLog(noopLogger)
 }
+
