@@ -32,33 +32,6 @@ describe('client.driver', () => {
     expect(client.driver).toBeInstanceOf(Driver)
   })
 
-  it('receives method calls made on the client', async () => {
-    const client = createClient()
-    const methodCall = jest.spyOn(client.driver, 'methodCall').mockResolvedValue(undefined as any)
-
-    await client.methodCall('getRoomIdByNameOrId', 'general')
-
-    expect(methodCall).toHaveBeenCalledWith('getRoomIdByNameOrId', 'general')
-  })
-
-  it('receives room subscriptions made on the client', async () => {
-    const client = createClient()
-    const subscribeRoom = jest.spyOn(client.driver, 'subscribeRoom').mockResolvedValue([])
-
-    await client.subscribeRoom('GENERAL')
-
-    expect(subscribeRoom).toHaveBeenCalledWith('GENERAL')
-  })
-
-  it('receives subscriptions made on the client, with the arguments in order', async () => {
-    const client = createClient()
-    const subscribe = jest.spyOn(client.driver, 'subscribe').mockResolvedValue(undefined)
-
-    await client.subscribe('stream-room-messages', 'GENERAL', false)
-
-    expect(subscribe).toHaveBeenCalledWith('stream-room-messages', 'GENERAL', false)
-  })
-
   it('is not exposed on the client under a socket field', () => {
     expect('socket' in createClient()).toBe(false)
   })
@@ -81,6 +54,29 @@ describe('client.login', () => {
 
     expect(client.currentLogin!.result!.me).toMatchObject({ username: 'fake-username' })
   })
+
+  it('keeps its username but drops its result when the ddp login answers another token', async () => {
+    const client = await loggedInClient('ddp-token')
+
+    expect(client.currentLogin).toMatchObject({
+      username: 'fake-username',
+      authToken: 'ddp-token',
+      result: null
+    })
+  })
+
+  it('keeps the REST token held after the realtime login fails', async () => {
+    const restClient = new FakeClient()
+    const client = createClient(restClient)
+    jest.spyOn(client.driver, 'login').mockRejectedValue(new Error('realtime login failed'))
+
+    const pending = client.login({ username: 'user', password: 'pass' })
+    restClient.lastRequest().resolve(loginResponse())
+
+    await expect(pending).rejects.toThrow('realtime login failed')
+    expect(client.loggedIn()).toBe(true)
+    expect(client.currentLogin).toMatchObject({ userId: 'fake-user-id', authToken: 'fake-token' })
+  })
 })
 
 describe('client.resume', () => {
@@ -97,7 +93,7 @@ describe('client.resume', () => {
 
     await client.resume({ token: 'fake-token' })
 
-    expect(ddpLogin).toHaveBeenCalledWith({ resume: 'fake-token' }, {})
+    expect(ddpLogin).toHaveBeenCalledWith({ resume: 'fake-token' })
   })
 
   it('leaves the client logged in for REST', async () => {
@@ -109,14 +105,6 @@ describe('client.resume', () => {
       'X-Auth-Token': 'fake-token',
       'X-User-Id': 'fake-user-id'
     })
-  })
-
-  it('leaves an existing login with the same credentials untouched', async () => {
-    const client = await loggedInClient()
-
-    await client.resume({ token: 'fake-token' })
-
-    expect(client.currentLogin).toMatchObject({ username: 'fake-username', authToken: 'fake-token' })
   })
 
   it('replaces the login when the token has rotated', async () => {
@@ -143,23 +131,27 @@ describe('client.resume', () => {
     expect(client.currentLogin).toMatchObject({ username: null, result: null })
   })
 
+  it('rejects and leaves the held login untouched when the realtime login fails', async () => {
+    const client = await loggedInClient()
+    const heldLogin = client.currentLogin
+    jest.spyOn(client.driver, 'login').mockRejectedValue(new Error('realtime login failed'))
+
+    await expect(client.resume({ token: 'rotated' })).rejects.toThrow('realtime login failed')
+
+    expect(client.currentLogin).toBe(heldLogin)
+    expect(client.currentLogin).toMatchObject({ userId: 'fake-user-id', authToken: 'fake-token' })
+  })
+
   it('replaces the login when resuming as another user', async () => {
     const client = await loggedInClient()
     answerDdpLoginWith(client, { id: 'other-id', token: 'other-token' })
 
     await client.resume({ token: 'other-token' })
 
-    expect(client.currentLogin).toMatchObject({ userId: 'other-id', authToken: 'other-token' })
-  })
-})
-
-describe('client.login', () => {
-  it('keeps its username but drops its result when the ddp login answers another token', async () => {
-    const client = await loggedInClient('ddp-token')
-
     expect(client.currentLogin).toMatchObject({
-      username: 'fake-username',
-      authToken: 'ddp-token',
+      username: null,
+      userId: 'other-id',
+      authToken: 'other-token',
       result: null
     })
   })
@@ -190,7 +182,7 @@ describe('client.logout', () => {
     expect(client.loggedIn()).toBe(false)
   })
 
-  it('still sends an Endpoint to the REST client', async () => {
+  it('still reaches the REST client with the Endpoint after logout', async () => {
     const { client, restClient } = await loggedOutClient()
 
     const pending = client.get('me', {})
@@ -216,5 +208,23 @@ describe('client.logger', () => {
 describe('client.url', () => {
   it('resolves to the driver host', async () => {
     expect(await createClient().url).toBe('localhost:3000')
+  })
+
+  it('drops the scheme from the configured host', async () => {
+    const client = new RocketChatClient({ host: 'https://localhost:3000', logger: createSilentLogger() })
+
+    expect(await client.url).toBe('localhost:3000')
+  })
+})
+
+describe('client.driver.config', () => {
+  it('carries config options the client does not recognise', () => {
+    const client = new RocketChatClient({
+      host: 'localhost:3000',
+      logger: createSilentLogger(),
+      unknownOption: 'unknown-value'
+    })
+
+    expect(client.driver.config).toMatchObject({ unknownOption: 'unknown-value' })
   })
 })

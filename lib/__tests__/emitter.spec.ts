@@ -2,13 +2,6 @@ import { EventEmitter } from 'tiny-events'
 
 import { SDKEventEmitter } from '../emitter'
 
-/**
- * `removeAllListeners` is not upstream API — `tiny-events` ships only
- * on/once/off/emit. It used to be installed onto that package's prototype at
- * module load, so it reached every emitter in the host process. These specs pin
- * the two halves of the replacement: the capability belongs to the SDK's own
- * emitters, and nothing outside them is touched.
- */
 describe('SDKEventEmitter.removeAllListeners', () => {
   let emitter: SDKEventEmitter
 
@@ -17,8 +10,6 @@ describe('SDKEventEmitter.removeAllListeners', () => {
   })
 
   it('does not reach emitters the SDK did not create', () => {
-    // The guarantee the old prototype patch broke. `tiny-events` has no
-    // `removeAllListeners`, and importing the SDK must not give it one.
     expect((new EventEmitter() as any).removeAllListeners).toBeUndefined()
   })
 
@@ -132,6 +123,20 @@ describe('SDKEventEmitter.off', () => {
     expect(listenOnce).not.toHaveBeenCalled()
   })
 
+  it('leaves every listener registered when given neither event nor listener', () => {
+    const first = jest.fn()
+    const second = jest.fn()
+    emitter.on('reply', first)
+    emitter.on('other', second)
+
+    expect(emitter.off()).toBe(emitter)
+
+    emitter.emit('reply')
+    emitter.emit('other')
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(second).toHaveBeenCalledTimes(1)
+  })
+
   it('clears every listener for the event when given no listener', () => {
     const first = jest.fn()
     const second = jest.fn()
@@ -166,6 +171,15 @@ describe('SDKEventEmitter.emit', () => {
 
     expect(listenOnce).toHaveBeenCalledWith('payload')
     expect(nextListener).toHaveBeenCalledWith('payload')
+  })
+
+  it('is a no-op for an event with no listeners', () => {
+    const listener = jest.fn()
+    emitter.on('reply', listener)
+
+    expect(emitter.emit('other')).toBe(emitter)
+
+    expect(listener).not.toHaveBeenCalled()
   })
 
   it('calls every listener when they are all `once`', () => {

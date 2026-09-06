@@ -1,14 +1,13 @@
 import { Socket } from '../socket'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
+  CLOSED,
   FakeWebSocket,
   flushMicrotasks,
   openFakeConnection,
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
-// Hoisted above the imports by jest, so the driver's own `import WebSocket from
-// 'universal-websocket-client'` resolves to the fake. See test/fakeTransport.ts.
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
@@ -18,7 +17,7 @@ describe('Socket login', () => {
   let transport: FakeWebSocket
 
   beforeEach(async () => {
-    socket = new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
+    socket = createSocket()
     transport = await openFakeConnection(socket)
   })
 
@@ -28,6 +27,28 @@ describe('Socket login', () => {
     transport.receive({ msg: 'result', id: transport.lastSent().id, result })
     return logging
   }
+
+  describe('loggedIn', () => {
+    it('is not logged in on a connection that is merely connected', () => {
+      expect(socket.connected).toBe(true)
+      expect(socket.loggedIn).toBe(false)
+    })
+
+    it('is logged in once the login result is stored', async () => {
+      await loginAndAck()
+
+      expect(socket.loggedIn).toBe(true)
+    })
+
+    it('is not logged in when the connection is gone, however recent the login', async () => {
+      await loginAndAck()
+
+      transport.readyState = CLOSED
+
+      expect(socket.resume).not.toBeNull()
+      expect(socket.loggedIn).toBe(false)
+    })
+  })
 
   describe('when the resubscribe after login fails', () => {
     const failResubscribe = (message: string) => jest

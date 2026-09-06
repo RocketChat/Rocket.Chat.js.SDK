@@ -1,5 +1,4 @@
 import Api from '../api'
-import { logger as moduleLogger } from '../../log'
 import { createSilentLogger } from '../../../test/createSilentLogger'
 import {
   anonymousApiWithFakeClient,
@@ -39,11 +38,37 @@ describe('api', () => {
       })
     })
 
+    it('keeps a null username when the answered login carries no username', async () => {
+      const { api, restClient } = anonymousApiWithFakeClient()
+      restClient.enqueueReply({
+        status: 200,
+        data: { data: { userId: 'fake-user-id', authToken: 'fake-token', me: { _id: 'fake-user-id' } } }
+      })
+
+      await api.loginWithRest({ username: 'user', password: 'pass' })
+
+      expect(api.username).toBeNull()
+      expect(api.userId).toBe('fake-user-id')
+    })
+
+    it('posts the configured login fields alongside the credentials', async () => {
+      const { api, restClient } = anonymousApiWithFakeClient()
+      restClient.enqueueReply(loginResponse())
+
+      await api.loginWithRest({ username: 'user', password: 'pass' }, { code: '2fa-code' })
+
+      expect(restClient.lastRequest().data).toEqual({
+        username: 'user',
+        password: 'pass',
+        code: '2fa-code'
+      })
+    })
+
     it('sends a resume token as its own login method', async () => {
       const { api, restClient } = anonymousApiWithFakeClient()
       restClient.enqueueReply(loginResponse())
 
-      await api.login({ resume: 'fake-token' })
+      await api.loginWithRest({ resume: 'fake-token' })
 
       expect(restClient.requests[0].data).toEqual({ resume: 'fake-token' })
       expect(api.userId).toBe('fake-user-id')
@@ -69,6 +94,13 @@ describe('api', () => {
       expect(restClient.lastRequest().endpoint).toBe('logout')
     })
 
+    it('answers the body the server sent', async () => {
+      const { api, restClient } = await loggedInApiWithFakeClient()
+      restClient.enqueueReply({ status: 200, data: { success: true } })
+
+      await expect(api.logout()).resolves.toEqual({ success: true })
+    })
+
     it('removes the auth headers and leaves the others in place', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.headers = { ...restClient.headers, 'X-Custom-Header': 'kept' }
@@ -81,18 +113,6 @@ describe('api', () => {
   })
 
   describe('request', () => {
-    it('reaches the restClient for an unauthenticated request when logged out', async () => {
-      const { api, restClient } = anonymousApiWithFakeClient()
-      restClient.enqueueReply(emptySuccess())
-
-      await api.post('login', { username: 'user' })
-
-      expect(restClient.lastRequest()).toMatchObject({
-        method: 'POST',
-        data: { username: 'user' }
-      })
-    })
-
     it('routes each method to its own restClient call', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())
@@ -121,7 +141,7 @@ describe('api', () => {
       expect(restClient.lastRequest().data).toEqual({ msg: 'edited' })
     })
 
-    it('passes the api version through to the restClient on every method', async () => {
+    it('passes an explicit api version through to the restClient on every method', async () => {
       const { api, restClient } = await loggedInApiWithFakeClient()
       restClient.enqueueReply(emptySuccess(), emptySuccess(), emptySuccess(), emptySuccess())
 
@@ -225,7 +245,7 @@ describe('api', () => {
 
       await api.get('me', {})
 
-      expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('[API] GET me'))
+      expect(logger.debug).toHaveBeenCalledWith('[API] GET me: {}')
     })
 
     it('logs the failure to the logger it was handed', async () => {
@@ -235,11 +255,17 @@ describe('api', () => {
 
       await expect(api.get('me', {})).rejects.toBeDefined()
 
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('[API] GET error(me)'))
+      expect(logger.error).toHaveBeenCalledWith('[API] GET error(me): {"status":400,"data":{}}')
     })
 
-    it('falls back to the module logger when handed none', () => {
-      expect(anonymousApiWithFakeClient().api.logger).toBe(moduleLogger)
+    it('does not serialize request data for the default silent logger', async () => {
+      const { api, restClient } = anonymousApiWithFakeClient()
+      const toJSON = jest.fn(() => ({}))
+      restClient.enqueueReply(emptySuccess())
+
+      await api.get('me', { toJSON })
+
+      expect(toJSON).not.toHaveBeenCalled()
     })
   })
 })

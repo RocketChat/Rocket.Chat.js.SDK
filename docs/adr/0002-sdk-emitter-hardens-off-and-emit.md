@@ -23,10 +23,11 @@ Both faults are silent. No code throws, and no code writes a log line. The only
 symptom is a listener that stops to receive its events.
 
 The Socket pairs `once` with `off` on the same event at each wait that the Socket
-owns. These waits are `reopenNow`, `probe`, `waitForOpen` and `send`. More than
-one listener on one event is therefore the normal state of the Socket, not a rare
-case. A consuming app also adds its own listeners to that same emitter through
-the Driver's `onStreamData`.
+owns. These waits are `probe`, `waitForOpen` and the wait a `send` holds for its
+DDP response. More than one listener on one event is therefore the normal state
+of the Socket, not a rare case: the Driver keeps a listener of its own on `open`
+for the life of the Socket, and a consuming app adds more to that same emitter
+through the Driver's `onStreamData`.
 
 ## Decision
 
@@ -58,10 +59,12 @@ the Driver's `onStreamData`.
   app. Two calls to `stop`, or one call after the listener was already gone,
   removed a different listener on the same event. `stop` removes only the
   listener that the app gave it.
-- Every rejection reaches its listener, including the ones `emit` stepped over.
-  An immediate reconnect rejects each send in flight, not approximately one half
-  of them. For this reason the value of those rejections must be a true Error.
-  Refer to ADR-0003.
+- Every response reaches its listener, including the ones `emit` stepped over. A
+  `send` is answered on the event its id names while `probe` and `waitForOpen`
+  hold `once` listeners of their own, so a Socket carrying ordinary traffic is
+  exactly the case the fault appeared in. What a wait rejects with, and why an
+  abandoned one settles on the ownership change rather than on an event, is
+  ADR-0014's.
 - Read this ADR again if a person replaces or upgrades `tiny-events`. Both
   replacements exist only because of the behaviour of that package. A different
   package without that behaviour makes both replacements dead weight.

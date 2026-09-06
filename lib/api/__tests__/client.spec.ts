@@ -1,7 +1,7 @@
 import * as settings from '../../settings'
 import Api, { IClient } from '../api'
 import { loggedInApiWithFakeFetch } from '../../../test/apiFixtures'
-import { answerFetchWith, answerFetchWithUnparsableBody, installFakeFetch, lastFetchCall } from '../../../test/fakeFetch'
+import { answerFetchWith, answerFetchWithStatus, answerFetchWithUnparsableBody, installFakeFetch, lastFetchCall } from '../../../test/fakeFetch'
 
 describe('REST client', () => {
   let api: Api
@@ -57,6 +57,18 @@ describe('REST client', () => {
       await api.get('rooms.info', { roomIds: ['one', 'two'] })
 
       expect(lastFetchCall().url).toContain('roomIds[]=one&roomIds[]=two')
+    })
+
+    it('url-encodes a scalar value', async () => {
+      await api.get('rooms.info', { roomId: 'room one' })
+
+      expect(lastFetchCall().url).toContain('roomId=room%20one')
+    })
+
+    it('sends no query string on a post', async () => {
+      await api.post('chat.postMessage', { msg: 'hello' })
+
+      expect(lastFetchCall().url).toBe('http://localhost:3000/api/v1/chat.postMessage')
     })
 
     it('encodes an object as json', async () => {
@@ -147,6 +159,22 @@ describe('REST client', () => {
     })
   })
 
+  describe('abort signal', () => {
+    it('sends the signal of the request that was issued', async () => {
+      await api.get('me', {})
+
+      expect(lastFetchCall().init.signal).toBe(api.controller.signal)
+    })
+
+    it('sends no signal when the caller passed no options', async () => {
+      answerFetchWith({})
+
+      await restClient.get('me', {})
+
+      expect(lastFetchCall().init.signal).toBeUndefined()
+    })
+  })
+
   describe('result', () => {
     it('answers the parsed body under the http status', async () => {
       answerFetchWith({ success: true })
@@ -155,7 +183,21 @@ describe('REST client', () => {
         status: 200,
         data: { success: true }
       })
+    })
+
+    it('hands the caller the parsed body without the http status', async () => {
+      answerFetchWith({ success: true })
+
       await expect(api.get('me', {})).resolves.toEqual({ success: true })
+    })
+
+    it('answers a failure status and its body without throwing', async () => {
+      answerFetchWithStatus(400, { error: 'nope' })
+
+      await expect(restClient.get('me', {}, {})).resolves.toEqual({
+        status: 400,
+        data: { error: 'nope' }
+      })
     })
 
     it('rejects a body that is not json', async () => {

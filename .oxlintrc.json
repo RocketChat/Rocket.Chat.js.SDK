@@ -6,6 +6,21 @@
 		"triple-slash-reference": "warn",
 		// https://github.com/Microsoft/TypeScript/issues/340
 		"no-unsafe-declaration-merging": "warn",
-		"no-unused-vars": "error"
-	}
+		"no-unused-vars": "error",
+		"complexity": ["warn", 20],
+		"max-depth": ["error", 4],
+		"max-nested-callbacks": ["error", 10],
+		"max-params": ["warn", 4]
+	},
+	"overrides": [
+		{
+			"files": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts", "test/**"],
+			"rules": {
+				"complexity": "off",
+				"max-depth": "off",
+				"max-nested-callbacks": "off",
+				"max-params": "off"
+			}
+		}
+	]
 }

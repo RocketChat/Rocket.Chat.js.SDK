@@ -20,7 +20,7 @@ export const loggedInApiWithFakeClient = async (logger?: ILogger) => {
   const api = new Api({ client: restClient, logger })
 
   restClient.enqueueReply(loginResponse())
-  await api.login({ username: 'user', password: 'pass' })
+  await api.loginWithRest({ username: 'user', password: 'pass' })
   restClient.requests = []
 
   return { api, restClient }
@@ -29,7 +29,7 @@ export const loggedInApiWithFakeClient = async (logger?: ILogger) => {
 export const loggedInApiWithFakeFetch = async (host?: string) => {
   const api = new Api({ host })
   answerFetchWith(loginResponse().data)
-  await api.login({ username: 'user', password: 'pass' })
+  await api.loginWithRest({ username: 'user', password: 'pass' })
   answerFetchWith({})
   return { api, restClient: api.client }
 }

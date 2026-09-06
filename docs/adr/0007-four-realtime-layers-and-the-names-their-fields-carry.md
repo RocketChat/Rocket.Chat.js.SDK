@@ -1,6 +1,6 @@
 # ADR-0007: Four realtime layers, and the names their fields carry
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0013
 
 ## Context
 

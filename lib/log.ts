@@ -5,24 +5,29 @@
 
 import { ILogger } from '../interfaces'
 
-/** Temp logging, should override form adapter's log */
-class InternalLog implements ILogger {
-  debug (..._args: any[]) {
-    // console.log(...args)
-  }
-  info (..._args: any[]) {
-    // console.log(...args)
-  }
-  warning (..._args: any[]) {
-    // console.log(...args)
-  }
-  warn (...args: any[]) { // legacy method
-    return this.warning(...args)
-  }
-  error (..._args: any[]) {
-    // console.log(...args)
-  }
+const noopLogger: ILogger = {
+  debug: () => null,
+  info: () => null,
+  warning: () => null,
+  warn (...args: any[]) { return this.warning(...args) },
+  error: () => null
 }
+
 
 /** Default basic console logging */
 export const logger: ILogger = new InternalLog()
+=======
+export const isLoggerSilent = (candidate: ILogger) => candidate === noopLogger
+
+export let logger: ILogger = noopLogger
+
+/** Substitute logging handler */
+export function replaceLog (externalLog: ILogger) {
+  logger = externalLog
+}
+
+/** Null all log outputs */
+export function silence () {
+  replaceLog(noopLogger)
+}
+

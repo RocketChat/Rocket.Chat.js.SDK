@@ -9,3 +9,5 @@ Code carries its own meaning. Names and structure say what a comment would.
 - **Write comments that stay true.** A comment describing history ("this used to...") is stale the day it lands.
 - **Match the surrounding file.** Commented code nearby is not a reason to add more.
 - **Re-read the diff before calling an edit done** and confirm every added line is code.
+
+Tautological tests considered harmful.

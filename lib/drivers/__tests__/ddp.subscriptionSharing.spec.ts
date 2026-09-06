@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSilentLogger } from '../../../test/createSilentLogger'
+import { createSocket } from '../../../test/createSocket'
 import {
   FakeWebSocket,
   flushMicrotasks,
@@ -12,20 +12,10 @@ import {
   useFakeClockAndSocketRegistry
 } from '../../../test/fakeTransport'
 
-// Hoisted above the imports by jest, so the driver's own `import WebSocket from
-// 'universal-websocket-client'` resolves to the fake. See test/fakeTransport.ts.
 jest.mock('universal-websocket-client', () => require('../../../test/fakeTransport').fakeTransportModule)
 
 useFakeClockAndSocketRegistry()
 
-const createSocket = () => new Socket({ host: 'localhost:3000', logger: createSilentLogger() })
-
-/**
- * One stream is one DDP subscription id, so a second `subscribe` for a stream
- * already recorded shares it. What the id is derived from belongs to ADR-0011;
- * this file is about what sharing does to the wire, the registry and the
- * callbacks.
- */
 describe('Socket subscription sharing', () => {
   let socket: Socket
   let transport: FakeWebSocket
@@ -77,9 +67,6 @@ describe('Socket subscription sharing', () => {
   })
 
   it('records the subscription before the queue slot releases', async () => {
-    // A second subscribe released into a gap between the server's `ready` and
-    // the write would find nothing and send a second `sub` under an id already
-    // in use — worse than the duplicate this fix removes.
     const first = socket.subscribe('stream-room-messages', ['GENERAL'])
     transport.receive({ msg: 'ready', subs: [lastSubId(transport)] })
 
@@ -144,8 +131,6 @@ describe('Socket subscription sharing', () => {
   })
 
   it('resolves false while a user subscribe for the same stream is still unanswered', async () => {
-    // Nothing is recorded until the server acks, so the resubscribe never gets
-    // to start and its deadline settles it while the `sub` is still pending.
     socket.subscribe('stream-notify-user', ['uid/media-signal'])
     const id = lastSubId(transport)
 
@@ -163,9 +148,6 @@ describe('Socket subscription sharing', () => {
 
   it('resolves false when another request on the same id holds the queue past its deadline', async () => {
     const subscription = await subscribe('stream-notify-user', ['uid/media-signal'])
-
-    // The `unsub` is on the wire and unanswered, so it still holds the id's
-    // queue and the entry it will remove is still there for the poll to find.
     subscription!.unsubscribe()
     const framesBefore = subFrames(transport.sent).length
 

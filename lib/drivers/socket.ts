@@ -2,7 +2,8 @@
 /**
  * @module Socket
  * The DDP layer inside a Driver: it owns the Transport, performs the DDP
- * handshake, runs the Liveness chain and holds the DDP subscriptions.
+ * handshake, runs the Liveness chain and holds the DDP subscriptions. Which
+ * Connection work it is allowed to do belongs to the Connection it composes.
  */
 
 import WebSocket from 'universal-websocket-client'
@@ -26,8 +27,23 @@ import {
 	ILogger
 } from '../../interfaces'
 
-import { IStream, RecordedDDPSubscription, IDDPSubscriptionRequest } from './definitions'
-import { DDPError, toError } from './ddpError'
+import { IStream, RecordedDDPSubscription } from './definitions'
+import {
+  abandonedWaitMessages,
+  AbandonedWait,
+  DDPRequests,
+  FailedConnectionAttempt
+} from './ddpRequests'
+import {
+  closeTransportIntentionally,
+  Connection,
+  ConnectionAttempt,
+  intentionalCloseCode,
+  Transport,
+  transportClosedState,
+  transportOpenState
+} from './connection'
+import { DDPSubscriptions } from './ddpSubscriptions'
 import { sha256 } from 'js-sha256'
 
 function hostToWS (host: string, ssl = false) {
@@ -35,66 +51,61 @@ function hostToWS (host: string, ssl = false) {
   return `ws${ssl ? 's' : ''}://${host}`
 }
 
-const userDisconnectCloseCode = 4000;
-const socketOpen = 1;
-const socketClosed = 3;
-
 const socketDeadlineMs = 2000;
 
-const abandonedByReopen = '[ddp] connection reopened before the response arrived'
-const abandonedByClose = '[ddp] connection closed before the response arrived'
-const abandonedBySocketChange = '[ddp] connection replaced before the message was written'
-const abandonedBeforeOpen = '[ddp] connection closed before it opened'
-const deadlineExpired = '[ddp] no response arrived before the deadline'
-
-/** See ADR-0011. */
-const subscriptionId = (name: string, params: any[]) =>
-  `sub-${name}-${sha256(JSON.stringify(params))}`
-
-class AbandonedWait extends Error {
-  constructor (message?: string) {
-    super(message)
-    Object.setPrototypeOf(this, AbandonedWait.prototype)
-  }
+interface Latch<T> {
+  settle: (value: T) => void
+  refuse: (error: Error) => void
+  undoOnSettle: (undo: () => void) => void
 }
 
-/**
- * An `AbandonedWait` for a request whose frame was already written, carrying the
- * id so a caller can name what the server may have acted on. See ADR-0006.
- */
-class AbandonedRequest extends AbandonedWait {
-  constructor (public id: string, message: string) {
-    super(message)
-    Object.setPrototypeOf(this, AbandonedRequest.prototype)
-  }
-}
+const latchedByDeadline = <T>(
+  deadlineMs: number,
+  onDeadline: (latch: Latch<T>) => void,
+  wire: (latch: Latch<T>) => void
+): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    let settled = false
+    let cleanup = () => {}
 
-/**
- * The wait for a DDP response ended by its Deadline, carrying the id so a caller
- * can name what the server may still have acted on. See ADR-0003 and ADR-0006.
- */
-class ExpiredWait extends Error {
-  constructor (public id: string) {
-    super(deadlineExpired)
-    Object.setPrototypeOf(this, ExpiredWait.prototype)
-  }
-}
+    const finish = (announce: () => void) => {
+      if (settled) return
+      settled = true
+      clearTimeout(deadline as any)
+      cleanup()
+      announce()
+    }
+
+    const latch: Latch<T> = {
+      settle: (value) => finish(() => resolve(value)),
+      refuse: (error) => finish(() => reject(error)),
+      undoOnSettle: (undo) => { cleanup = undo }
+    }
+
+    const deadline = setTimeout(() => onDeadline(latch), deadlineMs)
+    wire(latch)
+  })
 
 export class Socket extends SDKEventEmitter {
   sent = 0
   host: string
   lastPing = Date.now()
-  subscriptions: { [id: string]: RecordedDDPSubscription } = {}
   config: ISocketConfig
-  openTimeout?: NodeJS.Timer | number
   pingTimeout?: NodeJS.Timer | number
-  connection?: WebSocket
   session?: string
   logger: ILogger
-  reopenPromise?: Promise<void>
-  private settleReopen?: () => void
-  private pendingOpenRejects = new WeakMap<WebSocket, (err: Error) => void>()
-  private subscriptionRequests: { [id: string]: Promise<void> } = {}
+  private requests: DDPRequests
+  private readonly ddpSubscriptions: DDPSubscriptions
+  private readonly connectionWork: Connection
+  private readonly waitsForOpen = new Set<(error: Error) => void>()
+
+  get connection (): Transport | undefined {
+    return this.connectionWork.attachedTransport
+  }
+
+  get subscriptions (): { [id: string]: RecordedDDPSubscription } {
+    return this.ddpSubscriptions.records
+  }
 
   /** Create a websocket handler */
   constructor (
@@ -111,6 +122,35 @@ export class Socket extends SDKEventEmitter {
       ping: options.ping || timeout,
       timeout
     }
+    this.requests = new DDPRequests({
+      emitter: this,
+      getLogger: () => this.logger,
+      nextId: (id) => {
+        const nextId = id || `ddp-${this.sent}`
+        this.sent += 1
+        return nextId
+      }
+    })
+    this.ddpSubscriptions = new DDPSubscriptions({
+      getLogger: () => this.logger,
+      send: (message) => this.send(message),
+      onEvent: (name, listener) => this.onEvent(name, listener),
+      getCloseGeneration: () => this.connectionWork.closesTaken,
+      isOffline: () => this.connectionWork.offline,
+      deadlineMs: this.config.timeout
+    })
+    this.connectionWork = new Connection({
+      getLogger: () => this.logger,
+      reopenDelayMs: this.config.reopen,
+      deadlineMs: this.config.timeout,
+      hasUsableTransport: () => this.connected,
+      constructTransport: (attempt) => this.constructTransport(attempt),
+      awaitTransportClose: (transport) => this.letTransportClose(transport),
+      abandonWrittenWaits: (message) => this.requests.abandonAll(message),
+      refuseEveryWait: () => this.refuseEveryWait(),
+      forgetConnection: () => this.forgetConnection(),
+      emit: (event, ...args) => this.emit(event, ...args)
+    })
 
     this.host = `${hostToWS(this.config.host, this.config.useSsl)}/websocket`
 
@@ -123,69 +163,26 @@ export class Socket extends SDKEventEmitter {
     this.on('ready', (data: any) => this.emit(data.subs[0], data))
   }
 
-  /**
-   * Create a new WebSocket, tear down any previous one, and wire up handlers.
-   * Emits 'connecting' exactly once per actual new socket.
-   */
-  private createConnection = (): Promise<WebSocket> => {
-    return new Promise((resolve, reject) => {
-      let connection: WebSocket
-
-      try {
-        connection = new WebSocket(this.host, null, { headers: settings.customHeaders })
-        connection.onerror = reject
-        this.pendingOpenRejects.set(connection, reject)
-      } catch (err) {
-        this.logger.error(err)
-        return reject(err)
-      }
-      // Tear down the previous connection before replacing it.
-      // Callers only reach here when the existing socket isn't healthy, so
-      // detaching its handlers and closing it stops a stale or still-connecting
-      // socket from later firing onClose and clobbering the live connection.
-      if (this.connection) {
-        try {
-          this.detach(this.connection)
-          this.connection.close(userDisconnectCloseCode)
-        } catch (err) {
-          this.logger.debug(`[ddp] open: previous connection teardown failed: ${(err as Error).message}`)
-        }
-      }
-      this.connection = connection
-      this.connection.onmessage = this.onMessage.bind(this)
-      this.connection.onclose = (ev: any) => this.onClose(ev, connection) // pass closing socket so onClose can compare identity
-      this.connection.onopen = this.onOpen.bind(this, resolve, reject)
-      this.emit('connecting')
-    })
-  }
-
-  /**
-   * Open websocket connection.
-   * Stores connection, setting up handlers for open/close/message events.
-   * Resumes login if given token.
-   */
-  open = async (): Promise<any> => {
-    if (this.connected) {
-      return undefined
+  private constructTransport = (attempt: ConnectionAttempt): Transport => {
+    let transport: Transport
+    try {
+      transport = new WebSocket(this.host, null, { headers: settings.customHeaders })
+    } catch (err) {
+      this.logger.error(err)
+      throw err
     }
 
-    if (this.reopenPromise) {
-      await this.reopenPromise
-      if (!this.connected) {
-        await this.createConnection()
-      }
-      return this.connection
-    }
-
-    await this.createConnection()
-    return this.connection
+    transport.onmessage = this.onMessage.bind(this)
+    transport.onerror = () =>
+      this.connectionWork.fail(attempt, FailedConnectionAttempt.transportFailed())
+    transport.onclose = (ev: any) => this.onClose(ev, transport)
+    transport.onopen = () => this.handshake(attempt, transport)
+    return transport
   }
 
-  /** Send handshake message to confirm connection, start pinging. */
-  onOpen = async (resolve: Function, reject: Function) => {
+  private handshake = async (attempt: ConnectionAttempt, transport: Transport) => {
     this.lastPing = Date.now()
 
-    // `onopen` is a websocket callback, so a throw here has nowhere to go.
     let connected
     try {
       connected = await this.send({
@@ -195,28 +192,19 @@ export class Socket extends SDKEventEmitter {
       })
     } catch (err) {
       this.logger.error(`[ddp] the handshake did not complete: ${(err as Error).message}`)
-      return reject(err)
+      return this.connectionWork.fail(attempt, err)
     }
+
+    if (!this.connectionWork.isCurrent(attempt) || this.connection !== transport) return
+
     this.session = connected.session
     this.ping().catch((err) => this.logger.error(`[ddp] Unable to ping server: ${err.message}`))
-    this.emit('open')
-    return resolve(this.connection)
+    this.connectionWork.succeed(attempt)
   }
 
-  onClose = (e: any, closedConnection?: WebSocket) => {
-    // A detached socket's late close would clobber the live connection.
-    if (closedConnection && closedConnection !== this.connection) {
-      return
-    }
-    this.emit('close', e)
-    try {
-      if (e?.code !== userDisconnectCloseCode) {
-        this.reopen()
-      }
-      this.logger.info(`[ddp] Close (${e?.code})${e?.reason ? `: ${e.reason}` : ''}`)
-    } catch (error) {
-      this.logger.error(error)
-    }
+  private onClose = (e: any, closedTransport: Transport) => {
+    this.logger.info(`[ddp] Close (${e?.code})${e?.reason ? `: ${e.reason}` : ''}`)
+    this.connectionWork.transportLost(closedTransport, e, e?.code !== intentionalCloseCode)
   }
 
   /**
@@ -225,257 +213,118 @@ export class Socket extends SDKEventEmitter {
    * on whichever of the three it knows. Any frame at all also counts as a sign of
    * life and moves `lastPing`.
    */
+  private parseFrame = (raw: any) => {
+    let frame
+    try {
+      frame = JSON.parse(raw)
+    } catch (err) {
+      this.logger.error(`[ddp] JSON parse error on frame: ${raw} — ${(err as Error).message}`)
+      return undefined
+    }
+    if (!frame) {
+      this.logger.debug(`[ddp] empty frame dropped: ${raw}`)
+      return undefined
+    }
+    return frame
+  }
+
   onMessage = (e: any) => {
     if (!e.data) return
 
-    // The caller is the websocket's `onmessage`, which has nowhere to put a
-    // throw — a malformed frame is logged and dropped.
-    let data
-    try {
-      data = JSON.parse(e.data)
-    } catch (err) {
-      return this.logger.error(
-        `[ddp] JSON parse error on frame: ${e.data} — ${(err as Error).message}`
-      )
-    }
-
-    // A frame that parses to a falsy value — `null`, `0`, `""` — carries
-    // nothing to dispatch on.
-    if (!data) return this.logger.debug(`[ddp] empty frame dropped: ${e.data}`)
+    const data = this.parseFrame(e.data)
+    if (!data) return
 
     this.lastPing = Date.now()
 
-    this.logger.debug(data) // 👈  very useful for debugging missing responses
     this.logger.debug(`[ddp] messages received: ${e.data}`)
     if (data.collection) this.emit(data.collection, data)
     if (data.msg) this.emit(data.msg, data)
     if (data.id) this.emit(data.id, data)
   }
 
-  /**
-   * Closing the socket is a separate obligation, left to the caller.
-   *
-   * An open of this socket that is still pending is abandoned on a microtask,
-   * so a handshake rejection already in flight settles it first.
-   */
-  private detach = (connection: WebSocket) => {
-    const rejectPendingOpen = this.pendingOpenRejects.get(connection)
-    this.pendingOpenRejects.delete(connection)
-    Promise.resolve().then(() => rejectPendingOpen?.(new AbandonedWait(abandonedBeforeOpen)))
-    connection.onopen = null as any
-    connection.onmessage = null as any
-    connection.onerror = null as any
-    connection.onclose = null as any
+  /** End every wait a Close ends: those for an open, and those for a response. */
+  private refuseEveryWait = () => {
+    const refused = [...this.waitsForOpen]
+    this.waitsForOpen.clear()
+    refused.forEach((reject) => reject(AbandonedWait.responseClosed()))
+    this.requests.abandonAll(abandonedWaitMessages.responseClosed)
   }
 
-  private replaced = (connection?: WebSocket) =>
-    this.connection !== undefined && this.connection !== connection
-
-  /**
-   * The wait ends on this socket's `onclose` rather than on the driver's
-   * `close` event: a close emitted for the connection that replaced this one
-   * says nothing about the socket being closed here.
-   */
-  private waitForClose = (connection: WebSocket, deadlineMs: number) =>
-    new Promise<void>((resolve) => {
-      let settled = false
-      const driverOnClose = connection.onclose
-
-      const settle = () => {
-        if (settled) return
-        settled = true
-        clearTimeout(deadline as any)
-        resolve()
-      }
-
-      const onTransportClose = (e: any) => {
-        driverOnClose?.(e)
-        settle()
-      }
-
-      const answerCloseOurselves = (reason: string) => {
-        // Null rather than restore: a transport close that lands after this
-        // would otherwise re-enter onClose, emit a second close and arm a
-        // reopen for a socket the driver is already letting go.
-        if (connection.onclose === onTransportClose) connection.onclose = null as any
-        this.onClose({ code: userDisconnectCloseCode, reason, wasClean: false }, connection)
-        settle()
-      }
-
-      connection.onclose = onTransportClose
-      const deadline = setTimeout(
-        () => answerCloseOurselves('the transport did not answer the close'),
-        deadlineMs
-      )
-
-      try {
-        connection.close(userDisconnectCloseCode)
-      } catch (err) {
-        this.logger.debug(`[ddp] close: the transport refused to close: ${(err as Error).message}`)
-        answerCloseOurselves('the transport refused to close')
-      }
-    })
-
-  /**
-   * Close the Transport and forget every DDP subscription locally.
-   * See ADR-0009.
-   */
-  close = async (): Promise<void> => {
-    this.settleReopen?.()
-
-    const connection = this.connection
-
-    if (connection && connection.readyState !== socketClosed) {
-      await this.waitForClose(connection, socketDeadlineMs)
-    }
-
-    if (this.replaced(connection)) return
-
-    this.cancelScheduledReopen()
+  private forgetConnection = () => {
     if (this.pingTimeout) {
       clearTimeout(this.pingTimeout as any)
       delete this.pingTimeout
     }
     this.lastPing = 0
-
-    if (connection) {
-      this.detach(connection)
-      delete this.connection
-    }
-
-    this.forgetAllSubscriptions()
+    delete this.session
+    this.ddpSubscriptions.forgetAllSubscriptions()
   }
 
-  /** Drop one DDP subscription. */
-  forgetSubscription = (id: string) => {
-    delete this.subscriptions[id]
-  }
-
-  /** Drop every DDP subscription, one key at a time, in the same object. */
-  forgetAllSubscriptions = () => {
-    Object.keys(this.subscriptions).forEach((id) => this.forgetSubscription(id))
-  }
-
-  // Call open directly, so it skips openTimeout
-  checkAndReopen = () => {
-    if (!this.connected) {
-      this.cancelScheduledReopen()
-      this.open().catch((err) => this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`))
-    }
-  }
-
-  private reopenUnlessAbandoned = (err: unknown) => {
-    if (!(err instanceof AbandonedWait)) this.reopen()
-  }
-
-  private cancelScheduledReopen = () => {
-    if (!this.openTimeout) return
-    clearTimeout(this.openTimeout as any)
-    delete this.openTimeout
-  }
-
-  /** Clear connection and try to connect again. */
-  reopen = () => {
-    if (this.openTimeout) return
-    this.openTimeout = setTimeout(async() => {
-      delete this.openTimeout
-
-      try {
-        await this.open()
-      } catch (err) {
-        this.logger.error(`[ddp] Reopen error: ${(err as Error).message}`);
-        this.reopenUnlessAbandoned(err);
-      }
-    }, this.config.reopen);
+  private letTransportClose = async (transport: Transport) => {
+    if (transport.readyState === transportClosedState) return
+    await this.waitForClose(transport)
   }
 
   /**
-   * Force an immediate reconnect. Shared across concurrent callers so only one
-   * new WebSocket is created. Emits 'disconnected' to unblock in-flight sends,
-   * then creates the connection directly so a concurrent open() cannot tear it
-   * down. Unhandled creation errors are swallowed because cleanup already runs
-   * via the open/timeout paths.
-   *
-   * Past the deadline the promise resolves and `reopenPromise` is cleared even
-   * though the connection may still be down.
+   * The wait ends on this Transport's `onclose` rather than on the Socket's
+   * `close` event: a close emitted for the connection that replaced this one
+   * says nothing about the Transport being closed here.
    */
-  reopenNow = (): Promise<void> => {
-    if (this.reopenPromise) {
-      return this.reopenPromise
+  private waitForClose = (transport: Transport) => {
+    const socketOnClose = transport.onclose
+    let onTransportClose: (e: any) => void
+
+    const answerCloseOurselves = (latch: Latch<void>, reason: string) => {
+      // Null rather than restore: a transport close that lands after this
+      // would otherwise re-enter onClose and emit a second close for a
+      // connection the Socket is already letting go.
+      if (transport.onclose === onTransportClose) transport.onclose = null as any
+      this.onClose({ code: intentionalCloseCode, reason, wasClean: false }, transport)
+      latch.settle()
     }
 
-    this.reopenPromise = new Promise<void>(resolve => {
-      this.cancelScheduledReopen()
-      this.lastPing = 0
-      this.emit('disconnected')
+    return latchedByDeadline<void>(
+      socketDeadlineMs,
+      (latch) => answerCloseOurselves(latch, 'the transport did not answer the close'),
+      (latch) => {
+        onTransportClose = (e: any) => {
+          socketOnClose?.(e)
+          latch.settle()
+        }
+        transport.onclose = onTransportClose
 
-      let settled = false
-      const cleanup = () => {
-        if (settled) return
-        settled = true
-        this.off('open', cleanup)
-        if (timeout) clearTimeout(timeout as any)
-        delete this.reopenPromise
-        delete this.settleReopen
-        resolve()
+        if (!closeTransportIntentionally(transport, this.logger)) {
+          answerCloseOurselves(latch, 'the transport refused to close')
+        }
       }
-
-      this.settleReopen = cleanup
-      this.once('open', cleanup)
-
-      this.createConnection().catch(() => {})
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        this.reopen()
-      }, this.config.timeout)
-    })
-
-    return this.reopenPromise
+    )
   }
+
+  open = (): Promise<void> => this.connectionWork.open()
+
+  reopen = () => this.connectionWork.reopen()
+
+  reopenNow = (): Promise<void> => this.connectionWork.reopenNow()
+
+  close = (): Promise<void> => this.connectionWork.close()
 
   /**
    * Bounded liveness check for a socket in the gray zone. Returns true only if
    * the socket is open and the server answers the ping within the deadline.
    */
   probe = (deadlineMs = socketDeadlineMs): Promise<boolean> => {
-    return new Promise<boolean>(resolve => {
-      const connection = this.connection
-      if (!connection || connection.readyState !== socketOpen) {
-        return resolve(false)
-      }
+    const transport = this.connection
+    if (!this.transportOpen || !transport || this.connectionWork.closing) {
+      return Promise.resolve(false)
+    }
 
-      let settled = false
-      const cleanup = () => {
-        if (settled) return
-        settled = true
-        this.off('pong', onPong)
-        if (timeout) clearTimeout(timeout as any)
-      }
-
-      const onPong = () => {
-        cleanup()
-        resolve(true)
-      }
-
-      this.once('pong', onPong)
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        resolve(false)
-      }, deadlineMs)
-
-      try {
-        connection.send(JSON.stringify({ msg: 'ping' }))
-      } catch {
-        cleanup()
-        resolve(false)
-      }
-    })
+    return this.requests
+      .send({ msg: 'ping' }, transport.send.bind(transport), deadlineMs)
+      .then(() => true, () => false)
   }
 
   get transportOpen () {
-    return !!(this.connection && this.connection.readyState === socketOpen)
+    return !!(this.connection && this.connection.readyState === transportOpenState)
   }
 
   get connected () {
@@ -489,32 +338,30 @@ export class Socket extends SDKEventEmitter {
   /**
    * Wait for the socket to open, bounded by the reopen interval. Rejects on the
    * deadline so a send issued while the socket is down fails the caller rather
-   * than hanging for the life of the process.
+   * than hanging for the life of the process. Close ownership refuses the wait
+   * outright, because nothing will open while a close holds the Socket.
    *
-   * The default is twice `config.reopen`, not `config.reopen`: `reopen()` only
+   * The default is twice `config.reopen`, not `config.reopen`: a Reopen only
    * *schedules* the retry at that interval, so a deadline of exactly `reopen`
-   * expires as the reconnect begins and every send issued at a drop fails.
+   * expires as the reconnect begins, before the attempt it waits on can open.
    */
-  private waitForOpen = (deadlineMs = this.config.reopen * 2): Promise<void> => {
-    return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        this.off('open', onOpen)
-        clearTimeout(timeout as any)
+  private waitForOpen = (deadlineMs = this.config.reopen * 2): Promise<void> =>
+    latchedByDeadline<void>(
+      deadlineMs,
+      (latch) => latch.refuse(new Error('[ddp] timed out waiting for the connection to open')),
+      (latch) => {
+        const onOpen = () => latch.settle()
+        const refuse = (error: Error) => latch.refuse(error)
+
+        latch.undoOnSettle(() => {
+          this.off('open', onOpen)
+          this.waitsForOpen.delete(refuse)
+        })
+
+        this.once('open', onOpen)
+        this.waitsForOpen.add(refuse)
       }
-
-      const onOpen = () => {
-        cleanup()
-        resolve()
-      }
-
-      this.once('open', onOpen)
-
-      const timeout = setTimeout(() => {
-        cleanup()
-        reject(new Error('[ddp] timed out waiting for the connection to open'))
-      }, deadlineMs)
-    })
-  }
+    )
 
   /**
    * Send an object to the server via Socket. Adds handler to collection to
@@ -530,80 +377,28 @@ export class Socket extends SDKEventEmitter {
     // Outside the promise executor: a `throw` from an async executor is dropped
     // on the floor as an unhandled rejection instead of rejecting the send.
     if (!this.connection) throw new Error('[ddp] sending without open connection')
+    if (this.connectionWork.closing) throw AbandonedWait.responseClosed()
     // A message belongs to the connection that was current when it was sent. It
     // is never written to a successor: the DDP session, and any Login on it, is
     // the old connection's.
     const connection = this.connection
     if (!this.transportOpen) {
       await this.waitForOpen()
-      if (this.connection !== connection) throw new AbandonedWait(abandonedBySocketChange)
+      if (this.connection !== connection) throw AbandonedWait.connectionReplacedBeforeWrite()
+      if (this.connectionWork.closing) throw AbandonedWait.responseClosed()
       // The wait resolves a microtask before the listeners below are attached, so
       // a connection lost in that window would be missed by all three of them.
       // `readyState` rather than `connected`: in that window the events have not
       // been delivered, so only the transport knows whether the connection went away.
-      if (connection.readyState !== socketOpen) throw new AbandonedWait(abandonedByClose)
+      if (connection.readyState !== transportOpenState) throw AbandonedWait.responseClosed()
     }
 
-    return new Promise<any>((resolve, reject) => {
-      const id = obj.id || `ddp-${ this.sent }`
-      this.sent += 1
-      const data = { ...obj, ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) }
-      const stringdata = JSON.stringify(data)
-      const listener = (data.msg === 'ping' && 'pong') || (data.msg === 'connect' && 'connected') || data.id
-      this.logger.debug(`[ddp] sending message: ${stringdata}`)
-
-      try {
-        connection.send(stringdata)
-      } catch (err) {
-        this.logger.error(`[ddp] the transport failed to write the message: ${stringdata}`);
-        return reject(err)
-      }
-
-      // Before any listener is attached: a DDP message with no response to wait for —
-      // `pong` — would otherwise strand a `disconnected` listener forever.
-      if (!listener) {
-        return resolve(undefined)
-      }
-
-      // The DDP response can only arrive on the connection this message went out
-      // on, so every event that ends that connection ends this wait.
-      const abandonListeners = [
-        { event: 'disconnected', message: abandonedByReopen },
-        { event: 'connecting', message: abandonedByReopen },
-        { event: 'close', message: abandonedByClose }
-      ].map(({ event, message }) => ({
-        event,
-        onAbandon: () => {
-          removeListeners()
-          reject(new AbandonedRequest(id, message))
-        }
-      }))
-
-      let deadlineTimer: NodeJS.Timer | number | undefined
-
-      const removeListeners = () => {
-        clearTimeout(deadlineTimer as any)
-        this.off(listener, onResponse)
-        abandonListeners.forEach(({ event, onAbandon }) => this.off(event, onAbandon))
-      }
-
-      deadlineTimer = setTimeout(() => {
-        removeListeners()
-        reject(new ExpiredWait(id))
-      }, deadlineMs)
-
-      const onResponse = (result: any) => {
-        removeListeners()
-        return (result.error ? reject(toError(result.error)) : resolve({ ...(/connect|ping|pong/.test(obj.msg) ? {} : { id }) , ...result }))
-      }
-
-      abandonListeners.forEach(({ event, onAbandon }) => this.once(event, onAbandon))
-      this.once(listener, onResponse)
-    })
+    return this.requests.send(obj, connection.send.bind(connection), deadlineMs)
   }
 
-  private reopenAndKeepPinging = (err: unknown) => {
-    this.reopenUnlessAbandoned(err)
+  private recoverAndKeepPinging = (error: Error) => {
+    if (error instanceof AbandonedWait) return
+    this.reopen()
     if (this.connection) this.ping()
   }
 
@@ -613,7 +408,7 @@ export class Socket extends SDKEventEmitter {
     this.pingTimeout = setTimeout(() => {
       this.send({ msg: 'ping' }, this.config.ping)
         .then(() => this.ping())
-        .catch(this.reopenAndKeepPinging)
+        .catch(this.recoverAndKeepPinging)
     }, this.config.ping)
   }
 
@@ -678,11 +473,14 @@ export class Socket extends SDKEventEmitter {
     return params
   }
 
-  /** Logout the current User from the server via Socket. */
   logout = () => {
+    if (this.connectionWork.closing) return Promise.reject(AbandonedWait.responseClosed())
+    if (this.connectionWork.offline && this.connectionWork.closesTaken) {
+      return Promise.reject(AbandonedWait.responseClosed())
+    }
     this.resume = null
-    return this.unsubscribeAll()
-			.then(() => this.call('logout'))
+    if (this.connectionWork.offline) return this.unsubscribeAll()
+    return this.unsubscribeAll().then(() => this.call('logout'))
   }
 
   /** Register a callback to trigger on message events in subscription */
@@ -690,193 +488,18 @@ export class Socket extends SDKEventEmitter {
     this.on(id, callback)
   }
 
-  /**
-   * Hold a `sub` or `unsub` until the one before it on the same id has its DDP
-   * response.
-   *
-   * A `sub` and an `unsub` for one DDP subscription carry the same id, and
-   * `send` matches a DDP response to its request by id alone, so two of them in
-   * flight at once leave the first response settling both — the `nosub` that
-   * ends the DDP subscription also settles the `sub`, and the `ready` that
-   * establishes it also settles the `unsub`. The server takes one message from
-   * a session at a time and answers in that order, so waiting for the response
-   * is enough to keep one request per id on the wire.
-   *
-   * The wait is bounded by the request before it, which each send bounds in
-   * turn with its own deadline, so a chain always drains.
-   */
-  private queueSubscriptionRequest = <T>(id: string, request: () => Promise<T>): Promise<T> => {
-    // The tail is registered here rather than when the frame goes out, so a
-    // third request queues behind the second rather than behind the first.
-    const waiting = this.subscriptionRequests[id]
-    const sending = waiting ? waiting.then(request) : request()
-    const settled = sending.then(() => undefined, () => undefined)
+  subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback) =>
+    this.ddpSubscriptions.subscribe(name, params, callback)
 
-    this.subscriptionRequests[id] = settled
-    settled.then(() => {
-      if (this.subscriptionRequests[id] === settled) delete this.subscriptionRequests[id]
-    })
+  findSubscriptions = (stream: IStream): RecordedDDPSubscription[] =>
+    this.ddpSubscriptions.findSubscriptions(stream)
 
-    return sending
-  }
+  resubscribeWhenRecorded = (streams: IStream[], timeoutMs?: number): Promise<boolean> =>
+    this.ddpSubscriptions.resubscribeWhenRecorded(streams, timeoutMs)
 
-  /**
-   * Subscribe to a stream on server via socket and returns a promise resolved
-   * with the subscription object when the subscription is ready.
-   *
-   * Sole owner of `subscriptions`: the entry is written when the server
-   * acknowledged the `sub`, or when its answer was abandoned after the frame went
-   * out on a connection that is still installed. A refused `sub`, one that never
-   * reached the wire, and one whose connection is gone leave nothing behind, and
-   * a resubscribe under an existing id that the server refuses forgets that
-   * entry. A second call for a stream already recorded shares that record and
-   * sends nothing. The caller is handed a subscription exactly when an entry
-   * was written, so every recorded stream can be unsubscribed from.
-   * See ADR-0004, ADR-0006, ADR-0011 and ADR-0012.
-   * @param name      Stream name to subscribe to
-   * @param params    Params sent to the subscription request
-   */
-  subscribe = (name: string, params: any[], callback ?: ISocketMessageCallback) => {
-    this.logger.info(`[ddp] Subscribe to ${name}, param: ${JSON.stringify(params)}`)
-    const id = subscriptionId(name, params)
-    return this.queueSubscriptionRequest(id, () => {
-      const shared = this.subscriptions[id]
-      if (!shared) return this.sendSubscription({ id, name, params }, callback)
-      if (callback) shared.onEvent(callback)
-      return Promise.resolve(shared)
-    })
-  }
+  subscribeAll = () => this.ddpSubscriptions.subscribeAll()
 
-  private resubscribe = (sub: RecordedDDPSubscription) =>
-    this.queueSubscriptionRequest(sub.id, () => this.sendSubscription(sub))
+  unsubscribe = (id: any) => this.ddpSubscriptions.unsubscribe(id)
 
-  private sendSubscription = (
-    stream: IDDPSubscriptionRequest,
-    callback?: ISocketMessageCallback
-  ) => this.send({ msg: 'sub', ...stream })
-    .then((result) => {
-      if (result.subs?.length) return this.rememberSubscription(stream, callback)
-    })
-    .catch((err) => {
-      this.logger.error(`[ddp] Subscribe error: ${err.message}`)
-      if (err instanceof AbandonedRequest || err instanceof ExpiredWait) {
-        return this.rememberSubscription(stream, callback)
-      }
-      if (err instanceof DDPError) this.forgetSubscription(stream.id)
-      return undefined
-    })
-
-  /**
-   * Write the entry that instructs `subscribeAll` to establish this stream.
-   * A stream only belongs to an installed connection, so with none there is
-   * nothing for a later login to re-establish. A close forgets these entries
-   * locally and sends no `unsub`: closing the connection ends the streams on
-   * the server.
-   */
-  private rememberSubscription = (
-    { id, name, params }: IDDPSubscriptionRequest,
-    callback?: ISocketMessageCallback
-  ) => {
-    if (!this.connection) return
-    const unsubscribe = this.unsubscribe.bind(this, id)
-    const onEvent = this.onEvent.bind(this, name)
-    const subscription = { id, name, params, unsubscribe, onEvent }
-    if (callback) subscription.onEvent(callback)
-    this.subscriptions[id] = subscription
-    return subscription
-  }
-
-  /**
-   * The DDP subscriptions on this Socket for one stream name, matched on a
-   * prefix of the params given.
-   */
-  findSubscriptions = ({ name, params = [] }: IStream): RecordedDDPSubscription[] =>
-    Object.keys(this.subscriptions || {})
-      .map((id) => this.subscriptions[id])
-      .filter((sub) => (
-        sub &&
-        sub.name === name &&
-        params.every((param, index) => sub.params?.[index] === param)
-      ))
-
-  /**
-   * Re-send the given streams on the current connection under the ids they were
-   * first sent with, and resolve on whether the server acked every one of them.
-   *
-   * Nothing goes out until every stream asked for is recorded here, so the
-   * deadline expiring first resolves false.
-   */
-  resubscribeWhenRecorded = (
-    streams: IStream[],
-    timeoutMs = this.config.timeout
-  ): Promise<boolean> => {
-    const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
-    const resubscribeAll = (subs: RecordedDDPSubscription[]) => Promise.all(
-      subs.map((sub) => this.resubscribe(sub))
-    )
-      .then((results) => {
-        const unacknowledged = subs.filter((_, index) => !results[index])
-        unacknowledged.forEach((sub) => this.logger.error(
-          `[ddp] Subscribe not acknowledged: ${sub.params?.[0]}`
-        ))
-        return unacknowledged.length === 0
-      })
-      .catch(() => false)
-
-    return new Promise<boolean>((resolve) => {
-      let settled = false
-      let inFlight = false
-      const finish = (value: boolean) => {
-        if (settled) return
-        settled = true
-        clearInterval(poll)
-        clearTimeout(deadline)
-        resolve(value)
-      }
-      const attempt = () => {
-        if (inFlight) return
-        const perStream = recordedPerStream()
-        if (!perStream.every((subs) => subs.length > 0)) return
-        inFlight = true
-        const recorded = perStream.reduce((all, subs) => all.concat(subs), [] as RecordedDDPSubscription[])
-        resubscribeAll(recorded).then((value) => {
-          inFlight = false
-          finish(value)
-        })
-      }
-      const deadline = setTimeout(() => finish(false), timeoutMs)
-      const poll = setInterval(attempt, 100)
-      attempt()
-    })
-  }
-
-  /** Subscribe to all pre-configured streams (e.g. on login resume) */
-  subscribeAll = () => {
-    const subscriptions = Object.keys(this.subscriptions || {})
-      .map((key) => this.resubscribe(this.subscriptions[key]))
-    return Promise.all(subscriptions)
-  }
-
-  /** Unsubscribe to server stream, resolve with unsubscribe request result */
-  unsubscribe = (id: any) => {
-    if (!this.subscriptions[id]) return Promise.reject(new Error(`[ddp] No subscription to unsubscribe from: ${id}`))
-    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
-      .then((data: any) => {
-        this.forgetSubscription(id)
-        return data.result || data.subs
-      })
-      .catch((err) => {
-        if (err instanceof DDPError) this.forgetSubscription(id)
-        this.logger.error(`[ddp] Unsubscribe error: ${err.message}`)
-        throw err
-      })
-  }
-
-  /** Unsubscribe from all active subscriptions, ignoring any the server refuses */
-  unsubscribeAll = () => {
-    const unsubAll = Object.keys(this.subscriptions).map((id) => {
-      return this.subscriptions[id].unsubscribe().catch(() => undefined)
-    })
-    return Promise.all(unsubAll).then(() => undefined)
-  }
+  unsubscribeAll = () => this.ddpSubscriptions.unsubscribeAll()
 }

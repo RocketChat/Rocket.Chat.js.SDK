@@ -10,12 +10,13 @@ ADR-0004 left one question open: whether a `sub` may be sent for an id whose
 `unsub` is still in flight, and what the server does when it is. Both halves are
 answered here.
 
-`unsubscribe` keeps its entry until the DDP response arrives. `subscribeAll`
-re-sends every entry under its own id, and `login` calls `subscribeAll`. A
-Login during that window therefore sends a `sub` carrying the id of a DDP
-subscription that is still being unsubscribed. The reverse pairing is reachable
-too: `resubscribe` re-sends an existing entry under its own id, and
-`unsubscribe` can be called while that `sub` waits for its `ready`.
+An `unsubscribe` that writes an `unsub` keeps its entry until the DDP response
+arrives. `subscribeAll` re-sends every entry under its own id, and `login` calls
+`subscribeAll`. A Login during that window therefore sends a `sub` carrying the
+id of a DDP subscription that is still being unsubscribed. The reverse pairing
+is reachable too: `resubscribe` re-sends an existing entry under its own id, and
+`unsubscribe` can be called while that `sub` waits for its `ready`. Both
+pairings are between DDP messages on the wire, and this ADR orders nothing else.
 
 `send` matches a DDP response to its request by id alone. It registers one
 listener under the id and settles on the first message that carries it, without
@@ -52,7 +53,7 @@ return that would otherwise drop it in silence, and is answered with its own
 One `sub` or `unsub` is in flight per DDP subscription id. A second waits for
 the first to have its DDP response before its own frame is written.
 
-- The wait is `queueSubscriptionRequest` on `Socket`, and `subscribe` and
+- The wait is `queueSubscriptionRequest` on `DDPSubscriptions`, and `subscribe` and
   `unsubscribe` are its only callers. It holds one promise per id.
 - Every subscription request has an id and queues under it. The id of a `sub` is
   derived from the stream (ADR-0011), so a first-time `subscribe` knows its id
@@ -65,7 +66,7 @@ the first to have its DDP response before its own frame is written.
   with ADR-0004.
 - Nothing here bounds the wait but the request before it. The chain adds no
   Deadline and no bookkeeping about the connection of its own: a subscription
-  request is a send, so it carries the Deadline ADR-0003 gives every send, and a
+  request is a send, so it carries the Deadline ADR-0014 gives every send, and a
   send cannot outlive the connection it was issued on. Every request settles, and
   a chain always drains.
 - A request registers itself when it is queued, not when its frame is written. A
@@ -83,8 +84,11 @@ the first to have its DDP response before its own frame is written.
   rather than resolving it.
 - Two `sub`s for one stream carry one id and serialise on this rule, and the
   second finds the record the first wrote and shares it rather than sending
-  (ADR-0011). Two `unsub`s under one id serialise on the same rule. Neither was
-  known to lose data, but both left a second response with no listener.
+  (ADR-0011). Two `unsub`s that both reach the wire under one id serialise on the
+  same rule. Neither was known to lose data, but both left a second response with
+  no listener. Where the first `unsubscribe` had no attached Transport it has
+  already forgotten the entry, so the second finds no DDP subscription to end and
+  rejects rather than queueing behind anything.
 - A Login that runs while an `unsub` is in flight re-establishes that stream
   after the server has ended it, rather than racing it. The end state is the one
   the entry describes.
@@ -101,6 +105,7 @@ the first to have its DDP response before its own frame is written.
   the order of requests and nothing else. `subscribeAll` re-establishes the DDP
   subscriptions after a Login, and that stays the one path that re-sends.
 - No single place on `Socket` owns what happens to work in flight when the
-  connection changes. That knowledge is in the abandon listeners of `send`, in
-  `waitForOpen`, and in `reopenUnlessAbandoned`. This ADR removes one of the
-  places that held a piece of it.
+  connection changes. This ADR removed one of the places that held a piece of
+  it, and ADR-0014 gathered the rest: `DDPRequests.abandonAll` ends every
+  written wait on the ownership change, and `recoverAndKeepPinging` decides
+  which failures still ask for a Reopen.
