@@ -27,9 +27,7 @@ export interface IStream {
 export interface IDriver {
   logger: ILogger
   config: ISocketOptions
-  messages: ISubscription | undefined
   userId: string
-  joinedIds: string[]
   connect (): Promise<IDriver>
   connected: boolean
   disconnect (): Promise<void>
