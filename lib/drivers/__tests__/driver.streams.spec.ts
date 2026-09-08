@@ -246,6 +246,37 @@ describe('Driver.onMessage', () => {
 
     expect(received).toHaveBeenCalledWith({ _id: 'message-id', ts: new Date(ts) })
   })
+
+  it('drops a room-message frame without fields.args instead of throwing', () => {
+    const received = jest.fn()
+    const error = jest.spyOn(driver.logger, 'error')
+    driver.onMessage(received)
+
+    expect(() => {
+      transport.receive({
+        msg: 'changed',
+        collection: 'stream-room-messages',
+        fields: {}
+      })
+    }).not.toThrow()
+
+    expect(received).not.toHaveBeenCalled()
+    expect(error).toHaveBeenCalledWith('[driver] dropping stream-room-messages frame without fields.args')
+  })
+
+  it('drops a room-message frame with no fields instead of throwing', () => {
+    const received = jest.fn()
+    driver.onMessage(received)
+
+    expect(() => {
+      transport.receive({
+        msg: 'changed',
+        collection: 'stream-room-messages'
+      })
+    }).not.toThrow()
+
+    expect(received).not.toHaveBeenCalled()
+  })
 })
 
 describe('Driver.onTyping', () => {
@@ -263,6 +294,23 @@ describe('Driver.onTyping', () => {
     })
 
     expect(received).toHaveBeenCalledWith('username', true)
+  })
+
+  it('drops a typing frame without fields.args instead of throwing', () => {
+    const received = jest.fn()
+    const error = jest.spyOn(driver.logger, 'error')
+    driver.onTyping(received)
+
+    expect(() => {
+      transport.receive({
+        msg: 'changed',
+        collection: 'stream-notify-room',
+        fields: {}
+      })
+    }).not.toThrow()
+
+    expect(received).not.toHaveBeenCalled()
+    expect(error).toHaveBeenCalledWith('[driver] dropping stream-notify-room frame without fields.args')
   })
 })
 

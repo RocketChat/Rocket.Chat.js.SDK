@@ -209,12 +209,24 @@ export class Driver extends SDKEventEmitter implements IDriver {
   }
 
   onMessage = (cb: ICallback): void => {
-    this.socket.on('stream-room-messages', ({ fields: { args: [message] } }: any) => cb(this.ejsonMessage(message)))
+    this.socket.on('stream-room-messages', (payload: any) => {
+      const args = payload?.fields?.args
+      if (!Array.isArray(args) || args.length === 0) {
+        this.logger.error('[driver] dropping stream-room-messages frame without fields.args')
+        return
+      }
+      cb(this.ejsonMessage(args[0]))
+    })
   }
 
   onTyping = (cb: ICallback): EventEmitter => {
-    return this.socket.on('stream-notify-room', ({ fields: { args: [username, isTyping] } }: any) => {
-      cb(username, isTyping)
+    return this.socket.on('stream-notify-room', (payload: any) => {
+      const args = payload?.fields?.args
+      if (!Array.isArray(args) || args.length < 2) {
+        this.logger.error('[driver] dropping stream-notify-room frame without fields.args')
+        return
+      }
+      cb(args[0], args[1])
     })
   }
 
