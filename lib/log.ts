@@ -1,6 +1,6 @@
 /**
  * @module log
- * Basic log handling with ability to override when used within another module.
+ * Default silent logger. Callers inject a logger per instance instead.
  */
 
 import { ILogger } from '../interfaces'
@@ -15,14 +15,4 @@ const noopLogger: ILogger = {
 
 export const isLoggerSilent = (candidate: ILogger) => candidate === noopLogger
 
-export let logger: ILogger = noopLogger
-
-/** Substitute logging handler */
-export function replaceLog (externalLog: ILogger) {
-  logger = externalLog
-}
-
-/** Null all log outputs */
-export function silence () {
-  replaceLog(noopLogger)
-}
+export const logger: ILogger = noopLogger
