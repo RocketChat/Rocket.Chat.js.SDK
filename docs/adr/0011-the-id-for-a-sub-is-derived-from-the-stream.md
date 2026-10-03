@@ -68,6 +68,15 @@ the caller is handed the record that is already there.
   mounts the same stream twice concurrently — a `navigate('RoomView')` that
   bypasses the guard against re-entering the room already open. The contract is
   what covers it.
+- **Ending the stream ends its callbacks.** The record lists every callback
+  registered on it, and a re-established record inherits the list rather than
+  registering again. Whichever path removes the record — a response to `unsub`,
+  a DDP error, an Offline sub's `unsubscribe`, a refused resubscribe or a
+  Close — detaches the callbacks it listed, for every holder. A rejection the
+  SDK originates keeps the record, so it keeps its callbacks. Delivery stays
+  name-keyed, so a function listed by two records on one name stays attached
+  until the last of them goes. A listener put on the Socket by any other route,
+  `onStreamData` included, is not the record's and stays.
 - **Three keys mean "the same stream", and they do not agree.** They are
   deliberately different and each is load-bearing:
   1. the derived id — exact, by value, over `name` and every param;

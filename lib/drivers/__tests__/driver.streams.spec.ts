@@ -193,6 +193,26 @@ describe('Driver.onStreamData', () => {
     expect(stopped).not.toHaveBeenCalled()
     expect(kept).toHaveBeenCalledTimes(1)
   })
+
+  it('keeps receiving after a subscription on the same stream is unsubscribed', async () => {
+
+    const subscribed = jest.fn()
+    const received = jest.fn()
+    const subscribing = driver['socket'].subscribe('stream-room-messages', ['room-id'], subscribed)
+    const { id } = transport.lastSent() as { id: string }
+    transport.receive({ msg: 'ready', subs: [id] })
+    const subscription = await subscribing
+    await driver.onStreamData('stream-room-messages', received)
+
+    const unsubscribing = driver.unsubscribe(subscription!)
+    await flushMicrotasks()
+    transport.receive({ msg: 'nosub', id })
+    await unsubscribing
+    transport.receive({ msg: 'changed', collection: 'stream-room-messages', fields: { args: ['after'] } })
+
+    expect(subscribed).not.toHaveBeenCalled()
+    expect(received).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('Driver.removeAllListeners', () => {
