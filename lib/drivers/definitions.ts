@@ -17,6 +17,7 @@ export interface IDDPSubscriptionRequest {
 
 export type RecordedDDPSubscription = ISubscription & IDDPSubscriptionRequest & {
   onEvent: (callback: ISocketMessageCallback) => void
+  callbacks: ISocketMessageCallback[]
 }
 
 export interface IStream {

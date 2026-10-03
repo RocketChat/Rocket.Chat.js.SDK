@@ -16,6 +16,7 @@ interface DDPSubscriptionsOptions {
   getLogger: () => ILogger
   send: (message: any) => Promise<any>
   onEvent: (name: string, listener: ISocketMessageCallback) => void
+  offEvent: (name: string, listener: ISocketMessageCallback) => void
   getCloseGeneration: () => number
   isOffline: () => boolean
   deadlineMs: number
@@ -26,25 +27,36 @@ export class DDPSubscriptions {
   private getLogger: () => ILogger
   private send: (message: any) => Promise<any>
   private onEvent: (name: string, listener: ISocketMessageCallback) => void
+  private offEvent: (name: string, listener: ISocketMessageCallback) => void
   private getCloseGeneration: () => number
   private isOffline: () => boolean
   private deadlineMs: number
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
 
   constructor (
-    { getLogger, send, onEvent, getCloseGeneration, isOffline, deadlineMs }: DDPSubscriptionsOptions
+    { getLogger, send, onEvent, offEvent, getCloseGeneration, isOffline, deadlineMs }: DDPSubscriptionsOptions
   ) {
     this.getLogger = getLogger
     this.send = send
     this.onEvent = onEvent
+    this.offEvent = offEvent
     this.getCloseGeneration = getCloseGeneration
     this.isOffline = isOffline
     this.deadlineMs = deadlineMs
   }
 
   private forgetSubscription = (id: string) => {
+    const subscription = this.records[id]
     delete this.records[id]
+    if (!subscription) return
+    subscription.callbacks
+      .splice(0)
+      .filter((callback) => !this.isHeld(subscription.name, callback))
+      .forEach((callback) => this.offEvent(subscription.name, callback))
   }
+
+  private isHeld = (name: string, callback: ISocketMessageCallback) =>
+    Object.values(this.records).some((held) => held.name === name && held.callbacks.includes(callback))
 
   forgetAllSubscriptions = () => {
     Object.keys(this.records).forEach((id) => this.forgetSubscription(id))
@@ -168,7 +180,8 @@ export class DDPSubscriptions {
       return Promise.resolve(recorded || this.writeSubscription(stream, callback))
     }
     const closesBefore = this.getCloseGeneration()
-    return this.send({ msg: 'sub', ...stream })
+    const { id, name, params } = stream
+    return this.send({ msg: 'sub', id, name, params })
       .then((response) => {
         if (response.subs?.length) return this.rememberSubscription(stream, closesBefore, callback)
       })
@@ -195,11 +208,16 @@ export class DDPSubscriptions {
     { id, name, params }: IDDPSubscriptionRequest,
     callback?: ISocketMessageCallback
   ) => {
+    const callbacks = this.records[id]?.callbacks ?? []
     const unsubscribe = this.unsubscribe.bind(this, id)
-    const onEvent = (listener: ISocketMessageCallback) => this.onEvent(name, listener)
-    const subscription = { id, name, params, unsubscribe, onEvent }
-    if (callback) subscription.onEvent(callback)
+    const onEvent = (listener: ISocketMessageCallback) => {
+      if (this.records[id]?.callbacks !== callbacks) return
+      if (!callbacks.includes(listener)) callbacks.push(listener)
+      this.onEvent(name, listener)
+    }
+    const subscription = { id, name, params, unsubscribe, onEvent, callbacks }
     this.records[id] = subscription
+    if (callback) onEvent(callback)
     return subscription
   }
 }
