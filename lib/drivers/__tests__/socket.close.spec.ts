@@ -1,5 +1,5 @@
 import { Socket } from '../socket'
-import { createSocket, REOPEN_DELAY, socketOptions } from '../../../test/createSocket'
+import { createSocket, REOPEN_DELAY, TIMEOUT, socketOptions } from '../../../test/createSocket'
 import {
   CLOSED,
   CONNECTING,
@@ -414,6 +414,74 @@ describe('Socket close', () => {
 
       const rebuilt = await openFakeConnection(socket)
       expect(socket.connection).toBe(rebuilt)
+    })
+  })
+
+  /**
+   * A close on a connection that never opened: the transport is still
+   * CONNECTING, so the close has to ask it to close and settle the pending
+   * open, leaving no attempt deadline behind for a late signal to trip on.
+   */
+  describe('close on a connection that never opened', () => {
+    it('asks the connecting transport to close and settles on its close event', async () => {
+      const unopened = createSocket(socketOptions)
+      const constructed = fakeSockets.length
+      const opening = unopened.open()
+      const connecting = fakeSockets[constructed]
+      expect(connecting.readyState).toBe(CONNECTING)
+
+      const rejected = expect(opening).rejects.toThrow(CLOSED_BEFORE_OPEN)
+      const closing = unopened.close()
+      await jest.advanceTimersByTimeAsync(0)
+
+      expect(connecting.closedWith).toEqual([INTENTIONAL_CLOSE])
+      await closing
+      await rejected
+      expect(unopened.connection).toBeUndefined()
+      expect([connecting.onopen, connecting.onmessage, connecting.onerror, connecting.onclose])
+        .toEqual([null, null, null, null])
+    })
+
+    it('settles a close after the transport died before the handshake', async () => {
+      const unopened = createSocket(socketOptions)
+      const constructed = fakeSockets.length
+      const opening = unopened.open()
+      const connecting = fakeSockets[constructed]
+      expect(connecting.readyState).toBe(CONNECTING)
+
+      connecting.close(1006)
+      const rejected = expect(opening).rejects.toThrow()
+      await unopened.close()
+      await rejected
+
+      await jest.advanceTimersByTimeAsync(TIMEOUT + REOPEN_DELAY)
+      expect(fakeSockets).toHaveLength(constructed + 1)
+      expect(hasScheduledReopen(unopened)).toBe(false)
+      expect(connectionWork(unopened)).toBe('idle')
+    })
+
+    it('ignores a late open on a transport the close already answered for', async () => {
+      const unopened = createSocket(socketOptions)
+      const constructed = fakeSockets.length
+      const opening = unopened.open()
+      const connecting = fakeSockets[constructed]
+      connecting.answersClose = false
+      const opened = jest.fn()
+      unopened.on('open', opened)
+
+      const rejected = expect(opening).rejects.toThrow(CLOSED_BEFORE_OPEN)
+      const closing = unopened.close()
+      await jest.advanceTimersByTimeAsync(CLOSE_DEADLINE)
+      await closing
+      await rejected
+
+      connecting.onopen?.({})
+      await jest.advanceTimersByTimeAsync(TIMEOUT)
+
+      expect(opened).not.toHaveBeenCalled()
+      expect(connecting.sent).toEqual([])
+      expect(fakeSockets).toHaveLength(constructed + 1)
+      expect(connectionWork(unopened)).toBe('idle')
     })
   })
 })
