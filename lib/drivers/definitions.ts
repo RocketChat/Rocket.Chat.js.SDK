@@ -41,7 +41,7 @@ export interface IDriver {
   subscribeRaw (name: string, params: any[]): Promise<ISubscription | undefined>
   unsubscribe (subscription: ISubscription): Promise<any>
   unsubscribeAll (): Promise<void>
-  resubscribeWhenRecorded (streams: IStream[], timeoutMs?: number): Promise<boolean>
+  waitForStreamsReady (streams: IStream[], timeoutMs?: number): Promise<boolean>
   onStreamData (event: string, cb: ICallback): Promise<any>
   on (event: string, listener: Function): EventEmitter
   once (event: string, listener: Function): EventEmitter

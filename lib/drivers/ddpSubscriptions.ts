@@ -17,6 +17,7 @@ interface DDPSubscriptionsOptions {
   send: (message: any) => Promise<any>
   onEvent: (name: string, listener: ISocketMessageCallback) => void
   getCloseGeneration: () => number
+  getTransport: () => unknown
   isOffline: () => boolean
   deadlineMs: number
 }
@@ -27,23 +28,27 @@ export class DDPSubscriptions {
   private send: (message: any) => Promise<any>
   private onEvent: (name: string, listener: ISocketMessageCallback) => void
   private getCloseGeneration: () => number
+  private getTransport: () => unknown
   private isOffline: () => boolean
   private deadlineMs: number
   private subscriptionRequests: { [id: string]: Promise<void> } = {}
+  private readyOn: { [id: string]: unknown } = {}
 
   constructor (
-    { getLogger, send, onEvent, getCloseGeneration, isOffline, deadlineMs }: DDPSubscriptionsOptions
+    { getLogger, send, onEvent, getCloseGeneration, getTransport, isOffline, deadlineMs }: DDPSubscriptionsOptions
   ) {
     this.getLogger = getLogger
     this.send = send
     this.onEvent = onEvent
     this.getCloseGeneration = getCloseGeneration
+    this.getTransport = getTransport
     this.isOffline = isOffline
     this.deadlineMs = deadlineMs
   }
 
   private forgetSubscription = (id: string) => {
     delete this.records[id]
+    delete this.readyOn[id]
   }
 
   forgetAllSubscriptions = () => {
@@ -69,47 +74,31 @@ export class DDPSubscriptions {
         params.every((param, index) => subscription.params?.[index] === param)
       ))
 
-  resubscribeWhenRecorded = (
+  waitForStreamsReady = (
     streams: IStream[],
     timeoutMs = this.deadlineMs
   ): Promise<boolean> => {
-    const recordedPerStream = () => streams.map((stream) => this.findSubscriptions(stream))
-    const resubscribeAll = (subscriptions: RecordedDDPSubscription[]) => Promise.all(
-      subscriptions.map((subscription) => this.resubscribe(subscription))
-    )
-      .then((responses) => {
-        const unrecorded = subscriptions.filter((_, index) => !responses[index])
-        unrecorded.forEach((subscription) => this.getLogger().error(
-          `[ddp] Subscribe not recorded: ${subscription.params?.[0]}`
-        ))
-        return unrecorded.length === 0
-      })
-      .catch(() => false)
+    const readyOnAttachedTransport = (subscription: RecordedDDPSubscription) => {
+      const transport = this.getTransport()
+      return transport !== undefined && this.readyOn[subscription.id] === transport
+    }
+    const everyStreamReady = () => streams.every((stream) => {
+      const subscriptions = this.findSubscriptions(stream)
+      return subscriptions.length > 0 && subscriptions.every(readyOnAttachedTransport)
+    })
+
+    if (everyStreamReady()) return Promise.resolve(true)
 
     return new Promise<boolean>((resolve) => {
-      let settled = false
-      let inFlight = false
       const finish = (value: boolean) => {
-        if (settled) return
-        settled = true
         clearInterval(poll)
         clearTimeout(deadline)
         resolve(value)
       }
-      const attempt = () => {
-        if (inFlight || this.isOffline()) return
-        const subscriptionsPerStream = recordedPerStream()
-        if (!subscriptionsPerStream.every((subscriptions) => subscriptions.length > 0)) return
-        inFlight = true
-        const recorded = subscriptionsPerStream.flat()
-        resubscribeAll(recorded).then((value) => {
-          inFlight = false
-          finish(value)
-        })
-      }
       const deadline = setTimeout(() => finish(false), timeoutMs)
-      const poll = setInterval(attempt, 100)
-      attempt()
+      const poll = setInterval(() => {
+        if (everyStreamReady()) finish(true)
+      }, 100)
     })
   }
 
@@ -125,7 +114,10 @@ export class DDPSubscriptions {
       this.forgetSubscription(id)
       return Promise.resolve(undefined)
     }
-    return this.queueSubscriptionRequest(id, () => this.send({ msg: 'unsub', id }))
+    return this.queueSubscriptionRequest(id, () => {
+      delete this.readyOn[id]
+      return this.send({ msg: 'unsub', id })
+    })
       .then((response: any) => {
         this.forgetSubscription(id)
         return response.result || response.subs
@@ -168,9 +160,13 @@ export class DDPSubscriptions {
       return Promise.resolve(recorded || this.writeSubscription(stream, callback))
     }
     const closesBefore = this.getCloseGeneration()
+    const sentOn = this.getTransport()
     return this.send({ msg: 'sub', ...stream })
       .then((response) => {
-        if (response.subs?.length) return this.rememberSubscription(stream, closesBefore, callback)
+        if (!response.subs?.length) return
+        const recorded = this.rememberSubscription(stream, closesBefore, callback)
+        if (recorded && this.getTransport() === sentOn) this.readyOn[stream.id] = sentOn
+        return recorded
       })
       .catch((error) => {
         this.getLogger().error(`[ddp] Subscribe error: ${error.message}`)

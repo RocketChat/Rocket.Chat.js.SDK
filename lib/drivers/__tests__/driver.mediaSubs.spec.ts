@@ -87,12 +87,18 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     expect(transport.sent).toHaveLength(sentBefore)
   })
 
-  it('resolves ready after an immediate reopen, on the socket the reopen built', async () => {
+  it('resolves true at once, sending no sub, when both media subs were acked on the attached transport', async () => {
+    await addMediaSubs()
+    const sentBefore = transport.sent.length
+
+    await expect(driver.waitForNotifyUserMediaSubs()).resolves.toBe(true)
+
+    expect(transport.sent).toHaveLength(sentBefore)
+  })
+
+  it('after a reopen, waits for the resubscribe acked on the new transport and sends nothing itself', async () => {
     const { signalId, callsId } = await addMediaSubs()
 
-    // A real reopen: a second transport is constructed and handshaken, and the
-    // subscription map survives it — which is what makes the resubscribe below
-    // reuse the ids rather than mint new ones.
     const reopening = driver.reopenNow()
     const reopened = fakeSockets[fakeSockets.length - 1]
     expect(reopened).not.toBe(transport)
@@ -100,116 +106,47 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     await reopening
 
     const waiting = driver.waitForNotifyUserMediaSubs()
-    // The resubscribes go out on the new socket, not the dead one.
-    expect(reopened.sent.map((frame) => JSON.parse(frame).id))
-      .toEqual(expect.arrayContaining([signalId, callsId]))
+    let resolved: boolean | undefined
+    waiting.then((value) => { resolved = value })
+    await jest.advanceTimersByTimeAsync(1000)
+    expect(resolved).toBeUndefined()
+    expect(reopened.sent.filter((frame) => JSON.parse(frame).msg === 'sub')).toHaveLength(0)
+
+    const resubscribing = driver['socket'].subscribeAll()
     reopened.receive({ msg: 'ready', subs: [signalId] })
     reopened.receive({ msg: 'ready', subs: [callsId] })
+    await resubscribing
+    await jest.advanceTimersByTimeAsync(100)
 
     await expect(waiting).resolves.toBe(true)
   })
 
-  it('does not resubscribe again while a resubscribe is still in flight', async () => {
-    const { signalId, callsId } = await addMediaSubs()
-
-    const sentBefore = transport.sent.length
+  it('polls until both media subscriptions are acked', async () => {
     const waiting = driver.waitForNotifyUserMediaSubs()
     let resolved: boolean | undefined
     waiting.then((value) => { resolved = value }, () => { resolved = false })
 
-    // The server never acks, so the first attempt stays in flight across many
-    // poll ticks. Without the latch each tick would fire another pair of
-    // resubscribes — a storm the server would see as repeated sub requests.
-    await jest.advanceTimersByTimeAsync(1000)
-
-    expect(transport.sent).toHaveLength(sentBefore + 2)
-    expect(resolved).toBeUndefined()
-
-    // Left settled so the pending timers do not outlive the test.
-    transport.receive({ msg: 'ready', subs: [signalId] })
-    transport.receive({ msg: 'ready', subs: [callsId] })
-    await expect(waiting).resolves.toBe(true)
-  })
-
-  it('polls until both media subscriptions appear, then resubscribes on their own ids', async () => {
-    const waiting = driver.waitForNotifyUserMediaSubs()
-    let resolved: boolean | undefined
-    waiting.then((value) => { resolved = value }, () => { resolved = false })
-
-    // Nothing to find yet, and one poll interval passing changes nothing.
     await jest.advanceTimersByTimeAsync(100)
     expect(resolved).toBeUndefined()
 
-    // Half of what it waits for is not enough: the poll wants both.
-    const signalId = await addMediaSub('media-signal')
+    await addMediaSub('media-signal')
     await jest.advanceTimersByTimeAsync(100)
     expect(resolved).toBeUndefined()
 
-    const callsId = await addMediaSub('media-calls')
-    const sentBefore = transport.sent.length
+    await addMediaSub('media-calls')
     await jest.advanceTimersByTimeAsync(100)
-
-    // Both resubscribes go out on the existing ids, so the server treats them as
-    // the same subscriptions rather than minting new ones.
-    const resent = transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame))
-    expect(resent).toEqual([
-      { msg: 'sub', id: signalId, name: topic, params: [`${userId}/media-signal`] },
-      { msg: 'sub', id: callsId, name: topic, params: [`${userId}/media-calls`] }
-    ])
-
-    // Still pending until the server acks both: readiness is the ack, not the send.
-    expect(resolved).toBeUndefined()
-    transport.receive({ msg: 'ready', subs: [signalId] })
-    transport.receive({ msg: 'ready', subs: [callsId] })
 
     await expect(waiting).resolves.toBe(true)
-  })
-
-  it('resolves false when the server refuses both resubscribes', async () => {
-    const { signalId, callsId } = await addMediaSubs()
-
-    const waiting = driver.waitForNotifyUserMediaSubs()
-    transport.receive({ msg: 'nosub', id: signalId })
-    transport.receive({ msg: 'nosub', id: callsId })
-
-    await expect(waiting).resolves.toBe(false)
-  })
-
-  it('resolves false when only one of the two resubscribes is refused', async () => {
-    const { signalId, callsId } = await addMediaSubs()
-
-    const waiting = driver.waitForNotifyUserMediaSubs()
-    transport.receive({ msg: 'ready', subs: [signalId] })
-    transport.receive({ msg: 'nosub', id: callsId })
-
-    await expect(waiting).resolves.toBe(false)
-  })
-
-  it('resolves false when a resubscribe is acked without a subscription id', async () => {
-    const { signalId, callsId } = await addMediaSubs()
-
-    const waiting = driver.waitForNotifyUserMediaSubs()
-    // Answered, but carrying nothing to subscribe with: the stream is no more
-    // restored than it is by a refusal.
-    transport.receive({ msg: 'ready', id: signalId, subs: [] })
-    transport.receive({ msg: 'ready', subs: [callsId] })
-
-    await expect(waiting).resolves.toBe(false)
   })
 
   it('leaves the user\'s other streams on the same topic alone', async () => {
     await addSub([`${userId}/message`])
-    const { signalId, callsId } = await addMediaSubs()
-
+    await addMediaSubs()
     const sentBefore = transport.sent.length
-    const waiting = driver.waitForNotifyUserMediaSubs()
 
-    const resent = transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame).id)
-    expect(resent).toEqual([signalId, callsId])
+    await expect(driver.waitForNotifyUserMediaSubs()).resolves.toBe(true)
 
-    transport.receive({ msg: 'ready', subs: [signalId] })
-    transport.receive({ msg: 'ready', subs: [callsId] })
-    await expect(waiting).resolves.toBe(true)
+    expect(transport.sent).toHaveLength(sentBefore)
   })
 
   it('does not count another user\'s media streams as this user\'s', async () => {
@@ -225,23 +162,14 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     expect(transport.sent).toHaveLength(sentBefore)
   })
 
-  it('resubscribes every entry recorded for a media stream, and needs each acked', async () => {
-    const signalId = await addMediaSub('media-signal')
-    // A second entry the readiness poll finds for the same media stream: same
-    // event, different params, so a stream of its own. Every entry found is
-    // re-sent, and one refusal is enough.
-    const collectedSignalId = await addSub([`${userId}/media-signal`, false])
-    const callsId = await addMediaSub('media-calls')
+  it('needs every entry recorded for a media stream acked', async () => {
+    await addMediaSubs()
+    const unanswered = driver['socket'].subscribe(topic, [`${userId}/media-signal`, false])
+    await jest.advanceTimersByTimeAsync(driver['socket'].config.timeout)
+    await unanswered
 
-    const sentBefore = transport.sent.length
-    const waiting = driver.waitForNotifyUserMediaSubs()
-
-    const resent = transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame).id)
-    expect(resent).toEqual([signalId, collectedSignalId, callsId])
-
-    transport.receive({ msg: 'ready', subs: [signalId] })
-    transport.receive({ msg: 'nosub', id: collectedSignalId })
-    transport.receive({ msg: 'ready', subs: [callsId] })
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
 
     await expect(waiting).resolves.toBe(false)
   })
@@ -250,24 +178,17 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     const reopening = driver.reopenNow()
     const reopened = fakeSockets[fakeSockets.length - 1]
 
-    // The gate opens before the new connection is even handshaken: nothing to
-    // find yet, so it is the poll that has to carry it across the reopen.
     const waiting = driver.waitForNotifyUserMediaSubs()
 
     await driveToHandshake(reopened, 'reopened-session')
     await reopening
 
-    const { signalId, callsId } = await addMediaSubs(reopened)
-
+    await addMediaSubs(reopened)
     const sentBefore = reopened.sent.length
     await jest.advanceTimersByTimeAsync(100)
 
-    const resent = reopened.sent.slice(sentBefore).map((frame) => JSON.parse(frame).id)
-    expect(resent).toEqual([signalId, callsId])
-
-    reopened.receive({ msg: 'ready', subs: [signalId] })
-    reopened.receive({ msg: 'ready', subs: [callsId] })
     await expect(waiting).resolves.toBe(true)
+    expect(reopened.sent).toHaveLength(sentBefore)
   })
 
   it('takes its deadline from the configured timeout when given none', async () => {
@@ -300,20 +221,13 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
   })
 
   it('leaves no timer behind once it settles', async () => {
-    const { signalId, callsId } = await addMediaSubs()
-
-    // The socket's own ping timer is already pending and stays that way; only
-    // what the wait itself scheduled has to be gone by the end.
     const timersBefore = jest.getTimerCount()
 
     const waiting = driver.waitForNotifyUserMediaSubs()
-    // The first attempt runs synchronously, so both resubscribes are already out.
-    transport.receive({ msg: 'ready', subs: [signalId] })
-    transport.receive({ msg: 'ready', subs: [callsId] })
+    await addMediaSubs()
+    await jest.advanceTimersByTimeAsync(100)
     await expect(waiting).resolves.toBe(true)
 
-    // Both the poll interval and the deadline are cleared: a leaked interval
-    // would keep resubscribing for the life of the process.
     expect(jest.getTimerCount()).toBe(timersBefore)
   })
 })

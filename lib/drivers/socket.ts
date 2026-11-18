@@ -136,6 +136,7 @@ export class Socket extends SDKEventEmitter {
       send: (message) => this.send(message),
       onEvent: (name, listener) => this.onEvent(name, listener),
       getCloseGeneration: () => this.connectionWork.closesTaken,
+      getTransport: () => this.connection,
       isOffline: () => this.connectionWork.offline,
       deadlineMs: this.config.timeout
     })
@@ -494,8 +495,8 @@ export class Socket extends SDKEventEmitter {
   findSubscriptions = (stream: IStream): RecordedDDPSubscription[] =>
     this.ddpSubscriptions.findSubscriptions(stream)
 
-  resubscribeWhenRecorded = (streams: IStream[], timeoutMs?: number): Promise<boolean> =>
-    this.ddpSubscriptions.resubscribeWhenRecorded(streams, timeoutMs)
+  waitForStreamsReady = (streams: IStream[], timeoutMs?: number): Promise<boolean> =>
+    this.ddpSubscriptions.waitForStreamsReady(streams, timeoutMs)
 
   subscribeAll = () => this.ddpSubscriptions.subscribeAll()
 

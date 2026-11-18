@@ -1,6 +1,6 @@
 # ADR-0012: A handle is returned exactly when an entry is written
 
-**Status:** Accepted
+**Status:** Accepted, amended by ADR-0016 for the media-subscription wait
 
 **Succeeds:** ADR-0006
 
