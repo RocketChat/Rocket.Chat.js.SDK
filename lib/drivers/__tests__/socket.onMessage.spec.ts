@@ -74,17 +74,17 @@ describe('Socket.onMessage', () => {
     expect(received[0]).toStrictEqual({ id: 'call-id', result: undefined, error: payload.error })
   })
 
-  it('emits only the first subscription id of a ready frame', () => {
-    const payload = { msg: 'ready', subs: ['sub-id', 'ignored-sub-id'] }
-    const received: any[] = []
-    const ignored = jest.fn()
-    socket.on('sub-id', (data: any) => received.push(data))
-    socket.on('ignored-sub-id', ignored)
+  it('emits a ready frame under every subscription id it acks', () => {
+    const payload = { msg: 'ready', subs: ['first-sub-id', 'second-sub-id'] }
+    const first = jest.fn()
+    const second = jest.fn()
+    socket.on('first-sub-id', first)
+    socket.on('second-sub-id', second)
 
     socket.onMessage(frame(payload))
 
-    expect(received).toEqual([payload])
-    expect(ignored).not.toHaveBeenCalled()
+    expect(first).toHaveBeenCalledWith(payload)
+    expect(second).toHaveBeenCalledWith(payload)
   })
 
   it('logs and swallows a malformed frame instead of throwing', () => {

@@ -146,6 +146,21 @@ describe('Socket subscription bookkeeping', () => {
       expect(jest.getTimerCount()).toBe(timersBefore)
     })
 
+    it('counts every stream a single ready frame acks', async () => {
+      const signal = socket.subscribe('stream-notify-user', ['uid/media-signal'])
+      await flushMicrotasks()
+      const signalId = lastSubId(transport)
+      const calls = socket.subscribe('stream-notify-user', ['uid/media-calls'])
+      await flushMicrotasks()
+      const callsId = lastSubId(transport)
+
+      transport.receive({ msg: 'ready', subs: [signalId, callsId] })
+
+      await expect(signal).resolves.toMatchObject({ id: signalId })
+      await expect(calls).resolves.toMatchObject({ id: callsId })
+      await expect(socket.waitForStreamsReady(streams, 0)).resolves.toBe(true)
+    })
+
     it('waits until the last stream is acked, sending nothing itself', async () => {
       await subscribe('stream-notify-user', ['uid/media-signal'])
       const waiting = socket.waitForStreamsReady(streams)
