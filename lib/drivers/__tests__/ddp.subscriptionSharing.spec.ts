@@ -115,26 +115,23 @@ describe('Socket subscription sharing', () => {
     await resubscribing
   })
 
-  it('re-sends a recorded stream on resubscribeWhenRecorded rather than sharing it', async () => {
+  it('sends no sub frame for a recorded stream on waitForStreamsReady', async () => {
     await subscribe('stream-notify-user', ['uid/media-signal'])
 
     const framesBefore = subFrames(transport.sent).length
-    const waiting = socket.resubscribeWhenRecorded([
+    const waiting = socket.waitForStreamsReady([
       { name: 'stream-notify-user', params: ['uid/media-signal'] }
     ])
-    await flushMicrotasks()
 
-    expect(subFrames(transport.sent)).toHaveLength(framesBefore + 1)
-
-    transport.receive({ msg: 'ready', subs: [lastSubId(transport)] })
     await expect(waiting).resolves.toBe(true)
+    expect(subFrames(transport.sent)).toHaveLength(framesBefore)
   })
 
   it('resolves false while a user subscribe for the same stream is still unanswered', async () => {
     socket.subscribe('stream-notify-user', ['uid/media-signal'])
     const id = lastSubId(transport)
 
-    const waiting = socket.resubscribeWhenRecorded([
+    const waiting = socket.waitForStreamsReady([
       { name: 'stream-notify-user', params: ['uid/media-signal'] }
     ], 500)
 
@@ -146,12 +143,12 @@ describe('Socket subscription sharing', () => {
     transport.receive({ msg: 'ready', subs: [id] })
   })
 
-  it('resolves false when another request on the same id holds the queue past its deadline', async () => {
+  it('resolves false while an unsubscribe for the stream is in flight', async () => {
     const subscription = await subscribe('stream-notify-user', ['uid/media-signal'])
     subscription!.unsubscribe()
     const framesBefore = subFrames(transport.sent).length
 
-    const waiting = socket.resubscribeWhenRecorded([
+    const waiting = socket.waitForStreamsReady([
       { name: 'stream-notify-user', params: ['uid/media-signal'] }
     ], 500)
 
