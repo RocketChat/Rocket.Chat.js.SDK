@@ -44,13 +44,11 @@ export class DDPSubscriptions {
     this.getTransport = getTransport
     this.isOffline = isOffline
     this.deadlineMs = deadlineMs
-    this.onEvent('ready', this.markRecordedReady)
+    this.onEvent('ready', this.markReady)
   }
 
-  private markRecordedReady = ({ subs = [] }: { subs?: string[] }) => {
-    subs
-      .filter((id) => this.records[id])
-      .forEach((id) => { this.readyOn[id] = this.getTransport() })
+  private markReady = ({ subs = [] }: { subs?: string[] }) => {
+    subs.forEach((id) => { this.readyOn[id] = this.getTransport() })
   }
 
   private forgetSubscription = (id: string) => {
@@ -60,6 +58,7 @@ export class DDPSubscriptions {
 
   forgetAllSubscriptions = () => {
     Object.keys(this.records).forEach((id) => this.forgetSubscription(id))
+    this.readyOn = {}
   }
 
   subscribe = (name: string, params: any[], callback?: ISocketMessageCallback) => {
@@ -167,13 +166,9 @@ export class DDPSubscriptions {
       return Promise.resolve(recorded || this.writeSubscription(stream, callback))
     }
     const closesBefore = this.getCloseGeneration()
-    const sentOn = this.getTransport()
     return this.send({ msg: 'sub', ...stream })
       .then((response) => {
-        if (!response.subs?.length) return
-        const recorded = this.rememberSubscription(stream, closesBefore, callback)
-        if (recorded && this.getTransport() === sentOn) this.readyOn[stream.id] = sentOn
-        return recorded
+        if (response.subs?.length) return this.rememberSubscription(stream, closesBefore, callback)
       })
       .catch((error) => {
         this.getLogger().error(`[ddp] Subscribe error: ${error.message}`)
