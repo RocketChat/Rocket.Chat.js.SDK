@@ -174,6 +174,20 @@ describe('Driver.waitForNotifyUserMediaSubs', () => {
     await expect(waiting).resolves.toBe(false)
   })
 
+  it('counts a ready that lands on the attached transport after its sub ran out its deadline', async () => {
+    await addMediaSub('media-calls')
+    const expiring = driver['socket'].subscribe(topic, [`${userId}/media-signal`])
+    const { id: signalId } = transport.lastSent() as { id: string }
+    await jest.advanceTimersByTimeAsync(driver['socket'].config.timeout)
+    await expiring
+
+    transport.receive({ msg: 'ready', subs: [signalId] })
+
+    const waiting = driver.waitForNotifyUserMediaSubs(500)
+    await jest.advanceTimersByTimeAsync(500)
+    await expect(waiting).resolves.toBe(true)
+  })
+
   it('resolves ready when the streams only land on the socket a reopen is still building', async () => {
     const reopening = driver.reopenNow()
     const reopened = fakeSockets[fakeSockets.length - 1]

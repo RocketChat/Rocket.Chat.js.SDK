@@ -34,7 +34,11 @@ attached Transport. It resolves `false` on its Deadline.
 
 - Only a `ready` with a subscription id counts, and only if the Transport that
   carried the `sub` is still attached when it lands. An entry kept from an
-  abandoned or expired `sub`, or written as an Offline sub, is not ready.
+  abandoned `sub`, or written as an Offline sub, is not ready.
+- An entry kept from an expired `sub` becomes ready if its `ready` lands later
+  on the attached Transport. The server answered on this connection, so the
+  stream is active, and nothing else would send that `sub` again before the
+  next reopen.
 - Forgetting an entry forgets its readiness, and an `unsub` clears it as it goes
   out.
 - A reopen does not move readiness to the new Transport. After a reopen,

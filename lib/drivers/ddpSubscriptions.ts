@@ -44,6 +44,13 @@ export class DDPSubscriptions {
     this.getTransport = getTransport
     this.isOffline = isOffline
     this.deadlineMs = deadlineMs
+    this.onEvent('ready', this.markRecordedReady)
+  }
+
+  private markRecordedReady = ({ subs = [] }: { subs?: string[] }) => {
+    subs
+      .filter((id) => this.records[id])
+      .forEach((id) => { this.readyOn[id] = this.getTransport() })
   }
 
   private forgetSubscription = (id: string) => {
