@@ -1,6 +1,6 @@
 # ADR-0006: A `sub` abandoned by a forced reconnect keeps its entry
 
-**Status:** Accepted
+**Status:** Accepted, amended by ADR-0016 for the media-subscription wait
 
 **Succeeds:** ADR-0005
 

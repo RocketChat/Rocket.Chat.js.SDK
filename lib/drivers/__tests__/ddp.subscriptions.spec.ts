@@ -128,40 +128,58 @@ describe('Socket subscription bookkeeping', () => {
     })
   })
 
-  describe('resubscribing once the streams asked for are present', () => {
+  describe('waiting for streams to be ready on the attached Transport', () => {
     const streams = [
       { name: 'stream-notify-user', params: ['uid/media-signal'] },
       { name: 'stream-notify-user', params: ['uid/media-calls'] }
     ]
 
-    it('waits for every stream, re-sends each under its own id, and resolves only on the server acks', async () => {
-      const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
+    it('resolves true at once, sending nothing, when every stream was acked on the attached Transport', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal'])
+      await subscribe('stream-notify-user', ['uid/media-calls'])
+      const sentBefore = transport.sent.length
+      const timersBefore = jest.getTimerCount()
 
-      const waiting = socket.resubscribeWhenRecorded(streams)
+      await expect(socket.waitForStreamsReady(streams)).resolves.toBe(true)
+
+      expect(transport.sent).toHaveLength(sentBefore)
+      expect(jest.getTimerCount()).toBe(timersBefore)
+    })
+
+    it('counts every stream a single ready frame acks', async () => {
+      const signal = socket.subscribe('stream-notify-user', ['uid/media-signal'])
+      await flushMicrotasks()
+      const signalId = lastSubId(transport)
+      const calls = socket.subscribe('stream-notify-user', ['uid/media-calls'])
+      await flushMicrotasks()
+      const callsId = lastSubId(transport)
+
+      transport.receive({ msg: 'ready', subs: [signalId, callsId] })
+
+      await expect(signal).resolves.toMatchObject({ id: signalId })
+      await expect(calls).resolves.toMatchObject({ id: callsId })
+      await expect(socket.waitForStreamsReady(streams, 0)).resolves.toBe(true)
+    })
+
+    it('waits until the last stream is acked, sending nothing itself', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal'])
+      const waiting = socket.waitForStreamsReady(streams)
       let resolved: boolean | undefined
       waiting.then((value) => { resolved = value })
 
       await jest.advanceTimersByTimeAsync(100)
       expect(resolved).toBeUndefined()
 
-      const callsId = await subscribe('stream-notify-user', ['uid/media-calls'])
+      await subscribe('stream-notify-user', ['uid/media-calls'])
       const sentBefore = transport.sent.length
       await jest.advanceTimersByTimeAsync(100)
 
-      expect(transport.sent.slice(sentBefore).map((frame) => JSON.parse(frame))).toEqual([
-        { msg: 'sub', id: signalId, name: 'stream-notify-user', params: ['uid/media-signal'] },
-        { msg: 'sub', id: callsId, name: 'stream-notify-user', params: ['uid/media-calls'] }
-      ])
-
-      expect(resolved).toBeUndefined()
-      transport.receive({ msg: 'ready', subs: [signalId] })
-      transport.receive({ msg: 'ready', subs: [callsId] })
-
       await expect(waiting).resolves.toBe(true)
+      expect(transport.sent).toHaveLength(sentBefore)
     })
 
     it('resolves false on its deadline, sending nothing, and clears both the deadline and the poll interval', async () => {
-      const waiting = socket.resubscribeWhenRecorded(streams, 500)
+      const waiting = socket.waitForStreamsReady(streams, 500)
       const timersBefore = jest.getTimerCount()
       const sentBefore = transport.sent.length
 
@@ -173,7 +191,7 @@ describe('Socket subscription bookkeeping', () => {
     })
 
     it('takes its deadline from the configured timeout when given none', async () => {
-      const waiting = socket.resubscribeWhenRecorded(streams)
+      const waiting = socket.waitForStreamsReady(streams)
       let resolved: boolean | undefined
       waiting.then((value) => { resolved = value })
 
@@ -184,25 +202,52 @@ describe('Socket subscription bookkeeping', () => {
       await expect(waiting).resolves.toBe(false)
     })
 
-    it('resolves true when a reopen abandons the resubscribes, since each one is recorded', async () => {
-      await subscribe('stream-notify-user', ['uid/media-signal'])
-      await subscribe('stream-notify-user', ['uid/media-calls'])
+    it('does not count an ack from a replaced Transport, only the resubscribe acked on the new one', async () => {
+      const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
+      const callsId = await subscribe('stream-notify-user', ['uid/media-calls'])
 
-      const waiting = socket.resubscribeWhenRecorded(streams)
+      const reopening = socket.reopenNow()
+      const reopened = fakeSockets[fakeSockets.length - 1]
+      await driveToHandshake(reopened)
+      await reopening
+
+      const waiting = socket.waitForStreamsReady(streams)
+      let resolved: boolean | undefined
+      waiting.then((value) => { resolved = value })
       await jest.advanceTimersByTimeAsync(100)
+      expect(resolved).toBeUndefined()
+      expect(subFrames(reopened.sent)).toHaveLength(0)
 
-      socket.reopenNow()
+      const resubscribing = socket.subscribeAll()
+      reopened.receive({ msg: 'ready', subs: [signalId] })
+      reopened.receive({ msg: 'ready', subs: [callsId] })
+      await resubscribing
+      await jest.advanceTimersByTimeAsync(100)
 
       await expect(waiting).resolves.toBe(true)
     })
 
-    it('resolves false when the server refuses one of the resubscribes', async () => {
-      const signalId = await subscribe('stream-notify-user', ['uid/media-signal'])
-      const callsId = await subscribe('stream-notify-user', ['uid/media-calls'])
+    it('does not count an entry kept from a sub the server never answered', async () => {
+      const subscribing = socket.subscribe('stream-notify-user', ['uid/media-signal'])
+      await subscribe('stream-notify-user', ['uid/media-calls'])
 
-      const waiting = socket.resubscribeWhenRecorded(streams)
-      transport.receive({ msg: 'ready', subs: [signalId] })
-      transport.receive({ msg: 'nosub', id: callsId })
+      await jest.advanceTimersByTimeAsync(socket.config.timeout)
+      await subscribing
+      expect(socket.findSubscriptions(streams[0])).toHaveLength(1)
+
+      const waiting = socket.waitForStreamsReady(streams, 500)
+      await jest.advanceTimersByTimeAsync(500)
+
+      await expect(waiting).resolves.toBe(false)
+    })
+
+    it('resolves false when the server refused one of the streams', async () => {
+      await subscribe('stream-notify-user', ['uid/media-signal'])
+      socket.subscribe('stream-notify-user', ['uid/media-calls'])
+      transport.receive({ msg: 'nosub', id: lastSubId(transport) })
+
+      const waiting = socket.waitForStreamsReady(streams, 500)
+      await jest.advanceTimersByTimeAsync(500)
 
       await expect(waiting).resolves.toBe(false)
     })
