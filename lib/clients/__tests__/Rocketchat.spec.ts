@@ -218,10 +218,11 @@ describe('client.url', () => {
 })
 
 describe('client.driver.config', () => {
-  it('carries config options the client does not recognise', () => {
+  it('carries runtime extension keys when callers bypass the constructor type', () => {
     const client = new RocketChatClient({
       host: 'localhost:3000',
       logger: createSilentLogger(),
+      // @ts-expect-error Runtime forwarding stays permissive for untyped callers.
       unknownOption: 'unknown-value'
     })
 

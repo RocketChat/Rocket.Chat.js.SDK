@@ -1,4 +1,5 @@
 import { Rocketchat } from '../index'
+import type { IRocketChatClientOptions } from '../index'
 import type { IDriver } from '../index'
 import type { ICallback, ILoginResult, IRealtimeCredentials, ISocketOptions, ISubscription } from '../interfaces'
 import type { EventEmitter } from 'tiny-events'
@@ -43,3 +44,15 @@ export type DriverContractAssertions = [
 declare const driver: IDriver
 
 void driver.login({ resume: 'token' })
+
+const rocketChatOptions: IRocketChatClientOptions = {
+  host: 'localhost:3000',
+  useSsl: true,
+  timeout: 5000,
+  config: { reopen: 10000 }
+}
+
+void new Rocketchat(rocketChatOptions)
+
+// @ts-expect-error Unknown constructor keys must not typecheck.
+void new Rocketchat({ host: 'localhost:3000', timout: 5000 })

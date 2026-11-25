@@ -1,12 +1,19 @@
 import type { IStream } from '../drivers/definitions'
 import { Driver } from '../drivers/driver'
 import ApiRocketChat from '../api/RocketChat'
+import type { IApiOptions } from '../api/api'
 import { ILoginResult, ICallback, ISubscription, ILoginCredentials } from '../../interfaces'
+import type { ISocketOptions } from '../../interfaces'
 import { logger as Logger } from '../log'
+
+export interface IRocketChatClientOptions extends IApiOptions, ISocketOptions {
+  config?: ISocketOptions
+}
+
 export default class RocketChatClient extends ApiRocketChat {
   driver: Driver
 
-  constructor ({ logger = Logger, ...config }: any) {
+  constructor ({ logger = Logger, ...config }: IRocketChatClientOptions) {
     super({ ...config, logger })
     this.driver = new Driver({ ...config, logger })
   }
