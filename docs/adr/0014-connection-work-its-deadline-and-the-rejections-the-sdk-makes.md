@@ -317,8 +317,11 @@ an Error the SDK writes.
 ## Consequences
 
 - A Socket built with `reopenAfterFailedOpen` keeps reopening a connection it
-  never established until its owner closes it. A client that wants one answer,
-  such as a probe, leaves the option off.
+  never established until a handshake succeeds or a close takes the Socket. A
+  close is not final (ADR-0015): an `open()` asked for after it, such as the one
+  a Login still in flight makes, starts that work again, so a consumer that
+  disconnects also cancels its own pending work. A client that wants one answer,
+  such as one built only to check a server, leaves the option off.
 - Two callers asking the same Socket to connect cost one Transport and share one
   answer. The ordinary `open()` race is gone, and with it the rejection that
   reported a close nobody requested.
