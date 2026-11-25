@@ -26,7 +26,8 @@ describe('new Socket', () => {
       useSsl: false,
       reopen: 10000,
       ping: 10000,
-      timeout: 10000
+      timeout: 10000,
+      reopenAfterFailedOpen: false
     })
   })
 })

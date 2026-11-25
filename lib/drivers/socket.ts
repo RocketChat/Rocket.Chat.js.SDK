@@ -120,7 +120,8 @@ export class Socket extends SDKEventEmitter {
       useSsl: options.useSsl || false,
       reopen: options.reopen || 10000,
       ping: options.ping || timeout,
-      timeout
+      timeout,
+      reopenAfterFailedOpen: options.reopenAfterFailedOpen === true
     }
     this.requests = new DDPRequests({
       emitter: this,
@@ -144,6 +145,7 @@ export class Socket extends SDKEventEmitter {
       getLogger: () => this.logger,
       reopenDelayMs: this.config.reopen,
       deadlineMs: this.config.timeout,
+      reopenAfterFailedOpen: this.config.reopenAfterFailedOpen,
       hasUsableTransport: () => this.connected,
       constructTransport: (attempt) => this.constructTransport(attempt),
       awaitTransportClose: (transport) => this.letTransportClose(transport),

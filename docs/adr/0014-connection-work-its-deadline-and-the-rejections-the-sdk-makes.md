@@ -106,7 +106,8 @@ attempt means waiting on that one attempt and constructing no second Transport.
   liveness reconnect.
 - An `open()` that consumed a Scheduled Reopen inherits its recovery intent, so
   a failure re-schedules rather than returning to Idle. Only an `open()` that
-  found nothing scheduled is one-shot.
+  found nothing scheduled, on a Socket built without `reopenAfterFailedOpen`, is
+  one-shot.
 - `reopenNow()` may replace an ordinary attempt once. Repeated `reopenNow()`
   calls share the forced attempt. A foreground resume and a VoIP call arriving
   together therefore cost one Transport, not two, and no sequence of forced
@@ -114,9 +115,9 @@ attempt means waiting on that one attempt and constructing no second Transport.
 - A failed attempt that carries recovery intent creates exactly one Scheduled
   Reopen. Unexpected loss of the established Transport, internal `reopen()` and
   public `reopenNow()` carry that intent. An `open()` that fails on its own
-  carries none and returns Connection work to Idle, so a consuming app that asks
-  the Driver to connect gets one answer rather than a background retry it did
-  not ask for.
+  carries none unless the Socket was built with `reopenAfterFailedOpen`, and
+  returns Connection work to Idle, so a consuming app that asks the Driver to
+  connect gets one answer rather than a background Reopen it did not ask for.
 - `checkAndReopen()` leaves the SDK. It made the decision the app is better
   placed to make, and made it without asking. The app composes the two public
   operations that already answer the question: `probe` says whether the

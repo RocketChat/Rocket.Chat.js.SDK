@@ -53,6 +53,7 @@ interface ConnectionOptions {
   getLogger: () => ILogger
   reopenDelayMs: number
   deadlineMs: number
+  reopenAfterFailedOpen: boolean
   hasUsableTransport: () => boolean
   constructTransport: (attempt: Attempt) => Transport
   awaitTransportClose: (transport: Transport) => Promise<void>
@@ -103,7 +104,7 @@ export class Connection {
 
     const recovery = this.cancelScheduledReopen()
     if (this.options.hasUsableTransport()) return Promise.resolve()
-    return this.start(false, recovery)
+    return this.start(false, recovery || this.options.reopenAfterFailedOpen)
   }
 
   reopen = () => {
