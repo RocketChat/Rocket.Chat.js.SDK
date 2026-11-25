@@ -115,9 +115,10 @@ attempt means waiting on that one attempt and constructing no second Transport.
 - A failed attempt that carries recovery intent creates exactly one Scheduled
   Reopen. Unexpected loss of the established Transport, internal `reopen()` and
   public `reopenNow()` carry that intent. An `open()` that fails on its own
-  carries none unless the Socket was built with `reopenAfterFailedOpen`, and
-  returns Connection work to Idle, so a consuming app that asks the Driver to
-  connect gets one answer rather than a background Reopen it did not ask for.
+  carries none and returns Connection work to Idle, so a consuming app that asks
+  the Driver to connect gets one answer rather than a background Reopen it did
+  not ask for. On a Socket built with `reopenAfterFailedOpen`, every `open()`
+  carries recovery intent, so its failure creates a Scheduled Reopen instead.
 - `checkAndReopen()` leaves the SDK. It made the decision the app is better
   placed to make, and made it without asking. The app composes the two public
   operations that already answer the question: `probe` says whether the
@@ -315,6 +316,9 @@ an Error the SDK writes.
 
 ## Consequences
 
+- A Socket built with `reopenAfterFailedOpen` keeps reopening a connection it
+  never established until its owner closes it. A client that wants one answer,
+  such as a probe, leaves the option off.
 - Two callers asking the same Socket to connect cost one Transport and share one
   answer. The ordinary `open()` race is gone, and with it the rejection that
   reported a close nobody requested.

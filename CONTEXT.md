@@ -151,7 +151,7 @@ The Connection work of a Socket that has neither a Scheduled Reopen nor an activ
 _Avoid_: Disconnected, quiet, inactive
 
 **Reopen**:
-The delayed retry after a connection is lost, or after an ordinary open fails on a Socket built with `reopenAfterFailedOpen`: waited out, then carried out as one Connection Attempt, unless the Transport is usable again by then, in which case it is retained and nothing is constructed. Distinct from the immediate replacement a caller forces through `reopenNow()`, which skips the wait.
+The delayed retry after a connection is lost, or after the Ordinary attempt an `open()` started fails on a Socket built with `reopenAfterFailedOpen`: waited out, then carried out as one Connection Attempt, unless the Transport is usable again by then, in which case it is retained and nothing is constructed. Distinct from the immediate replacement a caller forces through `reopenNow()`, which skips the wait.
 _Avoid_: Reconnect (unqualified — say which of the two), retry
 
 **Scheduled Reopen**:
