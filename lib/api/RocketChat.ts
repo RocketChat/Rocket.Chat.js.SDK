@@ -47,7 +47,9 @@ export default class ApiRocketChat extends ApiBase {
 	 * Usually prepared and called by sendMessageByRoomId or sendMessageByRoom.
 	 */
   async sendMessage (message: IMessage | string, rid: string): Promise<IMessageReceipt> { return (await this.post('chat.sendMessage', { message: this.prepareMessage(message, rid) })).message }
-  getRoomIdByNameOrId (name: string): Promise<RID> { return this.get('chat.getRoomIdByNameOrId', { name }) }
+  getRoomIdByNameOrId (name: string): Promise<{ _id: RID }> {
+    return this.get('chat.getRoomIdByNameOrId', { name })
+  }
   getRoomNameById (rid: RID): Promise<string> { return this.getRoomName(rid) }
   async getRoomName (rid: string): Promise<string> {
     const room = await this.get('chat.getRoomNameById', { rid })
@@ -84,12 +86,12 @@ export default class ApiRocketChat extends ApiBase {
   }
 
 	/** Get information about a public group */
-  async channelInfo (query: { roomName?: string, roomId?: string }) {
-    return (await this.get('channels.info', query)).channel as Promise<IChannelAPI>
+  async channelInfo (query: { roomName?: string, roomId?: string }): Promise<IChannelAPI> {
+    return (await this.get('channels.info', query)).channel
   }
 
 	/** Get information about a private group */
-  async privateInfo (query: { roomName?: string, roomId?: string }) {
-    return (await this.get('groups.info', query)).group as Promise<IGroupAPI>
+  async privateInfo (query: { roomName?: string, roomId?: string }): Promise<IGroupAPI> {
+    return (await this.get('groups.info', query)).group
   }
 }
