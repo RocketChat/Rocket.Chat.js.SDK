@@ -106,7 +106,8 @@ attempt means waiting on that one attempt and constructing no second Transport.
   liveness reconnect.
 - An `open()` that consumed a Scheduled Reopen inherits its recovery intent, so
   a failure re-schedules rather than returning to Idle. Only an `open()` that
-  found nothing scheduled is one-shot.
+  found nothing scheduled, on a Socket built without `reopenAfterFailedOpen`, is
+  one-shot.
 - `reopenNow()` may replace an ordinary attempt once. Repeated `reopenNow()`
   calls share the forced attempt. A foreground resume and a VoIP call arriving
   together therefore cost one Transport, not two, and no sequence of forced
@@ -115,8 +116,9 @@ attempt means waiting on that one attempt and constructing no second Transport.
   Reopen. Unexpected loss of the established Transport, internal `reopen()` and
   public `reopenNow()` carry that intent. An `open()` that fails on its own
   carries none and returns Connection work to Idle, so a consuming app that asks
-  the Driver to connect gets one answer rather than a background retry it did
-  not ask for.
+  the Driver to connect gets one answer rather than a background Reopen it did
+  not ask for. On a Socket built with `reopenAfterFailedOpen`, every `open()`
+  carries recovery intent, so its failure creates a Scheduled Reopen instead.
 - `checkAndReopen()` leaves the SDK. It made the decision the app is better
   placed to make, and made it without asking. The app composes the two public
   operations that already answer the question: `probe` says whether the
@@ -314,6 +316,10 @@ an Error the SDK writes.
 
 ## Consequences
 
+- A Socket built with `reopenAfterFailedOpen` keeps reopening a connection it
+  never established until a handshake succeeds or a close takes the Socket. A
+  client that wants one answer, such as one built only to check a server, leaves
+  the option off.
 - Two callers asking the same Socket to connect cost one Transport and share one
   answer. The ordinary `open()` race is gone, and with it the rejection that
   reported a close nobody requested.

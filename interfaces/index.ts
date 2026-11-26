@@ -26,6 +26,9 @@ export interface ILogger {
  *                    waits for its pong before the connection is reopened —
  *                    tightening it for liveness tightens that deadline too.
  *                    Defaults to `timeout`
+ * @param reopenAfterFailedOpen  When true, a `connect()` that fails
+ *                    schedules a Reopen, as a lost connection does, instead of
+ *                    leaving the Socket Idle. Defaults to false
  * @param integration Name added to message `bot` attribute to identify SDK use
  */
 export interface ISocketOptions {
@@ -34,6 +37,7 @@ export interface ISocketOptions {
   timeout?: number
   reopen?: number
   ping?: number
+  reopenAfterFailedOpen?: boolean
   integration?: string
 }
 
@@ -42,7 +46,7 @@ export interface ISocketOptions {
  * deadline read from it is a number. `integration` is left out because the
  * socket never reads it.
  */
-export type ISocketConfig = Required<Pick<ISocketOptions, 'host' | 'useSsl' | 'timeout' | 'reopen' | 'ping'>>
+export type ISocketConfig = Required<Pick<ISocketOptions, 'host' | 'useSsl' | 'timeout' | 'reopen' | 'ping' | 'reopenAfterFailedOpen'>>
 
 /** Function interface for DDP message handler callback */
 export interface ISocketMessageCallback {

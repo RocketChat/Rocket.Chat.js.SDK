@@ -323,6 +323,66 @@ describe('Socket open', () => {
     })
   })
 
+  describe('an ordinary open with reopenAfterFailedOpen', () => {
+    const failedOpen = async () => {
+      const retrying = createSocket({ logger, ...socketOptions, reopenAfterFailedOpen: true })
+      const socketsBefore = fakeSockets.length
+      const opening = retrying.open()
+      fakeSockets[socketsBefore].onerror?.(new Error('no route to host'))
+      await expect(opening).rejects.toThrow(TRANSPORT_FAILED)
+      expect(hasScheduledReopen(retrying)).toBe(true)
+      return { retrying, socketsBefore }
+    }
+
+    it('follows each failed Reopen with exactly one more until one connects', async () => {
+      const { retrying, socketsBefore } = await failedOpen()
+
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      expect(fakeSockets).toHaveLength(socketsBefore + 2)
+      fakeSockets[socketsBefore + 1].onerror?.(new Error('no route to host'))
+      expect(hasScheduledReopen(retrying)).toBe(true)
+
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY)
+      expect(fakeSockets).toHaveLength(socketsBefore + 3)
+      await driveToHandshake(fakeSockets[socketsBefore + 2])
+
+      expect(retrying.connected).toBe(true)
+      expect(connectionWork(retrying)).toBe('idle')
+    })
+
+    it('schedules a Reopen when the open runs out its deadline', async () => {
+      const retrying = createSocket({ logger, ...socketOptions, reopenAfterFailedOpen: true })
+      const opening = retrying.open()
+      const rejected = expect(opening).rejects.toThrow(ATTEMPT_DEADLINE)
+
+      await jest.advanceTimersByTimeAsync(TIMEOUT)
+      await rejected
+
+      expect(hasScheduledReopen(retrying)).toBe(true)
+    })
+
+    it('lets reopenNow replace the Reopen it scheduled immediately', async () => {
+      const { retrying, socketsBefore } = await failedOpen()
+
+      const forced = retrying.reopenNow()
+
+      expect(hasScheduledReopen(retrying)).toBe(false)
+      expect(fakeSockets).toHaveLength(socketsBefore + 2)
+      await driveToHandshake(fakeSockets[socketsBefore + 1])
+      await expect(forced).resolves.toBeUndefined()
+    })
+
+    it('leaves nothing scheduled once the Socket is closed', async () => {
+      const { retrying, socketsBefore } = await failedOpen()
+
+      await retrying.close()
+      await jest.advanceTimersByTimeAsync(REOPEN_DELAY * 2)
+
+      expect(connectionWork(retrying)).toBe('idle')
+      expect(fakeSockets).toHaveLength(socketsBefore + 1)
+    })
+  })
+
   describe('a transport that fails during the attempt', () => {
     it('rejects the attempt when the transport reports an error', async () => {
       transport.readyState = CLOSED
