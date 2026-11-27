@@ -37,7 +37,8 @@ export type DriverContractAssertions = [
   Expect<Equal<IDriver['removeAllListeners'], (event?: string) => Function[]>>,
   Expect<Equal<'checkAndReopen' extends keyof IDriver ? true : false, false>>,
   Expect<Equal<'checkAndReopen' extends keyof InstanceType<typeof Rocketchat> ? true : false, false>>,
-  Expect<Equal<'close' extends keyof ISocketOptions ? true : false, false>>
+  Expect<Equal<'close' extends keyof ISocketOptions ? true : false, false>>,
+  Expect<Equal<'integration' extends keyof ISocketOptions ? true : false, false>>
 ]
 
 declare const driver: IDriver
